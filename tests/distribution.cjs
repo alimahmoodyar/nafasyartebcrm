@@ -16,7 +16,8 @@ const sales=load('app/api/distribution/route.ts',imports);
 (async()=>{
  assert.equal((await sales.GET(new Request('https://test.local/api/distribution?device=x'))).status,401);
  identity=user('owner','owner@example.com');
- const createDevice=code=>records.POST(request('POST',{kind:'device',data:{code,model:'NF5',design:'R1',date:'2026-09-01'}}));
+ assert.equal((await records.POST(request('POST',{kind:'product',data:{code:'NF5',name:'Test product',group:'Oxygen',model:'NF5',warrantyMonths:'24',status:'فعال'}}))).status,201);
+ const createDevice=code=>records.POST(request('POST',{kind:'device',data:{code,product:'product:NF5',model:'NF5',design:'R1',date:'2026-09-01'}}));
  assert.equal((await createDevice('NF5-001')).status,201);assert.equal((await createDevice('NF5-002')).status,201);
  const first={serial:'nf5-001',dealerCode:'۰۰۱',dealerName:'نماینده نمونه',dealerDate:'2026-09-01'};
  const previewRows=rows=>sales.POST(request('POST',{mode:'preview',rows}));

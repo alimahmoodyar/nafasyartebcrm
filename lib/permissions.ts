@@ -1,6 +1,6 @@
 import type {Kind} from "./model";
 
-export const modules: Kind[] = ["batch", "device", "event", "service", "action", "distribution", "firmware"];
+export const modules: Kind[] = ["product", "batch", "device", "event", "service", "action", "distribution", "firmware"];
 const productionModules:Kind[]=["batch", "device", "event", "service", "action"];
 export const stages = ["مصرف قطعه", "مونتاژ", "آزمون نهایی", "بسته‌بندی", "تحویل"];
 export type Permissions = {read: Kind[]; write: Kind[]; eventStages: string[]};
@@ -9,7 +9,7 @@ export type Member = {id: string; email: string; name: string; unit: string; sta
 export const allPermissions: Permissions = {read: modules, write: modules, eventStages: stages};
 export const presets: Record<string, Permissions> = {
   "انبار": {read: ["batch"], write: ["batch"], eventStages: []},
-  "تولید": {read: ["batch", "device", "event"], write: ["device", "event"], eventStages: ["مصرف قطعه", "مونتاژ", "بسته‌بندی"]},
+  "تولید": {read: ["product", "batch", "device", "event"], write: ["device", "event"], eventStages: ["مصرف قطعه", "مونتاژ", "بسته‌بندی"]},
   "کنترل کیفیت": {read: productionModules, write: ["batch", "event", "action"], eventStages: ["آزمون نهایی"]},
   "فروش و تحویل": {read: ["batch", "device", "event", "distribution"], write: ["event", "distribution"], eventStages: ["تحویل"]},
   "خدمات پس از فروش": {read: [...productionModules,"distribution"], write: ["service", "action"], eventStages: []},

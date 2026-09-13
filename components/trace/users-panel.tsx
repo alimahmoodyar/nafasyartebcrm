@@ -29,6 +29,7 @@ export function UsersPanel({owner}: {owner: Session}) {
       if (operation === "read" && !enabled) next.write = next.write.filter(k => k !== kind);
       if (operation === "write" && enabled) {
         next.read = [...new Set([...next.read, kind, ...(["event", "service", "action", "distribution"].includes(kind) ? ["device", "batch"] as Kind[] : [])])];
+        if (kind === "device") next.read = [...new Set([...next.read, "product" as Kind])];
         if (kind === "event" && !next.eventStages.length) next.eventStages = [...stages];
       }
       if (!next.write.includes("event")) next.eventStages = [];
