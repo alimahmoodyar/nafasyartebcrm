@@ -1,7 +1,9 @@
+import {requireAccess, accessResponse} from "@/lib/authorization";
 import {storage} from "@/lib/storage";
 import {normalizePartCode, receiptDay, suggestBatchNumber} from "@/lib/batch-number";
 
 export async function GET(request: Request) {
+  try {await requireAccess("batch");} catch(error) {return accessResponse(error) || Response.json({error:"بررسی دسترسی ممکن نشد."},{status:503});}
   const params = new URL(request.url).searchParams;
   const part = params.get("partCode") || "", date = params.get("date") || "";
   try { normalizePartCode(part); receiptDay(date); }

@@ -8,6 +8,13 @@
       "when": 1789283506803,
       "tag": "0000_outgoing_spirit",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1789288891350,
+      "tag": "0001_conscious_nighthawk",
+      "breakpoints": true
     }
   ]
 }
