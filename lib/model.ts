@@ -1,11 +1,12 @@
 import {distributionFields} from "./distribution";
 import {validateBatchIdentity} from "./batch-number";
-export type Kind="batch"|"device"|"event"|"service"|"action"|"distribution";
+export type Kind="batch"|"device"|"event"|"service"|"action"|"distribution"|"firmware";
 export type Row={id:string;kind:Kind;created:string;data:Record<string,string>};
 export type Field={key:string;label:string;required?:boolean;type?:string;options?:string[];ref?:Kind};
-export const names:Record<Kind,string>={batch:"بچ قطعات",device:"دستگاه",event:"رویداد تولید و تحویل",service:"گزارش خدمات",action:"اقدام اصلاحی",distribution:"نماینده و مشتری"};
+export const names:Record<Kind,string>={batch:"بچ قطعات",device:"دستگاه",event:"رویداد تولید و تحویل",service:"گزارش خدمات",action:"اقدام اصلاحی",distribution:"نماینده و مشتری",firmware:"نسخه‌های نرم‌افزار"};
 export const fields:Record<Kind,Field[]>={
 distribution:distributionFields,
+firmware:[{key:"name",label:"نام نرم‌افزار",required:true},{key:"version",label:"شماره نسخه",required:true},{key:"deviceModel",label:"مدل دستگاه"},{key:"board",label:"نسخه / مدل برد"},{key:"notes",label:"توضیحات و تغییرات این نسخه",type:"textarea"}],
 batch:[{key:"partCode",label:"کد ثابت قطعه / کد انبار (برای پیشنهاد بچ)"},{key:"part",label:"نام و مدل قطعه / ماده",required:true},{key:"date",label:"تاریخ ورود (انتخاب میلادی؛ شماره بچ شمسی)",type:"date",required:true},{key:"code",label:"کد یکتای بچ",required:true},{key:"manufacturerLot",label:"شماره لات سازنده (عین برچسب؛ در صورت وجود)"},{key:"supplier",label:"تأمین‌کننده",required:true},{key:"maker",label:"سازنده"},{key:"purchase",label:"شماره خرید در همکاران سیستم"},{key:"quantity",label:"مقدار ورودی",type:"number",required:true},{key:"unit",label:"واحد",options:["عدد","کیلوگرم","متر","لیتر"],required:true},{key:"status",label:"کنترل ورودی",options:["در انتظار بررسی","تأیید","قرنطینه","رد"],required:true},{key:"test",label:"نتیجه آزمون ورودی",type:"textarea"}],
 device:[{key:"code",label:"سریال یکتای دستگاه",required:true},{key:"model",label:"مدل دستگاه",required:true},{key:"design",label:"نسخه طراحی",required:true},{key:"firmware",label:"نسخه نرم‌افزار"},{key:"date",label:"تاریخ شروع تولید",type:"date",required:true}],
 event:[{key:"device",label:"دستگاه",ref:"device",required:true},{key:"stage",label:"مرحله",options:["مصرف قطعه","مونتاژ","آزمون نهایی","بسته‌بندی","تحویل"],required:true},{key:"date",label:"تاریخ",type:"date",required:true},{key:"operator",label:"مسئول ثبت / اجرا",required:true},{key:"batch",label:"بچ قطعه (برای مصرف قطعه الزامی)",ref:"batch"},{key:"partSerial",label:"سریال قطعه (در صورت وجود)"},{key:"quantity",label:"مقدار مصرف",type:"number"},{key:"station",label:"ایستگاه / نسخه دستورالعمل"},{key:"result",label:"نتیجه آزمون",options:["تأیید","مردود","نیاز به دوباره‌کاری"]},{key:"purity",label:"خلوص اکسیژن (%)",type:"number"},{key:"flow",label:"دبی آزمون (L/min)",type:"number"},{key:"instrument",label:"شناسه ابزار اندازه‌گیری"},{key:"customer",label:"نماینده / مشتری (برای تحویل الزامی)"},{key:"notes",label:"جزئیات، اندازه‌گیری‌ها و توضیحات",type:"textarea"}],
@@ -23,6 +24,6 @@ export function validate(kind:Kind,d:Record<string,string>){
  if(kind==="action"&&d.status==="بسته‌شده"&&(!d.effectiveness?.trim()||!d.cause?.trim()))throw new Error("برای بستن اقدام، علت ریشه‌ای و شواهد اثربخشی لازم است.");
  if(kind==="service"&&d.replacement&&!d.batch)throw new Error("بچ قطعه خارج‌شده را مشخص کنید.");
 }
-export function label(r:Row){return r.data.code||r.data.title||r.data.complaint||r.data.stage||r.id;}
+export function label(r:Row){if(r.kind==="firmware")return r.data.name+" — "+r.data.version;return r.data.code||r.data.title||r.data.complaint||r.data.stage||r.id;}
 
 export const editable:Partial<Record<Kind,string[]>>={batch:["status","test"],service:["status","diagnosis","cause","notes","cost","operator"],action:["title","cause","plan","owner","due","status","effectiveness"]};

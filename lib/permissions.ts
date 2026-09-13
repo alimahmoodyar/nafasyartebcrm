@@ -1,6 +1,6 @@
 import type {Kind} from "./model";
 
-export const modules: Kind[] = ["batch", "device", "event", "service", "action", "distribution"];
+export const modules: Kind[] = ["batch", "device", "event", "service", "action", "distribution", "firmware"];
 const productionModules:Kind[]=["batch", "device", "event", "service", "action"];
 export const stages = ["مصرف قطعه", "مونتاژ", "آزمون نهایی", "بسته‌بندی", "تحویل"];
 export type Permissions = {read: Kind[]; write: Kind[]; eventStages: string[]};
@@ -15,6 +15,7 @@ export const presets: Record<string, Permissions> = {
   "خدمات پس از فروش": {read: [...productionModules,"distribution"], write: ["service", "action"], eventStages: []},
   "مدیریت — فقط مشاهده": {read: modules, write: [], eventStages: []},
   "سفارشی": {read: [], write: [], eventStages: []},
+  "مهندسی نرم‌افزار": {read: ["device", "firmware"], write: ["firmware"], eventStages: []},
 };
 export function validatePermissions(value: unknown): Permissions {
   const p = value as Permissions;

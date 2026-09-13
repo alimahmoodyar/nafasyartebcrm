@@ -15,6 +15,13 @@
       "when": 1789288891350,
       "tag": "0001_conscious_nighthawk",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789300400371,
+      "tag": "0002_previous_toad_men",
+      "breakpoints": true
     }
   ]
 }
