@@ -5,7 +5,7 @@ const sql=new DatabaseSync(':memory:');for(const file of fs.readdirSync(path.joi
 const db={prepare(query){let args=[];return{bind(...values){args=values;return this},async first(){return sql.prepare(query).get(...args)||null},async all(){return{results:sql.prepare(query).all(...args)}},async run(){return{meta:{changes:sql.prepare(query).run(...args).changes}}}}},async batch(statements){sql.exec('BEGIN');try{const results=[];for(const statement of statements)results.push(await statement.run());sql.exec('COMMIT');return results}catch(e){sql.exec('ROLLBACK');throw e}}};
 let identity=null;const env={TRACE_OWNER_EMAIL:'owner@example.com'};
 const permissions=load('lib/permissions.ts');for(const preset of Object.values(permissions.presets))permissions.validatePermissions(preset);
-const numbers=load('lib/batch-number.ts');const model=load('lib/model.ts',{'./batch-number':numbers});
+const numbers=load('lib/batch-number.ts');const distribution=load('lib/distribution.ts',{'./batch-number':numbers});const model=load('lib/model.ts',{'./batch-number':numbers,'./distribution':distribution});
 const auth=load('lib/authorization.ts',{'cloudflare:workers':{env},'@/app/chatgpt-auth':{getChatGPTUser:async()=>identity},'@/lib/storage':{storage:()=>db},'@/lib/permissions':permissions});
 const imports={'cloudflare:workers':{env},'@/lib/authorization':auth,'@/lib/storage':{storage:()=>db},'@/lib/permissions':permissions,'@/lib/batch-number':numbers,'@/lib/model':model};
 const users=load('app/api/users/route.ts',imports),records=load('app/api/records/route.ts',imports),suggestion=load('app/api/batch-suggestion/route.ts',imports);

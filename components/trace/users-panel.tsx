@@ -25,9 +25,10 @@ export function UsersPanel({owner}: {owner: Session}) {
     setPermissions(previous => {
       const next = {read: [...previous.read], write: [...previous.write], eventStages: [...previous.eventStages]};
       next[operation] = enabled ? [...new Set([...next[operation], kind])] : next[operation].filter(k => k !== kind);
+      if(operation==="read"&&enabled&&kind==="distribution")next.read=[...new Set([...next.read,"device" as Kind])];
       if (operation === "read" && !enabled) next.write = next.write.filter(k => k !== kind);
       if (operation === "write" && enabled) {
-        next.read = [...new Set([...next.read, kind, ...(["event", "service", "action"].includes(kind) ? ["device", "batch"] as Kind[] : [])])];
+        next.read = [...new Set([...next.read, kind, ...(["event", "service", "action", "distribution"].includes(kind) ? ["device", "batch"] as Kind[] : [])])];
         if (kind === "event" && !next.eventStages.length) next.eventStages = [...stages];
       }
       if (!next.write.includes("event")) next.eventStages = [];
