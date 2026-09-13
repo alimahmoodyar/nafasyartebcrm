@@ -3,14 +3,23 @@ import {requireAccess,checkOrigin,accessResponse,AccessError} from '@/lib/author
 import {normalizeDistribution,previewDistribution,normalizeSerial,distributionFields,type DistributionPreview} from '@/lib/distribution';
 import type {Row} from '@/lib/model';
 import type {Session} from '@/lib/permissions';
+import {firstWarrantyCodeIssuedAt} from '@/lib/warranty';
 const parse=(r:any):Row=>({id:r.id,kind:r.kind,created:r.created,data:JSON.parse(r.payload)});
 async function state(){const r=await storage().prepare("SELECT * FROM records WHERE kind IN ('device','distribution')").all();const rows=r.results.map(parse);return{devices:rows.filter(r=>r.kind==='device'),existing:rows.filter(r=>r.kind==='distribution')};}
 function fail(error:unknown){const denied=accessResponse(error);if(denied)return denied;const message=error instanceof Error?error.message:'';console.error('Distribution operation failed');return Response.json({error:/D1|SQLITE|Database/.test(message)?'ذخیره انجام نشد؛ پیش‌نمایش را دوباره بررسی کنید.':message||'درخواست معتبر نیست.'},{status:/D1|SQLITE|Database/.test(message)?503:400});}
-export async function GET(request:Request){try{await requireAccess('distribution');const device=new URL(request.url).searchParams.get('device');if(!device)throw new Error('دستگاه را انتخاب کنید.');const target='distribution:'+device;const audit=await storage().prepare("SELECT action, before, after, at FROM access_audit WHERE target = ? ORDER BY at DESC LIMIT 30").bind(target).all();return Response.json({history:audit.results.map((r:any)=>({...r,before:r.before?JSON.parse(r.before):null,after:JSON.parse(r.after)}))},{headers:{'Cache-Control':'no-store'}});}catch(e){return fail(e);}}
+export async function GET(request:Request){try{
+ await requireAccess('distribution');await requireAccess('device');
+ const params=new URL(request.url).searchParams,device=params.get('device');if(!device)throw new Error('دستگاه را انتخاب کنید.');
+ const warrantyActivatedAt=await firstWarrantyCodeIssuedAt(device);
+ if(params.get('view')==='warranty')return Response.json({warrantyActivatedAt},{headers:{'Cache-Control':'no-store'}});
+ const target='distribution:'+device;const audit=await storage().prepare("SELECT action, before, after, at FROM access_audit WHERE target = ? ORDER BY at DESC LIMIT 30").bind(target).all();
+ return Response.json({warrantyActivatedAt,history:audit.results.map((r:any)=>({...r,before:r.before?JSON.parse(r.before):null,after:JSON.parse(r.after)}))},{headers:{'Cache-Control':'no-store'}});
+ }catch(e){return fail(e);}}
 async function save(data:Record<string,string>,device:string,previous:string,actor:Session,source:string,reason:string){
  const db=storage(),id='distribution:'+device;const current=await db.prepare('SELECT * FROM records WHERE id=?').bind(id).first<any>();
  if((current?.payload||'')!==previous)throw new AccessError('اطلاعات این سریال تغییر کرده؛ پیش‌نمایش یا فرم را تازه کنید.',409);
- const now=new Date().toISOString();const next={...data,device,updatedAt:now,updatedBy:actor.name,source,reason};const row:Row={id,kind:'distribution',created:current?.created||now,data:next};
+ const legacyDelivery=current?JSON.parse(current.payload).deliveryDate:undefined;
+ const now=new Date().toISOString();const next={...data,...(typeof legacyDelivery==='string'?{deliveryDate:legacyDelivery}:{}),device,updatedAt:now,updatedBy:actor.name,source,reason};const row:Row={id,kind:'distribution',created:current?.created||now,data:next};
  try{if(current){const result=await db.batch([
  db.prepare('INSERT INTO access_audit(id,actor,target,action,before,after,at) SELECT ?,?,?,?,?,?,? FROM records WHERE id=? AND payload=?').bind(crypto.randomUUID(),actor.userId,id,'update_distribution',previous,JSON.stringify(next),now,id,previous),
  db.prepare('UPDATE records SET payload=? WHERE id=? AND payload=?').bind(JSON.stringify(next),id,previous)]);if(!result[1].meta.changes)throw new AccessError('رکورد هم‌زمان تغییر کرده؛ دوباره بررسی کنید.',409);

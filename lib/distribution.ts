@@ -11,7 +11,6 @@ export const distributionFields: Field[] = [
  {key:'customerNationalId',label:'کد ملی مشتری'},
  {key:'customerCity',label:'شهر مشتری'},
  {key:'customerAddress',label:'نشانی مشتری',type:'textarea'},
- {key:'deliveryDate',label:'تاریخ تحویل به مشتری',type:'date'},
  {key:'notes',label:'توضیحات',type:'textarea'},
 ];
 export const distributionKeys=distributionFields.map(f=>f.key);
@@ -25,9 +24,8 @@ export function normalizeDistribution(input:unknown):Record<string,string>{
  if(!result.serial||!result.dealerName)throw new Error('سریال دستگاه و نام نماینده الزامی‌اند.');
  if(result.customerNationalId&&!/^\d{10}$/.test(result.customerNationalId))throw new Error('کد ملی باید ۱۰ رقم باشد؛ صفرهای ابتدایی را از منبع اصلی وارد کنید.');
  if(result.customerMobile&&!/^(?:09\d{9}|\+989\d{9})$/.test(result.customerMobile))throw new Error('موبایل را به صورت 09xxxxxxxxx یا +989xxxxxxxxx وارد کنید.');
- for(const key of ['dealerDate','deliveryDate'])if(result[key]){const d=new Date(result[key]+'T12:00:00Z');if(!/^\d{4}-\d{2}-\d{2}$/.test(result[key])||!Number.isFinite(d.getTime())||d.toISOString().slice(0,10)!==result[key]||Number(result[key].slice(0,4))<1900||Number(result[key].slice(0,4))>2100)throw new Error('تاریخ باید میلادی و به صورت YYYY-MM-DD باشد.');}
- if(result.dealerDate&&result.deliveryDate&&result.deliveryDate<result.dealerDate)throw new Error('تاریخ تحویل مشتری نمی‌تواند قبل از فروش به نماینده باشد.');
- if(!result.customerName&&['customerMobile','customerNationalId','customerCity','customerAddress','deliveryDate'].some(k=>result[k]))throw new Error('برای ثبت مشخصات یا تحویل مشتری، نام مشتری را هم وارد کنید.');
+ for(const key of ['dealerDate'])if(result[key]){const d=new Date(result[key]+'T12:00:00Z');if(!/^\d{4}-\d{2}-\d{2}$/.test(result[key])||!Number.isFinite(d.getTime())||d.toISOString().slice(0,10)!==result[key]||Number(result[key].slice(0,4))<1900||Number(result[key].slice(0,4))>2100)throw new Error('تاریخ باید میلادی و به صورت YYYY-MM-DD باشد.');}
+ if(!result.customerName&&['customerMobile','customerNationalId','customerCity','customerAddress'].some(k=>result[k]))throw new Error('برای ثبت مشخصات مشتری، نام مشتری را هم وارد کنید.');
  return result;
 }
 export type DistributionPreview={row:number;data:Record<string,string>;status:'new'|'complete'|'same'|'conflict'|'invalid'|'unknown';message:string;device?:string;previous?:string;changes?:string[]};

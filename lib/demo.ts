@@ -1,7 +1,7 @@
 import type {Row,Kind} from "./model";
 const r=(id:string,kind:Kind,data:Record<string,string>):Row=>({id,kind,data,created:"2026-09-10T08:00:00Z"});
 export const demo:Row[]=[
-r("sale0","distribution",{serial:"NF5-2609-001",device:"d0",dealerName:"نماینده نمونه تهران",dealerCode:"001",dealerDate:"2026-09-08",customerName:"مصرف‌کننده نمونه",customerCity:"تهران",deliveryDate:"2026-09-09",source:"داده آموزشی"}),
+r("sale0","distribution",{serial:"NF5-2609-001",device:"d0",dealerName:"نماینده نمونه تهران",dealerCode:"001",dealerDate:"2026-09-08",customerName:"مصرف‌کننده نمونه",customerCity:"تهران",source:"داده آموزشی"}),
 r("b1","batch",{code:"CMP-2608-01",part:"کمپرسور ۵ لیتری",supplier:"تأمین‌کننده نمونه A",maker:"سازنده نمونه",date:"2026-08-01",quantity:"100",unit:"عدد",status:"تأیید",test:"فشار و دبی: مطابق معیار داخلی نمونه"}),
 r("b2","batch",{code:"ZEO-2608-02",part:"زئولیت LiLSX",supplier:"تأمین‌کننده نمونه B",date:"2026-08-02",quantity:"200",unit:"کیلوگرم",status:"تأیید"}),
 r("b3","batch",{code:"PCB-2609-01",part:"برد کنترل V2.1",supplier:"تأمین‌کننده نمونه C",date:"2026-09-01",quantity:"80",unit:"عدد",status:"قرنطینه",test:"نیاز به بررسی مجدد پایداری تغذیه"}),
