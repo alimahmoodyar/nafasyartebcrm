@@ -1,0 +1,65 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),ts=require('typescript');
+const {DatabaseSync}=require('node:sqlite');const root=path.resolve(__dirname,'..');
+function load(file,imports={}){const exports={};const source=ts.transpileModule(fs.readFileSync(path.join(root,file),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;vm.runInNewContext(source,{exports,require:name=>{if(!(name in imports))throw new Error('Missing import '+name);return imports[name]},Response,Request,URL,Error,crypto:globalThis.crypto,Date,Intl,Set,console:{error(){}}});return exports;}
+const sql=new DatabaseSync(':memory:');for(const file of fs.readdirSync(path.join(root,'drizzle')).filter(f=>f.endsWith('.sql')).sort())sql.exec(fs.readFileSync(path.join(root,'drizzle',file),'utf8'));
+const db={prepare(query){let args=[];return{bind(...values){args=values;return this},async first(){return sql.prepare(query).get(...args)||null},async all(){return{results:sql.prepare(query).all(...args)}},async run(){return{meta:{changes:sql.prepare(query).run(...args).changes}}}}},async batch(statements){sql.exec('BEGIN');try{const results=[];for(const statement of statements)results.push(await statement.run());sql.exec('COMMIT');return results}catch(e){sql.exec('ROLLBACK');throw e}}};
+let identity=null;const env={TRACE_OWNER_EMAIL:'owner@example.com'};
+const permissions=load('lib/permissions.ts');for(const preset of Object.values(permissions.presets))permissions.validatePermissions(preset);
+const numbers=load('lib/batch-number.ts');const distribution=load('lib/distribution.ts',{'./batch-number':numbers});const model=load('lib/model.ts',{'./batch-number':numbers,'./distribution':distribution});
+const auth=load('lib/authorization.ts',{'cloudflare:workers':{env},'@/app/chatgpt-auth':{getChatGPTUser:async()=>identity},'@/lib/storage':{storage:()=>db},'@/lib/permissions':permissions});
+const imports={'cloudflare:workers':{env},'@/lib/authorization':auth,'@/lib/storage':{storage:()=>db},'@/lib/permissions':permissions,'@/lib/batch-number':numbers,'@/lib/model':model};
+const users=load('app/api/users/route.ts',imports),records=load('app/api/records/route.ts',imports),suggestion=load('app/api/batch-suggestion/route.ts',imports);
+const request=(method,body,origin='https://test.local')=>new Request('https://test.local/api/records',{method,headers:{'Content-Type':'application/json',Origin:origin},body:JSON.stringify(body)});
+const user=(id,email)=>({userId:id,email,displayName:id});
+const serialUtils=load('lib/serials.ts',{'./batch-number':numbers});
+const serialApi=load('app/api/serials/route.ts',{...imports,'@/lib/serials':serialUtils});
+const printApi=load('app/api/serials/print/route.ts',imports);
+sql.exec('PRAGMA foreign_keys=ON');
+// Model D1's serialized atomic batches, while request reads may interleave.
+const atomicBatch=db.batch;let batchTail=Promise.resolve();db.batch=statements=>{const result=batchTail.then(()=>atomicBatch(statements));batchTail=result.catch(()=>{});return result;};
+const reserve=(productId,count=3,requestId=crypto.randomUUID())=>serialApi.POST(request('POST',{requestId,productId,count}));
+const detail=async id=>(await (await serialApi.GET(new Request('https://test.local/api/serials?id='+id))).json());
+(async()=>{
+ assert.equal(serialUtils.tehranDay(new Date('2026-09-13T20:29:59Z')),'2026-09-13');
+ assert.equal(serialUtils.tehranDay(new Date('2026-09-13T20:30:00Z')),'2026-09-14');
+ assert.equal(serialUtils.serialPrefix('NF5','2025-03-21'),'NF5-14040101-');
+ assert.equal((await reserve('x')).status,401);assert.equal((await printApi.GET(new Request('https://test.local/api/serials/print?id=x'))).status,401);
+ identity=user('owner-subject','owner@example.com');
+ const product={code:'NF5',name:'<img src=x onerror=alert(1)>',group:'Oxygen',model:'NF5',warrantyMonths:'24',status:'فعال'};
+ let response=await records.POST(request('POST',{kind:'product',data:product}));assert.equal(response.status,201);const p=(await response.json()).record;
+ response=await records.POST(request('POST',{kind:'product',data:{...product,code:'NF10'}}));const other=(await response.json()).record;
+ for(const count of [0,101,1.5,'2'])assert.equal((await reserve(p.id,count)).status,400);
+ assert.equal((await serialApi.POST(request('POST',{productId:p.id,count:1,requestId:crypto.randomUUID()},'https://evil.local'))).status,403);
+ const prefix=serialUtils.serialPrefix(p.data.code,serialUtils.tehranDay());
+ // Pre-existing manual serials participate in the sequence.
+ sql.prepare('INSERT INTO records(id,kind,payload,created) VALUES(?,?,?,?)').run('device:'+prefix+'0007','device',JSON.stringify({code:prefix+'0007',product:p.id}),'2026-09-01');
+ const key=crypto.randomUUID();response=await reserve(p.id,3,key);assert.equal(response.status,201);const run=(await response.json()).run;
+ let d=await detail(run.id);assert.equal(d.serials.length,3);assert.equal(d.serials[0].serial,prefix+'0008');assert.equal(d.serials[2].serial,prefix+'0010');assert.ok(d.serials.every(s=>s.deviceId===null));
+ response=await reserve(p.id,3,key);assert.equal(response.status,200);assert.equal((await response.json()).replayed,true);
+ assert.equal((await reserve(p.id,2,key)).status,409);
+ const concurrent=await Promise.all([reserve(p.id,2),reserve(p.id,2)]);assert.ok(concurrent.every(r=>r.status===201));
+ assert.equal(sql.prepare('SELECT count(*) n FROM serial_reservations').get().n,7);
+ assert.equal(sql.prepare('SELECT count(DISTINCT serial) n FROM serial_reservations').get().n,7);
+ assert.equal(sql.prepare("SELECT count(*) n FROM records WHERE kind='device'").get().n,1,'Reservations are not devices');
+ const device={code:d.serials[0].serial,product:other.id,design:'R1',date:'2026-09-13'};
+ assert.equal((await records.POST(request('POST',{kind:'device',data:device}))).status,409,'Wrong product rejected');
+ response=await records.POST(request('POST',{kind:'device',data:{...device,product:p.id}}));assert.equal(response.status,201);
+ d=await detail(run.id);assert.equal(d.serials[0].deviceId,'device:'+device.code);
+ const before=sql.prepare('SELECT count(*) n FROM serial_reservations').get().n;
+ response=await printApi.GET(new Request('https://test.local/api/serials/print?id='+run.id));assert.equal(response.status,200);let html=await response.text();assert.ok(html.includes('&lt;img'));assert.ok(!html.includes('<img src=x'));assert.ok(html.includes(device.code));assert.ok(html.includes('@page{size:A4'));assert.equal(response.headers.get('Cache-Control'),'no-store');
+ response=await printApi.GET(new Request('https://test.local/api/serials/print?id='+run.id+'&layout=thermal'));assert.ok((await response.text()).includes('size:60mm 30mm'));assert.equal(sql.prepare('SELECT count(*) n FROM serial_reservations').get().n,before,'Printing never allocates');
+ const dayList=await (await serialApi.GET(new Request('https://test.local/api/serials?day='+run.day))).json();assert.equal(dayList.runs.length,3);
+ // A catalog stop between read and transaction rolls the entire reservation back.
+ const originalBatch=db.batch;let fired=false;
+ db.batch=async statements=>{if(!fired){fired=true;sql.prepare('UPDATE records SET payload=? WHERE id=?').run(JSON.stringify({...p.data,status:'توقف تولید'}),p.id);}return originalBatch(statements)};
+ assert.equal((await reserve(p.id,2)).status,400);db.batch=originalBatch;
+ assert.equal(sql.prepare('SELECT count(*) n FROM serial_reservations').get().n,before);
+ assert.equal(sql.prepare('SELECT count(*) n FROM serial_runs').get().n,3);
+ assert.equal(sql.prepare("SELECT count(*) n FROM access_audit WHERE action='reserve_device_serials'").get().n,3);
+ assert.equal(sql.prepare("SELECT count(*) n FROM access_audit WHERE action='issue_warranty_code'").get().n,0);
+ await users.POST(request('POST',{email:'stock@example.com',name:'Stock',unit:'انبار',status:'active',permissions:permissions.presets['انبار']}));
+ await users.POST(request('POST',{email:'prod@example.com',name:'Prod',unit:'تولید',status:'active',permissions:permissions.presets['تولید']}));
+ identity=user('stock','stock@example.com');assert.equal((await reserve(other.id)).status,403);assert.equal((await serialApi.GET(new Request('https://test.local/api/serials'))).status,403);assert.equal((await printApi.GET(new Request('https://test.local/api/serials/print?id='+run.id))).status,403);
+ identity=user('prod','prod@example.com');assert.equal((await reserve(other.id)).status,201);assert.equal((await printApi.GET(new Request('https://test.local/api/serials/print?id='+run.id))).status,200);
+ console.log('Serial checks passed: Tehran midnight, Jalali year, limits, idempotency, concurrent allocation, legacy serial collisions, reserved product matching, pending passports, catalog race rollback, audit, no warranty activation, scoped access and escaped reprint output.');
+})().catch(e=>{console.error(e);process.exitCode=1});

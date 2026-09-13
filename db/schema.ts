@@ -14,3 +14,12 @@ export const firmwareFiles=sqliteTable("firmware_files",{
  uploadedAt:text("uploaded_at").notNull(),
  uploadedBy:text("uploaded_by").notNull(),
 });
+
+export const serialRuns=sqliteTable("serial_runs",{
+ id:text("id").primaryKey(),productId:text("product_id").notNull().references(()=>records.id),
+ actor:text("actor").notNull(),day:text("day").notNull(),payload:text("payload").notNull(),created:text("created").notNull(),
+},t=>[index("idx_serial_runs_day_created").on(t.day,t.created)]);
+export const serialReservations=sqliteTable("serial_reservations",{
+ serial:text("serial").primaryKey().notNull(),runId:text("run_id").notNull().references(()=>serialRuns.id),
+ productId:text("product_id").notNull().references(()=>records.id),
+},t=>[index("idx_serial_reservations_run").on(t.runId)]);
