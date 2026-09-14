@@ -1,0 +1,13 @@
+[Unit]
+Description=Nafasyar Trace
+After=network.target
+[Service]
+User=nafasyar
+WorkingDirectory=/opt/nafasyar/ready-to-run
+ExecStart=/usr/bin/dotnet /opt/nafasyar/ready-to-run/Nafasyar.Api.dll
+Environment=DATA_DIR=/var/lib/nafasyar
+Environment=PUBLIC_ORIGIN=https://trace.example.com
+Restart=on-failure
+UMask=0077
+[Install]
+WantedBy=multi-user.target

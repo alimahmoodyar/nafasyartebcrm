@@ -1,0 +1,7 @@
+2026-09-14
+.NET SDK 8.0.425; runtime 8.0.31; Linux
+Release build: succeeded, 0 warnings / 0 errors.
+Frontend Vite build: succeeded.
+Integration: 58 HTTP assertions passed against actual .NET backend, plus SQLite integrity and uniqueness.
+Published CLI: JSON import, integrity_check, foreign_key_check and backup passed.
+Not run: company server deployment, Windows/Docker, real printer and manual browser acceptance.

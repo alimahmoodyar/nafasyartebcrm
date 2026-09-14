@@ -1,0 +1,8 @@
+**/bin/
+**/obj/
+**/node_modules/
+**/App_Data/
+**/bootstrap-admin.json
+LOGIN.txt
+data/
+ready-to-run/

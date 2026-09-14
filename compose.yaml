@@ -1,0 +1,16 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      PUBLIC_ORIGIN: https://trace.example.com
+      TRACE_OWNER_EMAIL: dr.aliebrahimi1368@gmail.com
+      DATA_DIR: /data
+      Urls: http://0.0.0.0:8080
+    ports:
+      - "127.0.0.1:5080:8080"
+    volumes:
+      - nafasyar-data:/data
+      - ./data:/seed:ro
+volumes:
+  nafasyar-data:
