@@ -23,3 +23,10 @@ export const serialReservations=sqliteTable("serial_reservations",{
  serial:text("serial").primaryKey().notNull(),runId:text("run_id").notNull().references(()=>serialRuns.id),
  productId:text("product_id").notNull().references(()=>records.id),
 },t=>[index("idx_serial_reservations_run").on(t.runId)]);
+
+export const batchFiles=sqliteTable("batch_files",{
+ id:text("id").primaryKey(),batchId:text("batch_id").notNull().references(()=>records.id),
+ objectKey:text("object_key").notNull().unique(),filename:text("filename").notNull(),
+ byteSize:integer("byte_size").notNull(),sha256:text("sha256").notNull(),
+ uploadedAt:text("uploaded_at").notNull(),uploadedBy:text("uploaded_by").notNull(),
+},t=>[index("idx_batch_files_batch").on(t.batchId)]);

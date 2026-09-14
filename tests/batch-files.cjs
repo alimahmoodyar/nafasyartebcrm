@@ -1,0 +1,47 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),ts=require('typescript');
+const {DatabaseSync}=require('node:sqlite');const root=path.resolve(__dirname,'..');
+function load(file,imports={}){const exports={};const source=ts.transpileModule(fs.readFileSync(path.join(root,file),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;vm.runInNewContext(source,{exports,require:name=>{if(!(name in imports))throw new Error('Missing import '+name);return imports[name]},Response,Request,URL,Error,crypto:globalThis.crypto,Date,Intl,Set,FormData,TextEncoder,TextDecoder,Uint8Array,console:{error(){}}});return exports;}
+const sql=new DatabaseSync(':memory:');sql.exec('PRAGMA foreign_keys=ON');for(const file of fs.readdirSync(path.join(root,'drizzle')).filter(f=>f.endsWith('.sql')).sort())sql.exec(fs.readFileSync(path.join(root,'drizzle',file),'utf8'));sql.exec('PRAGMA optimize');
+let queue=Promise.resolve(),failNextBatch=false,throwAfterCommit=false;
+const db={prepare(query){let args=[];return{bind(...values){args=values;return this},async first(){return sql.prepare(query).get(...args)||null},async all(){return{results:sql.prepare(query).all(...args)}},async run(){return{meta:{changes:sql.prepare(query).run(...args).changes}}}}},batch(statements){const job=queue.then(async()=>{if(failNextBatch){failNextBatch=false;throw Error('D1 unavailable');}sql.exec('BEGIN');let results=[];try{for(const s of statements)results.push(await s.run());sql.exec('COMMIT');}catch(e){sql.exec('ROLLBACK');throw e;}if(throwAfterCommit){throwAfterCommit=false;throw Error('D1 response lost');}return results;});queue=job.catch(()=>{});return job;}};
+const objects=new Map();let failPut=false;
+const bucket={async put(key,buffer){if(failPut)throw Error('R2 unavailable');objects.set(key,buffer.slice(0));return{key}},async get(key){const buffer=objects.get(key);return buffer?{arrayBuffer:async()=>buffer.slice(0)}:null},async delete(key){objects.delete(key)}};
+let identity=null;const env={TRACE_OWNER_EMAIL:'owner@example.com',BUCKET:bucket};
+const permissions=load('lib/permissions.ts'),numbers=load('lib/batch-number.ts'),distribution=load('lib/distribution.ts',{'./batch-number':numbers});
+const model=load('lib/model.ts',{'./batch-number':numbers,'./distribution':distribution});
+const auth=load('lib/authorization.ts',{'cloudflare:workers':{env},'@/app/chatgpt-auth':{getChatGPTUser:async()=>identity},'@/lib/storage':{storage:()=>db},'@/lib/permissions':permissions});
+const firmware=load('lib/firmware.ts',{'./batch-number':numbers});
+const filesStorage=load('lib/firmware-storage.ts',{'cloudflare:workers':{env},'@/lib/storage':{storage:()=>db},'@/lib/authorization':auth});
+const imports={'cloudflare:workers':{env},'@/lib/authorization':auth,'@/lib/storage':{storage:()=>db},'@/lib/permissions':permissions,'@/lib/model':model,'@/lib/batch-number':numbers,'@/lib/firmware':firmware,'@/lib/firmware-storage':filesStorage};
+
+imports['@/lib/batch-files']=load('lib/batch-files.ts');
+const files=load('app/api/batch-files/route.ts',imports),users=load('app/api/users/route.ts',imports),records=load('app/api/records/route.ts',imports);
+const user=(userId,email)=>({userId,email,displayName:userId});
+const json=(body,method='POST')=>new Request('https://test.local/api/records',{method,headers:{Origin:'https://test.local','Content-Type':'application/json'},body:JSON.stringify(body)});
+const url=(batch='batch:B1',id='')=>'https://test.local/api/batch-files?batch='+encodeURIComponent(batch)+(id?'&id='+id:'');
+const upload=(id=crypto.randomUUID(),batch='batch:B1',text='<html>arbitrary document</html>',name='نقشه.html',origin='https://test.local')=>{const f=new FormData();f.set('file',new File([text],name));return new Request(url(batch)+'&requestId='+id,{method:'POST',headers:{Origin:origin},body:f});};
+(async()=>{
+ assert.equal((await files.GET(new Request(url()))).status,401);
+ identity=user('owner','owner@example.com');
+ const data={code:'B1',part:'قطعه',supplier:'تامین',date:'2026-09-14',quantity:'10',unit:'عدد',status:'تأیید',notes:'تغییر جنس نسبت به بچ قبلی\nنقشه جدید'};
+ let r=await records.POST(json({kind:'batch',data}));assert.equal(r.status,201);const b=(await r.json()).record;
+ r=await records.PATCH(json({id:b.id,data:{...b.data,notes:'شرح اصلاح‌شده'},previous:JSON.stringify(b.data)},'PATCH'));assert.equal(r.status,200);assert.equal((await r.json()).record.data.notes,'شرح اصلاح‌شده');
+ assert.equal((await files.POST(upload(crypto.randomUUID(),'batch:missing'))).status,404);
+ const id=crypto.randomUUID();assert.equal((await files.POST(upload(id,'batch:B1','data','a.pdf','https://evil.test'))).status,403);
+ assert.equal((await files.POST(upload(id,'batch:B1','','a.pdf'))).status,400);assert.equal(objects.size,0);
+ r=await files.POST(upload(id));assert.equal(r.status,201);assert.equal(objects.size,1);assert.equal((await files.POST(upload(id))).status,200);assert.equal(objects.size,1);
+ assert.equal((await files.POST(upload(id,'batch:B1','changed'))).status,409);
+ r=await files.GET(new Request(url('batch:B1',id)));assert.equal(r.status,200);assert.match(r.headers.get('content-disposition'),/^attachment;/);assert.equal(r.headers.get('content-type'),'application/octet-stream');assert.match(r.headers.get('content-security-policy'),/sandbox/);assert.equal(await r.text(),'<html>arbitrary document</html>');
+ const listing=await (await files.GET(new Request(url()))).json();assert.equal(listing.files.length,1);assert.ok(!JSON.stringify(listing).includes('object_key'));
+ assert.equal(sql.prepare("SELECT count(*) n FROM access_audit WHERE action='attach_batch_file'").get().n,1);
+ failNextBatch=true;assert.equal((await files.POST(upload())).status,503);assert.equal(objects.size,1);
+ throwAfterCommit=true;assert.equal((await files.POST(upload())).status,201);assert.equal(objects.size,2);
+ failPut=true;assert.equal((await files.POST(upload())).status,503);failPut=false;assert.equal(objects.size,2);
+ const meta=sql.prepare('SELECT * FROM batch_files WHERE id=?').get(id),original=objects.get(meta.object_key);objects.set(meta.object_key,new TextEncoder().encode('corrupted').buffer);assert.equal((await files.GET(new Request(url('batch:B1',id)))).status,503);objects.set(meta.object_key,original);
+ r=await users.POST(json({email:'reader@example.com',name:'Reader',unit:'QC',status:'active',permissions:{read:['batch'],write:[],eventStages:[]}}));assert.equal(r.status,201);
+ identity=user('reader','reader@example.com');assert.equal((await files.GET(new Request(url()))).status,200);assert.equal((await files.POST(upload())).status,403);
+ identity=user('owner','owner@example.com');await users.POST(json({email:'other@example.com',name:'Other',unit:'فروش',status:'active',permissions:{read:['product'],write:[],eventStages:[]}}));
+ identity=user('other','other@example.com');assert.equal((await files.GET(new Request(url()))).status,403);assert.equal((await files.GET(new Request(url('batch:B1',id)))).status,403);
+ assert.throws(()=>imports['@/lib/batch-files'].validateBatchFile('large.pdf',10*1024*1024+1));assert.throws(()=>imports['@/lib/batch-files'].validateBatchFile('../a.pdf',1));
+ assert.equal(sql.prepare('PRAGMA integrity_check').get().integrity_check,'ok');console.log('Batch attachments passed: notes update, download isolation, access checks, idempotent upload, rollback and lost-response recovery, integrity, size and filename checks.');
+})().catch(e=>{console.error(e);process.exitCode=1});
