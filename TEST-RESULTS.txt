@@ -1,7 +1,8 @@
-2026-09-14
-.NET SDK 8.0.425; runtime 8.0.31; Linux
-Release build: succeeded, 0 warnings / 0 errors.
-Frontend Vite build: succeeded.
-Integration: 58 HTTP assertions passed against actual .NET backend, plus SQLite integrity and uniqueness.
-Published CLI: JSON import, integrity_check, foreign_key_check and backup passed.
-Not run: company server deployment, Windows/Docker, real printer and manual browser acceptance.
+2026-09-14 | .NET SDK 8.0.425 / runtime 8.0.31 | Linux
+Release build: 0 errors, 0 warnings. Frontend Vite build passed.
+Existing integration suite: 58 HTTP assertions passed.
+New features suite: 42 HTTP assertions passed.
+Backup with attachment bytes and complete new-table import passed.
+Old-schema JSON import followed by new-schema upgrade: integrity OK, no FK errors.
+Published ready-to-run: admin / Nafasyar12345 login succeeded; first-login password change enforced.
+Not verified: company deployment, Windows/IIS/Docker, real printer or browser acceptance.

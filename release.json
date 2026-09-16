@@ -1,0 +1,13 @@
+{
+  "release": "dotnet8-v13",
+  "onlineVersion": 13,
+  "sourceCommit": "be1689ec8c147e6206f77ba1f64982ac08687a77",
+  "dataSnapshot": "2026-09-13T15:24:05.408Z",
+  "defaultLogin": "admin",
+  "newSchema": [
+    "batch_files",
+    "quality_templates",
+    "quality_reports",
+    "quality_files"
+  ]
+}
