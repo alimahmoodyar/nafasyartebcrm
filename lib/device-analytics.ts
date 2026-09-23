@@ -15,3 +15,18 @@ export function buckets(rows:DailyCount[],from:string,to:string,monthly:boolean)
  const row=result.get(key)||{date:key,label,count:0};row.count+=counts.get(iso)||0;result.set(key,row);
  }return [...result.values()];
 }
+
+export function solarParts(iso:string){
+ const parts=persian.formatToParts(new Date(iso+'T12:00:00Z'));
+ const get=(t:string)=>Number(parts.find(p=>p.type===t)?.value);
+ return {year:get('year'),month:get('month'),day:get('day')};
+}
+const solarYears=new Map<number,Map<string,string>>();
+function solarYear(year:number){
+ let dates=solarYears.get(year);if(dates)return dates;
+ dates=new Map();const start=new Date(Date.UTC(year+621,2,18,12));
+ for(let i=0;i<370;i++){const iso=start.toISOString().slice(0,10),p=solarParts(iso);if(p.year===year)dates.set(`${p.month}/${p.day}`,iso);start.setUTCDate(start.getUTCDate()+1);}
+ solarYears.set(year,dates);return dates;
+}
+export function solarToIso(year:number,month:number,day:number){return solarYear(year).get(`${month}/${day}`)||'';}
+export function solarMonthDays(year:number,month:number){for(let d=31;d>=28;d--)if(solarToIso(year,month,d))return d;return 0;}
