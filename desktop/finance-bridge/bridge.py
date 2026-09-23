@@ -1,11 +1,11 @@
-"""Nafasyar Windows Bridge 0.2.1. Derived from Hesabyar 0.1.0 discovery.
+"""Nafasyar Windows Bridge 0.2.2. Derived from Hesabyar 0.1.0 discovery.
 Read-only UI inspection. No clicks, focus changes, keystrokes or posting endpoints.
 """
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from datetime import datetime, timezone
 import base64, hashlib, hmac, io, itertools, json, os, secrets, sys, time
 
-VERSION='0.2.1'
+VERSION='0.2.2'
 ORIGIN='https://nafasyar-trace.dr-aliebrahimi1368.chatgpt.site'
 PORT=8765
 

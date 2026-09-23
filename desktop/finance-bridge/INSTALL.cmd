@@ -4,10 +4,13 @@ cd /d "%~dp0"
 set "NAFASYAR_INSTALL_LOG=%~dp0INSTALL-LOG.txt"
 set "NAFASYAR_PYTHON="
 set "NAFASYAR_SELECTOR="
-> "%NAFASYAR_INSTALL_LOG%" echo Nafasyar Bridge 0.2.1 installation diagnostics
+> "%NAFASYAR_INSTALL_LOG%" echo Nafasyar Bridge 0.2.2 installation diagnostics
 if errorlevel 1 goto log_failed
 if not exist "%~dp0check_python.py" goto incomplete
 if not exist "%~dp0install.py" goto incomplete
+if not exist "%~dp0startup_check.py" goto incomplete
+if not exist "%~dp0create_shortcuts.py" goto incomplete
+if not exist "%~dp0run_bridge.py" goto incomplete
 
 echo Looking for Python 3.11 or 3.12. Please wait...
 if not "%~1"=="" call :try_executable "%~1"
@@ -69,7 +72,8 @@ echo Compatible Python found. Installing Nafasyar Bridge...
 "%NAFASYAR_PYTHON%" %NAFASYAR_SELECTOR% "%~dp0install.py"
 if errorlevel 1 goto install_failed
 echo.
-echo Installation completed. Use Nafasyar Bridge on your Desktop.
+echo Installation completed and the program window was confirmed.
+ echo The application folder is also open; START.cmd runs the program.
 pause
 exit /b 0
 

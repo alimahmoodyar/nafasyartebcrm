@@ -2,7 +2,7 @@ import os, sys, threading, tkinter as tk, webbrowser
 from tkinter import messagebox
 from bridge import Session, BridgeServer, ORIGIN, VERSION
 
-def main():
+def main(on_ready=None):
     if sys.platform!='win32':raise SystemExit('Windows 10/11 is required.')
     root=tk.Tk();root.title('Nafasyar Windows Bridge '+VERSION);root.geometry('650x360');root.minsize(600,350)
     state={'server':None,'session':None};status=tk.StringVar(value='Stopped / قطع');token=tk.StringVar()
@@ -35,5 +35,15 @@ def main():
     buttons=tk.Frame(root);buttons.pack(pady=12)
     for label,fn in [('شروع اتصال',start),('کپی کد',copy),('بازکردن سامانه',lambda:webbrowser.open(ORIGIN)),('قطع اتصال',stop)]:tk.Button(buttons,text=label,command=fn,padx=10,pady=6).pack(side='right',padx=5)
     tk.Label(root,text='خواندن فقط با درخواست شما • بدون ثبت سند • بدون اجرای خودکار روزانه',font=('Segoe UI',10)).pack(pady=8)
+    def report_callback_error(kind,value,tb):
+        import traceback
+        traceback.print_exception(kind,value,tb)
+        messagebox.showerror('Nafasyar Bridge',str(value)+'\nSee START-LOG.txt in the application folder.')
+    root.report_callback_exception=report_callback_error
+    def visible():
+        if not root.winfo_viewable():root.after(100,visible);return
+        root.lift()
+        if on_ready:on_ready()
+    root.after(200,visible)
     root.protocol('WM_DELETE_WINDOW',lambda:(stop(),root.destroy()));root.mainloop()
 if __name__=='__main__':main()

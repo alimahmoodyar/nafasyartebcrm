@@ -1,7 +1,8 @@
 """Per-user installer with a local diagnostic log; never writes accounting data."""
-import os, pathlib, shutil, subprocess, sys, traceback, venv
+import os, pathlib, shutil, subprocess, sys, traceback, venv, uuid
 from check_python import check
-VERSION='0.2.1'
+from startup_check import wait_for_window
+VERSION='0.2.2'
 
 class Tee:
     def __init__(self, stream, log):self.stream=stream;self.log=log
@@ -25,7 +26,7 @@ def install(source):
     if code:raise RuntimeError(message)
     base=pathlib.Path(os.environ['LOCALAPPDATA'])/'NafasyarBridge'
     target=base/VERSION;target.mkdir(parents=True,exist_ok=True)
-    for name in ('bridge.py','launcher.py','requirements.txt','START.cmd','README-fa.html','release.json'):
+    for name in ('bridge.py','launcher.py','run_bridge.py','requirements.txt','START.cmd','README-fa.html','release.json'):
         if source/name!=target/name:shutil.copy2(source/name,target/name)
     print('Using Python: '+sys.executable)
     print('Creating isolated environment ...')
@@ -33,16 +34,27 @@ def install(source):
     python=target/'.venv'/'Scripts'/'python.exe'
     run_checked([str(python),'-m','pip','install','--disable-pip-version-check','--index-url','https://pypi.org/simple','-r',str(target/'requirements.txt')])
     run_checked([str(python),'-c','import psutil, pywinauto, PIL, tkinter; print("Dependencies OK")'])
-    shortcut_code='''import sys
-from win32com.client import Dispatch
-from pathlib import Path
-shell=Dispatch('WScript.Shell');target=Path(sys.argv[1]);folder=Path(shell.SpecialFolders('Desktop'))
-shortcut=shell.CreateShortcut(str(folder/'Nafasyar Bridge.lnk'))
-shortcut.TargetPath=str(target/'START.cmd');shortcut.WorkingDirectory=str(target);shortcut.Description='Nafasyar read-only Windows bridge';shortcut.Save()
-'''
-    run_checked([str(python),'-c',shortcut_code,str(target)])
-    print('Installed. Use Nafasyar Bridge on your Desktop. Keep this folder: '+str(target))
-    subprocess.Popen([str(python),str(target/'launcher.py')],cwd=str(target))
+    run_checked([str(python),str(source/'create_shortcuts.py'),str(target)])
+    print('Application folder: '+str(target))
+    try:os.startfile(str(target))
+    except OSError as exc:print('Could not open the application folder: '+str(exc))
+    ready=target/('startup-'+uuid.uuid4().hex+'.json')
+    startup_log=target/'START-LOG.txt'
+    with startup_log.open('a',encoding='utf-8') as output:
+        process=subprocess.Popen([str(python),str(target/'run_bridge.py'),'--ready-file',str(ready)],cwd=str(target),stdout=output,stderr=output)
+    try:
+        result=wait_for_window(process,ready)
+        print('Bridge window confirmed. Version '+result['version'])
+        print('Installation completed. Shortcuts were verified in Desktop and Start Menu.')
+        print('You can also run START.cmd in the application folder, or OPEN.cmd in the extracted package.')
+    except Exception:
+        print('Program startup failed. Diagnostic file: '+str(startup_log))
+        if startup_log.exists():print(startup_log.read_text(encoding='utf-8',errors='replace')[-12000:])
+        raise
+    finally:
+        for marker in (ready,ready.with_suffix('.tmp')):
+            try:marker.unlink(missing_ok=True)
+            except OSError:pass
 
 def main():
     source=pathlib.Path(__file__).resolve().parent
@@ -52,7 +64,11 @@ def main():
         try:install(source);return 0
         except Exception:
             traceback.print_exc()
-            print('Installation failed. Send INSTALL-LOG.txt for diagnosis.')
+            print('Installation did not finish successfully. Send INSTALL-LOG.txt for diagnosis.')
+            folder=pathlib.Path(os.environ.get('LOCALAPPDATA',''))/'NafasyarBridge'/VERSION
+            if sys.platform=='win32' and folder.is_dir():
+                try:os.startfile(str(folder))
+                except OSError:pass
             return 1
         finally:sys.stdout,sys.stderr=stdout,stderr
 

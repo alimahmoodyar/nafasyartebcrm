@@ -6,7 +6,7 @@ import {Checkbox} from "@/components/ui/checkbox";
 
 type WindowItem={id:string;title:string;exe:string};
 type Snapshot={version:string;capturedAt:string;title:string;exe:string;backend:string;controls:{name:string;automationId:string;type:string;className:string;text:string}[];image:string|null;truncated:boolean;skipped:number;scope:string;readOnly:boolean};
-const compatibleVersions=["0.2.0","0.2.1"];
+const compatibleVersions=["0.2.0","0.2.1","0.2.2"];
 export function FinanceBridge(){
  const [token,setToken]=useState(""),[connected,setConnected]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(""),[backend,setBackend]=useState("uia"),[windows,setWindows]=useState<WindowItem[]>([]),[selected,setSelected]=useState(""),[screenshot,setScreenshot]=useState(false),[snapshot,setSnapshot]=useState<Snapshot|null>(null);
  const request=useRef<AbortController|null>(null),generation=useRef(0);
@@ -19,14 +19,14 @@ export function FinanceBridge(){
   catch(e){if(generation.current===serial){setError(e instanceof TypeError||e instanceof DOMException?"ارتباط برقرار نشد یا زمان پاسخ تمام شد. رابط باید روی همین رایانه روشن باشد؛ کد اتصال و اجازه دسترسی محلی مرورگر را بررسی کنید.":e instanceof Error?e.message:"ارتباط برقرار نشد.");setConnected(false);setWindows([]);setSelected("");setSnapshot(null);}}
   finally{clearTimeout(timeout);if(generation.current===serial){setBusy(false);request.current=null;}}
  }
- function connect(){void call<{version:string;readOnly:boolean}>("/health",{},value=>{if(!compatibleVersions.includes(value.version)||value.readOnly!==true)throw new Error("نسخه رابط با سامانه هماهنگ نیست؛ بسته ۰٫۲٫۱ را نصب کنید.");setConnected(true);setSnapshot(null);});}
+ function connect(){void call<{version:string;readOnly:boolean}>("/health",{},value=>{if(!compatibleVersions.includes(value.version)||value.readOnly!==true)throw new Error("نسخه رابط با سامانه هماهنگ نیست؛ بسته ۰٫۲٫۲ را نصب کنید.");setConnected(true);setSnapshot(null);});}
  function list(){setSnapshot(null);setSelected("");setWindows([]);void call<{windows:WindowItem[]}>("/windows",{backend},value=>setWindows(value.windows));}
  function inspect(){setSnapshot(null);void call<Snapshot>("/inspect",{backend,id:selected,screenshot},setSnapshot);}
  function exportTechnical(){if(!snapshot)return;const report={bridgeVersion:snapshot.version,capturedAt:snapshot.capturedAt,backend:snapshot.backend,scope:snapshot.scope,truncated:snapshot.truncated,skipped:snapshot.skipped,controls:snapshot.controls.map(c=>({type:c.type,className:c.className}))};const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:"application/json"}));const a=document.createElement("a");a.href=url;a.download="nafasyar-bridge-technical.json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
  return <div style={{display:"grid",gap:20}}>
-  <section className="panel"><div className="panelhead"><div><h2><Monitor size={21} style={{display:"inline",marginLeft:8}}/>اتصال حسابداری</h2><p className="subtle">رابط ویندوز ۰٫۲٫۱ · فقط مشاهده · دسترسی مدیر</p></div></div><div className="inside" style={{display:"grid",gap:16}}>
+  <section className="panel"><div className="panelhead"><div><h2><Monitor size={21} style={{display:"inline",marginLeft:8}}/>اتصال حسابداری</h2><p className="subtle">رابط ویندوز ۰٫۲٫۲ · فقط مشاهده · دسترسی مدیر</p></div></div><div className="inside" style={{display:"grid",gap:16}}>
    <p>ابتدا رابط را روی رایانه ویندوزیِ دارای نرم‌افزار حسابداری نصب کنید. این صفحه را نیز در مرورگر همان رایانه باز کنید؛ اتصال از گوشی به رایانه انجام نمی‌شود.</p>
-   <div className="tools"><a className="btn primary" href="/downloads/nafasyar-windows-bridge-0.2.1.zip" download><Download size={17}/>دانلود بسته نصب ویندوز</a><a className="btn" href="/downloads/nafasyar-bridge-guide.html" target="_blank" rel="noreferrer">راهنمای نصب</a></div>
+   <div className="tools"><a className="btn primary" href="/downloads/nafasyar-windows-bridge-0.2.2.zip" download><Download size={17}/>دانلود بسته نصب ویندوز</a><a className="btn" href="/downloads/nafasyar-bridge-guide.html" target="_blank" rel="noreferrer">راهنمای نصب</a></div>
    <ol style={{listStyle:"decimal",paddingInlineStart:24,lineHeight:2}}><li>فایل ZIP را از حالت فشرده خارج کنید و INSTALL.cmd را اجرا کنید. نصب به Python 3.11 یا 3.12 و اینترنت نیاز دارد.</li><li>از میان‌بر Nafasyar Bridge روی دسکتاپ، «شروع اتصال» و سپس «کپی کد» را بزنید.</li><li>کد را اینجا وارد کنید و پنجره نرم‌افزار حسابداری را انتخاب کنید.</li></ol>
    <p className="notice">این نسخه برای بررسی امکان خواندن صفحه حسابداری است. گزارش کامل، بررسی اسناد، نتیجه‌گیری درباره عملکرد کارکنان و اجرای روزانه هنوز پیاده‌سازی نشده‌اند.</p>
    <div className="formgrid"><label className="field"><span>کد اتصال همین نشست</span><input type="password" dir="ltr" autoComplete="off" spellCheck={false} value={token} disabled={busy} onChange={e=>{reset();setToken(e.target.value)}} placeholder="کد را از رابط ویندوز کپی کنید"/></label><label className="field"><span>روش خواندن پنجره</span><Select dir="rtl" disabled={busy} value={backend} onValueChange={v=>{reset();setBackend(v)}}><SelectTrigger aria-label="روش خواندن پنجره"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="uia">استاندارد (UIA)</SelectItem><SelectItem value="win32">برنامه‌های قدیمی (Win32)</SelectItem></SelectContent></Select></label></div>

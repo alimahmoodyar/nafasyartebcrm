@@ -52,3 +52,7 @@ __pycache__/
 *.pyc
 
 INSTALL-LOG.txt
+
+START-LOG.txt
+startup-*.json
+startup-*.tmp
