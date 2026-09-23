@@ -7,6 +7,7 @@ echo Starting Nafasyar Bridge...
 echo If the window cannot open, details will be saved in START-LOG.txt.
 "%~dp0.venv\Scripts\python.exe" "%~dp0run_bridge.py"
 if errorlevel 1 goto failed
+if not errorlevel 0 goto failed
 exit /b 0
 :missing
 echo Installed files were not found. Run INSTALL.cmd from the extracted package.

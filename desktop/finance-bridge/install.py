@@ -1,8 +1,8 @@
 """Per-user installer with a local diagnostic log; never writes accounting data."""
-import os, pathlib, shutil, subprocess, sys, traceback, venv, uuid
+import os, pathlib, shutil, subprocess, sys, traceback, venv, uuid, argparse
 from check_python import check
 from startup_check import wait_for_window
-VERSION='0.2.2'
+VERSION='0.2.3'
 
 class Tee:
     def __init__(self, stream, log):self.stream=stream;self.log=log
@@ -45,7 +45,6 @@ def install(source):
     try:
         result=wait_for_window(process,ready)
         print('Bridge window confirmed. Version '+result['version'])
-        print('Installation completed. Shortcuts were verified in Desktop and Start Menu.')
         print('You can also run START.cmd in the application folder, or OPEN.cmd in the extracted package.')
     except Exception:
         print('Program startup failed. Diagnostic file: '+str(startup_log))
@@ -56,12 +55,17 @@ def install(source):
             try:marker.unlink(missing_ok=True)
             except OSError:pass
 
-def main():
+def main(receipt=None):
+    if receipt:pathlib.Path(receipt).unlink(missing_ok=True)
     source=pathlib.Path(__file__).resolve().parent
     stdout,stderr=sys.stdout,sys.stderr
     with (source/'INSTALL-LOG.txt').open('a',encoding='utf-8') as log:
         sys.stdout,sys.stderr=Tee(stdout,log),Tee(stderr,log)
-        try:install(source);return 0
+        try:
+            install(source)
+            if receipt:pathlib.Path(receipt).write_text('NAFASYAR_INSTALL_OK_V1\n',encoding='ascii')
+            print('Installation completed. Window and shortcuts were confirmed.')
+            return 0
         except Exception:
             traceback.print_exc()
             print('Installation did not finish successfully. Send INSTALL-LOG.txt for diagnosis.')
@@ -72,4 +76,6 @@ def main():
             return 1
         finally:sys.stdout,sys.stderr=stdout,stderr
 
-if __name__=='__main__':raise SystemExit(main())
+if __name__=='__main__':
+    parser=argparse.ArgumentParser();parser.add_argument('--receipt')
+    raise SystemExit(main(parser.parse_args().receipt))

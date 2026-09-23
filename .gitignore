@@ -56,3 +56,5 @@ INSTALL-LOG.txt
 START-LOG.txt
 startup-*.json
 startup-*.tmp
+
+*.receipt

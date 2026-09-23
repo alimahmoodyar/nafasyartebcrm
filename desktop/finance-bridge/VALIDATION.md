@@ -33,3 +33,12 @@ No financial data is preloaded. Automated navigation, complete report export, AI
 - Added desktop and Start Menu shortcuts targeting the venv Python executable directly, with saved-target/file validation. Opens the actual install folder and provides OPEN.cmd in the extracted package as an alternate launch path.
 - Added seven portable tests for startup confirmation: no marker/timeout, process exit with 0/nonzero, wrong process marker, valid confirmation, explicit startup error, and a real entrypoint exception with log output. All 21 Python protocol/runtime/startup tests pass. Python syntax and TypeScript checks pass.
 - No Windows session is available here. Actual Tk rendering, Windows shortcuts, registry, installation and accounting access remain unverified on the user's PC. These tests exercise control logic, not Windows GUI compatibility.
+
+## 0.2.3 missing-runtime / false-success correction — 2026-09-23
+
+- User screenshot explicitly reports: No runtime installed that matches 3.12, followed by incorrect batch success messages. It proves runtime selection failed, not that the Python installer or GUI executed.
+- The old batch checks used IF ERRORLEVEL 1, which only catches codes >= 1. Negative nonzero exit codes could fall through. The screenshot does not show the numeric exit code, so that exact local code has not been measured.
+- Both signs of nonzero exit code now stop the flow. Runtime selection additionally requires a fresh exact receipt written by check_python.py; installer completion requires a different fresh receipt written only after successful install and GUI checks. Removed the batch's independent unverified Installation completed message.
+- Added guidance for the manager's py install 3.12 command and version check.
+- Four new tests verify failure removes stale receipts, failed installation cannot issue confirmation, and confirmation follows success. All 25 portable Python tests pass; Python syntax and TypeScript checks pass.
+- Actual Windows CMD/manager execution is not tested here. User must first install runtime 3.12, then run this package. No claim of successful installation on the user's PC is made.
