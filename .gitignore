@@ -46,3 +46,7 @@ next-env.d.ts
 /work/
 
 *.tsbuildinfo
+
+# Python desktop bridge build output
+__pycache__/
+*.pyc

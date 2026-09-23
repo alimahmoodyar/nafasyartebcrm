@@ -1,0 +1,1 @@
+{"component":"nafasyar-windows-bridge","version":"0.2.0","basedOn":"hesabyar-bridge-0.1.0","upstreamSourceCommit":"d86ce55202b454d888e9b9379d8dcbe6ca277d8f","target":"Windows 10/11 with Python 3.11/3.12","mode":"read-only","automatedReports":false,"dailyScheduler":false,"posting":false}
