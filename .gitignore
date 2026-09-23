@@ -50,3 +50,5 @@ next-env.d.ts
 # Python desktop bridge build output
 __pycache__/
 *.pyc
+
+INSTALL-LOG.txt
