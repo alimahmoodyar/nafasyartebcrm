@@ -42,3 +42,14 @@ No financial data is preloaded. Automated navigation, complete report export, AI
 - Added guidance for the manager's py install 3.12 command and version check.
 - Four new tests verify failure removes stale receipts, failed installation cannot issue confirmation, and confirmation follows success. All 25 portable Python tests pass; Python syntax and TypeScript checks pass.
 - Actual Windows CMD/manager execution is not tested here. User must first install runtime 3.12, then run this package. No claim of successful installation on the user's PC is made.
+
+## 0.2.4 window discovery / diagnostics — 2026-09-23
+
+- User reports both UIA and Win32 cannot read/select a window. Root cause on their Windows computer is not established. The prior user screenshot confirms that a bridge GUI opened, not that accounting data was readable.
+- Confirmed code issue: discovery silently discarded every per-window exception, including failures to read optional executable paths. These failures are now counted by stage/type/numeric code; optional executable/name failures no longer remove otherwise identifiable windows. PID, process creation time and selected-window checks remain required.
+- Worker COM mode changed from STA to MTA, matching Microsoft UI Automation guidance: https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-threading . This is a compatibility correction, not proof of the user's failure cause.
+- Added independent bounded UIA and Win32 probes (18 seconds each); a hung probe does not prevent the next method. Reports exclude window titles, UI text, images, full paths, tokens and raw exception messages. No accounting action, typing or posting is added.
+- CHECK.cmd uses an existing installed bridge environment to run diagnostics from the extracted package without reinstalling anything; opens DIAGNOSTICS.json in Notepad. GUI also provides diagnostic and copy-report buttons.
+- Web page explicitly distinguishes a responding bridge, empty discovery, discovery errors and read/screenshot errors. Actual bridge version is shown; 0.2.0 through 0.2.4 remain compatible.
+- Seven new portable tests cover optional-path permission failures, required identity failures, error-vs-empty distinction, report privacy, screenshot failure, isolated timeout and failed-process output privacy. Total 32 Python tests pass; syntax and TypeScript checks pass.
+- No Windows host is available here. Native COM, the new CHECK.cmd, Notepad opening, GUI rendering and real accounting compatibility are NOT tested on Windows. The user's diagnostic report is the next acceptance evidence.

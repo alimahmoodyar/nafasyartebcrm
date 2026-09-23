@@ -2,7 +2,7 @@
 import os, pathlib, shutil, subprocess, sys, traceback, venv, uuid, argparse
 from check_python import check
 from startup_check import wait_for_window
-VERSION='0.2.3'
+VERSION='0.2.4'
 
 class Tee:
     def __init__(self, stream, log):self.stream=stream;self.log=log
@@ -26,7 +26,7 @@ def install(source):
     if code:raise RuntimeError(message)
     base=pathlib.Path(os.environ['LOCALAPPDATA'])/'NafasyarBridge'
     target=base/VERSION;target.mkdir(parents=True,exist_ok=True)
-    for name in ('bridge.py','launcher.py','run_bridge.py','requirements.txt','START.cmd','README-fa.html','release.json'):
+    for name in ('bridge.py','launcher.py','diagnose.py','run_bridge.py','requirements.txt','START.cmd','README-fa.html','release.json'):
         if source/name!=target/name:shutil.copy2(source/name,target/name)
     print('Using Python: '+sys.executable)
     print('Creating isolated environment ...')

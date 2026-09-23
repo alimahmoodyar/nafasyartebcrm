@@ -58,3 +58,5 @@ startup-*.json
 startup-*.tmp
 
 *.receipt
+
+DIAGNOSTICS.json

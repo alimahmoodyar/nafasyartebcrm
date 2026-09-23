@@ -1,13 +1,55 @@
-"""Nafasyar Windows Bridge 0.2.3. Derived from Hesabyar 0.1.0 discovery.
+"""Nafasyar Windows Bridge 0.2.4. Derived from Hesabyar 0.1.0 discovery.
 Read-only UI inspection. No clicks, focus changes, keystrokes or posting endpoints.
 """
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from datetime import datetime, timezone
 import base64, hashlib, hmac, io, itertools, json, os, secrets, sys, time
 
-VERSION='0.2.3'
+VERSION='0.2.4'
 ORIGIN='https://nafasyar-trace.dr-aliebrahimi1368.chatgpt.site'
 PORT=8765
+
+def record_error(errors,stage,exc):
+    # Do not include exception messages: they can contain local paths or UI text.
+    code=next((getattr(exc,key,None) for key in ('winerror','hresult','errno') if isinstance(getattr(exc,key,None),int)),None)
+    for item in errors:
+        if (item['stage'],item['type'],item['code'])==(stage,type(exc).__name__,code):
+            item['count']+=1;return
+    if len(errors)<12:errors.append({'stage':stage,'type':type(exc).__name__,'code':code,'count':1})
+
+def discover_windows(backend,selected):
+    selected.clear();result=[]
+    diag={'backend':backend,'status':'empty','seen':0,'accepted':0,'skipped':0,'unnamed':0,'errors':[],'limited':False}
+    stage='import'
+    try:
+        import psutil
+        from pywinauto import Desktop
+        stage='enumerate'
+        candidates=Desktop(backend=backend).windows(visible_only=True)
+        for w in candidates:
+            diag['seen']+=1;stage='window_identity'
+            try:
+                pid=w.process_id()
+                if pid==os.getpid():continue
+                title=w.window_text()
+                if not title:diag['unnamed']+=1;continue
+                proc=psutil.Process(pid);started=proc.create_time()
+                # A denied optional executable path must not hide the window.
+                exe=None;name='PID '+str(pid)
+                try:exe=proc.exe()
+                except Exception as exc:record_error(diag['errors'],'executable_path',exc)
+                try:name=proc.name()
+                except Exception as exc:record_error(diag['errors'],'process_name',exc)
+                key=secrets.token_urlsafe(16)
+                selected[key]={'handle':w.handle,'pid':pid,'started':started,'exe':exe,'backend':backend,'time':time.time()}
+                result.append({'id':key,'title':title[:240],'exe':name})
+                if len(result)>=100:diag['limited']=True;break
+            except Exception as exc:
+                diag['skipped']+=1;record_error(diag['errors'],stage,exc)
+    except Exception as exc:record_error(diag['errors'],stage,exc)
+    diag['accepted']=len(result)
+    diag['status']=('partial' if diag['errors'] else 'ok') if result else ('failed' if diag['errors'] else 'empty')
+    return {'windows':result,'diagnostics':diag}
 
 class Session:
     def __init__(self):
@@ -22,30 +64,20 @@ class Session:
         if not isinstance(body,dict): raise ValueError('Expected an object.')
         if path=='/health':return {'ok':True,'version':VERSION,'readOnly':True,'canPost':False,'capabilities':['windows','inspect']}
         if path not in ('/windows','/inspect'):raise ValueError('This version only supports reading windows. Operation denied.')
-        import psutil
-        from pywinauto import Desktop
         backend=body.get('backend','uia')
         if backend not in ('uia','win32'):raise ValueError('Unknown inspection mode.')
-        if path=='/windows':
-            self.windows.clear();result=[]
-            for w in Desktop(backend=backend).windows(visible_only=True):
-                try:
-                    pid=w.process_id();title=w.window_text()
-                    if not title or pid==os.getpid():continue
-                    proc=psutil.Process(pid);key=secrets.token_urlsafe(16)
-                    self.windows[key]={'handle':w.handle,'pid':pid,'started':proc.create_time(),'exe':proc.exe(),'backend':backend,'time':time.time()}
-                    result.append({'id':key,'title':title[:240],'exe':proc.name()})
-                    if len(result)>=100:break
-                except Exception:continue
-            return {'windows':result}
+        if path=='/windows':return discover_windows(backend,self.windows)
+        import psutil
+        from pywinauto import Desktop
         selected=self.windows.get(body.get('id'))
         if not selected or time.time()-selected['time']>600:raise ValueError('Select the window again. Window list expired.')
         if backend!=selected['backend']:raise ValueError('Inspection mode changed. Select the window again.')
         proc=psutil.Process(selected['pid'])
-        if proc.create_time()!=selected['started'] or proc.exe()!=selected['exe']:raise ValueError('Application changed. Select the window again.')
+        if proc.create_time()!=selected['started']:raise ValueError('Application changed. Select the window again.')
+        if selected['exe'] is not None and proc.exe()!=selected['exe']:raise ValueError('Application changed. Select the window again.')
         w=Desktop(backend=backend).window(handle=selected['handle']).wrapper_object()
         if w.process_id()!=selected['pid'] or not w.is_visible():raise ValueError('Window unavailable. Select it again.')
-        controls=[];skipped=0;seen=0
+        controls=[];skipped=0;seen=0;errors=[]
         # Limit traversal of the visible UI. This is NOT a complete accounting export.
         pending=[w];truncated=False
         while pending:
@@ -66,13 +98,13 @@ class Session:
                 children=control.children();capacity=max(0,601-seen-len(pending))
                 if len(children)>capacity:truncated=True
                 pending.extend(children[:capacity])
-            except Exception:skipped+=1
+            except Exception as exc:skipped+=1;record_error(errors,'read_control',exc)
         image=None
         if body.get('screenshot') is True:
             try:
                 pic=w.capture_as_image();pic.thumbnail((1600,1000));out=io.BytesIO();pic.save(out,format='PNG');image='data:image/png;base64,'+base64.b64encode(out.getvalue()).decode('ascii')
-            except Exception:pass
-        return {'version':VERSION,'capturedAt':datetime.now(timezone.utc).isoformat(),'title':w.window_text()[:240],'exe':proc.name(),'backend':backend,'controls':controls,'image':image,'truncated':truncated,'skipped':skipped,'scope':'visible-window-only','readOnly':True}
+            except Exception as exc:record_error(errors,'screenshot',exc)
+        return {'version':VERSION,'capturedAt':datetime.now(timezone.utc).isoformat(),'title':w.window_text()[:240],'backend':backend,'controls':controls,'image':image,'truncated':truncated,'skipped':skipped,'errors':errors,'scope':'visible-window-only','readOnly':True}
 
 class BridgeServer(HTTPServer):
     def __init__(self,session):

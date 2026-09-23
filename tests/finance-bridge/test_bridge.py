@@ -54,6 +54,44 @@ class BridgeTests(unittest.TestCase):
         self.window.nodes=[Control(str(i)) for i in range(1000)]
         result=self.session.dispatch('/inspect',{'id':self.select()})
         self.assertLessEqual(len(result['controls']),600);self.assertTrue(result['truncated'])
+    def test_optional_executable_access_does_not_hide_window(self):
+        proc=types.SimpleNamespace(create_time=lambda:100,exe=lambda:(_ for _ in ()).throw(PermissionError('PRIVATE PATH')),name=lambda:'Accounting.exe')
+        with patch.dict(sys.modules,{'psutil':types.SimpleNamespace(Process=lambda pid:proc)}):
+            result=self.session.dispatch('/windows',{})
+            self.assertEqual(len(result['windows']),1)
+            self.assertEqual(result['diagnostics']['errors'][0]['stage'],'executable_path')
+            self.assertNotIn('PRIVATE',json.dumps(result['diagnostics']))
+            read=self.session.dispatch('/inspect',{'id':result['windows'][0]['id']})
+            self.assertGreater(len(read['controls']),0)
+            proc.create_time=lambda:200
+            with self.assertRaises(ValueError):self.session.dispatch('/inspect',{'id':result['windows'][0]['id']})
+    def test_required_identity_failure_is_reported_and_not_selectable(self):
+        proc=types.SimpleNamespace(create_time=lambda:(_ for _ in ()).throw(PermissionError('SECRET')))
+        with patch.dict(sys.modules,{'psutil':types.SimpleNamespace(Process=lambda pid:proc)}):
+            result=self.session.dispatch('/windows',{})
+        self.assertEqual(result['windows'],[]);self.assertEqual(self.session.windows,{})
+        self.assertEqual(result['diagnostics']['skipped'],1)
+        self.assertEqual(result['diagnostics']['status'],'failed')
+        self.assertNotIn('SECRET',json.dumps(result))
+    def test_enumeration_failure_is_different_from_empty_desktop(self):
+        desktop=types.SimpleNamespace(windows=lambda **kw:(_ for _ in ()).throw(OSError(5,'PRIVATE')))
+        with patch.dict(sys.modules,{'pywinauto':types.SimpleNamespace(Desktop=lambda **kw:desktop)}):
+            result=self.session.dispatch('/windows',{})
+        self.assertEqual(result['diagnostics']['status'],'failed')
+        self.assertEqual(result['diagnostics']['errors'][0]['code'],5)
+        desktop.windows=lambda **kw:[]
+        with patch.dict(sys.modules,{'pywinauto':types.SimpleNamespace(Desktop=lambda **kw:desktop)}):
+            self.assertEqual(self.session.dispatch('/windows',{})['diagnostics']['status'],'empty')
+    def test_discovery_diagnostics_contain_no_window_titles(self):
+        self.window.element_info.name='PRIVATE customer invoice 123'
+        result=self.session.dispatch('/windows',{})
+        self.assertNotIn('PRIVATE',json.dumps(result['diagnostics']))
+        self.assertEqual(result['diagnostics']['accepted'],1)
+    def test_screenshot_failure_is_explicit(self):
+        self.window.capture_as_image=lambda:(_ for _ in ()).throw(OSError(5,'PRIVATE'))
+        result=self.session.dispatch('/inspect',{'id':self.select(),'screenshot':True})
+        self.assertIsNone(result['image']);self.assertEqual(result['errors'][0]['stage'],'screenshot')
+        self.assertNotIn('PRIVATE',json.dumps(result['errors']))
 class HttpTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

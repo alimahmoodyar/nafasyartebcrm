@@ -6,13 +6,14 @@ set "NAFASYAR_PYTHON="
 set "NAFASYAR_SELECTOR="
 set "NAFASYAR_PROBE=%~dp0runtime-%RANDOM%-%RANDOM%.receipt"
 set "NAFASYAR_COMPLETE=%~dp0install-%RANDOM%-%RANDOM%.receipt"
-> "%NAFASYAR_INSTALL_LOG%" echo Nafasyar Bridge 0.2.3 installation diagnostics
+> "%NAFASYAR_INSTALL_LOG%" echo Nafasyar Bridge 0.2.4 installation diagnostics
 if errorlevel 1 goto log_failed
 if not exist "%~dp0check_python.py" goto incomplete
 if not exist "%~dp0install.py" goto incomplete
 if not exist "%~dp0startup_check.py" goto incomplete
 if not exist "%~dp0create_shortcuts.py" goto incomplete
 if not exist "%~dp0run_bridge.py" goto incomplete
+if not exist "%~dp0diagnose.py" goto incomplete
 
 echo Looking for Python 3.11 or 3.12. Please wait...
 if not "%~1"=="" call :try_executable "%~1"
