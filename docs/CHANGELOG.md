@@ -62,3 +62,12 @@
 - سامانه: نمایش نسخه واقعی رابط، تفاوت پاسخ‌گویی رابط با خواندن حسابداری، پیام فهرست خالی و خطا و دانلود گزارش فنی.
 - آزمون: ۳۲ آزمون خودکار Python، بررسی نحوی و TypeScript موفق؛ اجرای واقعی Windows و خواندن حسابداری هنوز تأیید نشده است.
 - بدون تغییر دیتابیس، مجوز، داده مالی یا قابلیت ثبت سند؛ خروجی جدید دات‌نت تهیه نشده است.
+
+## 2026-09-24 — Financial control workspace
+- Added Finance > Financial control navigation, with 6 daily and 8 weekly report categories.
+- Jalali period selection; weekly records keyed to Saturday–Friday, independent history per period.
+- Persistent R2 report uploads (20 MiB each) with D1 metadata and authenticated download; checksum verification and audit trail.
+- Append-only review results, responsible-person questions, linked answers and recorded closure, plus period summary.
+- Reserved per-report instructions area explicitly awaiting supplied Sepidar manuals. No fabricated menu paths or automatic analysis.
+- Finance read/write permissions and Finance preset; existing accounts receive no new finance access by default.
+- Tests: finance route integration with SQLite/R2 harness, existing authorization regression, TypeScript compile. No financial content interpretation implemented.

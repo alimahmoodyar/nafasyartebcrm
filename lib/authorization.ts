@@ -40,3 +40,5 @@ export function checkOrigin(request: Request) {
 export function accessResponse(error: unknown): Response | null {
   return error instanceof AccessError ? Response.json({error: error.message}, {status: error.status, headers: {"Cache-Control": "no-store"}}) : null;
 }
+
+export async function requireFinance(write=false){const user=await session();if(!user.isAdmin&&!(write?user.permissions.finance==='write':['read','write'].includes(user.permissions.finance||'')))throw new AccessError('دسترسی کنترل مالی برای شما فعال نیست.',403);return user;}

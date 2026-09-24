@@ -3,11 +3,12 @@ import type {Kind} from "./model";
 export const modules: Kind[] = ["product", "batch", "device", "event", "service", "action", "distribution", "firmware"];
 const productionModules:Kind[]=["batch", "device", "event", "service", "action"];
 export const stages = ["مصرف قطعه", "مونتاژ", "آزمون نهایی", "بسته‌بندی", "تحویل"];
-export type Permissions = {read: Kind[]; write: Kind[]; eventStages: string[]};
+export type Permissions = {read: Kind[]; write: Kind[]; eventStages: string[]; finance?: "none"|"read"|"write"};
 export type Session = {userId: string; email: string; name: string; isAdmin: boolean; permissions: Permissions};
 export type Member = {id: string; email: string; name: string; unit: string; status: string; userId: string | null; permissions: Permissions; revision: number; created: string; updated: string};
-export const allPermissions: Permissions = {read: modules, write: modules, eventStages: stages};
+export const allPermissions: Permissions = {read: modules, write: modules, eventStages: stages, finance: "write"};
 export const presets: Record<string, Permissions> = {
+  "مالی": {read: [], write: [], eventStages: [], finance: "write"},
   "انبار": {read: ["batch"], write: ["batch"], eventStages: []},
   "تولید": {read: ["product", "batch", "device", "event"], write: ["device", "event"], eventStages: ["مصرف قطعه", "مونتاژ", "بسته‌بندی"]},
   "کنترل کیفیت": {read: productionModules, write: ["batch", "event", "action"], eventStages: ["آزمون نهایی"]},
@@ -26,5 +27,6 @@ export function validatePermissions(value: unknown): Permissions {
   if (p.write.includes("service") && (!p.read.includes("device") || !p.read.includes("batch"))) throw new Error("ثبت خدمات به مشاهده دستگاه و بچ نیاز دارد.");
   if (p.write.includes("action") && (!p.read.includes("device") || !p.read.includes("batch"))) throw new Error("ثبت اقدام اصلاحی به مشاهده دستگاه و بچ نیاز دارد.");
   if(p.read.includes("distribution")&&!p.read.includes("device"))throw new Error("مشاهده نماینده و مشتری به مشاهده دستگاه نیاز دارد.");
-  return {read: [...new Set(p.read)], write: [...new Set(p.write)], eventStages: p.write.includes("event") ? [...new Set(p.eventStages)] : []};
+  if(p.finance!==undefined&&!(["none","read","write"] as unknown[]).includes(p.finance))throw new Error("دسترسی مالی معتبر نیست.");
+  return {finance:p.finance||"none",read: [...new Set(p.read)], write: [...new Set(p.write)], eventStages: p.write.includes("event") ? [...new Set(p.eventStages)] : []};
 }

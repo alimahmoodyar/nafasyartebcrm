@@ -46,3 +46,11 @@ export const qualityFiles=sqliteTable("quality_files",{
  objectKey:text("object_key").notNull().unique(),filename:text("filename").notNull(),byteSize:integer("byte_size").notNull(),
  sha256:text("sha256").notNull(),uploadedAt:text("uploaded_at").notNull(),uploadedBy:text("uploaded_by").notNull(),
 },t=>[index("idx_quality_files_report").on(t.reportId)]);
+
+export const financeFiles=sqliteTable('finance_files',{
+ id:text('id').primaryKey(),cadence:text('cadence').notNull(),period:text('period').notNull(),reportId:text('report_id').notNull(),
+ objectKey:text('object_key').notNull().unique(),filename:text('filename').notNull(),byteSize:integer('byte_size').notNull(),sha256:text('sha256').notNull(),uploadedAt:text('uploaded_at').notNull(),uploadedBy:text('uploaded_by').notNull(),
+},t=>[index('idx_finance_files_period').on(t.cadence,t.period)]);
+export const financeNotes=sqliteTable('finance_notes',{
+ id:text('id').primaryKey(),cadence:text('cadence').notNull(),period:text('period').notNull(),reportId:text('report_id').notNull(),kind:text('kind').notNull(),body:text('body').notNull(),responsible:text('responsible').notNull(),parentId:text('parent_id'),created:text('created').notNull(),createdBy:text('created_by').notNull(),
+},t=>[index('idx_finance_notes_period').on(t.cadence,t.period)]);
