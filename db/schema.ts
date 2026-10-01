@@ -119,3 +119,13 @@ export const flowSlots=sqliteTable('flow_slots',{
 export const assistantActions=sqliteTable('assistant_actions',{
  id:text('id').primaryKey(),owner:text('owner').notNull(),turnId:text('turn_id').notNull().references(()=>assistantTurns.id),tool:text('tool').notNull(),args:text('args').notNull(),state:text('state').notNull(),result:text('result'),created:text('created').notNull(),expires:text('expires').notNull(),
 },t=>[index('idx_assistant_actions_owner').on(t.owner,t.created)]);
+
+export const dutyRuns=sqliteTable('duty_runs',{
+ id:text('id').primaryKey(),templateId:text('template_id').notNull(),period:text('period').notNull(),assignee:text('assignee').notNull().references(()=>appMembers.id),supervisor:text('supervisor'),due:text('due').notNull(),state:text('state').notNull(),data:text('data').notNull(),revision:integer('revision').notNull().default(1),created:text('created').notNull(),updated:text('updated').notNull(),
+},t=>[uniqueIndex('idx_duty_occurrence').on(t.templateId,t.period,t.assignee),index('idx_duty_assignee_state').on(t.assignee,t.state),index('idx_duty_supervisor').on(t.supervisor,t.state)]);
+export const dutyFiles=sqliteTable('duty_files',{
+ id:text('id').primaryKey(),taskId:text('task_id').notNull().references(()=>dutyRuns.id),objectKey:text('object_key').notNull(),filename:text('filename').notNull(),byteSize:integer('byte_size').notNull(),sha256:text('sha256').notNull(),uploadedBy:text('uploaded_by').notNull(),created:text('created').notNull(),
+},t=>[index('idx_duty_files_task').on(t.taskId)]);
+export const dutyNotices=sqliteTable('duty_notices',{
+ id:text('id').primaryKey(),taskId:text('task_id').notNull().references(()=>dutyRuns.id),recipient:text('recipient').notNull(),phase:text('phase').notNull(),message:text('message').notNull(),created:text('created').notNull(),readAt:text('read_at'),
+},t=>[uniqueIndex('idx_duty_notice_phase').on(t.taskId,t.recipient,t.phase),index('idx_duty_notice_recipient').on(t.recipient,t.readAt)]);

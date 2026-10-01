@@ -8,6 +8,7 @@ type Message={role:'user'|'assistant';text:string};
 export function AssistantChat({admin,onSettings,accountId,accountName,onAccountChanged,onNavigate,onMutation}:{admin:boolean;onSettings:()=>void;accountId:string;accountName:string;onAccountChanged:()=>void;onNavigate:(section:string)=>void;onMutation:()=>void}){
  const [open,setOpen]=useState(false),[messages,setMessages]=useState<Message[]>([]),[profiles,setProfiles]=useState<{id:string;name:string;model:string}[]>([]),[profile,setProfile]=useState(''),[input,setInput]=useState(''),[busy,setBusy]=useState(false),[loading,setLoading]=useState(false),[error,setError]=useState('');
  const [compact,setCompact]=useState(true),[showOptions,setShowOptions]=useState(false),[glass,setGlass]=useState(true);
+ const taskPrompt=useRef('');
  const [refreshTick,setRefreshTick]=useState(0);
  const [actions,setActions]=useState<AssistantAction[]>([]);
  const bottom=useRef<HTMLDivElement>(null),messageArea=useRef<HTMLDivElement>(null),editor=useRef<HTMLTextAreaElement>(null),launcher=useRef<HTMLButtonElement>(null),pending=useRef<{id:string;text:string}|null>(null);
@@ -41,6 +42,8 @@ export function AssistantChat({admin,onSettings,accountId,accountName,onAccountC
  },[open,accountId,refreshTick]);
  useEffect(()=>{if(open&&messageArea.current)messageArea.current.scrollTop=messageArea.current.scrollHeight},[messages,busy,open,compact]);
 
+ useEffect(()=>{const receive=(e:Event)=>{const text=(e as CustomEvent).detail?.text;if(typeof text!=='string')return;taskPrompt.current=text.slice(0,4000);setOpen(true);if(open&&!loading){setInput(taskPrompt.current);taskPrompt.current='';}};window.addEventListener('nafasyar-duty-prompt',receive);return()=>window.removeEventListener('nafasyar-duty-prompt',receive)},[open,loading,accountId]);
+ useEffect(()=>{if(open&&!loading&&taskPrompt.current){setInput(taskPrompt.current);taskPrompt.current=''}},[open,loading]);
  function close(){epoch.current++;setMessages([]);setActions([]);setInput('');pending.current=null;setBusy(false);setOpen(false);launcher.current?.focus();}
  async function send(){const question=input.trim();const normalized=question.replace(/[ي]/g,'ی').replace(/[أإآ]/g,'ا').replace(/[‌\s.!؟،]/g,'');const proposed=actions.filter(a=>a.state==='pending');if(proposed.length===1&&['تاییداجرا','تأییداجرا','لغوفرمان'].includes(normalized)){await decide(proposed[0].id,normalized==='لغوفرمان'?'cancel':'confirm');return;}if(!question||busy||!profile||loading)return;const generation=epoch.current;setBusy(true);setError('');if(pending.current?.text!==question)pending.current={id:crypto.randomUUID(),text:question};try{
  const r=await fetch('/api/assistant',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json','x-assistant-account':accountId},body:JSON.stringify({requestId:pending.current.id,profileId:profile,message:question})});const d=await r.json() as any;

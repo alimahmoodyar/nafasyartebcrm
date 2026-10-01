@@ -1,5 +1,6 @@
 declare namespace Cloudflare {
   interface Env {
+    TASK_SCHEDULER_TOKEN?: string;
     DB?: D1Database;
     LLM_CONFIG_ENCRYPTION_KEY?: string;
     TRACE_OWNER_EMAIL?: string;

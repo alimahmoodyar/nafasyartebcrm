@@ -1,6 +1,9 @@
 import * as assistantProfiles from '@/app/api/assistant/profiles/route';
 import * as llmTest from '@/app/api/llm-config/test/route';
 import * as assistantActions from '@/app/api/assistant/actions/route';
+import * as duties from '@/app/api/tasks/route';
+import * as dutyTick from '@/app/api/tasks/tick/route';
+import * as dutyFiles from '@/app/api/tasks/files/route';
 import * as fulfillment from '@/app/api/fulfillment/route';
 import * as flow from '@/app/api/flow/route';
 import * as assistant from "@/app/api/assistant/route";
@@ -99,7 +102,7 @@ api('save_llm_config','Create/update LLM settings. revision=0 for new UUID. API 
 api('delete_llm_config','Delete a saved LLM profile using its current revision.',payload({id,revision:integer(1,1e9)}),'/api/llm-config','DELETE',llm.DELETE,{admin:true},['id','revision']);
 
 // File transport: base64 upload, metadata lists, and bounded chunk downloads.
-const groups:{name:string;path:string;route:{GET:(r:Request)=>Promise<Response>;POST:(r:Request)=>Promise<Response>};keys:Record<string,Schema>;kind?:Kind;finance?:boolean}[]=[{name:'batch',path:'/api/batch-files',route:batchFiles,keys:{batch:id},kind:'batch' as Kind},{name:'quality',path:'/api/quality/files',route:qualityFiles,keys:{report:id}},{name:'finance',path:'/api/finance/files',route:financeFiles,keys:{...period,report:text('',80)},finance:true},{name:'firmware',path:'/api/firmware/files',route:firmwareFiles,keys:{version:id},kind:'firmware' as Kind}];
+const groups:{name:string;path:string;route:{GET:(r:Request)=>Promise<Response>;POST:(r:Request)=>Promise<Response>};keys:Record<string,Schema>;kind?:Kind;finance?:boolean}[]=[{name:'task',path:'/api/tasks/files',route:dutyFiles,keys:{task:id}},{name:'batch',path:'/api/batch-files',route:batchFiles,keys:{batch:id},kind:'batch' as Kind},{name:'quality',path:'/api/quality/files',route:qualityFiles,keys:{report:id}},{name:'finance',path:'/api/finance/files',route:financeFiles,keys:{...period,report:text('',80)},finance:true},{name:'firmware',path:'/api/firmware/files',route:firmwareFiles,keys:{version:id},kind:'firmware' as Kind}];
 for(const g of groups){
  const queryKeys=Object.keys(g.keys);
  if(g.name!=='firmware')api('list_'+g.name+'_files','List authorized attachment metadata.',obj(g.keys),g.path,'GET',g.route.GET,{kind:g.kind,finance:g.finance},queryKeys);
@@ -171,3 +174,13 @@ fulfillmentPost('reserve_finished_sale','Sales: reserve available same-model ser
 fulfillmentPost('cancel_finished_sale','Sales: cancel an unshipped reservation and free its serials, with reason.', 'cancel_sale',{saleId:id,reason:text()});
 fulfillmentPost('dispatch_finished_sale','Assigned finished warehouse officer: verify serials and physical handover to active logistics account. Swap only available same-model serials with reason. Moves finished to in_transit once, not customer delivery or warranty activation.', 'dispatch',{saleId:id,deviceIds:list(id,100),carrierId:id,handedOver:{type:'boolean',const:true},reason:text(),receiptReference:text('',300)});
 fulfillmentPost('acknowledge_transport_receipt','Only assigned logistics recipient (or admin) confirms custody of dispatched devices. Does not confirm destination delivery or warranty activation.', 'acknowledge',{saleId:id,notes:text()});
+
+api('get_task_inbox','Read own assigned/supervised duties and private notifications. Admin can manage position and recurring templates; assignment never grants financial/inventory permissions.',obj({}),'/api/tasks','GET',duties.GET);
+api('run_task_scheduler','Run due generation and in-app reminders with deduplication. No LLM calls. Server clock/Tehran calendar only. Rate limited to once per minute.',payload({}),'/api/tasks/tick','POST',dutyTick.POST,{admin:true});
+const dutyPost=(name:string,description:string,mode:string,properties:Record<string,Schema>,admin=false)=>api(name,description,payload({id,...properties}),'/api/tasks','POST',duties.POST,{admin},[],a=>({...a,mode}));
+dutyPost('save_position','Admin: define organizational position, active members and independent reviewer. Blank definitionId creates. Edits need revision. Existing task owners stay unchanged.', 'position',{definitionId:text('',200),revision:integer(0,1e9),name:text('',200),unit:text('',200),members:list(id,20),supervisor:text('Blank means administrators.',200),active:{type:'boolean'}},true);
+dutyPost('save_duty_template','Admin: recurring duty with explicit instructions, evidence and reviewer approval. Daily weekdays are JS 0 Sunday through 6 Saturday; monthly day is Persian/Jalali with clamp to final day. Start date Gregorian, time Tehran. Does not modify existing instances.', 'template',{definitionId:text('',200),revision:integer(0,1e9),positionId:id,title:text('',200),instructions:text('',12000),cadence:enumeration(['once','daily','weekly','monthly']),evidence:enumeration(['text','file']),startDate:text('',10),time:text('',5),weekdays:list(integer(0,6),7),weekday:integer(0,6),monthDay:integer(1,31),remindHours:integer(4,168),escalateHours:integer(1,720),sourceSection:enumeration(['','finance-control','fulfillment','flow','inventory','product']),active:{type:'boolean'}},true);
+for(const mode of ['answer','submit','blocked','request_extension','approve','return','cancel'])dutyPost('task_'+mode,'Duty '+mode+': owner responds; reviewer/admin approves or returns. Exact revision and note required. File-evidence submission requires uploaded file. No inventory or accounting mutation.',mode,{taskId:id,revision:integer(1,1e9),note:text('',12000)});
+dutyPost('task_extend','Reviewer/admin: grant new future deadline in Tehran with reason. Requesting an extension does not change deadline.','extend',{taskId:id,revision:integer(1,1e9),note:text('',12000),newDue:text('YYYY-MM-DDTHH:mm:00+03:30',40)});
+dutyPost('task_reassign','Admin explicitly transfers an existing duty; retains audit and evidence, resets response and requires fresh evidence.','reassign',{taskId:id,revision:integer(1,1e9),note:text('',12000),assignee:id},true);
+dutyPost('read_task_notice','Mark only own notification as read; does not complete task.','read_notice',{noticeId:id});

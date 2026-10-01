@@ -202,3 +202,5 @@ html,button,input,textarea,select,option,svg text{font-family:"Vazirmatn",sans-s
 .assistant-glass .assistant-action-card{background:rgba(245,250,248,.94)}
 .assistant-glass-setting{display:flex;align-items:center;gap:8px;padding:5px 12px;font-size:12px;flex-shrink:0;background:rgba(255,255,255,.65)}
 .assistant-glass-setting input{width:auto;min-height:0}
+
+.task-nudge{position:fixed;right:18px;bottom:22px;z-index:44;display:flex;align-items:center;gap:8px;padding:10px 14px;border:1px solid #d4dded;border-radius:24px;background:#fff;color:#344486;box-shadow:0 5px 20px #26316b22;font:inherit;font-size:14px;cursor:pointer}@media print{.task-nudge{display:none}}

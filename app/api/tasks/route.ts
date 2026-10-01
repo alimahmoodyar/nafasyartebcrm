@@ -1,0 +1,51 @@
+import {requireAccess,checkOrigin,accessResponse,AccessError} from '@/lib/authorization';
+import {storage} from '@/lib/storage';
+import {boundedBody} from '@/lib/firmware-storage';
+import {memberId,taskAccess,taskText as text,taskRequired as required,validDay,dayAt,notice} from '@/lib/duties';
+const json=(x:unknown)=>Response.json(x,{headers:{'Cache-Control':'private, no-store','Vary':'Cookie, Authorization'}});
+const fail=(m:string,s=400):never=>{throw new AccessError(m,s)};
+export async function GET(){try{const u=await requireAccess(),db=storage(),mid=await memberId(u);
+ const tasks=(await db.prepare("SELECT * FROM duty_runs WHERE ?=1 OR assignee=? OR supervisor=? ORDER BY CASE WHEN state IN ('completed','cancelled') THEN 1 ELSE 0 END,due,id LIMIT 300").bind(u.isAdmin?1:0,mid,mid).all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}));
+ const notifications=(await db.prepare('SELECT n.* FROM duty_notices n JOIN duty_runs t ON t.id=n.task_id WHERE (n.recipient=? OR (?=1 AND n.recipient=\'@admin\')) AND (?=1 OR t.assignee=? OR t.supervisor=?) ORDER BY n.created DESC LIMIT 100').bind(mid,u.isAdmin?1:0,u.isAdmin?1:0,mid,mid).all()).results;
+ const definitions=u.isAdmin?(await db.prepare("SELECT * FROM flow_entities WHERE type IN ('position','duty_template') ORDER BY created DESC").all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)})):[];
+ const members=u.isAdmin?(await db.prepare("SELECT id,name,unit,status FROM app_members ORDER BY name").all()).results:[];
+ const scheduler:any=u.isAdmin?await db.prepare("SELECT data FROM flow_entities WHERE id='duty_scheduler'").first():null;
+ return json({accountId:u.userId,memberId:mid,isAdmin:u.isAdmin,tasks,limited:tasks.length===300,notifications,definitions,members,scheduler:scheduler?JSON.parse(scheduler.data):null});
+ }catch(e){return accessResponse(e)||Response.json({error:'کارتابل در دسترس نیست؛ نصب مهاجرت 0013 را بررسی کنید.'},{status:503})}}
+export async function POST(request:Request){try{checkOrigin(request);const u=await requireAccess(),db=storage(),b=JSON.parse(new TextDecoder().decode(await boundedBody(request,80000))),mode=required(b.mode),id=required(b.id),now=new Date().toISOString();if(!/^[a-f0-9-]{36}$/i.test(id))fail('شناسه عملیات معتبر نیست.');const signature=JSON.stringify(b),oldOp:any=await db.prepare('SELECT payload,actor FROM inventory_operations WHERE id=?').bind(id).first();if(oldOp){if(oldOp.actor!==u.userId||oldOp.payload!==signature)fail('شناسه عملیات تکراری است.',409);return json({saved:true,repeated:true});}
+ const statements:D1PreparedStatement[]=[],checks:D1PreparedStatement[]=[];
+ const guard=(q:string,...a:any[])=>checks.push(db.prepare('UPDATE inventory_operations SET guard=CASE WHEN '+q+' THEN 1 ELSE 0 END WHERE id=?').bind(...a,id));
+ let target=id;
+ if(['position','template'].includes(mode)){
+ if(!u.isAdmin)fail('تعریف سمت و وظیفه فقط توسط مدیر مجاز است.',403);target=b.definitionId?required(b.definitionId):id;const type=mode==='position'?'position':'duty_template',old:any=await db.prepare('SELECT * FROM flow_entities WHERE id=? AND type=?').bind(target,type).first();if(b.definitionId&&!old)fail('تعریف پیدا نشد.',404);if(old){if(b.revision!==old.revision)fail('تعریف تغییر کرده است؛ تازه‌سازی کنید.',409);guard('EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)',old.id,old.revision);}let data:any;
+ if(mode==='position'){
+ if(!Array.isArray(b.members)||b.members.length>20||new Set(b.members).size!==b.members.length)fail('حداکثر ۲۰ مسئول غیرتکراری انتخاب کنید.');const supervisor=text(b.supervisor||'',200);for(const mid of [...b.members,...(supervisor?[supervisor]:[])]){if(!await db.prepare("SELECT id FROM app_members WHERE id=? AND status='active'").bind(mid).first())fail('کاربر فعال انتخاب کنید.');}if(supervisor&&b.members.includes(supervisor))fail('بررسی‌کننده باید با مسئول انجام کار متفاوت باشد.');data={name:required(b.name),unit:required(b.unit),members:b.members,supervisor,active:b.active===true};
+ }else{
+ const positionId=required(b.positionId);if(!await db.prepare("SELECT id FROM flow_entities WHERE id=? AND type='position'").bind(positionId).first())fail('سمت را انتخاب کنید.');if(!['once','daily','weekly','monthly'].includes(b.cadence)||!['text','file'].includes(b.evidence))fail('دوره یا مدرک لازم معتبر نیست.');const startDate=required(b.startDate),time=required(b.time);if(!validDay(startDate)||(!old&&startDate<dayAt())||!/^([01]\d|2[0-3]):[0-5]\d$/.test(time))fail('تاریخ شروع از امروز و ساعت معتبر تهران انتخاب کنید.');if(!Array.isArray(b.weekdays)||!b.weekdays.length||b.weekdays.some((x:any)=>!Number.isInteger(x)||x<0||x>6))fail('روزهای کاری معتبر انتخاب کنید.');for(const [key,min,max] of [['weekday',0,6],['monthDay',1,31],['remindHours',4,168],['escalateHours',1,720]] as [string,number,number][]){if(!Number.isInteger(b[key])||b[key]<min||b[key]>max)fail('مقادیر زمان‌بندی معتبر نیست.');}const sourceSection=text(b.sourceSection||'',60);if(!['','finance-control','fulfillment','flow','inventory','product'].includes(sourceSection))fail('بخش مرتبط معتبر نیست.');data={positionId,title:required(b.title),instructions:required(b.instructions,12000),cadence:b.cadence,evidence:b.evidence,startDate,time,weekdays:b.weekdays,weekday:b.weekday,monthDay:b.monthDay,remindHours:b.remindHours,escalateHours:b.escalateHours,sourceSection,active:b.active===true,...(old?{lastDay:JSON.parse(old.data).lastDay}: {})};
+ }
+ statements.push(old?db.prepare('UPDATE flow_entities SET data=?,revision=revision+1,updated=? WHERE id=? AND revision=?').bind(JSON.stringify(data),now,target,old.revision):db.prepare('INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?)').bind(target,type,JSON.stringify(data),now,now));
+ }else if(mode==='read_notice'){
+ target=required(b.noticeId);const mid=await memberId(u);const n:any=await db.prepare('SELECT * FROM duty_notices WHERE id=?').bind(target).first();if(!n||n.recipient!==mid&&!(u.isAdmin&&n.recipient==='@admin'))fail('اعلان پیدا نشد.',404);statements.push(db.prepare('UPDATE duty_notices SET read_at=? WHERE id=?').bind(now,target));
+ }else{
+ target=required(b.taskId);const t=await taskAccess(target,u),mid=await memberId(u);if(b.revision!==t.revision)fail('وظیفه تغییر کرده است؛ تازه‌سازی کنید.',409);guard('EXISTS(SELECT 1 FROM duty_runs WHERE id=? AND revision=?)',t.id,t.revision);let state=t.state,due=t.due,data={...t.data};const note=required(b.note,12000);if(['completed','cancelled'].includes(state))fail('وظیفه بسته شده است.');
+ if(['answer','submit','blocked','request_extension'].includes(mode)){
+ if(!u.isAdmin&&mid!==t.assignee)fail('فقط مسئول وظیفه می‌تواند پاسخ بدهد.',403);if(state==='submitted')fail('پاسخ در حال بررسی است.');
+ if(mode==='answer')data.answer=note;
+ if(mode==='blocked'){state='blocked';data.blockedReason=note;}
+ if(mode==='request_extension'){data.extensionRequested=note;statements.push(notice(t.id,t.supervisor||'@admin','extension:'+String(t.revision+1),'درخواست تمدید «'+data.title+'»',now));}
+ if(mode==='submit'){
+ if(data.evidence==='file'&&!await db.prepare('SELECT id FROM duty_files WHERE task_id=? AND created>? LIMIT 1').bind(t.id,data.evidenceAfter||'').first())fail('ابتدا فایل مدرک را بارگذاری کنید.');data.answer=note;state='submitted';statements.push(notice(t.id,t.supervisor||'@admin','review:'+String(t.revision+1),'پاسخ «'+data.title+'» آماده بررسی است.',now));}
+ }else if(['approve','return','extend','cancel','reassign'].includes(mode)){
+ if(!u.isAdmin&&mid!==t.supervisor)fail('مجوز بررسی این وظیفه را ندارید.',403);
+ if(mode==='approve'){if(state!=='submitted')fail('ابتدا مسئول باید پاسخ را برای بررسی ارسال کند.');if(!u.isAdmin&&mid===t.assignee)fail('تأیید پاسخ خود مجاز نیست.',403);state='completed';}
+ if(mode==='return'){if(state!=='submitted')fail('وظیفه در انتظار بررسی نیست.');state='open';}
+ if(mode==='cancel')state='cancelled';
+ if(mode==='extend'){const d=text(b.newDue,40);if(!validDay(d.slice(0,10))||!/^\d{4}-\d\d-\d\dT([01]\d|2[0-3]):[0-5]\d:00\+03:30$/.test(d)||!Number.isFinite(Date.parse(d))||Date.parse(d)<=Date.now())fail('مهلت جدید معتبر و در آینده وارد کنید.');due=new Date(d).toISOString();data.extensionRequested='';}
+ if(mode==='reassign'){if(!u.isAdmin)fail('انتقال مسئولیت فقط برای مدیر مجاز است.',403);const newAssignee=required(b.assignee);if(newAssignee===t.supervisor||!await db.prepare("SELECT id FROM app_members WHERE id=? AND status='active'").bind(newAssignee).first())fail('مسئول فعال و متفاوت با بررسی‌کننده انتخاب کنید.');statements.push(db.prepare('UPDATE duty_runs SET assignee=? WHERE id=?').bind(newAssignee,t.id));state='open';data.answer='';data.previousAssignee=t.assignee;data.evidenceAfter=now;}
+ statements.push(notice(t.id,mode==='reassign'?b.assignee:t.assignee,'decision:'+String(t.revision+1),'نتیجه پیگیری «'+data.title+'»: '+note,now));
+ }else fail('عملیات ناشناخته است.');
+ data.history=[...(data.history||[]),{mode,note,actor:u.userId,name:u.name,at:now,...(mode==='extend'?{oldDue:t.due,newDue:due}:{}),...(mode==='reassign'?{from:t.assignee,to:b.assignee}:{})}];
+ statements.push(db.prepare('UPDATE duty_runs SET state=?,due=?,data=?,revision=revision+1,updated=? WHERE id=? AND revision=?').bind(state,due,JSON.stringify(data),now,t.id,t.revision));
+ }
+ await db.batch([db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(id,'duty_'+mode,signature,u.userId,now),...checks,...statements,db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,target,'duty_'+mode,signature,now)]);return json({saved:true});
+ }catch(e){return accessResponse(e)||Response.json({error:'ثبت انجام نشد؛ احتمال تغییر هم‌زمان وجود دارد. تازه‌سازی کنید.'},{status:409})}}
