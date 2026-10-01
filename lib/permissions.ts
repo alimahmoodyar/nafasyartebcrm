@@ -4,8 +4,8 @@ export const modules: Kind[] = ["product", "batch", "device", "event", "service"
 const productionModules:Kind[]=["batch", "device", "event", "service", "action"];
 export const stages = ["مصرف قطعه", "مونتاژ", "آزمون نهایی", "بسته‌بندی", "تحویل"];
 export type Permissions = {read: Kind[]; write: Kind[]; eventStages: string[]; finance?: "none"|"read"|"write"};
-export type Session = {userId: string; email: string; name: string; isAdmin: boolean; permissions: Permissions};
-export type Member = {id: string; email: string; name: string; unit: string; status: string; userId: string | null; permissions: Permissions; revision: number; created: string; updated: string};
+export type Session = {username?:string;authType?:"password"|"chatgpt";userId: string; email: string; name: string; isAdmin: boolean; permissions: Permissions};
+export type Member = {username?:string;id: string; email: string; name: string; unit: string; status: string; userId: string | null; permissions: Permissions; revision: number; created: string; updated: string};
 export const allPermissions: Permissions = {read: modules, write: modules, eventStages: stages, finance: "write"};
 export const presets: Record<string, Permissions> = {
   "مالی": {read: [], write: [], eventStages: [], finance: "write"},

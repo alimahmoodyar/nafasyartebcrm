@@ -1,3 +1,4 @@
+import {localSession} from "@/lib/password-auth";
 import {mcpActor} from "@/lib/mcp/context";
 import {env} from "cloudflare:workers";
 import {getChatGPTUser} from "@/app/chatgpt-auth";
@@ -9,11 +10,13 @@ export class AccessError extends Error { constructor(message: string, public sta
 export async function session(): Promise<Session> {
   const actor = mcpActor.getStore();
   if (actor) return actor;
+  const local=await localSession();
+  if(local!==undefined){if(!local)throw new AccessError("نشست شما منقضی یا غیرفعال شده است؛ دوباره وارد شوید.",401);return local;}
   const identity = await getChatGPTUser();
   return resolveIdentity(identity);
 }
 export async function resolveIdentity(identity: Awaited<ReturnType<typeof getChatGPTUser>>): Promise<Session> {
-  if (!identity) throw new AccessError("برای ادامه با حساب ChatGPT وارد شوید.", 401);
+  if (!identity) throw new AccessError("با نام کاربری و رمز عبور یا حساب مجاز ChatGPT وارد شوید.", 401);
   const email = identity.email.trim().toLowerCase();
   const ownerEmail = env.TRACE_OWNER_EMAIL?.trim().toLowerCase();
   if (!ownerEmail) throw new AccessError("حساب مدیر سامانه هنوز پیکربندی نشده است.", 503);
@@ -25,7 +28,7 @@ export async function resolveIdentity(identity: Awaited<ReturnType<typeof getCha
     return {userId: identity.userId, email, name: identity.displayName, isAdmin: true, permissions: allPermissions};
   }
   const db = storage();
-  const member = await db.prepare("SELECT * FROM app_members WHERE email = ?").bind(email).first<{id: string; name: string; status: string; subject: string | null; permissions: string}>();
+  const member = await db.prepare("SELECT * FROM app_members WHERE email = ? AND NOT EXISTS(SELECT 1 FROM password_accounts WHERE member_id=app_members.id)").bind(email).first<{id: string; name: string; status: string; subject: string | null; permissions: string}>();
   if (!member || member.status !== "active") throw new AccessError("برای حساب شما دسترسی فعال تعریف نشده است؛ با مدیر سامانه هماهنگ کنید.", 403);
   if (!member.subject) await db.prepare("UPDATE app_members SET subject = ? WHERE id = ? AND subject IS NULL AND status = 'active'").bind(identity.userId, member.id).run();
   const current = await db.prepare("SELECT subject, status, permissions FROM app_members WHERE id = ?").bind(member.id).first<{subject: string; status: string; permissions: string}>();

@@ -94,3 +94,13 @@ export const productionMaterials=sqliteTable('production_materials',{
 export const productionReceipts=sqliteTable('production_receipts',{
  orderId:text('order_id').primaryKey().references(()=>productionOrders.id),operationId:text('operation_id').notNull().unique().references(()=>inventoryOperations.id),created:text('created').notNull(),
 });
+
+export const passwordAccounts=sqliteTable('password_accounts',{
+ memberId:text('member_id').primaryKey().references(()=>appMembers.id),username:text('username').notNull().unique(),passwordHash:text('password_hash').notNull(),version:integer('version').notNull().default(1),
+});
+export const passwordSessions=sqliteTable('password_sessions',{
+ hash:text('hash').primaryKey(),memberId:text('member_id').notNull().references(()=>appMembers.id),version:integer('version').notNull(),expires:text('expires').notNull(),created:text('created').notNull(),
+},t=>[index('idx_password_sessions_member').on(t.memberId)]);
+export const loginAttempts=sqliteTable('login_attempts',{
+ key:text('key').primaryKey(),count:integer('count').notNull(),reset:text('reset').notNull(),
+});
