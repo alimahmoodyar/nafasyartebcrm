@@ -49,5 +49,42 @@ function latest(id){const r=sql.prepare('SELECT * FROM duty_runs WHERE id=?').ge
  assert.equal(engine.scheduled({...template,cadence:'weekly',startDate:'2026-01-01',weekday:6},'2026-10-03'),true);
  env.TASK_SCHEDULER_TOKEN='test-scheduler-secret';assert.equal((await tick.POST(request('/api/tasks/tick','POST',{}, {authorization:'Bearer wrong'}))).status,401);
  token=(await mint('read')).token;assert.ok(!(await call('get_task_inbox')).error);assert.ok((await call('task_cancel',{id:crypto.randomUUID(),taskId:run,revision:latest(run).revision,note:'cancel',confirmed:true})).error);
+
+ // Starter installation: all requested positions, drafts, preservation and privacy.
+ const starter=load('lib/duty-starter.ts'),installer=load('lib/duty-starter-install.ts');
+ assert.equal(starter.dutyStarter.length,16);assert.equal(new Set(starter.dutyStarter.map(p=>p.name)).size,16);
+ assert.equal(starter.dutyStarter.flatMap(p=>p.tasks).length,64);
+ for(const p of starter.dutyStarter){assert.equal(p.tasks.filter(t=>t.cadence==='daily').length,2);assert.equal(p.tasks.filter(t=>t.cadence==='weekly').length,1);assert.equal(p.tasks.filter(t=>t.cadence==='monthly').length,1);for(const k of installer.positionProfileFields)assert.ok(p[k].length>5);for(const t of p.tasks)assert.ok(t.instructions.includes('معیار پذیرش'))}
+ const existingId=crypto.randomUUID();await op(admin,'position',{id:existingId,name:'خزانه‌دار',unit:'مالی ویژه',members:['w'],supervisor:'m',active:false,mission:'Existing custom mission'});
+ await op(worker,'install_starter',{},403);
+ const installed=await Promise.all([installer.installDutyStarter(admin),installer.installDutyStarter(admin)]);
+ assert.equal(installed.filter(r=>r.addedPositions===15&&r.addedTemplates===64).length,1);
+ const rows=sql.prepare("SELECT * FROM flow_entities WHERE type='position'").all();assert.equal(rows.length,17); // baseline test role + 16 requested
+ assert.equal(rows.filter(r=>installer.normalizePosition(JSON.parse(r.data).name)==='خزانهدار').length,1);
+ let preserved=JSON.parse(sql.prepare('SELECT data FROM flow_entities WHERE id=?').get(existingId).data);
+ assert.equal(preserved.mission,'Existing custom mission');assert.equal(preserved.unit,'مالی ویژه');assert.equal(preserved.members[0],'w');assert.equal(preserved.active,false);assert.ok(preserved.responsibilities);
+ let programs=sql.prepare("SELECT * FROM flow_entities WHERE id LIKE 'starter-duty:%'").all();assert.equal(programs.length,64);assert.ok(programs.every(r=>JSON.parse(r.data).active===false));
+ await engine.tickDuties(new Date(day+'T20:00:00Z'));assert.equal(sql.prepare("SELECT count(*) n FROM duty_runs WHERE template_id LIKE 'starter-duty:%'").get().n,0);
+ const seedId='starter-duty:treasurer:bank-cash',seed=programs.find(p=>p.id===seedId),seedData=JSON.parse(seed.data);
+ await op(admin,'template',{definitionId:seedId,revision:seed.revision,...seedData,instructions:'Edited instructions',startDate:engine.addDay(day,-5),active:false});
+ await installer.installDutyStarter(admin);assert.equal(JSON.parse(sql.prepare('SELECT data FROM flow_entities WHERE id=?').get(seedId).data).instructions,'Edited instructions');
+ let revision=sql.prepare('SELECT revision FROM flow_entities WHERE id=?').get(seedId).revision;
+ await op(admin,'template',{definitionId:seedId,revision,...seedData,startDate:engine.addDay(day,-5),active:true},400);
+ await op(admin,'template',{definitionId:seedId,revision,...seedData,startDate:day,active:true});
+ const storedPosition=sql.prepare('SELECT * FROM flow_entities WHERE id=?').get(existingId);
+ await op(admin,'position',{definitionId:existingId,revision:storedPosition.revision,...JSON.parse(storedPosition.data),active:true});
+ await engine.tickDuties(new Date(day+'T20:00:00Z'));const isWorkday=engine.scheduled(seedData,day);
+ assert.equal(sql.prepare("SELECT count(*) n FROM duty_runs WHERE template_id LIKE 'starter-duty:%'").get().n,isWorkday?1:0);
+ d=await (await as(worker,()=>tasks.GET())).json();assert.ok(d.ownPositions.some(p=>p.id===existingId&&p.mission==='Existing custom mission'));assert.equal(d.definitions.length,0);assert.ok(!JSON.stringify(d.ownPositions).includes('sales-manager'));
+ d=await (await as(outsider,()=>tasks.GET())).json();assert.equal(d.ownPositions.length,0);
+ const beforeRepeat=sql.prepare("SELECT count(*) n FROM flow_entities").get().n;await op(admin,'install_starter',{});assert.equal(sql.prepare("SELECT count(*) n FROM flow_entities").get().n,beforeRepeat);
+ token=(await mint('read_write')).token;
+ const current=sql.prepare('SELECT * FROM flow_entities WHERE id=?').get(existingId),currentData=JSON.parse(current.data);
+ const mcpSave=await call('save_position',{id:crypto.randomUUID(),definitionId:existingId,revision:current.revision,name:currentData.name,unit:currentData.unit,members:['w'],supervisor:'m',active:true,mission:'Updated through MCP',confirmed:true});assert.ok(!mcpSave.error,JSON.stringify(mcpSave));
+ preserved=JSON.parse(sql.prepare('SELECT data FROM flow_entities WHERE id=?').get(existingId).data);assert.equal(preserved.mission,'Updated through MCP');assert.equal(preserved.responsibilities,currentData.responsibilities);
+ assert.ok(!(await call('install_duty_starter',{id:crypto.randomUUID(),confirmed:true})).error);
+ const roleList=await call('get_position_programs',{positionId:''});assert.equal(roleList.positions.length,17);const roleDetail=await call('get_position_programs',{positionId:existingId});assert.equal(roleDetail.templates.length,4);assert.equal(roleDetail.position.data.mission,'Updated through MCP');assert.ok(JSON.stringify(roleDetail).length<16000);
+ assert.equal((await as(outsider,()=>tasks.GET(request('/api/tasks?view=positions&position='+existingId)))).status,404);const ownRole=await (await as(worker,()=>tasks.GET(request('/api/tasks?view=positions&position='+existingId)))).json();assert.equal(ownRole.templates.length,4);assert.equal(ownRole.position.data.members,undefined);
+ console.log('Starter passed: 16 positions / 64 drafts, concurrent install once, normalized existing names, preserve edits/assignees, no automatic duties, safe activation dates, private own profiles and MCP edit parity.');
  console.log('Duties passed: concurrent/deduplicated scheduling, Tehran/Persian dates, owner/supervisor isolation, private evidence, required uploads, stale revisions, review, blocked/extension, no self approval, idempotency, no reminders after completion, scheduler auth and MCP scopes.');
 })().catch(e=>{console.error(e);process.exit(1)});
