@@ -1,3 +1,4 @@
+import * as assistantActions from '@/app/api/assistant/actions/route';
 import * as flow from '@/app/api/flow/route';
 import * as assistant from "@/app/api/assistant/route";
 import * as production from "@/app/api/production/route";
@@ -102,6 +103,7 @@ for(const g of groups){
  add({name:'upload_'+g.name+'_file',description:'Upload one file as base64; original file validators and limits apply (HEX 10 MiB, other files 20 MiB). No remote URL fetching. Reuse requestId for retries where supported.',inputSchema:payload({...g.keys,...(g.name==='firmware'?{}:{requestId:id}),filename:text('',180),base64:text('Standard base64 file bytes, without data URL prefix.',28*1024*1024)}),write:true,kind:g.kind,finance:g.finance,run:async(a,o)=>{if(!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(a.base64))throw new AccessError('Invalid base64.',400);const decoded=atob(a.base64);if(decoded.length>20*1024*1024)throw new AccessError('File too large.',413);const bytes=Uint8Array.from(decoded,c=>c.charCodeAt(0)),form=new FormData();form.append('file',new Blob([bytes],{type:'application/octet-stream'}),a.filename);const u=new URL(g.path,o);for(const k of [...queryKeys,'requestId'])if(a[k])u.searchParams.set(k,a[k]);return result(await g.route.POST(new Request(u,{method:'POST',headers:{origin:o},body:form})));}});
  add({name:'download_'+g.name+'_file',description:'Read an attachment in base64 chunks (at most 64 KiB). Use nextOffset until null. Original permissions and integrity checks apply.',inputSchema:obj({...g.keys,...(g.name==='firmware'?{}:{id}),offset:integer(0,20*1024*1024),length:integer(1,65536)},[...queryKeys,...(g.name==='firmware'?[]:['id'])]),write:false,kind:g.kind,finance:g.finance,run:async(a,o)=>{const r=await g.route.GET(req(o,g.path,'GET',undefined,Object.fromEntries([...queryKeys,'id'].map(k=>[k,a[k]]))));if(!r.ok)return result(r);const bytes=new Uint8Array(await r.arrayBuffer()),offset=a.offset||0,end=Math.min(bytes.length,offset+(a.length||65536));if(offset>bytes.length)throw new AccessError('Offset exceeds file length.',400);return {base64:btoa(String.fromCharCode(...bytes.slice(offset,end))),offset,nextOffset:end<bytes.length?end:null,totalBytes:bytes.length,contentDisposition:r.headers.get('content-disposition')};}});
 }
+export function validateToolArguments(name:string,args:unknown){const t=tools.find(t=>t.name===name);return !!t&&argsValid(t.inputSchema,args);}
 export function discoverTools(){return tools.map(t=>({name:t.name,description:t.description,inputSchema:t.inputSchema,annotations:{readOnlyHint:!t.write,destructiveHint:t.write,idempotentHint:!t.write,openWorldHint:false}}));}
 export async function executeTool(name:string,args:unknown,origin:string,p:McpPrincipal){
  const t=tools.find(t=>t.name===name);if(!t)throw new AccessError('Unknown tool.',404);if(!argsValid(t.inputSchema,args))throw new AccessError('Arguments do not match the tool schema.',400);
@@ -126,7 +128,7 @@ api('create_password_user','Admin: create a local username/password account with
 api('update_password_user','Admin: update a local account or reset its password. Blank password preserves it; reset invalidates old sessions. Exact revision required.',payload({id,revision:integer(1,1e9),password:text('',128),name:text('',100),unit:text('',100),status:enumeration(['active','disabled']),permissions:perms}),'/api/users','PATCH',users.PATCH,{admin:true});
 
 api('get_assistant_chat','List available model names and the current user’s saved chat history. Provider secrets are never returned.',obj({}),'/api/assistant','GET',assistant.GET);
-api('ask_assistant','Send a message to the configured external model (may incur provider cost). The assistant may read authorized records but cannot mutate business data. Reuse requestId on retry.',obj({requestId:id,profileId:id,message:text('',4000)}),'/api/assistant','POST',assistant.POST,{write:false});
+api('ask_assistant','Send a message to the configured external model (may incur provider cost). The assistant reads authorized records, asks for missing fields and stages proposed changes; no changes execute until decide_assistant_action confirms the exact saved proposal. Reuse requestId on retry.',obj({requestId:id,profileId:id,message:text('',4000)}),'/api/assistant','POST',assistant.POST,{write:false});
 
 api('get_material_flow','Read authorized material master data, quarantine/QC tasks, locations, requests, daily serial plans, builds, repair history and replenishment alerts. Stock quantities are in thousandths.',obj({}),'/api/flow','GET',flow.GET);
 const flowPost=(name:string,description:string,mode:string,properties:Record<string,Schema>)=>api(name,description,payload({id,...properties}),'/api/flow','POST',flow.POST,{},[],a=>({...a,mode}));
@@ -148,3 +150,5 @@ flowPost('record_serial_print','Record serial print/reprint intent for daily pla
 
 // Optional additions preserve compatibility with earlier clients.
 const qcTool=tools.find(t=>t.name==='record_quality_report')!;qcTool.inputSchema.required=qcTool.inputSchema.required.filter((k:string)=>k!=='cause');
+
+api('decide_assistant_action','Confirm or cancel an immutable proposed assistant action owned by this account. Read its exact args in get_assistant_chat first. Confirm only after explicit user approval. Repeated confirmation never executes twice.',obj({id,decision:enumeration(['confirm','cancel']),confirmed},['id','decision','confirmed']),'/api/assistant/actions','POST',assistantActions.POST,{},[],a=>a);
