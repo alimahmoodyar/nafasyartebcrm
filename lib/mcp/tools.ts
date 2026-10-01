@@ -1,3 +1,4 @@
+import * as assistantProfiles from '@/app/api/assistant/profiles/route';
 import * as llmTest from '@/app/api/llm-config/test/route';
 import * as assistantActions from '@/app/api/assistant/actions/route';
 import * as flow from '@/app/api/flow/route';
@@ -155,3 +156,5 @@ const qcTool=tools.find(t=>t.name==='record_quality_report')!;qcTool.inputSchema
 api('decide_assistant_action','Confirm or cancel an immutable proposed assistant action owned by this account. Read its exact args in get_assistant_chat first. Confirm only after explicit user approval. Repeated confirmation never executes twice.',obj({id,decision:enumeration(['confirm','cancel']),confirmed},['id','decision','confirmed']),'/api/assistant/actions','POST',assistantActions.POST,{},[],a=>a);
 
 api('test_llm_connection','Admin: list models from a saved provider profile or probe Chat Completions tool calling. Probe may incur provider cost; confirmed must be true. Does not change saved settings or company data.',obj({id,mode:enumeration(['models','probe']),confirmed}),'/api/llm-config/test','POST',llmTest.POST,{admin:true,write:false},[],a=>a);
+
+api('list_assistant_profiles','List saved model names for the signed-in account independently of chat history/actions storage. Never returns provider keys.',obj({}),'/api/assistant/profiles','GET',assistantProfiles.GET);

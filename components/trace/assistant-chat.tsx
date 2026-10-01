@@ -14,11 +14,21 @@ export function AssistantChat({admin,onSettings,accountId,accountName,onAccountC
  useEffect(()=>{if(!open)return;let active=true;let controller:AbortController;
   function clear(){epoch.current++;controller?.abort();setMessages([]);setActions([]);setInput('');pending.current=null;setBusy(false);}
   async function refresh(){clear();const generation=epoch.current;controller=new AbortController();setLoading(true);setError('');try{
-   const r=await fetch('/api/assistant',{cache:'no-store',headers:{'x-assistant-account':accountId},signal:controller.signal}),d=await r.json() as any;
+   // Profiles are independent of history/actions migrations and must remain selectable if those fail.
+   const options={cache:'no-store' as const,headers:{'x-assistant-account':accountId},signal:controller.signal};
+   const get=async(path:string)=>{const r=await fetch(path,options);let d:any;try{d=await r.json()}catch{throw new Error('پاسخ '+path+' معتبر نیست؛ مسیر API روی سرور را بررسی کنید.')};return {r,d}};
+   const results=await Promise.allSettled([get('/api/assistant/profiles'),get('/api/assistant')]);
    if(!active||generation!==epoch.current)return;
-   if(r.status===401||r.status===409){changed.current();return;}if(!r.ok)throw new Error(d.error);
-   if(d.accountId!==accountId){changed.current();return;}
-   setActions(d.actions||[]);setProfiles(d.profiles);setProfile(p=>d.profiles.some((v:any)=>v.id===p)?p:d.profiles.length===1?d.profiles[0].id:'');setMessages(d.history.flatMap((h:any)=>[{role:'user',text:h.question},{role:'assistant',text:h.answer}]));
+   const fulfilled=results.filter(x=>x.status==='fulfilled').map(x=>(x as PromiseFulfilledResult<any>).value);
+   if(fulfilled.some(({r,d})=>r.status===401||r.status===409||r.ok&&d.accountId!==accountId)){changed.current();return;}
+   const catalog=results[0].status==='fulfilled'&&results[0].value.r.ok?results[0].value.d:results[1].status==='fulfilled'&&results[1].value.r.ok?results[1].value.d:null;
+   if(catalog&&Array.isArray(catalog.profiles)){setProfiles(catalog.profiles);setProfile(p=>catalog.profiles.some((v:any)=>v.id===p)?p:catalog.profiles.length===1?catalog.profiles[0].id:'');}
+   else{setProfiles([]);setProfile('');}
+   const history=results[1];
+   if(history.status==='fulfilled'&&history.value.r.ok){const d=history.value.d;setActions(d.actions||[]);setMessages(d.history.flatMap((h:any)=>[{role:'user',text:h.question},{role:'assistant',text:h.answer}]));}
+   const errors=results.flatMap((item,i)=>item.status==='rejected'?[(i===0&&catalog)?'':item.reason.message]:item.value.r.ok?[]:(i===0&&catalog)?[]:[item.value.d.error||'دریافت اطلاعات انجام نشد.']).filter(Boolean);
+   setError(errors.join(' · '));
+
   }catch(e){if(active&&generation===epoch.current)setError((e as Error).message)}finally{if(active&&generation===epoch.current)setLoading(false)}}
   const visibility=()=>{if(document.visibilityState==='hidden')clear();else void refresh()};
   const switchAccount=()=>{clear();changed.current()};

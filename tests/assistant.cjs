@@ -67,6 +67,16 @@ const chat=load('app/api/assistant/route.ts');
  const provider=load('lib/llm-provider.ts');const reasoningBody=provider.completionBody({model:'gpt-5',base_url:'https://api.openai.com/v1',max_tokens:1000,temperature:0.3},[]);assert.equal(reasoningBody.max_completion_tokens,1000);assert.ok(!('max_tokens' in reasoningBody));assert.ok(!('temperature' in reasoningBody));assert.equal(provider.providerBase('https://example.test/v1/chat/completions'),'https://example.test/v1');
  providerMode='temperature';providerCalls=0;await provider.providerRequest({model:'compatible-model',base_url:'https://example.test/v1'},'provider-test-key','/chat/completions',{model:'compatible-model',temperature:0.3,messages:[]});assert.equal(providerCalls,2);assert.ok(!('temperature' in sent.at(-1)));
  await enter('bob');assert.equal((await diagnostic.POST(request('/api/llm-config/test','POST',{id:profileId,mode:'models'}))).status,403);
+
+ // Reproduce a server with working model settings but missing the newer assistant table.
+ cookie='';identity=owner;const profileList=load('app/api/assistant/profiles/route.ts');
+ sql.exec('DROP TABLE assistant_actions');
+ r=await profileList.GET(request('/api/assistant/profiles'));assert.equal(r.status,200);d=await r.json();assert.equal(d.profiles.length,2);assert.ok(!JSON.stringify(d).includes('provider-test-key'));
+ r=await chat.GET();assert.equal(r.status,503);assert.ok((await r.json()).error.includes('0012'));
+ assert.equal((await profileList.GET(request('/api/assistant/profiles','GET',undefined,{'x-assistant-account':'another-user'}))).status,409);
+ sql.exec('DROP TABLE assistant_turns');r=await chat.GET();assert.equal(r.status,503);assert.ok((await r.json()).error.includes('0010'));r=await profileList.GET();assert.equal((await r.json()).profiles.length,2);
+ identity=null;assert.equal((await profileList.GET()).status,401);
+ console.log('Missing migration regression passed: both profiles remain independently available when actions/history tables are absent; exact migration diagnostics and account isolation.');
  console.log('Model checks passed: two saved profiles, exact selected model used, safe provider diagnostics, tool probe, admin-only access, parameter compatibility, no secret disclosure.');
  console.log('Commands passed: no write before explicit approval, concurrent/repeated confirmation at most once, owner isolation, expiry, cancellation, permission recheck, navigation and MCP read/write parity.');
  console.log('Chat privacy passed: two password accounts, private history and provider context, stale-account requests rejected, cross-owner retries blocked, admin isolated.');
