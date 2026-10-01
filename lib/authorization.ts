@@ -44,7 +44,17 @@ export async function requireAccess(kind?: Kind, operation: "read" | "write" = "
 export async function requireAdmin() {const user = await session(); if (!user.isAdmin) throw new AccessError("مدیریت کاربران فقط برای مدیر سامانه مجاز است.", 403); return user;}
 export function checkOrigin(request: Request) {
   const origin = request.headers.get("origin");
-  if (origin !== new URL(request.url).origin) throw new AccessError("درخواست نامعتبر است؛ صفحه را دوباره باز کنید.", 403);
+  if (!origin) throw new AccessError("درخواست نامعتبر است؛ صفحه را دوباره باز کنید.", 403);
+  const url = new URL(request.url);
+  if (origin === url.origin) return;
+  // Behind IIS reverse proxy the worker may see 127.0.0.1 while the browser Origin is the public HTTPS host.
+  const forwardedHost = (request.headers.get("x-forwarded-host") || "").split(",")[0].trim();
+  const forwardedProto = (request.headers.get("x-forwarded-proto") || "https").split(",")[0].trim();
+  if (forwardedHost) {
+    const publicOrigin = `${forwardedProto}://${forwardedHost}`;
+    if (origin === publicOrigin) return;
+  }
+  throw new AccessError("درخواست نامعتبر است؛ صفحه را دوباره باز کنید.", 403);
 }
 export function accessResponse(error: unknown): Response | null {
   return error instanceof AccessError ? Response.json({error: error.message}, {status: error.status, headers: {"Cache-Control": "no-store"}}) : null;
