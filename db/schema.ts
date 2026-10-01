@@ -1,4 +1,5 @@
-import {sqliteTable,text,index,integer,uniqueIndex} from "drizzle-orm/sqlite-core";
+import {sql} from "drizzle-orm";
+import {sqliteTable,text,index,integer,uniqueIndex,check} from "drizzle-orm/sqlite-core";
 export const records=sqliteTable("records",{id:text("id").primaryKey(),kind:text("kind").notNull(),payload:text("payload").notNull(),created:text("created").notNull()},t=>[index("idx_records_kind").on(t.kind)]);
 
 export const appIdentity=sqliteTable("app_identity",{id:text("id").primaryKey(),subject:text("subject").notNull().unique()});
@@ -67,3 +68,29 @@ export const mcpStreams=sqliteTable('mcp_streams',{
 export const mcpMessages=sqliteTable('mcp_messages',{
  seq:integer('seq').primaryKey({autoIncrement:true}),streamId:text('stream_id').notNull().references(()=>mcpStreams.id,{onDelete:'cascade'}),requestKey:text('request_key').notNull(),requestHash:text('request_hash').notNull(),response:text('response'),created:text('created').notNull(),
 },t=>[uniqueIndex('idx_mcp_request').on(t.streamId,t.requestKey)]);
+
+// Inventory quantities use thousandths of the displayed unit (no floating-point stock).
+export const bomVersions=sqliteTable('bom_versions',{
+ id:text('id').primaryKey(),productId:text('product_id').notNull().references(()=>records.id),version:integer('version').notNull(),lines:text('lines').notNull(),created:text('created').notNull(),actor:text('actor').notNull(),
+},t=>[uniqueIndex('idx_bom_version').on(t.productId,t.version)]);
+export const inventoryBatches=sqliteTable('inventory_batches',{
+ batchId:text('batch_id').primaryKey().references(()=>records.id),partCode:text('part_code').notNull(),unit:text('unit').notNull(),created:text('created').notNull(),
+});
+export const inventoryOperations=sqliteTable('inventory_operations',{
+ id:text('id').primaryKey(),kind:text('kind').notNull(),payload:text('payload').notNull(),actor:text('actor').notNull(),created:text('created').notNull(),guard:integer('guard').notNull(),
+},t=>[check('inventory_operation_guard',sql`${t.guard} = 1`)]);
+export const inventoryBalances=sqliteTable('inventory_balances',{
+ id:text('id').primaryKey(),itemId:text('item_id').notNull().references(()=>records.id),warehouse:text('warehouse').notNull(),quantity:integer('quantity').notNull(),
+},t=>[uniqueIndex('idx_inventory_balance').on(t.itemId,t.warehouse),check('inventory_nonnegative',sql`${t.quantity} >= 0`)]);
+export const inventoryEntries=sqliteTable('inventory_entries',{
+ id:text('id').primaryKey(),operationId:text('operation_id').notNull().references(()=>inventoryOperations.id),itemId:text('item_id').notNull().references(()=>records.id),warehouse:text('warehouse').notNull(),delta:integer('delta').notNull(),
+},t=>[index('idx_inventory_entries_item').on(t.itemId)]);
+export const productionOrders=sqliteTable('production_orders',{
+ id:text('id').primaryKey(),deviceId:text('device_id').notNull().unique().references(()=>records.id),bomId:text('bom_id').notNull().references(()=>bomVersions.id),day:text('day').notNull(),operator:text('operator').notNull(),notes:text('notes').notNull(),actor:text('actor').notNull(),created:text('created').notNull(),
+});
+export const productionMaterials=sqliteTable('production_materials',{
+ id:text('id').primaryKey(),orderId:text('order_id').notNull().references(()=>productionOrders.id),batchId:text('batch_id').notNull().references(()=>records.id),warehouse:text('warehouse').notNull(),quantity:integer('quantity').notNull(),
+});
+export const productionReceipts=sqliteTable('production_receipts',{
+ orderId:text('order_id').primaryKey().references(()=>productionOrders.id),operationId:text('operation_id').notNull().unique().references(()=>inventoryOperations.id),created:text('created').notNull(),
+});

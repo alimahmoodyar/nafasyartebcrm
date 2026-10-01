@@ -1,3 +1,4 @@
+import * as production from "@/app/api/production/route";
 import * as records from '@/app/api/records/route';
 import * as serials from '@/app/api/serials/route';
 import * as printing from '@/app/api/serials/print/route';
@@ -111,3 +112,10 @@ export async function executeTool(name:string,args:unknown,origin:string,p:McpPr
  try{await storage().prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),p.user.userId,name,'mcp_call',JSON.stringify({outcome,tokenId:p.tokenId}),new Date().toISOString()).run();}catch{console.error('MCP audit write failed');}
  }
 }
+
+api('get_production_inventory','Read permitted BOM versions, production sheets and warehouse balances. Quantities in balances/materials are thousandths of units.',obj({}),'/api/production','GET',production.GET);
+api('save_product_bom','Save a versioned bill of materials for ONE device. Quantities are decimal strings (up to 3 decimal places).',payload({id,productId:id,previousVersion:integer(0,100000),lines:list(obj({partCode:text('',12),name:text('',200),unit:enumeration(['عدد','کیلوگرم','متر','لیتر']),quantity:text('',20)}),40)}),'/api/production','POST',production.POST,{},[],a=>({...a,mode:'bom'}));
+api('initialize_batch_stock','Admin: establish physically verified remaining stock ONCE per batch. Does not assume original receipt quantity is remaining stock.',payload({id,batchId:id,quantity:text('',20),to:enumeration(['raw','line','quarantine','nonconforming'])}),'/api/production','POST',production.POST,{admin:true},[],a=>({...a,mode:'opening'}));
+api('move_batch_stock','Move batch stock between material warehouses. Negative stock forbidden. Reuse request UUID when retrying.',payload({id,batchId:id,quantity:text('',20),from:enumeration(['raw','line','quarantine','nonconforming']),to:enumeration(['raw','line','quarantine','nonconforming'])}),'/api/production','POST',production.POST,{},[],a=>({...a,mode:'move'}));
+api('create_production_sheet','Create one device production sheet with frozen BOM and selected batches, without deducting stock. One batch per BOM line.',payload({id,deviceId:id,bomId:id,day:text('',10),operator:text('',200),notes:text(),allocations:list(obj({partCode:text('',12),batchId:id,warehouse:enumeration(['raw','line'])}),40)}),'/api/production','POST',production.POST,{},[],a=>({...a,mode:'order'}));
+api('transfer_finished_device','Atomically deduct BOM materials and receive one device into finished warehouse. Each sheet transfers once; insufficient stock rolls back all changes.',payload({id,orderId:id}),'/api/production','POST',production.POST,{},[],a=>({...a,mode:'finish'}));

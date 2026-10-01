@@ -57,6 +57,13 @@
       "when": 1790841994803,
       "tag": "0007_shallow_mindworm",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1790845692893,
+      "tag": "0008_curly_smasher",
+      "breakpoints": true
     }
   ]
 }
