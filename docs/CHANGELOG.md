@@ -71,3 +71,8 @@
 - Reserved per-report instructions area explicitly awaiting supplied Sepidar manuals. No fabricated menu paths or automatic analysis.
 - Finance read/write permissions and Finance preset; existing accounts receive no new finance access by default.
 - Tests: finance route integration with SQLite/R2 harness, existing authorization regression, TypeScript compile. No financial content interpretation implemented.
+
+## 2026-10-01 — محدود کردن جست‌وجوی شناسنامه به بخش دستگاه‌ها
+- حذف فرم سراسری «شناسنامه دستگاه را پیدا کن» از نمای کلی و سایر بخش‌ها.
+- انتقال همان جست‌وجوی سریال به داخل تب «شناسنامه دستگاه‌ها»؛ باز کردن شناسنامه و جست‌وجوی جدول حفظ شد.
+- بدون تغییر در اطلاعات، دیتابیس یا سطح دسترسی کاربران.
