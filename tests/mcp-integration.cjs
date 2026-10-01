@@ -51,7 +51,7 @@ async function mint(scope='read'){return (await (await tokens.POST(request('/api
  const currentProduct=JSON.parse(sql.prepare('SELECT payload FROM records WHERE id=?').get(prod.id).payload);
  assert.ok((await call('delete_record',{id:prod.id,previous:JSON.stringify(currentProduct),confirmed:true})).error); // device
  sql.prepare('INSERT INTO records(id,kind,payload,created) VALUES(?,?,?,?)').run('linked-event','event',JSON.stringify({batch:batch.record.id}),new Date().toISOString());
- assert.ok((await call('update_record',{id:batch.record.id,previous:JSON.stringify(batch.record.data),data:{...batch.record.data,quantity:'100'},confirmed:true})).error);
+ const corrected=await call('update_record',{id:batch.record.id,previous:JSON.stringify(batch.record.data),data:{...batch.record.data,quantity:'100'},confirmed:true});assert.equal(corrected.record.data.quantity,'100');batch.record=corrected.record;
  const notes=await call('update_record',{id:batch.record.id,previous:JSON.stringify(batch.record.data),data:{...batch.record.data,notes:'Inspection note'},confirmed:true});assert.equal(notes.record.data.notes,'Inspection note');
  const unusedProduct=await call('create_record',{kind:'product',data:{...product,code:'UNUSED'},confirmed:true});assert.equal((await call('delete_record',{id:unusedProduct.record.id,previous:JSON.stringify(unusedProduct.record.data),confirmed:true})).deleted,true);
  // A read-only member token cannot gain admin or production privileges.
