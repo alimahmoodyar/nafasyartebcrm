@@ -135,3 +135,20 @@ html,button,input,textarea,select,option,svg text{font-family:"Vazirmatn",sans-s
 @media(max-width:650px){.login-screen{padding:24px 16px}.login-screen::before{background-size:190vw auto;background-position:center 15%}}
 
 .flow-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:20px 0}.flow-card{padding:20px;border:1px solid var(--border);border-radius:14px;background:white;margin:14px 0;display:grid;gap:12px}.flow-card h3{font-size:17px}.flow-panel select,.flow-fieldset select{font:inherit;border:1px solid var(--border);border-radius:8px;padding:10px;background:white;max-width:100%}.flow-fieldset{border:0;padding:0;min-width:0}.flow-allocation{display:flex;align-items:end;flex-wrap:wrap;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}.flow-allocation .field{flex:1;min-width:140px}.flow-check{display:flex;align-items:center;gap:8px;padding:8px}.flow-check input{width:auto}.flow-table{overflow:auto}.flow-table table{width:100%;border-collapse:collapse;background:white}.flow-table td,.flow-table th{padding:14px;text-align:right;border-bottom:1px solid var(--border)}
+
+/* Nafasyar workspace: soft brand atmosphere and consistent icon tiles. */
+.workspace-body{background:radial-gradient(ellipse at 0% 0%,#dcefe780 0,transparent 48%),radial-gradient(ellipse at 100% 24%,#e3e7fb99 0,transparent 52%),#f6f8fc;min-height:100dvh}
+.workspace-topbar{background:#ffffffed;box-shadow:0 4px 20px #26345c05;flex-wrap:wrap}
+.workspace-breadcrumb{flex:1;order:0}
+.workspace-mode{order:1}
+.workspace-topbar .workspace-exit{order:2;display:inline-flex;align-items:center;justify-content:center;gap:8px;flex-shrink:0;min-height:44px;border-color:#dce3ee;background:#fff;color:#455477;box-shadow:0 3px 10px #26345c06}
+.workspace-topbar .workspace-exit:hover{background:#edf2fa;border-color:#a9b7d3}
+.workspace-body .stat,.workspace-body .daily-action,.workspace-body .panel{border-color:#dee5ef;box-shadow:0 6px 24px #2b3a6310}
+.workspace-body .stat{background:linear-gradient(135deg,#fff 62%,#f0f4fc)}
+.workspace-body .stat svg{box-shadow:inset 0 1px 0 #fff,0 4px 12px #4857a310}
+.workspace-body .daily-action{background:radial-gradient(ellipse at 0% 100%,#eaf5ef99,transparent 70%),#fff;transition:border-color .18s,box-shadow .18s,transform .18s}
+.workspace-body .daily-action-icon{display:inline-flex;align-items:center;justify-content:center;width:46px;height:46px;flex-shrink:0;border-radius:14px;background:linear-gradient(145deg,#f0f2ff,#e5ebf8);color:#5364a4;box-shadow:inset 0 1px 0 #fff,0 3px 10px #4857a30d;margin-bottom:3px}
+.workspace-body .daily-action:hover{transform:translateY(-2px);border-color:#a0b6cd;box-shadow:0 10px 26px #26345c15}
+.workspace-body .daily-action:focus-visible,.workspace-topbar .workspace-exit:focus-visible{outline:3px solid #7189bc;outline-offset:3px}
+@media(max-width:767px){.workspace-topbar{gap:8px}.workspace-breadcrumb{flex-basis:calc(100% - 150px)}.workspace-mode{order:3;flex-basis:auto}.workspace-topbar .workspace-exit{font-size:13px;padding:8px 10px}.workspace-body .daily-action{min-height:170px}}
+@media(prefers-reduced-motion:reduce){.workspace-body .daily-action{transition:none}.workspace-body .daily-action:hover{transform:none}}
