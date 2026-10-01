@@ -53,3 +53,5 @@ Tools enforce existing module/stage/admin permissions. Mutations require `confir
 
 ## Validation / operation
 `node tests/mcp-integration.cjs` exercises the real route/business handlers with SQLite and mock R2: protocol, auth, scope, encryption/redaction, concurrency, files, SSE message lifecycle/replay/idempotency and revocation. `tests/access-control.cjs` and `tests/finance-control.cjs` cover existing permission and financial behavior. These are local integration checks, not evidence of an actual Cursor connection across the private hosting boundary.
+
+Chat privacy: `get_assistant_chat` and `ask_assistant` return the authenticated `accountId` and never accept an owner override. History and model context are scoped to that identity, including administrators. The browser binds requests with `X-Assistant-Account` to reject stale tabs after an account switch; this header does not grant authority. Clients must discard replies for another active account. Shared credentials mean shared history; use individual staff accounts. No historical data is automatically reassigned or deleted.
