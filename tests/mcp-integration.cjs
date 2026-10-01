@@ -40,10 +40,25 @@ async function mint(scope='read'){return (await (await tokens.POST(request('/api
  const batch=await call('create_record',{kind:'batch',data:{part:'Compressor',date:'2026-10-01',code:'B-001',supplier:'Test',quantity:'10',unit:'عدد',status:'تأیید'},confirmed:true});assert.ok(batch.record?.id);
  const fileId=crypto.randomUUID(),bytes=btoa('date,amount\n2026-10-01,10');let uploaded=await call('upload_batch_file',{batch:batch.record.id,requestId:fileId,filename:'test.csv',base64:bytes,confirmed:true});assert.ok(!uploaded.error,JSON.stringify(uploaded));let download=await call('download_batch_file',{batch:batch.record.id,id:fileId,length:4});assert.equal(atob(download.base64),'date');assert.equal(download.nextOffset,4);
  assert.ok((await call('upload_batch_file',{batch:batch.record.id,requestId:crypto.randomUUID(),filename:'bad.csv',base64:'???',confirmed:true})).error);
+ // Admin record management: safe edits, immutable codes and guarded deletion.
+ const fresh=await call('create_record',{kind:'batch',data:{...batch.record.data,code:'B-DELETE'},confirmed:true});
+ let edit=await call('update_record',{id:fresh.record.id,previous:JSON.stringify(fresh.record.data),data:{...fresh.record.data,supplier:'Corrected',quantity:'20'},confirmed:true});assert.equal(edit.record.data.quantity,'20');
+ assert.ok((await call('update_record',{id:fresh.record.id,previous:JSON.stringify(edit.record.data),data:{...edit.record.data,code:'OTHER'},confirmed:true})).error);
+ assert.ok((await call('delete_record',{id:fresh.record.id,previous:JSON.stringify(fresh.record.data),confirmed:true})).error);
+ assert.equal((await call('delete_record',{id:fresh.record.id,previous:JSON.stringify(edit.record.data),confirmed:true})).deleted,true);
+ assert.equal(sql.prepare("SELECT count(*) AS n FROM access_audit WHERE target=? AND action='delete_record'").get(fresh.record.id).n,1);
+ assert.ok((await call('delete_record',{id:batch.record.id,previous:JSON.stringify(batch.record.data),confirmed:true})).error); // attachment
+ const currentProduct=JSON.parse(sql.prepare('SELECT payload FROM records WHERE id=?').get(prod.id).payload);
+ assert.ok((await call('delete_record',{id:prod.id,previous:JSON.stringify(currentProduct),confirmed:true})).error); // device
+ sql.prepare('INSERT INTO records(id,kind,payload,created) VALUES(?,?,?,?)').run('linked-event','event',JSON.stringify({batch:batch.record.id}),new Date().toISOString());
+ assert.ok((await call('update_record',{id:batch.record.id,previous:JSON.stringify(batch.record.data),data:{...batch.record.data,quantity:'100'},confirmed:true})).error);
+ const notes=await call('update_record',{id:batch.record.id,previous:JSON.stringify(batch.record.data),data:{...batch.record.data,notes:'Inspection note'},confirmed:true});assert.equal(notes.record.data.notes,'Inspection note');
+ const unusedProduct=await call('create_record',{kind:'product',data:{...product,code:'UNUSED'},confirmed:true});assert.equal((await call('delete_record',{id:unusedProduct.record.id,previous:JSON.stringify(unusedProduct.record.data),confirmed:true})).deleted,true);
  // A read-only member token cannot gain admin or production privileges.
  const permissions={read:['device'],write:[],eventStages:[],finance:'none'};sql.prepare('INSERT INTO app_members(id,email,name,unit,status,subject,permissions,created,updated) VALUES(?,?,?,?,?,?,?,?,?)').run('reader','reader@example.com','Reader','unit','active','reader',JSON.stringify(permissions),new Date().toISOString(),new Date().toISOString());
  const restricted='nfy_'+'a'.repeat(64),hash=await load('lib/mcp/auth.ts').tokenHash(restricted);sql.prepare('INSERT INTO mcp_tokens(id,token_hash,subject,email,name,scope,expires,created) VALUES(?,?,?,?,?,?,?,?)').run('r',hash,'reader','reader@example.com','R','read_write',new Date(Date.now()+100000).toISOString(),new Date().toISOString());
  assert.ok((await call('list_users',{},restricted)).error);assert.ok((await call('create_record',{kind:'product',data:product,confirmed:true},restricted)).error);assert.ok((await call('list_llm_configs',{},restricted)).error);
+ assert.ok((await call('delete_record',{id:batch.record.id,previous:JSON.stringify(notes.record.data),confirmed:true},restricted)).error);
  assert.equal((await call('get_device_passport',{serial:'TEST-001'},restricted)).product,null);
  sql.prepare("UPDATE app_members SET status='disabled' WHERE id='reader'").run();assert.equal((await http.POST(request('/mcp','POST',rpc('tools/list'),{authorization:'Bearer '+restricted}))).status,403);
  // Full legacy SSE: endpoint, POST message, streamed response, replay, isolation and revocation.

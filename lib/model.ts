@@ -29,3 +29,6 @@ export function validate(kind:Kind,d:Record<string,string>){
 export function label(r:Row){if(r.kind==="product")return r.data.code+" — "+r.data.name+" · "+r.data.model;if(r.kind==="firmware")return r.data.name+" — "+r.data.version;return r.data.code||r.data.title||r.data.complaint||r.data.stage||r.id;}
 
 export const editable:Partial<Record<Kind,string[]>>={product:["name","group","model","warrantyMonths","status","notes"],batch:["status","test","notes"],service:["status","diagnosis","cause","notes","cost","operator"],action:["title","cause","plan","owner","due","status","effectiveness"]};
+
+// Admin may correct unused batch business details; identifiers remain stable.
+export const adminBatchEditable=[...editable.batch!,"part","supplier","maker","purchase","manufacturerLot","quantity","unit"];
