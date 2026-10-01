@@ -71,6 +71,13 @@
       "when": 1790848457919,
       "tag": "0009_fearless_joseph",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1790849087479,
+      "tag": "0010_warm_hawkeye",
+      "breakpoints": true
     }
   ]
 }

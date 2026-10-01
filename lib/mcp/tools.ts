@@ -1,3 +1,4 @@
+import * as assistant from "@/app/api/assistant/route";
 import * as production from "@/app/api/production/route";
 import * as records from '@/app/api/records/route';
 import * as serials from '@/app/api/serials/route';
@@ -122,3 +123,6 @@ api('transfer_finished_device','Atomically deduct BOM materials and receive one 
 
 api('create_password_user','Admin: create a local username/password account without ChatGPT email. Password is never returned or logged. Confirm exact permissions.',payload({username:text('',40),password:text('10–128 characters; never reuse secrets in other tools.',128),name:text('',100),unit:text('',100),status:enumeration(['active','disabled']),permissions:perms}),'/api/users','POST',users.POST,{admin:true});
 api('update_password_user','Admin: update a local account or reset its password. Blank password preserves it; reset invalidates old sessions. Exact revision required.',payload({id,revision:integer(1,1e9),password:text('',128),name:text('',100),unit:text('',100),status:enumeration(['active','disabled']),permissions:perms}),'/api/users','PATCH',users.PATCH,{admin:true});
+
+api('get_assistant_chat','List available model names and the current user’s saved chat history. Provider secrets are never returned.',obj({}),'/api/assistant','GET',assistant.GET);
+api('ask_assistant','Send a message to the configured external model (may incur provider cost). The assistant may read authorized records but cannot mutate business data. Reuse requestId on retry.',obj({requestId:id,profileId:id,message:text('',4000)}),'/api/assistant','POST',assistant.POST,{write:false});

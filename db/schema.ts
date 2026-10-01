@@ -104,3 +104,7 @@ export const passwordSessions=sqliteTable('password_sessions',{
 export const loginAttempts=sqliteTable('login_attempts',{
  key:text('key').primaryKey(),count:integer('count').notNull(),reset:text('reset').notNull(),
 });
+
+export const assistantTurns=sqliteTable('assistant_turns',{
+ id:text('id').primaryKey(),owner:text('owner').notNull(),question:text('question').notNull(),answer:text('answer'),model:text('model').notNull(),created:text('created').notNull(),
+},t=>[index('idx_assistant_turns_owner').on(t.owner,t.created)]);
