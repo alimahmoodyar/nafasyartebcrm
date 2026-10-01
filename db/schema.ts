@@ -108,3 +108,10 @@ export const loginAttempts=sqliteTable('login_attempts',{
 export const assistantTurns=sqliteTable('assistant_turns',{
  id:text('id').primaryKey(),owner:text('owner').notNull(),question:text('question').notNull(),answer:text('answer'),model:text('model').notNull(),created:text('created').notNull(),
 },t=>[index('idx_assistant_turns_owner').on(t.owner,t.created)]);
+
+export const flowEntities=sqliteTable('flow_entities',{
+ id:text('id').primaryKey(),type:text('type').notNull(),data:text('data').notNull(),revision:integer('revision').notNull().default(1),created:text('created').notNull(),updated:text('updated').notNull(),
+},t=>[index('idx_flow_type').on(t.type)]);
+export const flowSlots=sqliteTable('flow_slots',{
+ location:text('location').primaryKey(),batchId:text('batch_id').notNull().references(()=>records.id),quantity:integer('quantity').notNull(),
+},t=>[check('flow_slot_nonnegative',sql`${t.quantity} >= 0`)]);
