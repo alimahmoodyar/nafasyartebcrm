@@ -16,7 +16,7 @@ export async function session(): Promise<Session> {
   return resolveIdentity(identity);
 }
 export async function resolveIdentity(identity: Awaited<ReturnType<typeof getChatGPTUser>>): Promise<Session> {
-  if (!identity) throw new AccessError("با نام کاربری و رمز عبور یا حساب مجاز ChatGPT وارد شوید.", 401);
+  if (!identity) throw new AccessError("با نام کاربری و رمز عبور یا از بخش ورود مدیر وارد شوید.", 401);
   const email = identity.email.trim().toLowerCase();
   const ownerEmail = env.TRACE_OWNER_EMAIL?.trim().toLowerCase();
   if (!ownerEmail) throw new AccessError("حساب مدیر سامانه هنوز پیکربندی نشده است.", 503);
