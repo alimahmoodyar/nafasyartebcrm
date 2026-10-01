@@ -3,10 +3,10 @@ import type {Kind} from "./model";
 export const modules: Kind[] = ["product", "batch", "device", "event", "service", "action", "distribution", "firmware"];
 const productionModules:Kind[]=["batch", "device", "event", "service", "action"];
 export const stages = ["مصرف قطعه", "مونتاژ", "آزمون نهایی", "بسته‌بندی", "تحویل"];
-export type Permissions = {warehouses?: string[];flowRoles?: string[];read: Kind[]; write: Kind[]; eventStages: string[]; finance?: "none"|"read"|"write"};
+export type Permissions = {supplyRoles?: string[];warehouses?: string[];flowRoles?: string[];read: Kind[]; write: Kind[]; eventStages: string[]; finance?: "none"|"read"|"write"};
 export type Session = {username?:string;authType?:"password"|"chatgpt";userId: string; email: string; name: string; isAdmin: boolean; permissions: Permissions};
 export type Member = {username?:string;id: string; email: string; name: string; unit: string; status: string; userId: string | null; permissions: Permissions; revision: number; created: string; updated: string};
-export const allPermissions: Permissions = {warehouses:["raw","line","quarantine","nonconforming","finished"],flowRoles:["inventory","qc","production","procurement","sales","logistics"],read: modules, write: modules, eventStages: stages, finance: "write"};
+export const allPermissions: Permissions = {supplyRoles:["sales","ceo","engineering","inventory","finance","domestic","foreign"],warehouses:["raw","line","quarantine","nonconforming","finished"],flowRoles:["inventory","qc","production","procurement","sales","logistics"],read: modules, write: modules, eventStages: stages, finance: "write"};
 export const presets: Record<string, Permissions> = {
  "تأمین": {flowRoles:["procurement"],read:["batch"],write:[],eventStages:[]},
   "تدارکات": {flowRoles:["logistics"],read:[],write:[],eventStages:[]},
@@ -32,5 +32,6 @@ export function validatePermissions(value: unknown): Permissions {
   if(p.finance!==undefined&&!(["none","read","write"] as unknown[]).includes(p.finance))throw new Error("دسترسی مالی معتبر نیست.");
   if(p.flowRoles!==undefined&&(!Array.isArray(p.flowRoles)||p.flowRoles.some(r=>!['inventory','qc','production','procurement','sales','logistics'].includes(r))))throw new Error('نقش گردش مواد معتبر نیست.');
   if(p.warehouses!==undefined&&(!Array.isArray(p.warehouses)||p.warehouses.some(w=>!['raw','line','quarantine','nonconforming','finished'].includes(w))))throw new Error('انبار مجاز معتبر نیست.');
-  return {...(p.warehouses!==undefined?{warehouses:[...new Set(p.warehouses)]}:{}),flowRoles:[...new Set(p.flowRoles||[])],finance:p.finance||"none",read: [...new Set(p.read)], write: [...new Set(p.write)], eventStages: p.write.includes("event") ? [...new Set(p.eventStages)] : []};
+  if(p.supplyRoles!==undefined&&(!Array.isArray(p.supplyRoles)||p.supplyRoles.some(r=>!['sales','ceo','engineering','inventory','finance','domestic','foreign'].includes(r))))throw new Error('نقش برنامه‌ریزی تأمین معتبر نیست.');
+  return {supplyRoles:[...new Set(p.supplyRoles||[])],...(p.warehouses!==undefined?{warehouses:[...new Set(p.warehouses)]}:{}),flowRoles:[...new Set(p.flowRoles||[])],finance:p.finance||"none",read: [...new Set(p.read)], write: [...new Set(p.write)], eventStages: p.write.includes("event") ? [...new Set(p.eventStages)] : []};
 }

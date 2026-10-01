@@ -129,3 +129,7 @@ export const dutyFiles=sqliteTable('duty_files',{
 export const dutyNotices=sqliteTable('duty_notices',{
  id:text('id').primaryKey(),taskId:text('task_id').notNull().references(()=>dutyRuns.id),recipient:text('recipient').notNull(),phase:text('phase').notNull(),message:text('message').notNull(),created:text('created').notNull(),readAt:text('read_at'),
 },t=>[uniqueIndex('idx_duty_notice_phase').on(t.taskId,t.recipient,t.phase),index('idx_duty_notice_recipient').on(t.recipient,t.readAt)]);
+
+export const sourcingHolds=sqliteTable('sourcing_holds',{
+ id:text('id').primaryKey(),planId:text('plan_id').notNull().references(()=>flowEntities.id),partCode:text('part_code').notNull(),unit:text('unit').notNull(),sourceType:text('source_type').notNull(),sourceId:text('source_id').notNull(),quantity:integer('quantity').notNull(),
+},t=>[uniqueIndex('idx_sourcing_hold_source_plan').on(t.planId,t.sourceType,t.sourceId),index('idx_sourcing_hold_source').on(t.sourceType,t.sourceId),check('sourcing_hold_positive',sql`${t.quantity}>0`)]);

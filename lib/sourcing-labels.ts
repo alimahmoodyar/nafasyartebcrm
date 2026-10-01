@@ -1,0 +1,2 @@
+export const supplyRoles:Record<string,string>={sales:'فروش / درخواست تولید',ceo:'مدیرعامل / تأیید',engineering:'تحقیق و توسعه',inventory:'کنترل موجودی',finance:'برنامه مالی',domestic:'بازرگانی داخلی',foreign:'بازرگانی خارجی'};
+export const supplyStates:Record<string,string>={pending:'در انتظار مدیرعامل',waiting_bom:'منتظر BOM',approved:'کنترل موجودی',sourcing:'استعلام و تأمین',ready:'مواد آماده تولید',released:'تحویل برنامه به تولید',rejected:'ردشده',cancelled:'لغوشده'};

@@ -217,3 +217,6 @@ html,button,input,textarea,select,option,svg text{font-family:"Vazirmatn",sans-s
 .duty-template h4 { font-size: 1rem; margin: .25rem 0; }
 .duty-template p { line-height: 1.9; }
 .duty-template .btn { margin-top: .5rem; }
+
+.sourcing-summary { margin: 1rem 0; border-inline-start: 4px solid #239876; padding: .75rem 1.25rem; }
+.sourcing-work { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,260px),1fr)); gap: .75rem; margin: 1rem 0; }
