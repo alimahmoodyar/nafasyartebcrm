@@ -122,3 +122,5 @@ body{margin:0;font-family:"Vazirmatn",sans-serif;font-size:16px;line-height:1.8;
 
 @font-face{font-family:"Vazirmatn";src:url("/fonts/Vazirmatn.woff2") format("woff2");font-weight:100 900;font-style:normal;font-display:swap;}
 html,button,input,textarea,select,option,svg text{font-family:"Vazirmatn",sans-serif}
+
+.llm-settings{display:grid;gap:24px;margin-top:24px}.llm-form{margin-top:24px;display:grid;gap:18px}.llm-settings select{padding:10px;border:1px solid var(--border);border-radius:8px;background:white;width:100%}.llm-check{display:flex;align-items:center;gap:10px}.llm-check input{width:auto}.llm-secret{display:grid;gap:12px;padding:20px;margin:20px 0;background:#f3f5fc;border:1px solid var(--border);border-radius:12px}.llm-settings code,.llm-settings strong{overflow-wrap:anywhere}.llm-settings .recordline{gap:12px;flex-wrap:wrap}

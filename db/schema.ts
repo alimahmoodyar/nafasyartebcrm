@@ -54,3 +54,16 @@ export const financeFiles=sqliteTable('finance_files',{
 export const financeNotes=sqliteTable('finance_notes',{
  id:text('id').primaryKey(),cadence:text('cadence').notNull(),period:text('period').notNull(),reportId:text('report_id').notNull(),kind:text('kind').notNull(),body:text('body').notNull(),responsible:text('responsible').notNull(),parentId:text('parent_id'),created:text('created').notNull(),createdBy:text('created_by').notNull(),
 },t=>[index('idx_finance_notes_period').on(t.cadence,t.period)]);
+
+export const llmConfigs=sqliteTable('llm_configs',{
+ id:text('id').primaryKey(),name:text('name').notNull(),model:text('model').notNull(),baseUrl:text('base_url').notNull(),systemPrompt:text('system_prompt').notNull(),temperature:text('temperature').notNull(),maxTokens:integer('max_tokens').notNull(),tokenCiphertext:text('token_ciphertext'),revision:integer('revision').notNull().default(1),updated:text('updated').notNull(),updatedBy:text('updated_by').notNull(),
+});
+export const mcpTokens=sqliteTable('mcp_tokens',{
+ id:text('id').primaryKey(),tokenHash:text('token_hash').notNull().unique(),subject:text('subject').notNull(),email:text('email').notNull(),name:text('name').notNull(),scope:text('scope').notNull(),expires:text('expires').notNull(),revoked:integer('revoked').notNull().default(0),created:text('created').notNull(),
+});
+export const mcpStreams=sqliteTable('mcp_streams',{
+ id:text('id').primaryKey(),tokenId:text('token_id').notNull().references(()=>mcpTokens.id),expires:text('expires').notNull(),lease:text('lease').notNull(),leaseUntil:text('lease_until').notNull(),
+},t=>[index('idx_mcp_streams_token').on(t.tokenId)]);
+export const mcpMessages=sqliteTable('mcp_messages',{
+ seq:integer('seq').primaryKey({autoIncrement:true}),streamId:text('stream_id').notNull().references(()=>mcpStreams.id,{onDelete:'cascade'}),requestKey:text('request_key').notNull(),requestHash:text('request_hash').notNull(),response:text('response'),created:text('created').notNull(),
+},t=>[uniqueIndex('idx_mcp_request').on(t.streamId,t.requestKey)]);

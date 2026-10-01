@@ -9,7 +9,7 @@ const bucket={async put(key,buffer){if(failPut)throw Error('R2 unavailable');obj
 let identity=null;const env={TRACE_OWNER_EMAIL:'owner@example.com',BUCKET:bucket};
 const permissions=load('lib/permissions.ts'),numbers=load('lib/batch-number.ts'),distribution=load('lib/distribution.ts',{'./batch-number':numbers});
 const model=load('lib/model.ts',{'./batch-number':numbers,'./distribution':distribution});
-const auth=load('lib/authorization.ts',{'cloudflare:workers':{env},'@/app/chatgpt-auth':{getChatGPTUser:async()=>identity},'@/lib/storage':{storage:()=>db},'@/lib/permissions':permissions});
+const auth=load('lib/authorization.ts',{'@/lib/mcp/context':{mcpActor:new (require('node:async_hooks').AsyncLocalStorage)()},'cloudflare:workers':{env},'@/app/chatgpt-auth':{getChatGPTUser:async()=>identity},'@/lib/storage':{storage:()=>db},'@/lib/permissions':permissions});
 const firmware=load('lib/firmware.ts',{'./batch-number':numbers});
 const filesStorage=load('lib/firmware-storage.ts',{'cloudflare:workers':{env},'@/lib/storage':{storage:()=>db},'@/lib/authorization':auth});
 const imports={'cloudflare:workers':{env},'@/lib/authorization':auth,'@/lib/storage':{storage:()=>db},'@/lib/permissions':permissions,'@/lib/model':model,'@/lib/batch-number':numbers,'@/lib/firmware':firmware,'@/lib/firmware-storage':filesStorage};

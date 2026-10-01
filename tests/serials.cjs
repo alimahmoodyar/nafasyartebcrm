@@ -6,7 +6,7 @@ const db={prepare(query){let args=[];return{bind(...values){args=values;return t
 let identity=null;const env={TRACE_OWNER_EMAIL:'owner@example.com'};
 const permissions=load('lib/permissions.ts');for(const preset of Object.values(permissions.presets))permissions.validatePermissions(preset);
 const numbers=load('lib/batch-number.ts');const distribution=load('lib/distribution.ts',{'./batch-number':numbers});const model=load('lib/model.ts',{'./batch-number':numbers,'./distribution':distribution});
-const auth=load('lib/authorization.ts',{'cloudflare:workers':{env},'@/app/chatgpt-auth':{getChatGPTUser:async()=>identity},'@/lib/storage':{storage:()=>db},'@/lib/permissions':permissions});
+const auth=load('lib/authorization.ts',{'@/lib/mcp/context':{mcpActor:new (require('node:async_hooks').AsyncLocalStorage)()},'cloudflare:workers':{env},'@/app/chatgpt-auth':{getChatGPTUser:async()=>identity},'@/lib/storage':{storage:()=>db},'@/lib/permissions':permissions});
 const imports={'cloudflare:workers':{env},'@/lib/authorization':auth,'@/lib/storage':{storage:()=>db},'@/lib/permissions':permissions,'@/lib/batch-number':numbers,'@/lib/model':model};
 const users=load('app/api/users/route.ts',imports),records=load('app/api/records/route.ts',imports),suggestion=load('app/api/batch-suggestion/route.ts',imports);
 const request=(method,body,origin='https://test.local')=>new Request('https://test.local/api/records',{method,headers:{'Content-Type':'application/json',Origin:origin},body:JSON.stringify(body)});

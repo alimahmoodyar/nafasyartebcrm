@@ -1,0 +1,21 @@
+import {env} from 'cloudflare:workers';
+import {requireAdmin,checkOrigin,accessResponse,AccessError} from '@/lib/authorization';
+import {storage} from '@/lib/storage';
+import {boundedBody} from '@/lib/firmware-storage';
+import {configInput,presentConfig} from '@/lib/llm-config';
+import {encryptToken} from '@/lib/llm-secrets';
+const json=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
+export async function GET(){try{await requireAdmin();const rows=await storage().prepare('SELECT * FROM llm_configs ORDER BY name,id').all();return json({profiles:rows.results.map(presentConfig),encryptionReady:!!env.LLM_CONFIG_ENCRYPTION_KEY});}catch(e){return accessResponse(e)||json({error:'دریافت تنظیمات انجام نشد.'},503);}}
+export async function PUT(request:Request){try{
+ checkOrigin(request);const actor=await requireAdmin();let raw;try{raw=JSON.parse(new TextDecoder().decode(await boundedBody(request,96000)));}catch{throw new AccessError('اطلاعات معتبر نیست.',400);}const parsed=configInput.safeParse(raw);if(!parsed.success)throw new AccessError('نام، مدل، نشانی HTTPS، دما (۰ تا ۲) و سقف توکن معتبر را وارد کنید.',400);const b=parsed.data;
+ const db=storage(),old=await db.prepare('SELECT * FROM llm_configs WHERE id=?').bind(b.id).first<any>();if((old?.revision||0)!==b.revision)throw new AccessError('تنظیمات تغییر کرده است؛ فهرست را تازه کنید.',409);
+ // Changing destination must never silently carry the old provider's credential.
+ if(old&&old.base_url!==b.baseUrl&&old.token_ciphertext&&!b.apiToken&&!b.clearToken)throw new AccessError('با تغییر Base URL توکن تازه وارد کنید یا حذف توکن قبلی را انتخاب کنید.',400);
+ const token=b.clearToken?null:b.apiToken?await encryptToken(b.apiToken,b.id):old?.token_ciphertext||null,now=new Date().toISOString();
+ const row={id:b.id,name:b.name,model:b.model,base_url:b.baseUrl,system_prompt:b.systemPrompt,temperature:String(b.temperature),max_tokens:b.maxTokens,token_ciphertext:token,revision:b.revision+1,updated:now,updated_by:actor.userId};
+ const audit=JSON.stringify({id:b.id,revision:row.revision,tokenChanged:!!b.apiToken||!!b.clearToken});
+ if(old){const res=await db.batch([db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) SELECT ?,?,?,?,?,? FROM llm_configs WHERE id=? AND revision=?').bind(crypto.randomUUID(),actor.userId,b.id,'update_llm_config',audit,now,b.id,b.revision),db.prepare('UPDATE llm_configs SET name=?,model=?,base_url=?,system_prompt=?,temperature=?,max_tokens=?,token_ciphertext=?,revision=revision+1,updated=?,updated_by=? WHERE id=? AND revision=?').bind(b.name,b.model,b.baseUrl,b.systemPrompt,String(b.temperature),b.maxTokens,token,now,actor.userId,b.id,b.revision)]);if(!res[1].meta.changes)throw new AccessError('تنظیمات هم‌زمان تغییر کرد.',409);}
+ else await db.batch([db.prepare('INSERT INTO llm_configs(id,name,model,base_url,system_prompt,temperature,max_tokens,token_ciphertext,revision,updated,updated_by) VALUES(?,?,?,?,?,?,?,?,1,?,?)').bind(b.id,b.name,b.model,b.baseUrl,b.systemPrompt,String(b.temperature),b.maxTokens,token,now,actor.userId),db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),actor.userId,b.id,'create_llm_config',audit,now)]);
+ return json({profile:presentConfig(row)},old?200:201);
+ }catch(e){return accessResponse(e)||json({error:'ذخیره تأیید نشد؛ فهرست را تازه کنید.'},503);}}
+export async function DELETE(request:Request){try{checkOrigin(request);const actor=await requireAdmin();const q=new URL(request.url).searchParams,id=q.get('id'),revision=Number(q.get('revision'));if(!id||!Number.isInteger(revision)||revision<1)throw new AccessError('شناسه و نسخه لازم است.',400);const db=storage(),r=await db.batch([db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) SELECT ?,?,?,?,?,? FROM llm_configs WHERE id=? AND revision=?').bind(crypto.randomUUID(),actor.userId,id,'delete_llm_config','{}',new Date().toISOString(),id,revision),db.prepare('DELETE FROM llm_configs WHERE id=? AND revision=?').bind(id,revision)]);if(!r[1].meta.changes)throw new AccessError('تنظیمات تغییر کرده یا حذف شده است.',409);return json({deleted:true});}catch(e){return accessResponse(e)||json({error:'حذف انجام نشد.'},503);}}

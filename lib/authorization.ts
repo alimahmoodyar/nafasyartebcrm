@@ -1,3 +1,4 @@
+import {mcpActor} from "@/lib/mcp/context";
 import {env} from "cloudflare:workers";
 import {getChatGPTUser} from "@/app/chatgpt-auth";
 import {storage} from "@/lib/storage";
@@ -6,7 +7,12 @@ import type {Kind} from "@/lib/model";
 
 export class AccessError extends Error { constructor(message: string, public status: number) {super(message);} }
 export async function session(): Promise<Session> {
+  const actor = mcpActor.getStore();
+  if (actor) return actor;
   const identity = await getChatGPTUser();
+  return resolveIdentity(identity);
+}
+export async function resolveIdentity(identity: Awaited<ReturnType<typeof getChatGPTUser>>): Promise<Session> {
   if (!identity) throw new AccessError("برای ادامه با حساب ChatGPT وارد شوید.", 401);
   const email = identity.email.trim().toLowerCase();
   const ownerEmail = env.TRACE_OWNER_EMAIL?.trim().toLowerCase();
