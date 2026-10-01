@@ -35,3 +35,6 @@ New records, record updates, member creation and member changes are appended to 
 ## Verification
 
 Run `node tests/access-control.cjs`, `node tests/batch-number.cjs`, TypeScript check and the established build. Access tests execute the actual API/authorization modules with injected trusted identity and real in-memory SQLite, covering anonymous/unlisted rejection, owner pinning, member binding, module reads/writes, event-stage denial, forged role fields, CSRF, revocation, stale updates and auditing. Batch tests retain prior numbering coverage. Browser/SIWC interaction was not exercised in a browser in this increment; user sign-in is platform-owned. No public sharing or staff invitations were performed.
+
+### بازرگانی
+در تعریف یا ویرایش حساب، «واحد سازمانی ← بازرگانی» و سپس «داخلی» یا «خارجی» را انتخاب کنید. دسترسی‌ها مستقل تنظیم می‌شوند. در API و MCP مقدار `unit` برابر `بازرگانی — داخلی` یا `بازرگانی — خارجی` است و در فیلد موجود ذخیره می‌شود. نام واحد بدون زیرمجموعه پذیرفته نمی‌شود.

@@ -10,6 +10,7 @@ function payload(value: any) {
   const email = typeof value.email === "string" ? value.email.trim().toLowerCase() : "";
   const name = typeof value.name === "string" ? value.name.trim() : "";
   const unit = typeof value.unit === "string" ? value.unit.trim() : "";
+  if (unit === "بازرگانی") throw new Error("زیرمجموعه بازرگانی را انتخاب کنید: داخلی یا خارجی.");
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254 || !name || name.length > 100 || !unit || unit.length > 100) throw new Error("نام، واحد و ایمیل معتبر را وارد کنید.");
   if (email === env.TRACE_OWNER_EMAIL?.trim().toLowerCase()) throw new Error("حساب مدیر اصلی از این بخش قابل تغییر نیست.");
   if (!["active", "disabled"].includes(value.status)) throw new Error("وضعیت حساب معتبر نیست.");

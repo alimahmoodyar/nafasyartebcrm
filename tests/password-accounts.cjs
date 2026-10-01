@@ -22,6 +22,13 @@ async function enter(pass='Test-password-123'){return login.POST(request('/api/a
  let r=await userApi.POST(request('/api/users','POST',body));assert.equal(r.status,201);let m=(await r.json()).member;assert.equal(m.username,'worker01');assert.equal(m.email,'');assert.ok(!JSON.stringify(m).includes(body.password));
  assert.ok(!JSON.stringify(sql.prepare('SELECT * FROM access_audit').all()).includes(body.password));assert.ok(sql.prepare('SELECT password_hash FROM password_accounts').get().password_hash.startsWith('pbkdf2-sha256'));
  assert.equal((await userApi.POST(request('/api/users','POST',body))).status,409);
+ r=await userApi.PATCH(request('/api/users','PATCH',{...m,unit:'بازرگانی'}));assert.equal(r.status,400);
+ for(const unit of ['بازرگانی — داخلی','بازرگانی — خارجی']) {
+  r=await userApi.PATCH(request('/api/users','PATCH',{...m,unit}));assert.equal(r.status,200);m=(await r.json()).member;
+  assert.equal(m.unit,unit);assert.equal(JSON.stringify(m.permissions),JSON.stringify(load('lib/permissions.ts').validatePermissions(permissions)));
+  assert.equal((await (await userApi.GET()).json()).members.find(x=>x.id===m.id).unit,unit);
+ }
+
  assert.equal((await login.POST(request('/api/auth/login','POST',body,{origin:'https://evil.test'}))).status,403);
  identity=null;assert.equal((await enter('bad')).status,401);r=await enter();assert.equal(r.status,200);assert.match(r.headers.get('set-cookie'),/HttpOnly; Secure; SameSite=Strict/);cookie=r.headers.get('set-cookie').split(';')[0].split('=')[1];const oldCookie=cookie;
  let actor=await auth.session();assert.equal(actor.isAdmin,false);assert.equal(actor.username,'worker01');assert.equal(actor.permissions.write.length,0);assert.equal((await userApi.GET()).status,403);
