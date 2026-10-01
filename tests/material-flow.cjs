@@ -50,14 +50,49 @@ const p=await create('product',{code:'FLOW',name:'FlowDevice',group:'G',model:'M
  await op('plan',{productId:p.id,count:2,design:'1',reason:''});const builds=entities('build');assert.equal(builds.length,2);assert.equal(sql.prepare('SELECT COUNT(*) AS n FROM serial_reservations').get().n,2);
  await op('build',{deviceId:builds[0].id,allocations:[{batchId:r1.id,quantity:'2'}]},400);
  await op('assign',{deviceIds:builds.map(x=>x.id),assembler:'Assembler 1',reason:''});
- await op('build',{deviceId:builds[0].id,allocations:[{batchId:r1.id,quantity:'1'}],notes:''},400);
- const before=stock(r1.id,'line');await op('build',{deviceId:builds[0].id,allocations:[{batchId:r1.id,quantity:'100'}],notes:'test deficit'},409);assert.equal(stock(r1.id,'line'),before);
- await op('build',{deviceId:builds[0].id,allocations:[{batchId:r1.id,quantity:'1'},{batchId:r2.id,quantity:'1'}],notes:''});assert.equal(stock(r1.id,'line'),7000);assert.equal(stock(builds[0].id,'finished'),0);
- await op('build',{deviceId:builds[0].id,allocations:[{batchId:r1.id,quantity:'2'}]},400);
- async function qc(verdict,value){const r=await qualityApi.POST(request('/api/quality/reports','POST',{requestId:crypto.randomUUID(),deviceId:builds[0].id,templateId:template.id,verdict,values:{purity:value},cause:'part',notes:'inspection'}));assert.equal(r.status,201,JSON.stringify(await r.json()));}
- await qc('fail','70');await op('repair',{deviceId:builds[0].id,oldBatchId:r1.id,newBatchId:r2.id,quantity:'1',reason:'bad part',cause:'part'});assert.equal(stock(r1.id,'nonconforming'),1000);assert.equal(stock(r2.id,'line'),0);
+ await op('prepare',{deviceId:builds[0].id,allocations:[{batchId:r1.id,quantity:'1'}],notes:''},400);
+ const before=stock(r1.id,'line');await op('prepare',{deviceId:builds[0].id,allocations:[{batchId:r1.id,quantity:'100'}],notes:'test deficit'},409);assert.equal(stock(r1.id,'line'),before);
+ await op('prepare',{deviceId:builds[0].id,allocations:[{batchId:r1.id,quantity:'1'},{batchId:r2.id,quantity:'1'}],notes:'split batch technical reason'});assert.equal(stock(r1.id,'line'),8000);
+ await op('build',{deviceId:builds[0].id,allocations:[{batchId:r1.id,quantity:'1'},{batchId:r2.id,quantity:'1'}]},400);
+ async function qc(verdict,value,did=builds[0].id){const r=await qualityApi.POST(request('/api/quality/reports','POST',{requestId:crypto.randomUUID(),deviceId:did,templateId:template.id,verdict,values:{purity:value},cause:'part',notes:'inspection'}));assert.equal(r.status,201,JSON.stringify(await r.json()));}
+ await qc('fail','70');await op('repair',{deviceId:builds[0].id,oldBatchId:r1.id,newBatchId:r2.id,quantity:'1',reason:'bad part',cause:'part'});assert.equal(stock(r1.id,'nonconforming'),1000);assert.equal(stock(r2.id,'line'),2000);
  await qc('pass','94');assert.equal(entities('finaltest').length,2);assert.equal(entities('repair').length,1);assert.equal(entities('finaltest')[0].data.verdict,'fail');
+ const finalize={id:crypto.randomUUID(),deviceId:builds[0].id,allocations:[{batchId:r2.id,quantity:'2'}],notes:''};await op('build',finalize);await op('build',finalize);assert.equal(stock(r2.id,'line'),0);
  await op('reject',{batchId:r1.id,quantity:'1',reason:'visual defect'});assert.equal(stock(r1.id,'line'),6000);assert.equal(stock(r1.id,'nonconforming'),2000);
+ await op('prepare',{deviceId:builds[1].id,allocations:[{batchId:r1.id,quantity:'2'}],notes:''});await qc('pass','93',builds[1].id);await qc('fail','70',builds[1].id);await op('build',{deviceId:builds[1].id,allocations:[{batchId:r1.id,quantity:'2'}],notes:''},400);await qc('pass','93',builds[1].id);
+ const finalize2={deviceId:builds[1].id,allocations:[{batchId:r1.id,quantity:'2'}],notes:''};await op('build',finalize2);
+ const fulfillment=load('app/api/fulfillment/route.ts');
+ async function finish(mode,b={},status=200,actor){const req=()=>fulfillment.POST(request('/api/fulfillment','POST',{id:crypto.randomUUID(),mode,...b}));const r=actor?await load('lib/mcp/context.ts').mcpActor.run(actor,req):await req();const d=await r.json();assert.equal(r.status,status,JSON.stringify(d));return d;}
+ const actor=(role,warehouses=[])=>({userId:role+'User',email:role+'@test.local',name:role,isAdmin:false,permissions:{read:[],write:[],eventStages:[],flowRoles:[role],warehouses}});
+ const wh=actor('inventory',['finished']),noWh=actor('inventory',['raw']),salesActor=actor('sales'),prod=actor('production'),log=actor('logistics');
+ const handoff={id:crypto.randomUUID(),deviceIds:builds.map(x=>x.id),packaged:true,notes:''};
+ await finish('handoff',handoff,400,prod); // cannot claim unprinted serials
+ await op('print',{planId:entities('plan')[0].id,notes:'physical print requested'});
+ await finish('handoff',handoff,200,prod);await finish('handoff',handoff,200,prod);
+ assert.equal(stock(builds[0].id,'finished'),0);assert.equal(stock(r1.id,'line'),4000);
+ await finish('receive',{handoffId:handoff.id,deviceIds:[builds[0].id],notes:'partial delivery'},403,noWh);
+ await finish('receive',{handoffId:handoff.id,deviceIds:[builds[0].id],notes:''},400,wh);
+ const receive={id:crypto.randomUUID(),handoffId:handoff.id,deviceIds:[builds[0].id],notes:'partial delivery'};await finish('receive',receive,200,wh);await finish('receive',receive,200,wh);assert.equal(stock(builds[0].id,'finished'),1000);
+ await finish('receive',{handoffId:handoff.id,deviceIds:[builds[0].id],notes:'again'},409,wh);
+ const partyId=crypto.randomUUID();await finish('party',{id:partyId,name:'Representative',kind:'representative',address:'Test city',phone:'123',active:true},200,salesActor);
+ await finish('reserve',{productId:p.id,partyId,count:2,deviceIds:[],notes:''},409,salesActor);
+ const saleId=crypto.randomUUID();await finish('reserve',{id:saleId,productId:p.id,partyId,count:1,deviceIds:[],notes:''},200,salesActor);
+ await finish('reserve',{productId:p.id,partyId,count:1,deviceIds:[builds[0].id],notes:''},409,salesActor); // cannot double reserve
+ assert.equal(stock(builds[0].id,'finished'),1000); // reservation is not exit
+ await finish('receive',{handoffId:handoff.id,deviceIds:[builds[1].id],notes:''},200,wh);
+ const carrierId=crypto.randomUUID(),now=new Date().toISOString();sql.prepare("INSERT INTO app_members(id,email,name,unit,status,subject,permissions,revision,created,updated) VALUES(?,?,?,'تدارکات','active',?,?,1,?,?)").run(carrierId,'carrier@example.com','Carrier',log.userId,JSON.stringify(log.permissions),now,now);
+ const dispatch={id:crypto.randomUUID(),saleId,deviceIds:[builds[1].id],carrierId,handedOver:true,reason:'serial substitution',receiptReference:'R1'};
+ await finish('dispatch',dispatch,403,salesActor);await finish('dispatch',{...dispatch,reason:''},400,wh);
+ await finish('dispatch',dispatch,200,wh);await finish('dispatch',dispatch,200,wh);assert.equal(stock(builds[1].id,'finished'),0);assert.equal(stock(builds[1].id,'in_transit'),1000);assert.equal(entities('build').find(x=>x.id===builds[0].id).data.state,'finished');
+ await finish('cancel_sale',{saleId,reason:'too late'},400,salesActor);
+ await finish('acknowledge',{saleId,notes:''},403,{...log,userId:'wrongCarrier'});await finish('acknowledge',{saleId,notes:'received'},200,log);
+ const cancelled=crypto.randomUUID();await finish('reserve',{id:cancelled,productId:p.id,partyId,count:1,deviceIds:[builds[0].id],notes:''},200,salesActor);await finish('cancel_sale',{saleId:cancelled,reason:'customer cancelled'},200,salesActor);assert.equal(entities('build').find(x=>x.id===builds[0].id).data.state,'finished');
+ assert.equal(stock(r1.id,'line'),4000);assert.equal(stock(r2.id,'line'),0); // no double consumption at warehouse receipt or dispatch
+ const outsider=await load('lib/mcp/context.ts').mcpActor.run({...log,userId:'wrongCarrier'},()=>fulfillment.GET());assert.equal((await outsider.json()).sales.length,0);
+ token=(await mint('read')).token;assert.ok(!(await call('get_fulfillment')).error);assert.ok((await call('reserve_finished_sale',{id:crypto.randomUUID(),partyId,productId:p.id,count:1,deviceIds:[],notes:'',confirmed:true})).error);
+ token=(await mint('read_write')).token;const mcpSale=crypto.randomUUID();assert.ok(!(await call('reserve_finished_sale',{id:mcpSale,partyId,productId:p.id,count:1,deviceIds:[],notes:'',confirmed:true})).error);assert.ok(!(await call('cancel_finished_sale',{id:crypto.randomUUID(),saleId:mcpSale,reason:'MCP test',confirmed:true})).error);
+ const raceBodies=[1,2].map(()=>({id:crypto.randomUUID(),mode:'reserve',partyId,productId:p.id,count:1,deviceIds:[builds[0].id],notes:''}));const race=await Promise.all(raceBodies.map(b=>fulfillment.POST(request('/api/fulfillment','POST',b))));assert.deepEqual(race.map(r=>r.status).sort(),[200,409]);
+ console.log('Fulfillment passed: pre-QC materials, print gate, partial receipt, warehouse scope, reservation collision, serial swap, physical dispatch, idempotency, carrier-only acknowledgment, cancellation, no double consumption.');
  await op('supply',{materialId:'material:01',quantity:'5',notes:'planned need'});await op('supply',{materialId:'material:01',quantity:'5',notes:'duplicate'},409);
  assert.equal((await flow.GET()).status,200);
  const worker={userId:'worker',email:'worker@example.com',name:'Worker',isAdmin:false,permissions:{read:['batch'],write:['batch'],eventStages:[],flowRoles:['production']}};

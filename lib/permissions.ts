@@ -3,17 +3,18 @@ import type {Kind} from "./model";
 export const modules: Kind[] = ["product", "batch", "device", "event", "service", "action", "distribution", "firmware"];
 const productionModules:Kind[]=["batch", "device", "event", "service", "action"];
 export const stages = ["مصرف قطعه", "مونتاژ", "آزمون نهایی", "بسته‌بندی", "تحویل"];
-export type Permissions = {flowRoles?: string[];read: Kind[]; write: Kind[]; eventStages: string[]; finance?: "none"|"read"|"write"};
+export type Permissions = {warehouses?: string[];flowRoles?: string[];read: Kind[]; write: Kind[]; eventStages: string[]; finance?: "none"|"read"|"write"};
 export type Session = {username?:string;authType?:"password"|"chatgpt";userId: string; email: string; name: string; isAdmin: boolean; permissions: Permissions};
 export type Member = {username?:string;id: string; email: string; name: string; unit: string; status: string; userId: string | null; permissions: Permissions; revision: number; created: string; updated: string};
-export const allPermissions: Permissions = {flowRoles:["inventory","qc","production","procurement"],read: modules, write: modules, eventStages: stages, finance: "write"};
+export const allPermissions: Permissions = {warehouses:["raw","line","quarantine","nonconforming","finished"],flowRoles:["inventory","qc","production","procurement","sales","logistics"],read: modules, write: modules, eventStages: stages, finance: "write"};
 export const presets: Record<string, Permissions> = {
  "تأمین": {flowRoles:["procurement"],read:["batch"],write:[],eventStages:[]},
+  "تدارکات": {flowRoles:["logistics"],read:[],write:[],eventStages:[]},
   "مالی": {read: [], write: [], eventStages: [], finance: "write"},
   "انبار": {flowRoles:["inventory"],read: ["batch"], write: ["batch"], eventStages: []},
   "تولید": {flowRoles:["production"],read: ["product", "batch", "device", "event"], write: ["device", "event"], eventStages: ["مصرف قطعه", "مونتاژ", "بسته‌بندی"]},
   "کنترل کیفیت": {flowRoles:["qc"],read: productionModules, write: ["batch", "event", "action"], eventStages: ["آزمون نهایی"]},
-  "فروش و تحویل": {read: ["batch", "device", "event", "distribution"], write: ["event", "distribution"], eventStages: ["تحویل"]},
+  "فروش و تحویل": {flowRoles:["sales"],read: ["batch", "device", "event", "distribution"], write: ["event", "distribution"], eventStages: ["تحویل"]},
   "خدمات پس از فروش": {read: [...productionModules,"distribution"], write: ["service", "action"], eventStages: []},
   "مدیریت — فقط مشاهده": {read: modules, write: [], eventStages: []},
   "سفارشی": {read: [], write: [], eventStages: []},
@@ -29,6 +30,7 @@ export function validatePermissions(value: unknown): Permissions {
   if (p.write.includes("action") && (!p.read.includes("device") || !p.read.includes("batch"))) throw new Error("ثبت اقدام اصلاحی به مشاهده دستگاه و بچ نیاز دارد.");
   if(p.read.includes("distribution")&&!p.read.includes("device"))throw new Error("مشاهده نماینده و مشتری به مشاهده دستگاه نیاز دارد.");
   if(p.finance!==undefined&&!(["none","read","write"] as unknown[]).includes(p.finance))throw new Error("دسترسی مالی معتبر نیست.");
-  if(p.flowRoles!==undefined&&(!Array.isArray(p.flowRoles)||p.flowRoles.some(r=>!['inventory','qc','production','procurement'].includes(r))))throw new Error('نقش گردش مواد معتبر نیست.');
-  return {flowRoles:[...new Set(p.flowRoles||[])],finance:p.finance||"none",read: [...new Set(p.read)], write: [...new Set(p.write)], eventStages: p.write.includes("event") ? [...new Set(p.eventStages)] : []};
+  if(p.flowRoles!==undefined&&(!Array.isArray(p.flowRoles)||p.flowRoles.some(r=>!['inventory','qc','production','procurement','sales','logistics'].includes(r))))throw new Error('نقش گردش مواد معتبر نیست.');
+  if(p.warehouses!==undefined&&(!Array.isArray(p.warehouses)||p.warehouses.some(w=>!['raw','line','quarantine','nonconforming','finished'].includes(w))))throw new Error('انبار مجاز معتبر نیست.');
+  return {...(p.warehouses!==undefined?{warehouses:[...new Set(p.warehouses)]}:{}),flowRoles:[...new Set(p.flowRoles||[])],finance:p.finance||"none",read: [...new Set(p.read)], write: [...new Set(p.write)], eventStages: p.write.includes("event") ? [...new Set(p.eventStages)] : []};
 }
