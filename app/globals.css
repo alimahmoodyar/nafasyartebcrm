@@ -165,3 +165,5 @@ html,button,input,textarea,select,option,svg text{font-family:"Vazirmatn",sans-s
 .assistant-widget.is-dragging .assistant-launcher{cursor:grabbing;box-shadow:0 12px 32px #26316b55}
 .assistant-widget .assistant-window{position:fixed;overflow-y:auto}
 @media(max-width:600px){.assistant-widget{bottom:calc(104px + env(safe-area-inset-bottom))}.assistant-launcher{padding:7px 12px 7px 7px}}
+
+.company-app-name{font-size:24px;font-weight:800;line-height:1.7;margin:4px 0 0;color:#39429a}.workspace-brand .company-app-name{color:#fff}.login-app-subtitle{font-size:16px;color:#65718b;margin:-4px 0 20px}
