@@ -154,3 +154,14 @@ html,button,input,textarea,select,option,svg text{font-family:"Vazirmatn",sans-s
 @media(prefers-reduced-motion:reduce){.workspace-body .daily-action{transition:none}.workspace-body .daily-action:hover{transform:none}}
 
 .assistant-voice{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid #e2e7ef}.assistant-voice span{font-size:13px;color:#536079}.assistant-voice .btn{display:flex;gap:6px;align-items:center;flex-shrink:0}.assistant-voice .voice-active{background:#fce7e7;color:#9b2727;border-color:#edb8b8}.assistant-action-card{padding:14px;margin:12px 0;background:#f5faf8;border:1px solid #c9dfd5;border-radius:12px;overflow-wrap:anywhere}.assistant-action-card>p{margin:8px 0}.assistant-arguments{margin:8px 0;font-size:14px}.assistant-arguments>div{padding:6px 0;border-bottom:1px solid #e0e8e4}.assistant-arguments dt{font-weight:600;color:#465877}.assistant-arguments dd{margin:4px 0;white-space:pre-wrap;overflow-wrap:anywhere}.assistant-action-card details{margin:10px 0}.assistant-action-card summary{cursor:pointer}.assistant-window{max-height:min(820px,calc(100dvh - 110px))}.assistant-messages{min-height:80px}
+
+/* Movable assistant: higher default position, uniform brand robot icon. */
+.assistant-widget{bottom:calc(104px + env(safe-area-inset-bottom))}
+.assistant-launcher{touch-action:none;user-select:none;cursor:grab;padding:8px 15px 8px 8px;gap:10px;background:linear-gradient(125deg,#303d89,#4857a5);border:1px solid #ffffff60;box-shadow:0 8px 24px #26316b38;min-height:64px;transition:box-shadow .15s}
+.assistant-launcher:hover{transform:none;box-shadow:0 10px 28px #26316b50}
+.assistant-avatar{display:grid;place-items:center;width:46px;height:46px;border-radius:50%;background:#ffffff18;border:1px solid #ffffff45;color:#fff}
+.assistant-launcher-label{display:flex;flex-direction:column;align-items:flex-start;line-height:1.7}
+.assistant-launcher-label small{font-size:12px;font-weight:400;color:#e4eaff}
+.assistant-widget.is-dragging .assistant-launcher{cursor:grabbing;box-shadow:0 12px 32px #26316b55}
+.assistant-widget .assistant-window{position:fixed;overflow-y:auto}
+@media(max-width:600px){.assistant-widget{bottom:calc(104px + env(safe-area-inset-bottom))}.assistant-launcher{padding:7px 12px 7px 7px}}
