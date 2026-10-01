@@ -1,3 +1,4 @@
+import {providerRequest,completionBody} from '@/lib/llm-provider';
 import {validate,type Kind} from '@/lib/model';
 import {userActions} from '@/app/api/assistant/actions/route';
 import {assistantReadNames,assistantWriteNames,sectionTitles,canOpenSection,actionTitles} from '@/lib/assistant-policy';
@@ -25,9 +26,8 @@ export async function POST(request:Request){let started=false,id='',owner='';try
 
  let answer='',calls=0,navigation='';const used:string[]=[];
  for(let round=0;round<4;round++){
- const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),25000);let response:Response;try{response=await fetch(endpoint,{method:'POST',redirect:'manual',signal:controller.signal,headers:{'Content-Type':'application/json',...(key?{Authorization:'Bearer '+key}:{})},body:JSON.stringify({model:profile.model,messages,temperature:Number(profile.temperature),max_tokens:Math.min(profile.max_tokens,4096),...(round<3?{tools:[...available.map(t=>({type:'function',function:{name:t.name,description:(t.write?'PREPARE ONLY; user must confirm before execution. ':'')+t.description,parameters:t.write?{...t.inputSchema,required:t.inputSchema.required.filter((k:string)=>!['confirmed',...(t.name==='issue_production_material'?[]:['requestId']),...(['update_record','delete_record'].includes(t.name)?[]:['id'])].includes(k))}:t.inputSchema}})),navigationTool],tool_choice:'auto'}:{})})});}catch{throw new AccessError('اتصال به ارائه‌دهنده مدل انجام نشد یا زمان پاسخ تمام شد.',502);}finally{clearTimeout(timer);}
- if(response.status>=300&&response.status<400)throw new AccessError('ارائه‌دهنده مدل هدایت غیرمجاز برگرداند.',502);if(!response.ok)throw new AccessError(response.status===401||response.status===403?'کلید API یا مجوز مدل معتبر نیست؛ مدیر تنظیمات LLM را بررسی کند.':response.status===429?'سهمیه یا محدودیت ارائه‌دهنده مدل پر شده است.':'ارائه‌دهنده مدل پاسخ ناموفق داد (HTTP '+response.status+').',502);
- const payload=await response.json() as any,message=payload.choices?.[0]?.message;if(!message)throw new AccessError('پاسخ مدل با Chat Completions سازگار نیست.',502);
+ const payload=await providerRequest(profile,key,'/chat/completions',completionBody(profile,messages,{...(round<3?{tools:[...available.map(t=>({type:'function',function:{name:t.name,description:(t.write?'PREPARE ONLY; user must confirm before execution. ':'')+t.description,parameters:t.write?{...t.inputSchema,required:t.inputSchema.required.filter((k:string)=>!['confirmed',...(t.name==='issue_production_material'?[]:['requestId']),...(['update_record','delete_record'].includes(t.name)?[]:['id'])].includes(k))}:t.inputSchema}})),navigationTool],tool_choice:'auto'}:{})}));
+ const message=payload.choices?.[0]?.message;if(!message)throw new AccessError('پاسخ مدل با Chat Completions سازگار نیست.',502);
  if(!message.tool_calls?.length){answer=typeof message.content==='string'?message.content:'';break;}
  if(!Array.isArray(message.tool_calls)||message.tool_calls.length>6||calls+message.tool_calls.length>8)throw new AccessError('درخواست به بررسی بیشتری نیاز دارد؛ سؤال را محدودتر بپرسید.',400);
  messages.push({role:'assistant',content:message.content||null,tool_calls:message.tool_calls});
