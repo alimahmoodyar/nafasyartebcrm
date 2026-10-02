@@ -10,7 +10,7 @@ export const allPermissions: Permissions = {transportRoles:['manager','driver'],
 export const presets: Record<string, Permissions> = {
  "تأمین": {flowRoles:["procurement"],read:["batch"],write:[],eventStages:[]},
   "مسئول تدارکات": {transportRoles:["manager"],read:[],write:[],eventStages:[]},
-  "تدارکات": {transportRoles:["driver"],flowRoles:["logistics"],read:[],write:[],eventStages:[]},
+  "کارشناس تدارکات و حمل‌ونقل": {transportRoles:["driver"],flowRoles:[],read:[],write:[],eventStages:[]},
   "مالی": {read: [], write: [], eventStages: [], finance: "write"},
   "انبار": {flowRoles:["inventory"],read: ["batch"], write: ["batch"], eventStages: []},
   "تولید": {flowRoles:["production"],read: ["product", "batch", "device", "event"], write: ["device", "event"], eventStages: ["مصرف قطعه", "مونتاژ", "بسته‌بندی"]},
