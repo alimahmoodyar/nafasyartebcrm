@@ -133,3 +133,20 @@ export const dutyNotices=sqliteTable('duty_notices',{
 export const sourcingHolds=sqliteTable('sourcing_holds',{
  id:text('id').primaryKey(),planId:text('plan_id').notNull().references(()=>flowEntities.id),partCode:text('part_code').notNull(),unit:text('unit').notNull(),sourceType:text('source_type').notNull(),sourceId:text('source_id').notNull(),quantity:integer('quantity').notNull(),
 },t=>[uniqueIndex('idx_sourcing_hold_source_plan').on(t.planId,t.sourceType,t.sourceId),index('idx_sourcing_hold_source').on(t.sourceType,t.sourceId),check('sourcing_hold_positive',sql`${t.quantity}>0`)]);
+
+export const serviceActivations=sqliteTable('service_activations',{serial:text('serial').primaryKey(),day:text('day').notNull(),months:integer('months').notNull(),source:text('source').notNull(),created:text('created').notNull(),actor:text('actor').notNull()});
+export const serviceLots=sqliteTable('service_lots',{
+ id:text('id').primaryKey(),owner:text('owner').notNull(),domain:text('domain').notNull(),batchId:text('batch_id').notNull().references(()=>records.id),orderId:text('order_id'),lineId:text('line_id'),quantity:integer('quantity').notNull(),unitRial:text('unit_rial').notNull(),created:text('created').notNull(),
+},t=>[index('idx_service_lots_owner').on(t.owner,t.domain),check('service_lot_nonnegative',sql`${t.quantity}>=0`)]);
+export const serviceReservations=sqliteTable('service_reservations',{
+ id:text('id').primaryKey(),caseId:text('case_id').notNull().references(()=>flowEntities.id),lineId:text('line_id').notNull(),lotId:text('lot_id').notNull().references(()=>serviceLots.id),quantity:integer('quantity').notNull(),
+},t=>[uniqueIndex('idx_service_reserve_line_lot').on(t.caseId,t.lineId,t.lotId),index('idx_service_reserve_lot').on(t.lotId),check('service_reservation_positive',sql`${t.quantity}>0`)]);
+export const serviceLedger=sqliteTable('service_ledger',{
+ id:text('id').primaryKey(),agentId:text('agent_id').notNull().references(()=>flowEntities.id),domain:text('domain').notNull(),kind:text('kind').notNull(),sourceId:text('source_id').notNull(),debit:text('debit').notNull(),credit:text('credit').notNull(),due:text('due'),data:text('data').notNull(),created:text('created').notNull(),actor:text('actor').notNull(),
+},t=>[uniqueIndex('idx_service_ledger_source_kind').on(t.sourceId,t.kind),index('idx_service_ledger_agent').on(t.agentId,t.created)]);
+export const serviceOffsets=sqliteTable('service_offsets',{
+ id:text('id').primaryKey(),debitId:text('debit_id').notNull().references(()=>serviceLedger.id),creditId:text('credit_id').notNull().references(()=>serviceLedger.id),amount:text('amount').notNull(),created:text('created').notNull(),actor:text('actor').notNull(),
+},t=>[index('idx_service_offset_debit').on(t.debitId),index('idx_service_offset_credit').on(t.creditId)]);
+export const serviceFiles=sqliteTable('service_files',{
+ id:text('id').primaryKey(),caseId:text('case_id').notNull().references(()=>flowEntities.id),purpose:text('purpose').notNull(),objectKey:text('object_key').notNull(),filename:text('filename').notNull(),mime:text('mime').notNull(),byteSize:integer('byte_size').notNull(),sha256:text('sha256').notNull(),created:text('created').notNull(),actor:text('actor').notNull(),
+},t=>[index('idx_service_files_case').on(t.caseId)]);

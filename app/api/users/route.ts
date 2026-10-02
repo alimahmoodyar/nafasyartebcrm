@@ -16,6 +16,7 @@ function payload(value: any) {
   if (!["active", "disabled"].includes(value.status)) throw new Error("وضعیت حساب معتبر نیست.");
   return {email, name, unit, status: value.status, permissions: JSON.stringify(validatePermissions(value.permissions))};
 }
+async function checkServiceAgent(permissions:string){const p=JSON.parse(permissions);if(p.serviceAgentId){const row:any=await storage().prepare("SELECT data FROM flow_entities WHERE id=? AND type='as_agent'").bind(p.serviceAgentId).first();if(!row||!JSON.parse(row.data).active||p.serviceDomains.length!==1||p.serviceDomains[0]!==JSON.parse(row.data).domain)throw new Error('نماینده فعال و حوزه منطبق را انتخاب کنید.');}}
 function failure(error: unknown) {
   console.error(error);
   const denied = accessResponse(error); if (denied) return denied;
@@ -30,6 +31,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     checkOrigin(request); const actor = await requireAdmin(); const body=await request.json() as any;const local=!!body.username;const login=local?username(body.username):null;const passwordHash=local?await hashPassword(password(body.password)):null;const data = payload({...body,email:local?crypto.randomUUID()+"@local.invalid":body.email});
+    await checkServiceAgent(data.permissions);
     const id = crypto.randomUUID(), now = new Date().toISOString();
     const row = {id, ...data, subject: null, username:login||undefined, revision: 1, created: now, updated: now};
     const db = storage();
@@ -49,6 +51,7 @@ export async function PATCH(request: Request) {
     const db = storage(); const old = await db.prepare("SELECT * FROM app_members WHERE id = ?").bind(body.id).first<any>();
     if (!old) return Response.json({error: "حساب یافت نشد."}, {status: 404});
     const credential:any=await db.prepare("SELECT username FROM password_accounts WHERE member_id=?").bind(body.id).first();const data=payload({...body,email:credential?old.email:body.email});const newHash=credential&&body.password?await hashPassword(password(body.password)):null;
+    await checkServiceAgent(data.permissions);
     if (old.email !== data.email) throw new Error("ایمیل حساب ثابت است؛ برای ایمیل دیگر حساب جدا تعریف کنید.");
     if (old.revision !== body.revision) return Response.json({error: "حساب توسط فرد دیگری تغییر کرده است؛ فهرست را تازه کنید."}, {status: 409});
     const now = new Date().toISOString(); const next = {...old, ...data,username:credential?.username, updated: now, revision: old.revision + 1};
