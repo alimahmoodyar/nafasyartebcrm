@@ -2,7 +2,7 @@ import {tehranDay} from './serials';
 import type {Session} from './permissions';
 export const flowRoles=['inventory','qc','production','procurement','sales','logistics'] as const;
 export const roleNames:Record<string,string>={inventory:'انبار',qc:'کنترل کیفیت',production:'تولید',procurement:'تأمین',sales:'فروش',logistics:'تدارکات'};
-export function flowRole(u:Session,role:string){return u.isAdmin||u.permissions.flowRoles?.includes(role)||false;}
+export function flowRole(u:Session,role:string){return u.isAdmin||u.permissions.flowRoles?.includes(role)||role==='logistics'&&!!u.permissions.transportRoles?.includes('driver')||false;}
 export const entity=(r:any)=>({...r,data:JSON.parse(r.data)});
 export const qty=(n:number)=>String(n/1000);
 export function suggestion(material:any,balances:any[],receipts:any[],builds:any[],boms:any[]){
