@@ -36,6 +36,7 @@ import {can,AccessError} from '@/lib/authorization';
 import {mcpActor} from './context';
 import type {McpPrincipal} from './auth';
 import {storage} from '@/lib/storage';
+import {presets} from '@/lib/permissions';
 
 type Schema=Record<string,any>;
 const text=(description='',maxLength=4000):Schema=>({type:'string',description,maxLength});
@@ -100,6 +101,7 @@ api('record_quality_report','Record measured values, verdict and notes; also cre
 add({name:'finance_report_catalog',description:'Daily/weekly financial report requirements and purpose.',inputSchema:obj({}),write:false,finance:true,run:async()=>financeReports});
 api('get_finance_period','List report files and review results/questions/answers/closures for a day or week.',obj(period),'/api/finance','GET',finance.GET,{finance:true},['cadence','period']);
 api('add_finance_note','Append review result, question, answer or closure. Questions need responsible; answers/closures need parent_id. Reuse id for retries.',obj({...period,id,report_id:text('',80),kind:enumeration(['result','question','answer','closure']),body:text('',5000),responsible:text('',150),parent_id:id,confirmed},['cadence','period','id','report_id','kind','body','confirmed']),'/api/finance','POST',finance.POST,{finance:true},['cadence','period']);
+add({name:'get_user_creation_guide',description:'Admin: account fields, permission presets and role labels. Ask one question at a time; position does not grant permissions. Never request passwords in chat; the assistant confirmation card collects the password privately.',inputSchema:obj({}),write:false,admin:true,run:async()=>({fields:['name','username','unit','status','permissions'],presets,serviceRoles,serviceDomains,notes:'Ask explicitly for access scope; suggest a least-privilege preset for approval. Commerce needs domestic or foreign unit. Agent accounts need exact organization and domain. New accounts are staff, not administrators. Password is entered in the secure confirmation field, never chat.'})});
 api('list_users','List app accounts and permissions. Admin only.',obj({}),'/api/users','GET',users.GET,{admin:true});
 api('create_user','Create an account with explicit permissions. Admin only; confirm the email and grants.',payload(member),'/api/users','POST',users.POST,{admin:true});
 api('update_user','Change account status or permissions using current revision. Cannot change email. Admin only.',payload({...member,id,revision:integer(1,1e9)}),'/api/users','PATCH',users.PATCH,{admin:true});
@@ -169,7 +171,7 @@ flowPost('record_serial_print','Record serial print/reprint intent for daily pla
 // Optional additions preserve compatibility with earlier clients.
 const qcTool=tools.find(t=>t.name==='record_quality_report')!;qcTool.inputSchema.required=qcTool.inputSchema.required.filter((k:string)=>k!=='cause');
 
-api('decide_assistant_action','Confirm or cancel an immutable proposed assistant action owned by this account. Read its exact args in get_assistant_chat first. Confirm only after explicit user approval. Repeated confirmation never executes twice.',obj({id,decision:enumeration(['confirm','cancel']),confirmed},['id','decision','confirmed']),'/api/assistant/actions','POST',assistantActions.POST,{},[],a=>a);
+api('decide_assistant_action','Confirm or cancel an immutable proposed assistant action owned by this account. Read its exact args in get_assistant_chat first. Confirm only after explicit user approval. Repeated confirmation never executes twice.',obj({id,decision:enumeration(['confirm','cancel']),confirmed,password:text('Only for creating a password account. Supply securely at confirmation; never place in chat or proposal.',128)},['id','decision','confirmed']),'/api/assistant/actions','POST',assistantActions.POST,{},[],a=>a);
 
 api('test_llm_connection','Admin: list models from a saved provider profile or probe Chat Completions tool calling. Probe may incur provider cost; confirmed must be true. Does not change saved settings or company data.',obj({id,mode:enumeration(['models','probe']),confirmed}),'/api/llm-config/test','POST',llmTest.POST,{admin:true,write:false},[],a=>a);
 

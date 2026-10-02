@@ -53,9 +53,9 @@ export function AssistantChat({admin,onSettings,accountId,accountName,onAccountC
  if(!check.ok||current.userId!==accountId||d.accountId!==accountId){setMessages([]);changed.current();return;}
  setActions(d.actions||[]);if(d.navigation){setCompact(true);onNavigate(d.navigation);}setMessages(m=>[...m,{role:'user',text:question},{role:'assistant',text:d.answer}]);setInput('');pending.current=null;
  }catch(e){if(generation===epoch.current)setError(e instanceof Error?e.message:'ارسال انجام نشد.')}finally{if(generation===epoch.current)setBusy(false)}}
- async function decide(id:string,decision:'confirm'|'cancel'){
+ async function decide(id:string,decision:'confirm'|'cancel',password?:string){
  if(busy||loading)return;const generation=epoch.current;setBusy(true);setError('');try{
- const r=await fetch('/api/assistant/actions',{method:'POST',headers:{'Content-Type':'application/json','x-assistant-account':accountId},body:JSON.stringify({id,decision,confirmed:decision==='confirm'})}),d=await r.json() as any;
+ const r=await fetch('/api/assistant/actions',{method:'POST',headers:{'Content-Type':'application/json','x-assistant-account':accountId},body:JSON.stringify({id,decision,confirmed:decision==='confirm',...(password?{password}:{})})}),d=await r.json() as any;
  if(generation!==epoch.current)return;if(r.status===401||r.status===409&&d.error?.includes('حساب ورود')){changed.current();return;}if(!r.ok)throw new Error(d.error);
  const check=await fetch('/api/session',{cache:'no-store'}),current=await check.json() as any;if(generation!==epoch.current)return;
  if(!check.ok||current.userId!==accountId||d.accountId!==accountId){changed.current();return;}

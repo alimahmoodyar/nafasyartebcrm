@@ -1,3 +1,4 @@
+import {password as validatePassword} from '@/lib/password-auth';
 import {requireAccess,checkOrigin,accessResponse,AccessError} from '@/lib/authorization';
 import {storage} from '@/lib/storage';
 import {executeTool} from '@/lib/mcp/tools';
@@ -15,12 +16,13 @@ export async function POST(request:Request){try{
  if(b.decision==='cancel')await db.prepare("UPDATE assistant_actions SET state='cancelled' WHERE id=? AND owner=? AND state='pending'").bind(a.id,u.userId).run();
  else{
  if(b.confirmed!==true)throw new AccessError('تأیید صریح خلاصه فرمان لازم است.',400);
+ if(a.tool==='create_password_user'){if(!u.isAdmin)throw new AccessError('ایجاد حساب فقط برای مدیر سامانه مجاز است.',403);try{validatePassword(b.password);}catch{throw new AccessError('رمز عبور ۱۰ تا ۱۲۸ کاراکتری را در کادر امن کارت وارد کنید؛ آن را در گفتگو ننویسید.',400);}}
  if(!assistantWriteNames.has(a.tool))throw new AccessError('این عملیات در دستیار مجاز نیست.',403);
  // Atomic claim: no duplicate execution even after network failures or simultaneous confirmations.
  const claim:any=await db.prepare("UPDATE assistant_actions SET state='running' WHERE id=? AND owner=? AND state='pending' AND expires>? RETURNING id").bind(a.id,u.userId,new Date().toISOString()).first();
  if(!claim)throw new AccessError('فرمان منقضی شده یا قبلاً اجرا شده است؛ وضعیت را تازه کنید.',409);
  try{
- const result=await executeTool(a.tool,{...JSON.parse(a.args),confirmed:true},new URL(request.url).origin,{user:u,scope:'read_write',tokenId:null});
+ const result=await executeTool(a.tool,{...JSON.parse(a.args),...(a.tool==='create_password_user'?{password:b.password}:{}),confirmed:true},new URL(request.url).origin,{user:u,scope:'read_write',tokenId:null});
  const raw=JSON.stringify(result);await db.prepare("UPDATE assistant_actions SET state='succeeded',result=? WHERE id=? AND owner=?").bind(raw.length>12000?JSON.stringify({notice:'عملیات ثبت شد؛ جزئیات کامل در بخش مربوطه موجود است.'}):raw,a.id,u.userId).run();
  }catch(e){
  // Unknown commit outcomes must never be blindly retried. Domain handlers still enforce roles and revisions.
