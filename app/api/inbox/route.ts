@@ -1,0 +1,50 @@
+import {requireAccess,checkOrigin,accessResponse,AccessError} from '@/lib/authorization';
+import {storage} from '@/lib/storage';
+import {boundedBody} from '@/lib/firmware-storage';
+import {taskRequired as required,taskText as text,validDay} from '@/lib/duties';
+import {inboxAccess,inboxAssistantExecution,inboxClosed,inboxDecode,inboxDirectory,inboxIdentity,inboxLink,inboxList,inboxState,inboxView} from '@/lib/inbox';
+import {inboxModes,inboxStates,inboxHelp} from '@/lib/inbox-contract';
+const json=(x:unknown)=>Response.json(x,{headers:{'Cache-Control':'private, no-store','Vary':'Cookie, Authorization'}});
+const fail=(s:string,status=400):never=>{throw new AccessError(s,status)};
+function due(v:any){const s=required(v,40);if(!/^\d{4}-\d\d-\d\dT([01]\d|2[0-3]):[0-5]\d:00\+03:30$/.test(s)||!validDay(s.slice(0,10))||Date.parse(s)<=Date.now())fail('مهلت آینده با ساعت تهران انتخاب کنید.');return new Date(s).toISOString();}
+export async function GET(request:Request){try{const u=await requireAccess(),q=new URL(request.url).searchParams,db=storage(),id=q.get('thread')||'';if(q.get('view')==='directory')return json(await inboxDirectory(u));
+ if(id){const t=await inboxAccess(id,u),offset=Math.max(0,Math.min(10000,Number(q.get('offset'))||0)),messages=(await db.prepare("SELECT * FROM flow_entities WHERE type='inbox_message' AND json_extract(data,'$.thread')=? ORDER BY created DESC,id DESC LIMIT 51 OFFSET ?").bind(id,offset).all()).results;let link=null;try{link=await inboxLink(u,t.data.link)}catch{}const files=(await db.prepare("SELECT * FROM flow_entities WHERE type='inbox_file' AND json_extract(data,'$.thread')=? ORDER BY created DESC").bind(id).all()).results.map((r:any)=>{const d=JSON.parse(r.data);delete d.objectKey;return {id:r.id,...d};});return json({accountId:u.userId,thread:await inboxView(t),messages:messages.slice(0,50).reverse().map((r:any)=>({id:r.id,created:r.created,...JSON.parse(r.data)})),nextOffset:messages.length>50?offset+50:null,link,files});}
+ const d=await inboxList(u),attention=d.threads.filter((t:any)=>t.needsAttention);return json({accountId:u.userId,me:await inboxIdentity(u),...d,summary:{unread:d.threads.filter((t:any)=>t.unread).length,overdue:d.threads.filter((t:any)=>t.overdue&&t.needsAttention).length,review:d.threads.filter((t:any)=>t.needsReview).length,attention:attention.length,next:attention.sort((a:any,b:any)=>(Number(b.priority==='urgent')-Number(a.priority==='urgent'))||(a.due||'9999').localeCompare(b.due||'9999')).slice(0,5).map((t:any)=>({id:t.id,title:t.title,sender:t.senderName,due:t.due,state:t.state}))},modes:inboxModes,states:inboxStates,help:inboxHelp});
+ }catch(e){return accessResponse(e)||Response.json({error:'دریافت صندوق ممکن نشد؛ دوباره تلاش کنید.'},{status:503})}}
+export async function POST(request:Request){try{checkOrigin(request);const u=await requireAccess(),db=storage(),me=await inboxIdentity(u),b=JSON.parse(new TextDecoder().decode(await boundedBody(request,80000))),id=required(b.id,100),mode=required(b.mode,40),now=new Date().toISOString();if(!/^[a-f0-9-]{36}$/i.test(id)||!inboxModes[mode])fail('عملیات معتبر نیست.');const signature=JSON.stringify(b);let t:any=null;if(mode!=='create')t=await inboxAccess(required(b.threadId,200),u);const previous:any=await db.prepare('SELECT payload,actor FROM inventory_operations WHERE id=?').bind(id).first();if(previous){if(previous.actor!==u.userId||previous.payload!==signature)fail('شناسه عملیات تکراری است.',409);return json({saved:true,repeated:true,threadId:t?.id||id});}
+ const statements:D1PreparedStatement[]=[],target=t?.id||id;let d:any=t?{...t.data}:null;let body=typeof b.body==='string'?text(b.body,12000):'';const viaAssistant=inboxAssistantExecution.getStore()===true;
+ const guard=(sql:string,...args:any[])=>statements.push(db.prepare('UPDATE inventory_operations SET guard=CASE WHEN '+sql+' THEN guard ELSE 0 END WHERE id=?').bind(...args,id));
+ if(mode==='read'||mode==='snooze'){
+  const s=await inboxState(target,me);if(mode==='read'){if(!Number.isInteger(b.revision)||b.revision<1||b.revision>t.revision)fail('نسخه پیام معتبر نیست.');s.readRevision=Math.max(s.readRevision||0,b.revision);}else{s.snoozeUntil=due(b.until);if(Date.parse(s.snoozeUntil)>Date.now()+7*86400000)fail('یادآوری حداکثر هفت روز بعد باشد.');}
+  const sid='inbox-state:'+target+':'+me;statements.push(db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'inbox_state',?,1,?,?) ON CONFLICT(id) DO UPDATE SET data=json_set(flow_entities.data,'$.readRevision',MAX(COALESCE(json_extract(flow_entities.data,'$.readRevision'),0),?),'$.snoozeUntil',?),revision=flow_entities.revision+1,updated=excluded.updated").bind(sid,JSON.stringify(s),now,now,s.readRevision||0,s.snoozeUntil||''));
+ }else{
+  if(mode==='create'){
+   const dir=await inboxDirectory(u);if(!['person','position'].includes(b.recipientType))fail('نوع گیرنده معتبر نیست.');const list=b.recipientType==='person'?dir.people:dir.positions,recipient:any=list.find((x:any)=>x.id===b.recipientId);if(!recipient)fail('گیرنده فعال انتخاب کنید.');if(b.recipientType==='person'&&recipient.id===me||b.recipientType==='position'&&!(recipient as any).members.some((x:string)=>x!==me))fail('گیرنده باید شخص دیگری یا سمتی دارای همکار فعال باشد.');if(!['message','request'].includes(b.kind)||!['normal','urgent'].includes(b.priority))fail('نوع یا اولویت معتبر نیست.');body=required(b.body,12000);const link=b.link?.id?await inboxLink(u,b.link):null;d={title:required(b.title,180),kind:b.kind,priority:b.priority,sender:me,senderName:u.name,recipientType:b.recipientType,recipientId:recipient.id,recipientName:recipient.name,assignee:b.recipientType==='person'?recipient.id:'',state:'open',due:b.kind==='request'?due(b.due):'',link};
+   // Protect against a recipient/position being disabled while sending.
+   if(b.recipientType==='person'&&recipient.id!=='@owner')guard("EXISTS(SELECT 1 FROM app_members WHERE id=? AND status='active')",recipient.id);if(b.recipientType==='position')guard("EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND type='position' AND json_extract(data,'$.active')=1)",recipient.id);
+  }else{
+   if(b.revision!==t.revision)fail('گفت‌وگو تغییر کرده است؛ تازه‌سازی و دوباره بررسی کنید.',409);guard('EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)',target,t.revision);
+   if(inboxClosed(d.state))fail('این گفت‌وگو بسته است.');
+   if(['claim','start','blocked','submit'].includes(mode)&&!t.isRecipient)fail('این اقدام فقط برای گیرنده است.',403);
+   if(mode==='claim'){if(t.isSender)fail('درخواست‌کننده نباید مسئول انجام درخواست خودش شود.');if(t.responsible&&t.responsible!==me)fail('همکار دیگری مسئول رسیدگی است.',409);d.assignee=me;body=body||'مسئولیت رسیدگی را پذیرفتم.';}
+   if(['start','blocked','submit'].includes(mode)&&!t.canWork)fail('ابتدا مسئولیت را بپذیرید.',403);
+   if(['start','blocked','submit'].includes(mode)&&d.kind!=='request')fail('ابتدا پیام را به درخواست کاری تبدیل کنید.');
+   if(mode==='start'){if(d.state==='submitted')fail('در انتظار تأیید درخواست‌کننده است.');d.state='working';body=body||'رسیدگی را شروع کردم.';}
+   if(mode==='blocked'){if(d.state==='submitted')fail('در انتظار تأیید است.');body=required(b.body,12000);d.state='blocked';}
+   if(mode==='submit'){if(d.state==='submitted')fail('قبلاً برای تأیید ارسال شده است.');body=required(b.body,12000);d.state='submitted';}
+   if(['approve','reopen','cancel','convert','reschedule'].includes(mode)&&!t.isSender)fail('فقط درخواست‌کننده مجاز است.',403);
+   if(mode==='approve'||mode==='reopen'){if(d.state!=='submitted')fail('درخواست آماده بررسی نیست.');if(t.responsible===me)fail('تأیید انجام توسط انجام‌دهنده مجاز نیست.');body=required(b.body,12000);d.state=mode==='approve'?'completed':'open';}
+   if(mode==='cancel'){body=required(b.body,12000);d.state='cancelled';}
+   if(mode==='convert'){if(d.kind!=='message')fail('قبلاً درخواست کاری است.');d.kind='request';d.due=due(b.due);body=required(b.body,12000);}
+   if(mode==='reschedule'){if(d.kind!=='request')fail('فقط درخواست کاری مهلت دارد.');d.due=due(b.due);body=required(b.body,12000);}
+   if(mode==='close'){if(d.kind!=='message')fail('درخواست کاری باید اعلام انجام و تأیید شود.');d.state='closed';body=required(b.body,12000);}
+   if(mode==='reply')body=required(b.body,12000);
+   if(d.recipientType==='position'&&t.isRecipient&&!t.isSender)guard("EXISTS(SELECT 1 FROM flow_entities p,json_each(p.data,'$.members') m WHERE p.id=? AND p.type='position' AND json_extract(p.data,'$.active')=1 AND m.value=?)",d.recipientId,me);
+  }
+  statements.push(t?db.prepare('UPDATE flow_entities SET data=?,revision=revision+1,updated=? WHERE id=? AND revision=?').bind(JSON.stringify(d),now,target,t.revision):db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'inbox_thread',?,1,?,?)").bind(target,JSON.stringify(d),now,now));
+  statements.push(db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'inbox_message',?,1,?,?)").bind('inbox-msg:'+id,JSON.stringify({thread:target,body,mode,author:me,authorName:u.name,viaAssistant}),now,now));
+  // The sender has seen this exact action; other participants stay unread.
+  statements.push(db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'inbox_state',?,1,?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data,revision=flow_entities.revision+1,updated=excluded.updated").bind('inbox-state:'+target+':'+me,JSON.stringify({readRevision:(t?.revision||0)+1,snoozeUntil:''}),now,now));
+ }
+ await db.batch([db.prepare("INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,'inbox',?,?,?,1)").bind(id,signature,u.userId,now),...statements,db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,target,'inbox_'+mode,JSON.stringify({mode,viaAssistant}),now)]);return json({saved:true,threadId:target});
+ }catch(e){return accessResponse(e)||Response.json({error:'ثبت نشد؛ احتمال تغییر هم‌زمان وجود دارد. صندوق را تازه کنید.'},{status:409})}}
