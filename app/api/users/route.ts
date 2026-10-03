@@ -1,11 +1,10 @@
-import {sealPassword} from '@/lib/password-vault';
 import {username,password,hashPassword} from "@/lib/password-auth";
 import {env} from "cloudflare:workers";
 import {storage} from "@/lib/storage";
 import {requireAdmin, checkOrigin, accessResponse, AccessError} from "@/lib/authorization";
 import {validatePermissions} from "@/lib/permissions";
 
-function present(row: any) {return {...row,hasStoredPassword:!!row.hasStoredPassword,mustChangePassword:!!row.mustChangePassword,canDelete:!row.protected,email:row.username?"":row.email, userId: row.subject, permissions: JSON.parse(row.permissions)};}
+function present(row: any) {return {...row,canDelete:!row.protected,email:row.username?"":row.email, userId: row.subject, permissions: JSON.parse(row.permissions)};}
 function payload(value: any) {
   if (!value || typeof value !== "object") throw new Error("اطلاعات حساب معتبر نیست.");
   const email = typeof value.email === "string" ? value.email.trim().toLowerCase() : "";
@@ -37,7 +36,7 @@ const conflict=()=>Response.json({error:'حساب توسط فرد دیگری ت�
 export async function GET() {
   try {
     const actor=await requireAdmin();
-    const result=await storage().prepare("SELECT m.*,a.username,(a.password_ciphertext IS NOT NULL) AS hasStoredPassword,a.must_change AS mustChangePassword FROM app_members m LEFT JOIN password_accounts a ON a.member_id=m.id WHERE m.status!='deleted' ORDER BY m.created DESC").all();
+    const result=await storage().prepare("SELECT m.*,a.username FROM app_members m LEFT JOIN password_accounts a ON a.member_id=m.id WHERE m.status!='deleted' ORDER BY m.created DESC").all();
     const members=await Promise.all(result.results.map(async row=>present({...row,protected:await protectedAccount(row,actor)})));
     return Response.json({members,accountId:actor.userId},{headers:{'Cache-Control':'no-store'}});
   } catch(error) {return failure(error);}
@@ -47,12 +46,11 @@ export async function POST(request: Request) {
     checkOrigin(request); const actor = await requireAdmin(); checkAccount(request,actor); const body=await request.json() as any;const local=!!body.username;const login=local?username(body.username):null;const passwordHash=local?await hashPassword(password(body.password)):null;const data = payload({...body,email:local?crypto.randomUUID()+"@local.invalid":body.email});
     await checkServiceAgent(data.permissions);
     const id = crypto.randomUUID(), now = new Date().toISOString();
-    const passwordCipher=local?await sealPassword(body.password,id):null;
-    const row = {id, ...data, subject: null, username:login||undefined, hasStoredPassword:!!passwordCipher,mustChangePassword:local,revision: 1, created: now, updated: now};
+    const row = {id, ...data, subject: null, username:login||undefined, revision: 1, created: now, updated: now};
     const db = storage();
     await db.batch([
       db.prepare("INSERT INTO app_members (id,email,name,unit,status,permissions,revision,created,updated) VALUES(?,?,?,?,?,?,1,?,?)").bind(id, data.email, data.name, data.unit, data.status, data.permissions, now, now),
-      ...(login?[db.prepare("INSERT INTO password_accounts(member_id,username,password_hash,password_ciphertext,must_change,password_changed_at,version) VALUES(?,?,?,?,1,?,1)").bind(id,login,passwordHash,passwordCipher,now)]:[]),
+      ...(login?[db.prepare("INSERT INTO password_accounts(member_id,username,password_hash,version) VALUES(?,?,?,1)").bind(id,login,passwordHash)]:[]),
       db.prepare("INSERT INTO access_audit (id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)").bind(crypto.randomUUID(), actor.userId, id, "create_member", JSON.stringify(row), now),
     ]);
     return Response.json({member: present(row)}, {status: 201});
@@ -67,23 +65,22 @@ export async function PATCH(request: Request) {
     if(!old||old.status==='deleted')return Response.json({error:'حساب یافت نشد یا حذف شده است.'},{status:404});
     const protectedUser=await protectedAccount(old,actor);
     if(protectedUser&&body.status!=='active')throw new AccessError('حساب مدیر اصلی یا حساب جاری را نمی‌توان غیرفعال کرد.',403);
-    const credential:any=await db.prepare('SELECT username,must_change,(password_ciphertext IS NOT NULL) AS has_cipher FROM password_accounts WHERE member_id=?').bind(old.id).first();
+    const credential:any=await db.prepare('SELECT username FROM password_accounts WHERE member_id=?').bind(old.id).first();
     const login=credential?username(body.username===undefined?credential.username:body.username):null;
     const data=payload({...body,email:credential?old.email:body.email});
     const newHash=credential&&body.password?await hashPassword(password(body.password)):null;
-    const newCipher=newHash?await sealPassword(body.password,old.id):null;
     await checkServiceAgent(data.permissions);
     if(old.email!==data.email)throw new Error('ایمیل ورود قبلی ثابت است؛ برای ایمیل دیگر حساب جدا تعریف کنید.');
     if(old.revision!==body.revision)return conflict();
     const revoke=!!(newHash||credential&&login!==credential.username||data.status==='disabled');
     const now=new Date().toISOString(),auditId=crypto.randomUUID();
-    const next={...old,...data,username:login||undefined,hasStoredPassword:!!(newHash||credential?.has_cipher),mustChangePassword:!!(newHash||credential?.must_change),updated:now,revision:old.revision+1};
+    const next={...old,...data,username:login||undefined,updated:now,revision:old.revision+1};
     // All statements are gated by the audit claim in the same transaction. A stale update changes nothing.
     const gate='EXISTS(SELECT 1 FROM access_audit WHERE id=?)';
     const results=await db.batch([
       db.prepare("INSERT INTO access_audit(id,actor,target,action,before,after,at) SELECT ?,?,?,?,?,?,? FROM app_members WHERE id=? AND revision=? AND status!='deleted'").bind(auditId,actor.userId,old.id,'update_member',JSON.stringify({...old,username:credential?.username}),JSON.stringify(next),now,old.id,old.revision),
       db.prepare('UPDATE app_members SET name=?,unit=?,status=?,permissions=?,updated=?,revision=revision+1 WHERE id=? AND '+gate).bind(data.name,data.unit,data.status,data.permissions,now,old.id,auditId),
-      ...(credential?[db.prepare('UPDATE password_accounts SET username=?,password_hash=COALESCE(?,password_hash),password_ciphertext=COALESCE(?,password_ciphertext),must_change=CASE WHEN ? THEN 1 ELSE must_change END,password_changed_at=CASE WHEN ? THEN ? ELSE password_changed_at END,version=version+? WHERE member_id=? AND '+gate).bind(login,newHash,newCipher,newHash?1:0,newHash?1:0,now,revoke?1:0,old.id,auditId)]:[]),
+      ...(credential?[db.prepare('UPDATE password_accounts SET username=?,password_hash=COALESCE(?,password_hash),version=version+? WHERE member_id=? AND '+gate).bind(login,newHash,revoke?1:0,old.id,auditId)]:[]),
       ...(revoke?[
         db.prepare('DELETE FROM password_sessions WHERE member_id=? AND '+gate).bind(old.id,auditId),
         db.prepare('UPDATE mcp_tokens SET revoked=1 WHERE (subject=? OR subject=?) AND '+gate).bind('local:'+old.id,old.subject||'local:'+old.id,auditId),
@@ -111,7 +108,7 @@ export async function DELETE(request:Request) {
     const results=await db.batch([
       db.prepare("INSERT INTO access_audit(id,actor,target,action,before,after,at) SELECT ?,?,?,?,?,?,? FROM app_members WHERE id=? AND revision=? AND status!='deleted'").bind(auditId,actor.userId,old.id,'delete_member',JSON.stringify(old),JSON.stringify(next),now,old.id,old.revision),
       db.prepare("UPDATE app_members SET status='deleted',updated=?,revision=revision+1 WHERE id=? AND "+gate).bind(now,old.id,auditId),
-      db.prepare("UPDATE password_accounts SET password_hash='deleted',password_ciphertext=NULL,must_change=0,version=version+1 WHERE member_id=? AND "+gate).bind(old.id,auditId),
+      db.prepare("UPDATE password_accounts SET password_hash='deleted',version=version+1 WHERE member_id=? AND "+gate).bind(old.id,auditId),
       db.prepare('DELETE FROM password_sessions WHERE member_id=? AND '+gate).bind(old.id,auditId),
       db.prepare('UPDATE mcp_tokens SET revoked=1 WHERE (subject=? OR subject=?) AND '+gate).bind('local:'+old.id,old.subject||'local:'+old.id,auditId),
       db.prepare('DELETE FROM mcp_streams WHERE token_id IN (SELECT id FROM mcp_tokens WHERE subject=? OR subject=?) AND '+gate).bind('local:'+old.id,old.subject||'local:'+old.id,auditId),
