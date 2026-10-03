@@ -1,9 +1,10 @@
 'use client';
+import {formatDateTime} from '@/lib/persian-date';
 import {useEffect,useState} from 'react';
 
 export function WarrantyDateValue({at,loading=false,error=false}:{at:string|null;loading?:boolean;error?:boolean}) {
  const valid=at&&Number.isFinite(new Date(at).getTime());
- return <div className="kv"><p>تاریخ فعال‌سازی گارانتی</p><strong role="status">{loading?'در حال دریافت…':error?'دریافت تاریخ انجام نشد؛ دوباره باز کنید.':at?(valid?new Date(at).toLocaleString('fa-IR',{timeZone:'Asia/Tehran',dateStyle:'medium',timeStyle:'short'}):'تاریخ نیازمند بررسی است'):'هنوز فعال نشده'}</strong></div>;
+ return <div className="kv"><p>تاریخ فعال‌سازی گارانتی</p><strong role="status">{loading?'در حال دریافت…':error?'دریافت تاریخ انجام نشد؛ دوباره باز کنید.':at?(valid?formatDateTime(at):'تاریخ نیازمند بررسی است'):'هنوز فعال نشده'}</strong></div>;
 }
 
 export function WarrantyDateField({deviceId,demo}:{deviceId?:string;demo:boolean}) {

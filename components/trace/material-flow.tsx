@@ -1,4 +1,5 @@
 'use client';
+import {formatDate} from '@/lib/persian-date';
 import {useEffect,useState} from 'react';
 import {Dialog,DialogContent,DialogTitle,DialogDescription} from '@/components/ui/dialog';
 import {SolarDate} from './solar-date';
@@ -10,7 +11,7 @@ import {type QField} from '@/lib/quality';
 import type {Row} from '@/lib/model';
 const blankField=(key='check_1'):QField=>({key,label:'',type:'number',unit:'',min:'',max:'',required:true});
 const n=(x:number)=>Number(x||0).toLocaleString('fa-IR');
-const when=(s:string)=>s?new Date(s.length===10?s+'T12:00:00Z':s).toLocaleDateString('fa-IR'):'—';
+const when=(s:string)=>s?formatDate(s):'—';
 const states:Record<string,string>={pending_qc:'در انتظار کنترل ورودی',awaiting_warehouse:'در انتظار انتقال انباردار',stored:'انبارشده',rejected:'مردود در قرنطینه',pending:'در انتظار تحویل',issued:'تحویل خط',prepared:'بچ‌های مصرفی ثبت‌شده',awaiting_receipt:'در انتظار دریافت انبار',finished:'در انبار محصول نهایی',reserved:'رزروشده فروش',in_transit:'تحویل تدارکات',planned:'در انتظار مونتاژ',assembled:'برگ تولید ثبت‌شده',open:'باز',closed:'بسته'};
 function Input({label,value,onChange,type='text',required=false}:{label:string;value:any;onChange:(s:string)=>void;type?:string;required?:boolean}){return <label className="field"><span>{label}</span>{type==='textarea'?<textarea required={required} value={value??''} onChange={e=>onChange(e.target.value)}/>:<input required={required} type={type} step={type==='number'?'0.001':undefined} value={value??''} onChange={e=>onChange(e.target.value)}/>}</label>}
 function Select({label,value,onChange,options}:{label:string;value:any;onChange:(v:string)=>void;options:[string,string][]}){return <label className="field"><span>{label}</span><select value={value||''} onChange={e=>onChange(e.target.value)}><option value="">انتخاب کنید</option>{options.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></label>}

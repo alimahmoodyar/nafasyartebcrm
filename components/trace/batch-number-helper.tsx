@@ -1,4 +1,5 @@
 "use client";
+import {persianDigits} from '@/lib/persian-date';
 import {useEffect, useState} from "react";
 import {RefreshCw, Hash} from "lucide-react";
 import {BATCH_SCHEME, suggestBatchNumber} from "@/lib/batch-number";
@@ -44,7 +45,7 @@ export function BatchNumberHelper({partCode, date, code, scheme, demoCodes, onAp
     <div className="batch-suggestion" aria-live="polite">
       {loading ? <p>در حال بررسی شماره بعدی…</p> : error ? <p role="alert" className="batch-error">{error}</p> : suggestion ? <>
         <output className="code" dir="ltr">{suggestion.code}</output>
-        <p className="subtle">کد قطعه: <bdi>{suggestion.partCode}</bdi> · ورود شمسی: <bdi>{suggestion.jalaliDate}</bdi> · ترتیب: <bdi>{suggestion.sequence}</bdi></p>
+        <p className="subtle">کد قطعه: <bdi>{suggestion.partCode}</bdi> · ورود شمسی: <bdi>{persianDigits(suggestion.jalaliDate)}</bdi> · ترتیب: <bdi>{suggestion.sequence}</bdi></p>
       </> : <p className="subtle">کد ثابت قطعه و تاریخ ورود را در فرم زیر وارد کنید تا شماره بعدی پیشنهاد شود.</p>}
     </div>
     <div className="tools"><button type="button" className="btn primary" disabled={!suggestion || loading || applied} onClick={() => suggestion && onApply(suggestion.code, suggestion.scheme)}>{applied ? "پیشنهاد در فرم قرار گرفت" : "استفاده از این پیشنهاد"}</button><button type="button" className="btn" disabled={!partCode || !date || loading} onClick={() => setRevision(v => v + 1)}><RefreshCw size={15}/>بررسی مجدد</button></div>

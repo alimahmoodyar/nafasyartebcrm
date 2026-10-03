@@ -1,7 +1,8 @@
+import {formatDate} from '@/lib/persian-date';
 import {requireAccess,accessResponse} from '@/lib/authorization';
 import {caseAccess,fail,monthsAfter} from '@/lib/after-sales';
 const escape=(v:unknown)=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
-const day=(s:string)=>s?new Date(s+'T12:00:00Z').toLocaleDateString('fa-IR'):'—';
+const day=(s:string)=>s?formatDate(s):'—';
 export async function GET(request:Request){try{const u=await requireAccess(),q=new URL(request.url).searchParams,c=await caseAccess(q.get('case')||'',u),d=c.data,kind=q.get('kind')||'receipt';if(!['receipt','warranty','invoice'].includes(kind))fail('نوع چاپ معتبر نیست.');if(kind==='receipt'&&!d.intake)fail('ابتدا پذیرش ثبت شود.');if(kind==='warranty'&&!d.deliveredDay)fail('ابتدا تحویل واقعی دستگاه ثبت شود.');if(kind==='invoice'&&!d.repairedAt)fail('ابتدا تعمیر ثبت شود.');
  const parts=(d.repairs||[]).map((r:any)=>{const l=d.lines.find((l:any)=>l.id===r.lineId);return {name:l?.name||r.partCode,quantity:r.quantity/1000,batch:r.batchId}}),message=kind==='warranty'?'سریال '+d.serial+'؛ قطعات تعویض‌شده: '+parts.map((p:any)=>p.name+' ('+p.quantity+')').join('، ')+'؛ گارانتی قطعات از '+day(d.deliveredDay)+' تا پیش از '+day(monthsAfter(d.deliveredDay,6))+' است.':'';
  if(q.get('format')==='text')return Response.json({text:message,sent:false},{headers:{'Cache-Control':'private, no-store'}});

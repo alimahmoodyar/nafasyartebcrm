@@ -1,4 +1,5 @@
 'use client';
+import {formatDateTime} from '@/lib/persian-date';
 import {InboxPanel} from './inbox-panel';
 import {useEffect,useState} from 'react';
 import {Dialog,DialogContent,DialogTitle,DialogDescription} from '@/components/ui/dialog';
@@ -12,7 +13,7 @@ const dayNames=['یکشنبه','دوشنبه','سه‌شنبه','چهارشنب�
 const cadenceNames:Record<string,string>={once:'یک‌باره',daily:'روزانه',weekly:'هفتگی',monthly:'ماهیانه'};
 const profileLabels:Record<string,string>={mission:'هدف سمت',responsibilities:'شرح مسئولیت‌ها',authorityBoundaries:'حدود اختیار و تفکیک مسئولیت',reportingTo:'گزارش‌دهی پیشنهادی به',handoffs:'ارتباط با سایر واحدها',metrics:'شاخص‌های پیشنهادی ارزیابی'};
 function PositionProfile({position}:{position:any}){return <dl className="position-profile">{Object.entries(profileLabels).filter(([key])=>position[key]).map(([key,label])=><div key={key}><dt>{label}</dt><dd>{position[key]}</dd></div>)}</dl>}
-const fa=(s:string)=>new Date(s).toLocaleString('fa-IR');
+const fa=(s:string)=>formatDateTime(s);
 function Pick({label,value,items,onChange}:{label:string;value:string;items:[string,string][];onChange:(v:string)=>void}){return <label className="field">{label}<Select dir="rtl" value={value} onValueChange={onChange}><SelectTrigger><SelectValue placeholder="انتخاب کنید"/></SelectTrigger><SelectContent>{items.map(([id,title])=><SelectItem key={id} value={id}>{title}</SelectItem>)}</SelectContent></Select></label>}
 export function TasksPanel({demo,onNavigate}:{demo:boolean;onNavigate:(s:string)=>void}){
  const [data,setData]=useState<any>(null),[tab,setTab]=useState('inbox'),[draft,setDraft]=useState<any>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[files,setFiles]=useState<any[]>([]),[loading,setLoading]=useState(false),[search,setSearch]=useState(''),[cadence,setCadence]=useState('all');

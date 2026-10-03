@@ -1,3 +1,4 @@
+import {parseCalendarDay} from './persian-date';
 import {storage} from './storage';
 import {AccessError} from './authorization';
 import type {Session} from './permissions';
@@ -18,7 +19,7 @@ export async function visible(u:Session,r:any){if(!r||!domainAccess(u,r.data.dom
 export async function entity(id:string,type:string){const r:any=await storage().prepare('SELECT * FROM flow_entities WHERE id=? AND type=?').bind(id,type).first();if(!r)fail('رکورد مرتبط پیدا نشد.',404);return decode(r);}
 export async function caseAccess(id:string,u:Session){return visible(u,await entity(id,'as_case'));}
 export async function list(type:string){return (await storage().prepare('SELECT * FROM flow_entities WHERE type=? ORDER BY created DESC,id').bind(type).all()).results.map(decode);}
-export function date(v:unknown){const d=req(v,10);if(!validDay(d)||d<'1900-01-01'||d>'2200-01-01')fail('تاریخ معتبر لازم است.');return d;}
+export function date(v:unknown){const d=parseCalendarDay(req(v,40));if(!validDay(d)||d<'1900-01-01'||d>'2200-01-01')fail('تاریخ معتبر لازم است.');return d;}
 export function past(v:unknown){const d=date(v);if(d>dayAt())fail('تاریخ انجام کار در آینده نباشد.');return d;}
 export function monthsAfter(d:string,n:number){const p=solarParts(d),index=p.year*12+p.month-1+n,y=Math.floor(index/12),m=index%12+1;return solarToIso(y,m,Math.min(p.day,solarMonthDays(y,m)));}
 export function amount(v:unknown){const s=txt(v,18);if(!/^\d{1,18}$/.test(s))fail('مبلغ ریال باید عدد صحیح نامنفی باشد.');return BigInt(s).toString();}

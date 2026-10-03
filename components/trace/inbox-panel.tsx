@@ -1,4 +1,5 @@
 'use client';
+import {formatDateTime} from '@/lib/persian-date';
 import {useEffect,useRef,useState} from 'react';
 import {Mail,Send,MessageSquare,Clock,Paperclip,Bot,ArrowRight,CheckCheck} from 'lucide-react';
 import {Dialog,DialogContent,DialogTitle,DialogDescription} from '@/components/ui/dialog';
@@ -6,7 +7,7 @@ import {Select,SelectContent,SelectItem,SelectTrigger,SelectValue} from '@/compo
 import {SolarDate} from './solar-date';
 import {VoiceInput} from './voice-input';
 import {inboxModes,inboxStates} from '@/lib/inbox-contract';
-const fa=(d:string)=>d?new Date(d).toLocaleString('fa-IR',{timeZone:'Asia/Tehran'}):'بدون موعد';
+const fa=(d:string)=>d?formatDateTime(d):'بدون موعد';
 const sections:Record<string,string>={tasks:'وظیفه کارتابل',transport:'مأموریت حمل', 'after-sales':'پرونده خدمات',sourcing:'برنامه تأمین',device:'دستگاه',batch:'بچ',product:'محصول'};
 function Pick({label,value,items,onChange}:{label:string;value:string;items:string[][];onChange:(s:string)=>void}){return <label className="field">{label}<Select dir="rtl" value={value||'_none'} onValueChange={v=>onChange(v==='_none'?'':v)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="_none">انتخاب کنید</SelectItem>{items.map(([v,t])=><SelectItem key={v} value={v}>{t}</SelectItem>)}</SelectContent></Select></label>}
 export function InboxPanel({onNavigate}:{onNavigate:(s:string)=>void}){

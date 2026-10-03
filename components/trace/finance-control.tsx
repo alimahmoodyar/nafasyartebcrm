@@ -1,4 +1,5 @@
 'use client';
+import {formatDate} from '@/lib/persian-date';
 import {useEffect,useState,useRef} from 'react';
 import {Upload,FileText,MessageSquare,ClipboardCheck,RefreshCw,BookOpen} from 'lucide-react';
 import {Tabs,TabsList,TabsTrigger} from '@/components/ui/tabs';
@@ -6,7 +7,7 @@ import {Select,SelectTrigger,SelectValue,SelectContent,SelectItem} from '@/compo
 import {SolarDate} from './solar-date';
 import {localDay} from '@/lib/device-analytics';
 import {financeReports,financePeriod,validateFinanceFile,type Cadence,type FinanceFile,type FinanceNote} from '@/lib/finance-control';
-const date=(s:string)=>new Date(s.length===10?s+'T12:00:00Z':s).toLocaleDateString('fa-IR',{timeZone:'Asia/Tehran'});
+const date=(s:string)=>formatDate(s);
 const num=(n:number)=>new Intl.NumberFormat('fa-IR').format(n);
 function NoteBox({report,notes,write,onSave}:{report:string;notes:FinanceNote[];write:boolean;onSave:(data:Partial<FinanceNote>)=>Promise<void>}){
  const [kind,setKind]=useState<FinanceNote['kind']>('result'),[body,setBody]=useState(''),[responsible,setResponsible]=useState(''),[parent,setParent]=useState<string|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');

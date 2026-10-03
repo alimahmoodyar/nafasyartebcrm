@@ -38,7 +38,7 @@ export const serviceForms:Record<string,ServiceField[]>={
 };
 serviceForms.activation_import=serviceForms.activation_preview;
 export const serviceWorkflowHelp={
- dates:'UI uses Persian dates. API takes ISO Gregorian YYYY-MM-DD; month deadlines use Persian calendar months. Quantities in requests are unscaled decimal strings; stored quantities are thousandths. Money is integer IRR string.',
+ dates:'UI uses Persian dates. API date fields accept Persian YYYY/MM/DD or ISO Gregorian YYYY-MM-DD and store ISO; month deadlines use Persian calendar months. Quantities in requests are unscaled decimal strings; stored quantities are thousandths. Money is integer IRR string.',
  identifiers:'Fetch current workspace and exact case before writes. Use entity ID, current revision, fresh UUID id per action; retry the identical body/id on uncertain network result. Never reuse another action id.',
  sequence:'contact → intake → diagnose → company authorization + customer consent when payable → reserve actual lots → repair → test → deliver → company callback → labor approval. New estimate invalidates consent and authorization. Declined estimate permits unrepaired return.',
  warranty:'Main activation status is a snapshot at intake. Technical coverage requires coordinator review. Replacement-part warranty is 6 calendar months from actual delivery. Unknown historical batch is explicitly unknown, never guessed. Review photos/videos manually; do not claim a photo proves a fault automatically.',

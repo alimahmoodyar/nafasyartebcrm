@@ -1,4 +1,5 @@
 "use client";
+import {formatDate} from '@/lib/persian-date';
 import {useEffect,useState} from 'react';
 import {Paperclip,Download,Upload,RefreshCw} from 'lucide-react';
 import {validateBatchFile,type BatchFile} from '@/lib/batch-files';
@@ -14,6 +15,6 @@ export function BatchFilesPanel({batchId,demo,write,quality=false}:{batchId:stri
  {write&&<div style={{marginTop:16}}><label className="field"><span>انتخاب عکس، نقشه یا فایل · هر فایل تا ۱۰ مگابایت</span><input aria-label="انتخاب فایل‌های بچ" type="file" multiple disabled={busy} onChange={e=>{setError('');setMessage('');try{const selected=Array.from(e.target.files||[]);selected.forEach(f=>validateBatchFile(f.name,f.size));setPending(selected.map(file=>({file,id:crypto.randomUUID(),done:false})));}catch(err){setPending([]);setError((err as Error).message);e.target.value='';}}}/></label>{pending.length>0&&<><ul>{pending.map(p=><li key={p.id} style={{overflowWrap:'anywhere'}}>{p.file.name}{p.done?' · ذخیره شد':''}</li>)}</ul><button type="button" className="btn primary" disabled={busy} onClick={upload}><Upload size={16}/>{busy?'در حال بارگذاری…':'بارگذاری فایل‌های باقی‌مانده'}</button></>}</div>}
  {loading&&<p role="status">در حال دریافت فایل‌ها…</p>}{error&&<p className="notice error" role="alert">{error}</p>}{message&&<p className="notice" role="status">{message}</p>}
  {!loading&&!error&&!files.length&&<p className="subtle" style={{marginTop:12}}>هنوز فایلی ثبت نشده است.</p>}
- {files.map(f=><div className="recordline" key={f.id} style={{gap:12,flexWrap:'wrap'}}><div style={{minWidth:0,flex:'1 1 180px'}}><strong style={{overflowWrap:'anywhere'}}>{f.filename}</strong><p className="subtle">{(f.byte_size/1024).toLocaleString('fa-IR',{maximumFractionDigits:1})} کیلوبایت · {new Date(f.uploaded_at).toLocaleDateString('fa-IR')} · {f.uploaded_by}</p></div><a className="btn" href={endpoint+'&id='+encodeURIComponent(f.id)}><Download size={16}/>دانلود</a></div>)}
+ {files.map(f=><div className="recordline" key={f.id} style={{gap:12,flexWrap:'wrap'}}><div style={{minWidth:0,flex:'1 1 180px'}}><strong style={{overflowWrap:'anywhere'}}>{f.filename}</strong><p className="subtle">{(f.byte_size/1024).toLocaleString('fa-IR',{maximumFractionDigits:1})} کیلوبایت · {formatDate(f.uploaded_at)} · {f.uploaded_by}</p></div><a className="btn" href={endpoint+'&id='+encodeURIComponent(f.id)}><Download size={16}/>دانلود</a></div>)}
  </>}</section>;
 }

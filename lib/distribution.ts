@@ -1,3 +1,4 @@
+import {parseCalendarDay} from './persian-date';
 import {asciiDigits} from './batch-number';
 import type {Field, Row} from './model';
 export const distributionFields: Field[] = [
@@ -24,7 +25,7 @@ export function normalizeDistribution(input:unknown):Record<string,string>{
  if(!result.serial||!result.dealerName)throw new Error('سریال دستگاه و نام نماینده الزامی‌اند.');
  if(result.customerNationalId&&!/^\d{10}$/.test(result.customerNationalId))throw new Error('کد ملی باید ۱۰ رقم باشد؛ صفرهای ابتدایی را از منبع اصلی وارد کنید.');
  if(result.customerMobile&&!/^(?:09\d{9}|\+989\d{9})$/.test(result.customerMobile))throw new Error('موبایل را به صورت 09xxxxxxxxx یا +989xxxxxxxxx وارد کنید.');
- for(const key of ['dealerDate'])if(result[key]){const d=new Date(result[key]+'T12:00:00Z');if(!/^\d{4}-\d{2}-\d{2}$/.test(result[key])||!Number.isFinite(d.getTime())||d.toISOString().slice(0,10)!==result[key]||Number(result[key].slice(0,4))<1900||Number(result[key].slice(0,4))>2100)throw new Error('تاریخ باید میلادی و به صورت YYYY-MM-DD باشد.');}
+ for(const key of ['dealerDate'])if(result[key]){const day=parseCalendarDay(result[key]);if(!day||day<'1900-01-01'||day>'2100-12-31')throw new Error('تاریخ معتبر وارد کنید؛ مثلاً ۱۴۰۵/۰۷/۱۱.');result[key]=day;}
  if(!result.customerName&&['customerMobile','customerNationalId','customerCity','customerAddress'].some(k=>result[k]))throw new Error('برای ثبت مشخصات مشتری، نام مشتری را هم وارد کنید.');
  return result;
 }

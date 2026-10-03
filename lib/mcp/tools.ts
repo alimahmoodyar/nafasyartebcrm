@@ -1,3 +1,4 @@
+import {localDay,solarDateText,parseCalendarDay,formatDateTime,calendarTimeZone} from '@/lib/persian-date';
 import * as transport from '@/app/api/transport/route';
 import * as transportFiles from '@/app/api/transport/files/route';
 import {transportRoles,transportForms,transportActions,transportHelp} from '@/lib/transport-contract';
@@ -51,7 +52,7 @@ const obj=(properties:Record<string,Schema>,required=Object.keys(properties)):Sc
 const list=(items:Schema,maxItems=500):Schema=>({type:'array',items,maxItems});
 const integer=(minimum:number,maximum:number):Schema=>({type:'integer',minimum,maximum});
 const id=text('Record ID (not a serial number).',200);
-const data:Schema={type:'object',additionalProperties:text(),maxProperties:80,description:'Field-name/string-value map. Call get_record_schema for required fields, options, references and editable fields. Dates: Gregorian YYYY-MM-DD; numeric values as strings.'};
+const data:Schema={type:'object',additionalProperties:text(),maxProperties:80,description:'Field-name/string-value map. Call get_record_schema for required fields, options, references and editable fields. Dates: use get_calendar_context to convert the user’s Persian dates to Gregorian ISO YYYY-MM-DD for storage; display in Persian. Numeric values as strings.'};
 const confirmed={type:'boolean',const:true,description:'True only after the user has approved these exact changes.'};
 const payload=(extra:Record<string,Schema>)=>obj({...extra,confirmed});
 const kinds=['product','batch','device','event','service','action','distribution','firmware'];
@@ -80,6 +81,7 @@ function api(name:string,description:string,inputSchema:Schema,path:string,metho
   return result(await handler(req(o,path,method,requestBody,query)));
  }});
 }
+add({name:'get_calendar_context',description:'Current Tehran time and accurate Persian (Solar Hijri/Jalali) date conversion. Use before interpreting relative or Persian dates; never guess conversions. Stored/API dates remain Gregorian ISO, human-facing dates must be Persian. Accepts Persian YYYY/MM/DD with Persian/Arabic/Latin digits, or ISO YYYY-MM-DD. Empty list returns today.',inputSchema:obj({dates:list(text('Year-first Persian or ISO date.',40),100)}),write:false,run:async a=>({calendar:'persian',timeZone:calendarTimeZone,today:{iso:localDay(),persian:solarDateText(localDay())},now:formatDateTime(new Date()),dates:a.dates.map((input:string)=>{const iso=parseCalendarDay(input);return iso?{input,iso,persian:solarDateText(iso)}:{input,error:'تاریخ معتبر نیست؛ روز، ماه و سال را بررسی کنید.'}})})});
 add({name:'get_session',description:'Current authenticated account and effective permissions. All MCP data is real company data, never demo data.',inputSchema:obj({}),write:false,run:async(_a,_o,p)=>p.user});
 add({name:'get_record_schema',description:'Field definitions, required fields, allowed options, relationships and editable fields for a record type.',inputSchema:obj({kind:enumeration(kinds)}),write:false,run:async a=>({fields:fields[a.kind as Kind],editable:editable[a.kind as Kind]||[],adminEditable:a.kind==="batch"?adminBatchEditable:editable[a.kind as Kind]||[],notes:'Device model snapshots are derived from product. Only use existing IDs. Distribution and firmware have dedicated tools.'})});
 add({name:'list_records',description:'Search visible company records. Returns pagination, total and exact previous payload for optimistic updates. No demo records.',inputSchema:obj({kind:enumeration(kinds),query:text('',200),offset:integer(0,1000000),limit:integer(1,200)},[]),write:false,run:async a=>{const r=await result(await records.GET()) as any;const rows=r.records.filter((r:any)=>(!a.kind||r.kind===a.kind)&&(!a.query||JSON.stringify(r.data).toLowerCase().includes(a.query.toLowerCase())));const offset=a.offset||0,limit=a.limit||50;return {total:rows.length,offset,nextOffset:offset+limit<rows.length?offset+limit:null,records:rows.slice(offset,offset+limit).map((r:any)=>({...r,previous:JSON.stringify(r.data)}))};}});

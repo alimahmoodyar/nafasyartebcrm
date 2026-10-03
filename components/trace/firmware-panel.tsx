@@ -1,4 +1,5 @@
 'use client';
+import {formatDateTime} from '@/lib/persian-date';
 import {useEffect,useState} from 'react';
 import {Plus,Upload,Download,Search,RefreshCw,FileCode2} from 'lucide-react';
 import {Dialog,DialogContent,DialogTitle,DialogDescription} from '@/components/ui/dialog';
@@ -6,7 +7,7 @@ import {Table,TableBody,TableCell,TableHead,TableHeader,TableRow} from '@/compon
 import {fields,type Row} from '@/lib/model';
 import {MAX_HEX_BYTES} from '@/lib/firmware';
 const sample:Row[]=[{id:'sample-firmware',kind:'firmware',created:'2026-09-01T08:00:00.000Z',data:{name:'کنترل اکسیژن‌ساز — نمونه آموزشی',version:'1.2.0',deviceModel:'NF5',board:'CTRL-R2',notes:'نمونه برای بررسی فرم؛ فایل واقعی ندارد.',createdBy:'داده آموزشی'}}];
-const date=(s:string)=>new Date(s).toLocaleString('fa-IR',{timeZone:'Asia/Tehran',dateStyle:'medium',timeStyle:'short'});
+const date=(s:string)=>formatDateTime(s);
 export function FirmwarePanel({demo,write,onSaved}:{demo:boolean;write:boolean;onSaved:(row:Row)=>void}){
  const [versions,setVersions]=useState<Row[]>(demo?sample:[]),[loading,setLoading]=useState(!demo),[error,setError]=useState(''),[message,setMessage]=useState(''),[query,setQuery]=useState('');
  const [open,setOpen]=useState(false),[target,setTarget]=useState<Row|null>(null),[draft,setDraft]=useState<Record<string,string>>({}),[file,setFile]=useState<File|null>(null),[busy,setBusy]=useState(false),[formError,setFormError]=useState(''),[progress,setProgress]=useState('');

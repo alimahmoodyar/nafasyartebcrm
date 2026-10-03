@@ -1,11 +1,12 @@
 'use client';
+import {formatDateTime} from '@/lib/persian-date';
 import {useEffect,useState} from 'react';
 import {Dialog,DialogContent,DialogTitle,DialogDescription} from '@/components/ui/dialog';
 import {Checkbox} from '@/components/ui/checkbox';
 import {Select,SelectContent,SelectItem,SelectTrigger,SelectValue} from '@/components/ui/select';
 const labels:Record<string,string>={delivered:'تحویل نهایی مقصد',planned:'در انتظار مونتاژ',prepared:'در انتظار تأیید برگ تولید',assembled:'برگ تولید ثبت‌شده',awaiting_receipt:'در انتظار دریافت انبار',finished:'آزاد در انبار',reserved:'رزروشده',in_transit:'تحویل تدارکات / در مسیر',cancelled:'لغوشده',pending:'در انتظار دریافت',closed:'بسته'};
 const kinds:Record<string,string>={agent:'عامل فروش',representative:'نماینده فروش',branch:'شعبه'};
-const date=(v:string)=>v?new Date(v).toLocaleString('fa-IR'):'—';
+const date=(v:string)=>v?formatDateTime(v):'—';
 function Pick({label,value,items,onChange}:{label:string;value:string;items:[string,string][];onChange:(v:string)=>void}){return <label className="field">{label}<Select dir="rtl" value={value||''} onValueChange={onChange}><SelectTrigger><SelectValue placeholder="انتخاب کنید"/></SelectTrigger><SelectContent>{items.map(([id,name])=><SelectItem value={id} key={id}>{name}</SelectItem>)}</SelectContent></Select></label>}
 export function FulfillmentPanel({demo,onSaved}:{demo:boolean;onSaved:()=>void}){
  const [data,setData]=useState<any>(null),[tab,setTab]=useState('handoff'),[query,setQuery]=useState(''),[product,setProduct]=useState(''),[selected,setSelected]=useState<string[]>([]),[draft,setDraft]=useState<any>(null),[error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[loading,setLoading]=useState(false);

@@ -7,7 +7,7 @@ const db={prepare(query){let args=[];return{bind(...values){args=values;return t
 const objects=new Map();let failPut=false;
 const bucket={async put(key,buffer){if(failPut)throw Error('R2 unavailable');objects.set(key,buffer.slice(0));return{key}},async get(key){const buffer=objects.get(key);return buffer?{arrayBuffer:async()=>buffer.slice(0)}:null},async delete(key){objects.delete(key)}};
 let identity=null;const env={TRACE_OWNER_EMAIL:'owner@example.com',BUCKET:bucket};
-const permissions=load('lib/permissions.ts'),numbers=load('lib/batch-number.ts'),distribution=load('lib/distribution.ts',{'./batch-number':numbers});
+const permissions=load('lib/permissions.ts'),numbers=load('lib/batch-number.ts'),distribution=load('lib/distribution.ts',{'./batch-number':numbers,'./persian-date':load('lib/persian-date.ts')});
 const model=load('lib/model.ts',{'./batch-number':numbers,'./distribution':distribution});
 const auth=load('lib/authorization.ts',{'@/lib/mcp/context':{mcpActor:new (require('node:async_hooks').AsyncLocalStorage)()},'cloudflare:workers':{env},'@/app/chatgpt-auth':{getChatGPTUser:async()=>identity},'@/lib/storage':{storage:()=>db},'@/lib/permissions':permissions});
 const firmware=load('lib/firmware.ts',{'./batch-number':numbers});

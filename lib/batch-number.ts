@@ -15,7 +15,7 @@ export function receiptDay(value: string): {compact: string; display: string} {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new Error("تاریخ ورود معتبر را انتخاب کنید.");
   const day = new Date(value + "T12:00:00Z");
   if (!Number.isFinite(day.getTime()) || day.toISOString().slice(0, 10) !== value || Number(value.slice(0, 4)) < 1900 || Number(value.slice(0, 4)) > 2100) {
-    throw new Error("تاریخ ورود معتبر را انتخاب کنید (سال میلادی ۱۹۰۰ تا ۲۱۰۰).");
+    throw new Error("تاریخ ورود معتبر را از تقویم شمسی انتخاب کنید.");
   }
   const parts = new Intl.DateTimeFormat("en-US-u-ca-persian-nu-latn", {year: "numeric", month: "2-digit", day: "2-digit", timeZone: "UTC"}).formatToParts(day);
   const get = (type: string) => parts.find(p => p.type === type)!.value;

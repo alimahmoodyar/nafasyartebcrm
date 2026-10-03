@@ -1,4 +1,5 @@
 "use client";
+import {formatDateTime} from '@/lib/persian-date';
 import {useEffect,useRef,useState} from "react";
 import {Download,Link2,Monitor,Unplug} from "lucide-react";
 import {Select,SelectContent,SelectItem,SelectTrigger,SelectValue} from "@/components/ui/select";
@@ -46,7 +47,7 @@ export function FinanceBridge(){
    <div className="tools"><button className="btn primary" disabled={busy||!selected} onClick={inspect}>خواندن همین پنجره</button></div>
    <p className="subtle">متن و تصویر فقط در همین مرورگر نمایش داده می‌شوند و به سرور سامانه فرستاده نمی‌شوند. کد اتصال ذخیره نمی‌شود. خروج از این بخش، اطلاعات نمایش‌داده‌شده را پاک می‌کند.</p>
   </div></section>}
-  {snapshot&&<section className="panel"><div className="panelhead"><div><h2>نتیجه خواندن پنجره</h2><p className="subtle">{snapshot.title} · {new Date(snapshot.capturedAt).toLocaleString("fa-IR")}</p></div><button className="btn" onClick={exportTechnical}><Download size={16}/>دانلود مشخصات فنی بدون متن و تصویر</button></div><div className="inside" style={{display:"grid",gap:16}}>
+  {snapshot&&<section className="panel"><div className="panelhead"><div><h2>نتیجه خواندن پنجره</h2><p className="subtle">{snapshot.title} · {formatDateTime(snapshot.capturedAt)}</p></div><button className="btn" onClick={exportTechnical}><Download size={16}/>دانلود مشخصات فنی بدون متن و تصویر</button></div><div className="inside" style={{display:"grid",gap:16}}>
    <p className="notice">این فهرست متن‌های قابل خواندنِ صفحه است؛ کامل‌بودن گزارش یا داده‌های مالی را نشان نمی‌دهد. {snapshot.controls.length.toLocaleString("fa-IR")} جزء خوانده شد.{snapshot.truncated?" حد خواندن ۶۰۰ جزء رسیده؛ نتیجه ناقص است.":""}{snapshot.skipped?` ${snapshot.skipped.toLocaleString("fa-IR")} جزء قابل خواندن نبود.`:""}</p>
    {snapshot.controls.length===0&&<p className="notice error">هیچ جزء قابل خواندنی از پنجره دریافت نشد. از دکمه عیب‌یابی در برنامه ویندوز استفاده کنید.</p>}
    {screenshot&&!snapshot.image&&<p className="notice error">تصویر پنجره دریافت نشد.</p>}

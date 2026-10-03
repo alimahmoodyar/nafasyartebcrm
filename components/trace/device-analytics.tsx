@@ -1,4 +1,5 @@
 'use client';
+import {formatMonth} from '@/lib/persian-date';
 import {SolarDate} from '@/components/trace/solar-date';
 import {useEffect,useState} from 'react';
 import {BarChart,Bar,XAxis,YAxis,CartesianGrid,Tooltip} from 'recharts';
@@ -11,7 +12,7 @@ function Plot({title,description,rows,from,to}:{title:string;description:string;
  const range=shown.length?`${shown[0].label} تا ${shown[shown.length-1].label}`:'';
  const width=Math.max(500,shown.length*(monthly?145:44)+65);
  const months:{key:string;label:string;days:number}[]=[];
- if(!monthly)for(const row of shown){const p=solarParts(row.date),key=`${p.year}/${p.month}`;const last=months[months.length-1];if(last?.key===key)last.days++;else months.push({key,label:new Intl.DateTimeFormat('fa-IR',{month:'long',year:'numeric',timeZone:'Asia/Tehran'}).format(new Date(row.date+'T12:00:00Z')),days:1});}
+ if(!monthly)for(const row of shown){const p=solarParts(row.date),key=`${p.year}/${p.month}`;const last=months[months.length-1];if(last?.key===key)last.days++;else months.push({key,label:formatMonth(row.date),days:1});}
  return <section className="panel"><div className="panelhead" style={{flexWrap:'wrap',gap:12}}><div><h2>{title}</h2><p className="subtle">{description}</p></div><div className="tools" role="group" aria-label={'بازه نمایش '+title}><button className={'btn '+(!monthly?'primary':'')} aria-pressed={!monthly} onClick={()=>setMonthly(false)}>روزانه</button><button className={'btn '+(monthly?'primary':'')} aria-pressed={monthly} onClick={()=>setMonthly(true)}>ماهانه</button></div></div><div className="inside">
  <p>مجموع کل بازه انتخابی: <strong>{num(total)} دستگاه</strong></p>
  <p>بازه کامل نمودار و جدول: <strong>{range}</strong></p><p className="subtle">تمام روزهای بازه، از ابتدا تا انتها، نمایش داده می‌شوند. برای دیدن ادامه نمودار آن را افقی بکشید؛ جدول نیز به پایین پیمایش می‌شود.</p>

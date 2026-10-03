@@ -29,7 +29,7 @@ numbers.validateBatchIdentity({code: 'CMP-2608-01'});
 const sqlite = new DatabaseSync(':memory:');
 for(const file of fs.readdirSync(path.join(root,'drizzle')).filter(f=>f.endsWith('.sql')).sort())sqlite.exec(fs.readFileSync(path.join(root,'drizzle',file),'utf8'));
 const storage = {async batch(statements){sqlite.exec('BEGIN');try{const results=[];for(const statement of statements)results.push(await statement.run());sqlite.exec('COMMIT');return results;}catch(error){sqlite.exec('ROLLBACK');throw error;}},prepare(query) {let args = []; return {bind(...values) {args = values; return this;}, async all() {return {results: sqlite.prepare(query).all(...args)};}, async first() {return sqlite.prepare(query).get(...args) || null;}, async run() {return {meta: {changes: sqlite.prepare(query).run(...args).changes}};}};}};
-const distribution=load('lib/distribution.ts',{'./batch-number':numbers});
+const distribution=load('lib/distribution.ts',{'./batch-number':numbers,'./persian-date':load('lib/persian-date.ts')});
 const model = load('lib/model.ts', {'./batch-number': numbers,'./distribution':distribution});
 const auth={requireAccess:async()=>({userId:'owner',isAdmin:true,permissions:{read:['batch','device','event','service','action']}}),can:()=>true,checkOrigin:()=>{},accessResponse:()=>null,AccessError:Error};
 const imports = {'@/lib/authorization':auth,'@/lib/storage': {storage: () => storage}, '@/lib/model': model, '@/lib/batch-number': numbers};
