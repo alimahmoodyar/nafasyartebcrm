@@ -1,6 +1,8 @@
 "use client";
 import {useEffect, useState} from "react";
-import {Eye, EyeOff, Plus, RefreshCw, ShieldCheck} from "lucide-react";
+import {Eye, EyeOff, Pencil, Plus, RefreshCw, ShieldCheck, Trash2} from "lucide-react";
+import {AlertDialog, AlertDialogContent, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction} from "@/components/ui/alert-dialog";
+import {notifyAccountChange} from "@/lib/account-change";
 import {Dialog, DialogContent, DialogTitle, DialogDescription} from "@/components/ui/dialog";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 import {Checkbox} from "@/components/ui/checkbox";
@@ -20,11 +22,12 @@ export function UsersPanel({owner}: {owner: Session}) {
   const [permissions, setPermissions] = useState<Permissions>(presets["تولید"]);
   const [username,setUsername]=useState(""),[password,setPassword]=useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [deleteTarget,setDeleteTarget]=useState<Member|null>(null),[deleting,setDeleting]=useState(false),[deleteError,setDeleteError]=useState("");
   const [message, setMessage] = useState("");
   const [serviceAgents,setServiceAgents]=useState<any[]>([]);
   async function load() {
     setLoading(true); setError("");
-    try {const response = await fetch("/api/users"); const result = await response.json() as {members: Member[]; error?: string}; if (!response.ok) throw new Error(result.error); setMembers(result.members);}
+    try {const response = await fetch("/api/users"); const result = await response.json() as {members: Member[]; error?: string;accountId?:string}; if(result.accountId&&result.accountId!==owner.userId)throw new Error("حساب ورود تغییر کرده است؛ صفحه را تازه کنید."); if (!response.ok) throw new Error(result.error); setMembers(result.members);}
     catch (err) {setError(err instanceof Error ? err.message : "دریافت کاربران انجام نشد.");} finally {setLoading(false);}
   }
   useEffect(() => {void load();void Promise.all(['home','hospital'].map(async domain=>{const r=await fetch('/api/after-sales?domain='+domain);if(!r.ok)return [];return ((await r.json()) as any).agents||[]})).then(r=>setServiceAgents(r.flat())).catch(()=>{});}, []);
@@ -47,22 +50,32 @@ export function UsersPanel({owner}: {owner: Session}) {
   async function save(event: React.FormEvent) {
     event.preventDefault(); if (busy) return; setBusy(true); setFormError("");
     try {
-      const response = await fetch("/api/users", {method: editing ? "PATCH" : "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({id: editing?.id, revision: editing?.revision, email, name, unit, status, permissions,username,password})});
-      const result = await response.json() as {member: Member; error?: string};
+      const response = await fetch("/api/users", {method: editing ? "PATCH" : "POST", headers: {"Content-Type": "application/json","x-assistant-account":owner.userId}, body: JSON.stringify({id: editing?.id, revision: editing?.revision, email, name, unit, status, permissions,username,password})});
+      const result = await response.json() as {member: Member; error?: string;reauthenticate?:boolean};
       if (!response.ok) throw new Error(result.error);
-      setMembers(previous => [result.member, ...previous.filter(m => m.id !== result.member.id)]); setOpen(false);setPassword("");setShowPassword(false); setMessage("دسترسی حساب ذخیره شد. هیچ دعوت‌نامه‌ای ارسال نشده است.");
+      setMembers(previous => [result.member, ...previous.filter(m => m.id !== result.member.id)]); setOpen(false);setPassword("");setShowPassword(false); setMessage("اطلاعات حساب ذخیره شد.");if(result.reauthenticate){notifyAccountChange();window.location.reload();}
     } catch (err) {setFormError(err instanceof Error ? err.message : "ذخیره حساب انجام نشد.");} finally {setBusy(false);}
   }
+  async function deleteAccount() {
+    if(!deleteTarget||deleting)return;
+    setDeleting(true);setDeleteError("");
+    try {
+      const response=await fetch('/api/users',{method:'DELETE',headers:{'Content-Type':'application/json','x-assistant-account':owner.userId},body:JSON.stringify({id:deleteTarget.id,revision:deleteTarget.revision,confirmed:true})});
+      const result=await response.json() as {error?:string};
+      if(!response.ok)throw new Error(result.error||'حذف حساب انجام نشد.');
+      setMembers(previous=>previous.filter(m=>m.id!==deleteTarget.id));setDeleteTarget(null);setMessage('حساب حذف و دسترسی ورود آن قطع شد؛ سوابق فعالیت حفظ شدند.');
+    }catch(err){setDeleteError(err instanceof Error?err.message:'حذف حساب انجام نشد.');}finally{setDeleting(false);}
+  }
   return <section>
-    <div className="notice"><div><strong>مدیریت حساب‌ها · نام کاربری و رمز عبور</strong><p>برای همکاران نام کاربری و رمز عبور بسازید و دسترسی واحدشان را مشخص کنید. در ویرایش حساب، وارد کردن رمز جدید، رمز قبلی و نشست‌های ورود قبلی را باطل می‌کند. حساب‌های قدیمی ChatGPT نیز حفظ می‌شوند.</p></div></div>
+    <div className="notice"><div><strong>مدیریت حساب‌ها · نام کاربری و رمز عبور</strong><p>برای همکاران نام کاربری و رمز عبور بسازید و دسترسی واحدشان را مشخص کنید. نام، نام کاربری، واحد، دسترسی و رمز جدید قابل ویرایش است. تغییر نام کاربری یا رمز، ورود دوباره می‌خواهد. حذف حساب، دسترسی را قطع می‌کند و سوابق فعالیت را نگه می‌دارد.</p></div></div>
     <div className="panel" style={{marginTop: 18}}><div className="panelhead"><div><h2>کاربران و دسترسی‌ها</h2><p className="subtle">دسترسی در سطح بخش؛ مجوز ثبت شامل ویرایش‌های مجاز همان بخش است.</p></div><div className="tools"><button className="btn" onClick={load} disabled={loading}><RefreshCw size={16}/>تازه‌سازی</button><button className="btn primary" onClick={() => start()}><Plus size={17}/>تعریف حساب</button></div></div>
       <div className="owner-account"><ShieldCheck size={22}/><div><strong>{owner.name} · مدیر اصلی</strong><p className="subtle" dir="ltr">{owner.email}</p></div><span className="badge good">دسترسی کامل · محافظت‌شده</span></div>
       {error && <p className="notice error" role="alert">{error}</p>}{message && <p className="notice" role="status">{message}</p>}
-      {loading ? <div className="empty">در حال دریافت کاربران…</div> : members.length ? <Table><TableHeader><TableRow>{["نام و ایمیل", "واحد", "دسترسی", "وضعیت", ""].map((h, i) => <TableHead className="tablehead" key={i}>{h}</TableHead>)}</TableRow></TableHeader><TableBody>{members.map(member => <TableRow key={member.id}><TableCell className="tablecell"><strong>{member.name}</strong><p className="subtle" dir="ltr">{member.username||member.email}</p></TableCell><TableCell className="tablecell">{member.unit}</TableCell><TableCell className="tablecell"><p>مشاهده: {member.permissions.read.map(k => names[k]).join("، ") || "هیچ بخش"}</p><p className="subtle">مالی: {member.permissions.finance==="write"?"مشاهده و ثبت":member.permissions.finance==="read"?"مشاهده":"بدون دسترسی"} · ثبت: {member.permissions.write.map(k => names[k]).join("، ") || "فقط مشاهده"}</p></TableCell><TableCell className="tablecell"><span className={"badge " + (member.status === "active" ? "good" : "bad")}>{member.status === "active" ? "فعال" : "غیرفعال"}</span><p className="subtle">{member.username?"ورود با نام کاربری":member.userId ? "هویت ورود متصل است" : "در انتظار اولین ورود"}</p></TableCell><TableCell className="tablecell"><button className="link" onClick={() => start(member)}>ویرایش دسترسی</button></TableCell></TableRow>)}</TableBody></Table> : <div className="empty">هنوز حسابی برای کارکنان تعریف نشده است.</div>}
+      {loading ? <div className="empty">در حال دریافت کاربران…</div> : members.length ? <Table><TableHeader><TableRow>{["نام و ایمیل", "واحد", "دسترسی", "وضعیت", ""].map((h, i) => <TableHead className="tablehead" key={i}>{h}</TableHead>)}</TableRow></TableHeader><TableBody>{members.map(member => <TableRow key={member.id}><TableCell className="tablecell"><strong>{member.name}</strong><p className="subtle" dir="ltr">{member.username||member.email}</p></TableCell><TableCell className="tablecell">{member.unit}</TableCell><TableCell className="tablecell"><p>مشاهده: {member.permissions.read.map(k => names[k]).join("، ") || "هیچ بخش"}</p><p className="subtle">مالی: {member.permissions.finance==="write"?"مشاهده و ثبت":member.permissions.finance==="read"?"مشاهده":"بدون دسترسی"} · ثبت: {member.permissions.write.map(k => names[k]).join("، ") || "فقط مشاهده"}</p></TableCell><TableCell className="tablecell"><span className={"badge " + (member.status === "active" ? "good" : "bad")}>{member.status === "active" ? "فعال" : "غیرفعال"}</span><p className="subtle">{member.username?"ورود با نام کاربری":member.userId ? "هویت ورود متصل است" : "در انتظار اولین ورود"}</p></TableCell><TableCell className="tablecell"><div className="tools"><button type="button" className="btn" onClick={() => start(member)} aria-label={"ویرایش حساب " + member.name}><Pencil size={16}/>ویرایش</button><button type="button" className="btn account-delete-btn" disabled={member.canDelete===false} title={member.canDelete===false?"حساب مدیر اصلی یا حساب جاری قابل حذف نیست":"حذف حساب"} onClick={() => {setDeleteError("");setDeleteTarget(member);}} aria-label={"حذف حساب " + member.name}><Trash2 size={16}/>حذف</button></div></TableCell></TableRow>)}</TableBody></Table> : <div className="empty">هنوز حسابی برای کارکنان تعریف نشده است.</div>}
     </div>
-    <Dialog open={open} onOpenChange={v => {if (!busy) {setOpen(v);if (!v) {setPassword("");setShowPassword(false);}}}}><DialogContent className="modal sm:max-w-2xl"><DialogTitle style={{paddingRight: 24}}>{editing ? "ویرایش دسترسی حساب" : "تعریف حساب کارکنان"}</DialogTitle><DialogDescription>نام کاربری و رمز عبور را تعیین کنید و دسترسی‌های موردنیاز را فعال کنید.</DialogDescription><form onSubmit={save}><div className="formgrid">
+    <Dialog open={open} onOpenChange={v => {if (!busy) {setOpen(v);if (!v) {setPassword("");setShowPassword(false);}}}}><DialogContent className="modal sm:max-w-2xl"><DialogTitle style={{paddingRight: 24}}>{editing ? "ویرایش حساب" : "تعریف حساب کارکنان"}</DialogTitle><DialogDescription>نام کاربری و رمز عبور را تعیین کنید و دسترسی‌های موردنیاز را فعال کنید.</DialogDescription><form onSubmit={save}><div className="formgrid">
       <label className="field">نام و نام خانوادگی<input required maxLength={100} value={name} onChange={e => setName(e.target.value)}/></label>
-      {(!editing||editing.username)?<><label className="field">نام کاربری<input autoComplete="off" required dir="ltr" disabled={!!editing} maxLength={40} value={username} onChange={e=>setUsername(e.target.value)}/></label>
+      {(!editing||editing.username)?<><label className="field">نام کاربری<input autoComplete="off" required dir="ltr" maxLength={40} value={username} onChange={e=>setUsername(e.target.value)}/></label>
         <div className="field">
           <label htmlFor="user-account-password">{editing?"رمز جدید (خالی بماند = بدون تغییر)":"رمز عبور"}</label>
           <div className="account-password-input">
@@ -75,7 +88,7 @@ export function UsersPanel({owner}: {owner: Session}) {
       </>:<label className="field">ایمیل ورود قبلی<input disabled value={email} dir="ltr"/></label>}
       <label className="field">واحد سازمانی<Select dir="rtl" value={commerceUnits.includes(unit) ? "بازرگانی" : unit} onValueChange={value => {setUnit(value); if (value !== "بازرگانی") setPermissions(presets[value]); else if (!editing) setPermissions(presets["سفارشی"]);}}><SelectTrigger className="full"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="بازرگانی">بازرگانی</SelectItem>{unit !== "بازرگانی" && !commerceUnits.includes(unit) && !presets[unit] && <SelectItem value={unit}>{unit}</SelectItem>}{Object.keys(presets).map(preset => <SelectItem value={preset} key={preset}>{preset}</SelectItem>)}</SelectContent></Select></label>
       {(unit === "بازرگانی" || commerceUnits.includes(unit)) && <label className="field">زیرمجموعه بازرگانی<Select dir="rtl" value={commerceUnits.includes(unit) ? unit : ""} onValueChange={setUnit}><SelectTrigger className="full"><SelectValue placeholder="داخلی یا خارجی را انتخاب کنید"/></SelectTrigger><SelectContent>{commerceUnits.map(value => <SelectItem key={value} value={value}>{value.endsWith("داخلی") ? "داخلی" : "خارجی"}</SelectItem>)}</SelectContent></Select><span className="subtle">دسترسی‌ها را جداگانه در پایین تعیین کنید؛ تغییر زیرمجموعه مجوزها را تغییر نمی‌دهد.</span></label>}
-      <label className="field">وضعیت حساب<Select dir="rtl" value={status} onValueChange={setStatus}><SelectTrigger className="full"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="active">فعال</SelectItem><SelectItem value="disabled">غیرفعال</SelectItem></SelectContent></Select></label>
+      <label className="field">وضعیت حساب<Select dir="rtl" value={status} onValueChange={setStatus}><SelectTrigger className="full"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="active">فعال</SelectItem><SelectItem value="disabled" disabled={editing?.canDelete===false}>غیرفعال</SelectItem></SelectContent></Select></label>
     </div><div style={{marginTop: 18}}><Table><TableHeader><TableRow><TableHead className="tablehead">بخش</TableHead><TableHead className="tablehead">مشاهده</TableHead><TableHead className="tablehead">ثبت / ویرایش</TableHead></TableRow></TableHeader><TableBody>{modules.map(kind => <TableRow key={kind}><TableCell className="tablecell">{names[kind]}</TableCell><TableCell className="tablecell"><Checkbox aria-label={"مشاهده " + names[kind]} checked={permissions.read.includes(kind)} onCheckedChange={value => toggle(kind, "read", value === true)}/></TableCell><TableCell className="tablecell"><Checkbox aria-label={"ثبت " + names[kind]} checked={permissions.write.includes(kind)} onCheckedChange={value => toggle(kind, "write", value === true)}/></TableCell></TableRow>)}</TableBody></Table></div>
     <label className="field" style={{marginTop:16}}>کنترل مالی<Select dir="rtl" value={permissions.finance||"none"} onValueChange={v=>setPermissions(p=>({...p,finance:v as Permissions["finance"]}))}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="none">بدون دسترسی</SelectItem><SelectItem value="read">مشاهده و دانلود</SelectItem><SelectItem value="write">مشاهده، بارگذاری و ثبت بررسی</SelectItem></SelectContent></Select></label>
     <fieldset className="stage-permissions"><legend>تدارکات و حمل‌ونقل</legend>{Object.entries(transportRoles).map(([key,label])=><label key={key}><Checkbox checked={(permissions.transportRoles||[]).includes(key)} onCheckedChange={v=>setPermissions(p=>({...p,transportRoles:v?[...(p.transportRoles||[]),key]:(p.transportRoles||[]).filter(x=>x!==key)}))}/>{label}</label>)}</fieldset>
@@ -87,5 +100,12 @@ export function UsersPanel({owner}: {owner: Session}) {
     {permissions.write.includes("event") && <fieldset className="stage-permissions"><legend>مراحل مجاز برای ثبت رویداد</legend>{stages.map(stage => <label key={stage}><Checkbox checked={permissions.eventStages.includes(stage)} onCheckedChange={value => setPermissions(p => ({...p, eventStages: value === true ? [...p.eventStages, stage] : p.eventStages.filter(s => s !== stage)}))}/>{stage}</label>)}</fieldset>}
     <p className="subtle" style={{marginTop: 12}}>دسترسی مشاهده، تمام فیلدهای ثبت‌شده آن بخش را شامل می‌شود؛ در نسخه‌های نرم‌افزار، دانلود فایل HEX نیز مجاز می‌شود. با غیرفعال‌کردن حساب، درخواست‌های بعدی کاربر رد می‌شوند.</p>
     {formError && <p className="notice error" role="alert" style={{marginTop: 12}}>{formError}</p>}<div className="tools" style={{marginTop: 18}}><button className="btn primary" disabled={busy}>{busy ? "در حال ذخیره…" : "ذخیره حساب و دسترسی"}</button><button type="button" className="btn" disabled={busy} onClick={() => setOpen(false)}>انصراف</button></div></form></DialogContent></Dialog>
-  </section>;
+  <AlertDialog open={!!deleteTarget} onOpenChange={v=>{if(!v&&!deleting)setDeleteTarget(null);}}>
+      <AlertDialogContent dir="rtl"><AlertDialogTitle>حذف حساب «{deleteTarget?.name}»؟</AlertDialogTitle>
+        <AlertDialogDescription>ورود این کاربر قطع و حساب از فهرست حذف می‌شود. سوابق تولید، خدمات، پیام‌ها و گزارش‌های ثبت‌شده او حفظ می‌شود. نام کاربری قبلی برای حفظ هویت سوابق قابل استفاده مجدد نیست. اگر کار باز یا سمت فعالی دارد، مسئول جایگزین را مشخص کنید.</AlertDialogDescription>
+        <p dir="ltr" className="subtle">{deleteTarget?.username||deleteTarget?.email}</p>
+        {deleteError&&<p className="notice error" role="alert">{deleteError}</p>}
+        <AlertDialogFooter><AlertDialogCancel disabled={deleting}>انصراف</AlertDialogCancel><AlertDialogAction variant="destructive" disabled={deleting} onClick={e=>{e.preventDefault();void deleteAccount();}}>{deleting?'در حال حذف…':'تأیید حذف حساب'}</AlertDialogAction></AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog></section>;
 }

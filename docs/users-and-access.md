@@ -8,7 +8,7 @@ The owner has a Users and access tab. Accounts are provisioned by authenticated 
 
 ## Authentication
 
-The platform supplies authenticated identity through the bundled ChatGPT helper. Passwords are neither created nor stored here. TRACE_OWNER_EMAIL is a hosted secret based on the verified Site owner's account. Missing configuration fails closed. First owner sign-in pins the stable Site-specific subject in app_identity. Provisioned members likewise bind the first matching authenticated subject to their email; later subject mismatch is denied. Client-supplied role, email and user ID are never authoritative.
+Local username/password accounts are supported. Passwords are stored only as salted PBKDF2 hashes; the eye toggle shows only the newly typed value, never a saved password. Legacy accounts also support the bundled ChatGPT identity helper. TRACE_OWNER_EMAIL is a hosted secret based on the verified Site owner's account. Missing configuration fails closed. First owner sign-in pins the stable Site-specific subject in app_identity. Provisioned members likewise bind the first matching authenticated subject to their email; later subject mismatch is denied. Client-supplied role, email and user ID are never authoritative.
 
 Local .env and .env.example declare TRACE_OWNER_EMAIL without a default administrator. Production uses the hosted secret; do not commit its value. Future migrations to another hosting/identity provider must deliberately migrate these subject bindings.
 
@@ -24,7 +24,7 @@ All data/session/user/suggestion endpoints check identity and current enabled me
 - Management read-only: all modules read, no writes.
 - Custom: explicit grants.
 
-Only the configured owner manages users. No delegated user-administration permission is exposed in this increment. The owner's account cannot be disabled through the member API. Member emails cannot be edited; provision a new account and disable the old account for an email change.
+Only authenticated administrators manage users (configured owner or bootstrapped local administrator). No delegated user-administration permission is exposed in this increment. The owner's account cannot be disabled through the member API. Member emails cannot be edited; provision a new account and disable the old account for an email change.
 
 Grants apply to whole modules, not individual fields, customers or records. For example, service read access includes stored service costs and complaint details. Event-stage restrictions apply to writes, while event read grants show all events. Export contains only the viewer's authorized dataset. Previously downloaded data cannot be recalled by revoking future access.
 
@@ -38,3 +38,11 @@ Run `node tests/access-control.cjs`, `node tests/batch-number.cjs`, TypeScript c
 
 ### بازرگانی
 در تعریف یا ویرایش حساب، «واحد سازمانی ← بازرگانی» و سپس «داخلی» یا «خارجی» را انتخاب کنید. دسترسی‌ها مستقل تنظیم می‌شوند. در API و MCP مقدار `unit` برابر `بازرگانی — داخلی` یا `بازرگانی — خارجی` است و در فیلد موجود ذخیره می‌شود. نام واحد بدون زیرمجموعه پذیرفته نمی‌شود.
+
+## مدیریت حساب‌ها — ۱۴۰۵/۰۷/۱۱
+- دکمه‌های «ویرایش» و «حذف» در کاربران و دسترسی‌ها؛ ویرایش نام، نام کاربری محلی، واحد، وضعیت، مجوزها و رمز جدید. ایمیل ورود قدیمی ثابت است.
+- تغییر نام کاربری یا رمز، نشست‌ها و توکن‌های حساب را باطل می‌کند؛ تغییر حساب خود مدیر، ورود دوباره می‌خواهد. مدیر اصلی و حساب جاری قابل حذف یا غیرفعال‌کردن نیستند.
+- حذف با تأیید نام حساب انجام می‌شود و `status=deleted` را ثبت می‌کند؛ حساب از فهرست فعال مدیریت حذف می‌شود و امکان ورود یا فعال‌سازی مجدد با PATCH ندارد. نام کاربری و ایمیل رزرو می‌ماند. سوابق تولید، خدمات، گزارش‌ها، وظایف و انتساب تاریخی حفظ می‌شود؛ جایگزینی مسئول کارهای باز باید جداگانه انجام شود.
+- تمام تغییرات با نسخه جاری و audit در یک تراکنش هستند. خطای نام کاربری تکراری، نسخه قدیمی یا شکست میانی هیچ تغییر جزئی به‌جا نمی‌گذارد؛ تکرار DELETE پس از موفقیت بی‌اثر است.
+- MCP: `update_user`، `update_password_user` و `delete_user` همان handler و مجوز را دارند. دستیار برای ویرایش غیرمحرمانه و حذف، شخص و نسخه را از `list_users` می‌خواند و کارت تأیید می‌سازد؛ رمز جدید فقط در فرم امن وارد می‌شود.
+- بدون مهاجرت دیتابیس. آزمون‌های `password-accounts.cjs`، `assistant.cjs` و `mcp-integration.cjs` مسیرهای مجوز، حفظ سابقه، ابطال ورود/توکن و تأیید دستیار را پوشش می‌دهند.
