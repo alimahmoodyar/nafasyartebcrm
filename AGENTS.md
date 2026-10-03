@@ -5,3 +5,5 @@
 - Add a concise entry to `docs/CHANGELOG.md` for each release and verify meaningful permission/data-integrity cases.
 - Push completed changes to GitHub `alimahmoodyar/nafasyartebcrm`, branch `sites/nafasyar-trace` for this TypeScript/Cloudflare app. `main` contains the separate .NET 8 application; do not overwrite it.
 - Keep credentials outside the repository. A source push does not deploy the .NET application.
+
+- When adding persistent business data, update `lib/reset-contract.ts` and the reset freeze triggers/migrations so preview, backup, delete ordering and preservation stay complete. Test FK-safe rollback; never run reset on production merely to test a release.

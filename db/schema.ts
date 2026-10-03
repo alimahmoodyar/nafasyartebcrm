@@ -150,3 +150,10 @@ export const serviceOffsets=sqliteTable('service_offsets',{
 export const serviceFiles=sqliteTable('service_files',{
  id:text('id').primaryKey(),caseId:text('case_id').notNull().references(()=>flowEntities.id),purpose:text('purpose').notNull(),objectKey:text('object_key').notNull(),filename:text('filename').notNull(),mime:text('mime').notNull(),byteSize:integer('byte_size').notNull(),sha256:text('sha256').notNull(),created:text('created').notNull(),actor:text('actor').notNull(),
 },t=>[index('idx_service_files_case').on(t.caseId)]);
+
+export const resetControl=sqliteTable('reset_control',{
+ id:integer('id').primaryKey(),passwordHash:text('password_hash'),phase:text('phase').notNull().default('testing'),jobId:text('job_id'),internal:integer('internal').notNull().default(0),revision:integer('revision').notNull().default(1),updated:text('updated').notNull(),
+},t=>[check('reset_singleton',sql`${t.id}=1`),check('reset_internal_flag',sql`${t.internal} IN (0,1)`)]);
+export const resetJobs=sqliteTable('reset_jobs',{
+ id:text('id').primaryKey(),owner:text('owner').notNull(),scope:text('scope').notNull(),state:text('state').notNull(),created:text('created').notNull(),expires:text('expires').notNull(),backupKey:text('backup_key'),backupHash:text('backup_hash'),byteSize:integer('byte_size'),summary:text('summary'),downloadedAt:text('downloaded_at'),completed:text('completed'),guard:integer('guard').notNull().default(1),
+},t=>[check('reset_job_guard',sql`${t.guard}=1`)]);

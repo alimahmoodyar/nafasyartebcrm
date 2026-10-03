@@ -57,6 +57,7 @@ export function checkOrigin(request: Request) {
   throw new AccessError("درخواست نامعتبر است؛ صفحه را دوباره باز کنید.", 403);
 }
 export function accessResponse(error: unknown): Response | null {
+  if(String(error).includes("RESET_MAINTENANCE")) return Response.json({error:"سامانه برای پشتیبان‌گیری و پاک‌سازی در حالت نگهداری است؛ ثبت جدید موقتاً متوقف شده است."},{status:423,headers:{"Cache-Control":"no-store"}});
   return error instanceof AccessError ? Response.json({error: error.message}, {status: error.status, headers: {"Cache-Control": "no-store"}}) : null;
 }
 
