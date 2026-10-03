@@ -1,3 +1,4 @@
+import * as ownProfile from '@/app/api/profile/route';
 import * as replenishment from '@/app/api/replenishment/route';
 import * as systemReset from '@/app/api/system-reset/route';
 import {resetScopes} from '@/lib/reset-contract';
@@ -264,3 +265,6 @@ supplyPost('mark_sourcing_ready','Inventory: mark ready only when every BOM line
 supplyPost('release_sourcing_to_production','Inventory: hand over fully ready case to production, with reference; releases planning holds without consuming stock. All related purchases must be closed/cancelled.', 'release',{...supplyCase,notes:text(),reference:text('',500)});
 supplyPost('cancel_sourcing_plan','CEO: cancel case without any non-cancelled purchase and release holds. Does not delete history.', 'cancel',{...supplyCase,notes:text()});
 supplyPost('followup_sourcing_plan','Authorized sourcing participant: record current follow-up and refresh stage task projection. Does not change commercial/stock approvals.', 'followup',{...supplyCase,notes:text()});
+
+api('get_my_profile','Get the current authenticated user name and own avatar metadata. No other account can be selected.',obj({}),'/api/profile','GET',ownProfile.GET);
+api('set_my_profile_photo','Upload or remove only your own profile photo. JPEG base64 up to 64 KiB, explicit confirmation and current profile revision required. Browser upload resizes images automatically.',payload({mode:{type:'string',enum:['upload','remove']},revision:integer(0,1e9),image:text('JPEG base64; empty for remove',88000)}),'/api/profile','POST',ownProfile.POST);
