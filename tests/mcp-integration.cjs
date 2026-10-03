@@ -29,6 +29,7 @@ async function mint(scope='read'){return (await (await tokens.POST(request('/api
  assert.equal((await configs.PUT(request('/api/llm-config','PUT',{...profile,apiToken:''}))).status,409);
  r=await configs.PUT(request('/api/llm-config','PUT',{...profile,revision:1,apiToken:'',name:'Updated'}));assert.equal(r.status,200);assert.equal(sql.prepare('SELECT token_ciphertext FROM llm_configs WHERE id=?').get(id).token_ciphertext,row.token_ciphertext);
  const read=await mint();token=read.token;identity=null;assert.ok(token.startsWith('nfy_'));assert.ok(!JSON.stringify(sql.prepare('SELECT * FROM mcp_tokens').all()).includes(token));
+ const mobileGuide=await call('get_mobile_install_guide');assert.equal(mobileGuide.section,'mobile-install');assert.equal(mobileGuide.internetRequired,true);assert.equal(mobileGuide.canInstallFromChat,false);
  assert.equal((await call('get_session')).userId,'owner');assert.ok((await call('list_llm_configs')).profiles[0].hasToken);assert.ok((await call('delete_llm_config',{id,revision:2,confirmed:true})).error);
  const cal=await call('get_calendar_context',{dates:['۱۴۰۵/۰۷/۱۱','۱۴۰۴/۱۲/۳۰']});assert.equal(cal.timeZone,'Asia/Tehran');assert.equal(cal.dates[0].iso,'2026-10-03');assert.equal(cal.dates[0].persian,'1405/07/11');assert.ok(cal.dates[1].error);
  const product={code:'TEST1',name:'Test',group:'Oxygen',model:'M1',warrantyMonths:'12',status:'فعال'};

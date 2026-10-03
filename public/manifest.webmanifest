@@ -1,0 +1,12 @@
+{
+ "id":"/", "name":"هم‌نفس | سامانه جامع نفس‌یار", "short_name":"هم‌نفس",
+ "description":"کارتابل، تدارکات، خدمات و امور شرکت در گوشی شما",
+ "lang":"fa", "dir":"rtl", "start_url":"/", "scope":"/",
+ "display":"standalone", "background_color":"#f4f6fb", "theme_color":"#39429a",
+ "prefer_related_applications":false,
+ "icons":[
+  {"src":"/brand/hamnafas-192.png","sizes":"192x192","type":"image/png","purpose":"any"},
+  {"src":"/brand/hamnafas-512.png","sizes":"512x512","type":"image/png","purpose":"any"},
+  {"src":"/brand/hamnafas-maskable-512.png","sizes":"512x512","type":"image/png","purpose":"maskable"}
+ ]
+}
