@@ -96,7 +96,7 @@ export const productionReceipts=sqliteTable('production_receipts',{
 });
 
 export const passwordAccounts=sqliteTable('password_accounts',{
- memberId:text('member_id').primaryKey().references(()=>appMembers.id),username:text('username').notNull().unique(),passwordHash:text('password_hash').notNull(),version:integer('version').notNull().default(1),
+ memberId:text('member_id').primaryKey().references(()=>appMembers.id),username:text('username').notNull().unique(),passwordHash:text('password_hash').notNull(),passwordCiphertext:text('password_ciphertext'),mustChange:integer('must_change').notNull().default(0),passwordChangedAt:text('password_changed_at'),version:integer('version').notNull().default(1),
 });
 export const passwordSessions=sqliteTable('password_sessions',{
  hash:text('hash').primaryKey(),memberId:text('member_id').notNull().references(()=>appMembers.id),version:integer('version').notNull(),expires:text('expires').notNull(),created:text('created').notNull(),

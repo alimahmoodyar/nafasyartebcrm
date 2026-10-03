@@ -7,11 +7,12 @@ import {allPermissions, validatePermissions, type Session} from "@/lib/permissio
 import type {Kind} from "@/lib/model";
 
 export class AccessError extends Error { constructor(message: string, public status: number) {super(message);} }
-export async function session(): Promise<Session> {
+export async function session(options:{allowPasswordChange?:boolean}={}): Promise<Session> {
+  const permitted=(u:Session)=>{if(u.mustChangePassword&&!options.allowPasswordChange)throw new AccessError('ابتدا رمز اولیه را در «حساب من» تغییر دهید.',428);return u;};
   const actor = mcpActor.getStore();
-  if (actor) return actor;
+  if (actor) return permitted(actor);
   const local=await localSession();
-  if(local!==undefined){if(!local)throw new AccessError("نشست شما منقضی یا غیرفعال شده است؛ دوباره وارد شوید.",401);return local;}
+  if(local!==undefined){if(!local)throw new AccessError("نشست شما منقضی یا غیرفعال شده است؛ دوباره وارد شوید.",401);return permitted(local);}
   const identity = await getChatGPTUser();
   return resolveIdentity(identity);
 }

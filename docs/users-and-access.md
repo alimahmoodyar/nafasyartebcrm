@@ -8,7 +8,7 @@ The owner has a Users and access tab. Accounts are provisioned by authenticated 
 
 ## Authentication
 
-Local username/password accounts are supported. Passwords are stored only as salted PBKDF2 hashes; the eye toggle shows only the newly typed value, never a saved password. Legacy accounts also support the bundled ChatGPT identity helper. TRACE_OWNER_EMAIL is a hosted secret based on the verified Site owner's account. Missing configuration fails closed. First owner sign-in pins the stable Site-specific subject in app_identity. Provisioned members likewise bind the first matching authenticated subject to their email; later subject mismatch is denied. Client-supplied role, email and user ID are never authoritative.
+Local username/password accounts are supported. Login verifies salted PBKDF2 hashes. Per the owner policy, the current password is also encrypted using a separate server vault key and may be revealed only by the audited, reauthenticated admin browser endpoint; never in general user APIs or MCP. Legacy accounts also support the bundled ChatGPT identity helper. TRACE_OWNER_EMAIL is a hosted secret based on the verified Site owner's account. Missing configuration fails closed. First owner sign-in pins the stable Site-specific subject in app_identity. Provisioned members likewise bind the first matching authenticated subject to their email; later subject mismatch is denied. Client-supplied role, email and user ID are never authoritative.
 
 Local .env and .env.example declare TRACE_OWNER_EMAIL without a default administrator. Production uses the hosted secret; do not commit its value. Future migrations to another hosting/identity provider must deliberately migrate these subject bindings.
 

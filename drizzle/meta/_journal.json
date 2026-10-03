@@ -120,6 +120,13 @@
       "when": 1791014998968,
       "tag": "0016_reset_controls",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1791020716000,
+      "tag": "0017_password_self_service",
+      "breakpoints": true
     }
   ]
 }

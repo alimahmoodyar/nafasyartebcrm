@@ -237,3 +237,5 @@ html,button,input,textarea,select,option,svg text{font-family:"Vazirmatn",sans-s
 .account-password-input{position:relative;width:100%;min-width:0}.account-password-input input{width:100%;padding-right:52px;min-height:46px}.account-password-toggle{position:absolute;right:2px;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:42px;height:42px;border:0;border-radius:7px;background:transparent;color:#536488}.account-password-toggle:hover{background:#eef2fa;color:#293c6b}.account-password-toggle:focus-visible{outline:2px solid #5364a4;outline-offset:-2px}.account-password-toggle:disabled{opacity:.5;cursor:default}
 
 .account-delete-btn{color:#b42318;border-color:#efc4c0}.account-delete-btn:disabled{opacity:.45;cursor:not-allowed}
+
+.my-account-panel{max-width:620px;margin-inline:auto;text-align:right}.password-form-fields{display:grid;gap:16px;border:0;padding:0;margin:16px 0 0;min-width:0}.my-account-panel .notice{display:block;margin:16px 0}

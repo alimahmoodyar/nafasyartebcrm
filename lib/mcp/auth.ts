@@ -7,7 +7,7 @@ export function validateOrigin(request:Request){const origin=request.headers.get
 export async function tokenPrincipal(token:string):Promise<McpPrincipal>{
  if(!/^nfy_[0-9a-f]{64}$/.test(token))throw new AccessError('Invalid reference token.',401);
  const t=await storage().prepare('SELECT * FROM mcp_tokens WHERE token_hash=? AND revoked=0 AND expires>?').bind(await tokenHash(token),new Date().toISOString()).first<any>();if(!t)throw new AccessError('Reference token expired, revoked or invalid.',401);
- const user=t.subject.startsWith('local:')?await localPrincipal(t.subject.slice(6)):await resolveIdentity({userId:t.subject,email:t.email,displayName:t.email,fullName:null});if(!user)throw new AccessError('Account is inactive.',401);return {user,scope:t.scope,tokenId:t.id};
+ const user=t.subject.startsWith('local:')?await localPrincipal(t.subject.slice(6)):await resolveIdentity({userId:t.subject,email:t.email,displayName:t.email,fullName:null});if(!user)throw new AccessError('Account is inactive.',401);if(user.mustChangePassword)throw new AccessError('Change your initial password in حساب من before using MCP.',428);return {user,scope:t.scope,tokenId:t.id};
 }
 export async function authenticateMcp(request:Request,requireToken=false):Promise<McpPrincipal>{
  validateOrigin(request);const url=new URL(request.url),query=url.searchParams.get('token'),authorization=request.headers.get('authorization');
