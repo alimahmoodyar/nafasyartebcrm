@@ -1,6 +1,6 @@
 "use client";
 import {useEffect, useState} from "react";
-import {Plus, RefreshCw, ShieldCheck} from "lucide-react";
+import {Eye, EyeOff, Plus, RefreshCw, ShieldCheck} from "lucide-react";
 import {Dialog, DialogContent, DialogTitle, DialogDescription} from "@/components/ui/dialog";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 import {Checkbox} from "@/components/ui/checkbox";
@@ -19,6 +19,7 @@ export function UsersPanel({owner}: {owner: Session}) {
   const [email, setEmail] = useState(""), [name, setName] = useState(""), [unit, setUnit] = useState("تولید"), [status, setStatus] = useState("active");
   const [permissions, setPermissions] = useState<Permissions>(presets["تولید"]);
   const [username,setUsername]=useState(""),[password,setPassword]=useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState("");
   const [serviceAgents,setServiceAgents]=useState<any[]>([]);
   async function load() {
@@ -27,7 +28,7 @@ export function UsersPanel({owner}: {owner: Session}) {
     catch (err) {setError(err instanceof Error ? err.message : "دریافت کاربران انجام نشد.");} finally {setLoading(false);}
   }
   useEffect(() => {void load();void Promise.all(['home','hospital'].map(async domain=>{const r=await fetch('/api/after-sales?domain='+domain);if(!r.ok)return [];return ((await r.json()) as any).agents||[]})).then(r=>setServiceAgents(r.flat())).catch(()=>{});}, []);
-  function start(member?: Member) {setEditing(member || null);setUsername(member?.username||"");setPassword(""); setEmail(member?.email || ""); setName(member?.name || ""); setUnit(member?.unit || "تولید"); setStatus(member?.status || "active"); setPermissions(member?.permissions || presets["تولید"]); setFormError(""); setOpen(true);}
+  function start(member?: Member) {setEditing(member || null);setUsername(member?.username||"");setPassword("");setShowPassword(false); setEmail(member?.email || ""); setName(member?.name || ""); setUnit(member?.unit || "تولید"); setStatus(member?.status || "active"); setPermissions(member?.permissions || presets["تولید"]); setFormError(""); setOpen(true);}
   function toggle(kind: Kind, operation: "read" | "write", enabled: boolean) {
     setPermissions(previous => {
       const next = {...previous,read: [...previous.read], write: [...previous.write], eventStages: [...previous.eventStages]};
@@ -49,7 +50,7 @@ export function UsersPanel({owner}: {owner: Session}) {
       const response = await fetch("/api/users", {method: editing ? "PATCH" : "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({id: editing?.id, revision: editing?.revision, email, name, unit, status, permissions,username,password})});
       const result = await response.json() as {member: Member; error?: string};
       if (!response.ok) throw new Error(result.error);
-      setMembers(previous => [result.member, ...previous.filter(m => m.id !== result.member.id)]); setOpen(false);setPassword(""); setMessage("دسترسی حساب ذخیره شد. هیچ دعوت‌نامه‌ای ارسال نشده است.");
+      setMembers(previous => [result.member, ...previous.filter(m => m.id !== result.member.id)]); setOpen(false);setPassword("");setShowPassword(false); setMessage("دسترسی حساب ذخیره شد. هیچ دعوت‌نامه‌ای ارسال نشده است.");
     } catch (err) {setFormError(err instanceof Error ? err.message : "ذخیره حساب انجام نشد.");} finally {setBusy(false);}
   }
   return <section>
@@ -59,9 +60,19 @@ export function UsersPanel({owner}: {owner: Session}) {
       {error && <p className="notice error" role="alert">{error}</p>}{message && <p className="notice" role="status">{message}</p>}
       {loading ? <div className="empty">در حال دریافت کاربران…</div> : members.length ? <Table><TableHeader><TableRow>{["نام و ایمیل", "واحد", "دسترسی", "وضعیت", ""].map((h, i) => <TableHead className="tablehead" key={i}>{h}</TableHead>)}</TableRow></TableHeader><TableBody>{members.map(member => <TableRow key={member.id}><TableCell className="tablecell"><strong>{member.name}</strong><p className="subtle" dir="ltr">{member.username||member.email}</p></TableCell><TableCell className="tablecell">{member.unit}</TableCell><TableCell className="tablecell"><p>مشاهده: {member.permissions.read.map(k => names[k]).join("، ") || "هیچ بخش"}</p><p className="subtle">مالی: {member.permissions.finance==="write"?"مشاهده و ثبت":member.permissions.finance==="read"?"مشاهده":"بدون دسترسی"} · ثبت: {member.permissions.write.map(k => names[k]).join("، ") || "فقط مشاهده"}</p></TableCell><TableCell className="tablecell"><span className={"badge " + (member.status === "active" ? "good" : "bad")}>{member.status === "active" ? "فعال" : "غیرفعال"}</span><p className="subtle">{member.username?"ورود با نام کاربری":member.userId ? "هویت ورود متصل است" : "در انتظار اولین ورود"}</p></TableCell><TableCell className="tablecell"><button className="link" onClick={() => start(member)}>ویرایش دسترسی</button></TableCell></TableRow>)}</TableBody></Table> : <div className="empty">هنوز حسابی برای کارکنان تعریف نشده است.</div>}
     </div>
-    <Dialog open={open} onOpenChange={v => {if (!busy) setOpen(v);}}><DialogContent className="modal sm:max-w-2xl"><DialogTitle style={{paddingRight: 24}}>{editing ? "ویرایش دسترسی حساب" : "تعریف حساب کارکنان"}</DialogTitle><DialogDescription>نام کاربری و رمز عبور را تعیین کنید و دسترسی‌های موردنیاز را فعال کنید.</DialogDescription><form onSubmit={save}><div className="formgrid">
+    <Dialog open={open} onOpenChange={v => {if (!busy) {setOpen(v);if (!v) {setPassword("");setShowPassword(false);}}}}><DialogContent className="modal sm:max-w-2xl"><DialogTitle style={{paddingRight: 24}}>{editing ? "ویرایش دسترسی حساب" : "تعریف حساب کارکنان"}</DialogTitle><DialogDescription>نام کاربری و رمز عبور را تعیین کنید و دسترسی‌های موردنیاز را فعال کنید.</DialogDescription><form onSubmit={save}><div className="formgrid">
       <label className="field">نام و نام خانوادگی<input required maxLength={100} value={name} onChange={e => setName(e.target.value)}/></label>
-      {(!editing||editing.username)?<><label className="field">نام کاربری<input autoComplete="off" required dir="ltr" disabled={!!editing} maxLength={40} value={username} onChange={e=>setUsername(e.target.value)}/></label><label className="field">{editing?"رمز جدید (خالی بماند = بدون تغییر)":"رمز عبور"}<input type="password" autoComplete="new-password" required={!editing} minLength={10} maxLength={128} value={password} onChange={e=>setPassword(e.target.value)}/></label></>:<label className="field">ایمیل ورود قبلی<input disabled value={email} dir="ltr"/></label>}
+      {(!editing||editing.username)?<><label className="field">نام کاربری<input autoComplete="off" required dir="ltr" disabled={!!editing} maxLength={40} value={username} onChange={e=>setUsername(e.target.value)}/></label>
+        <div className="field">
+          <label htmlFor="user-account-password">{editing?"رمز جدید (خالی بماند = بدون تغییر)":"رمز عبور"}</label>
+          <div className="account-password-input">
+            <input id="user-account-password" type={showPassword ? "text" : "password"} dir="ltr" autoComplete="new-password" spellCheck={false} autoCapitalize="none" required={!editing} minLength={10} maxLength={128} value={password} onChange={e=>setPassword(e.target.value)}/>
+            <button type="button" className="account-password-toggle" disabled={busy} onClick={() => setShowPassword(value => !value)} aria-label={showPassword ? "پنهان کردن رمز عبور" : "نمایش رمز عبور"} title={showPassword ? "پنهان کردن رمز عبور" : "نمایش رمز عبور"} aria-controls="user-account-password" aria-pressed={showPassword}>
+              {showPassword ? <EyeOff size={20} aria-hidden="true"/> : <Eye size={20} aria-hidden="true"/>}
+            </button>
+          </div>
+        </div>
+      </>:<label className="field">ایمیل ورود قبلی<input disabled value={email} dir="ltr"/></label>}
       <label className="field">واحد سازمانی<Select dir="rtl" value={commerceUnits.includes(unit) ? "بازرگانی" : unit} onValueChange={value => {setUnit(value); if (value !== "بازرگانی") setPermissions(presets[value]); else if (!editing) setPermissions(presets["سفارشی"]);}}><SelectTrigger className="full"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="بازرگانی">بازرگانی</SelectItem>{unit !== "بازرگانی" && !commerceUnits.includes(unit) && !presets[unit] && <SelectItem value={unit}>{unit}</SelectItem>}{Object.keys(presets).map(preset => <SelectItem value={preset} key={preset}>{preset}</SelectItem>)}</SelectContent></Select></label>
       {(unit === "بازرگانی" || commerceUnits.includes(unit)) && <label className="field">زیرمجموعه بازرگانی<Select dir="rtl" value={commerceUnits.includes(unit) ? unit : ""} onValueChange={setUnit}><SelectTrigger className="full"><SelectValue placeholder="داخلی یا خارجی را انتخاب کنید"/></SelectTrigger><SelectContent>{commerceUnits.map(value => <SelectItem key={value} value={value}>{value.endsWith("داخلی") ? "داخلی" : "خارجی"}</SelectItem>)}</SelectContent></Select><span className="subtle">دسترسی‌ها را جداگانه در پایین تعیین کنید؛ تغییر زیرمجموعه مجوزها را تغییر نمی‌دهد.</span></label>}
       <label className="field">وضعیت حساب<Select dir="rtl" value={status} onValueChange={setStatus}><SelectTrigger className="full"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="active">فعال</SelectItem><SelectItem value="disabled">غیرفعال</SelectItem></SelectContent></Select></label>
