@@ -1,19 +1,17 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
 import {Mic,Square} from 'lucide-react';
-// Native recognition is feature-detected; no audio blob or provider key is stored by this app.
+import {createVoiceRecognition,type VoiceState} from '@/lib/voice-recognition';
+// No audio blob or provider key is stored by this app; text is never auto-submitted.
 export function VoiceInput({value,onText,disabled,scope}:{value:string;onText:(s:string)=>void;disabled:boolean;scope:string}){
- const [supported,setSupported]=useState(false),[listening,setListening]=useState(false),[notice,setNotice]=useState('');
- const recognition=useRef<any>(null),timer=useRef<ReturnType<typeof setTimeout>|null>(null),generation=useRef(0),text=useRef(onText);text.current=onText;
- function abort(){generation.current++;const r=recognition.current;recognition.current=null;if(timer.current)clearTimeout(timer.current);r?.abort();setListening(false);}
- useEffect(()=>{setSupported(!!((window as any).SpeechRecognition||(window as any).webkitSpeechRecognition));const hidden=()=>{if(document.hidden)abort()};document.addEventListener('visibilitychange',hidden);return()=>{abort();document.removeEventListener('visibilitychange',hidden)}},[]);
- useEffect(()=>{if(disabled)abort()},[disabled]);useEffect(()=>()=>abort(),[scope]);
- function start(){if(disabled)return;if(recognition.current){recognition.current.stop();return;}const Constructor=(window as any).SpeechRecognition||(window as any).webkitSpeechRecognition;if(!Constructor)return;
- const r=new Constructor(),g=++generation.current,base=value.trim();recognition.current=r;r.lang='fa-IR';r.continuous=false;r.interimResults=true;r.maxAlternatives=1;setNotice('در حال شنیدن… پس از پایان، متن را بررسی و ارسال کنید.');setListening(true);
- r.onresult=(event:any)=>{if(g!==generation.current)return;let heard='';for(let i=0;i<event.results.length;i++)heard+=event.results[i][0].transcript+' ';text.current((base+(base?' ':'')+heard.trim()).slice(0,4000));};
- r.onerror=(event:any)=>{if(g!==generation.current)return;setNotice(({ 'not-allowed':'مجوز میکروفن داده نشده؛ از تنظیمات مرورگر اجازه دهید.', 'audio-capture':'میکروفن در دسترس نیست.',network:'سرویس تشخیص صدا در دسترس نیست؛ دوباره تلاش کنید یا تایپ کنید.','no-speech':'صدایی تشخیص داده نشد؛ دوباره میکروفن را بزنید.','language-not-supported':'تشخیص فارسی در این مرورگر پشتیبانی نمی‌شود؛ تایپ کنید.'} as Record<string,string>)[event.error]||'دریافت صدا متوقف شد؛ متن را بررسی کنید.');};
- r.onend=()=>{if(g!==generation.current)return;recognition.current=null;if(timer.current)clearTimeout(timer.current);setListening(false);setNotice(n=>n.startsWith('در حال')?'متن شنیده‌شده آماده ویرایش و ارسال است.':n)};
- try{r.start();timer.current=setTimeout(()=>r.stop(),60000)}catch{abort();setNotice('میکروفن شروع نشد؛ دوباره تلاش کنید یا متن را تایپ کنید.')}
+ const [state,setState]=useState<VoiceState>('idle'),[notice,setNotice]=useState('فارسی صحبت کنید؛ متن قبل از ارسال قابل اصلاح است.');
+ const controller=useRef<ReturnType<typeof createVoiceRecognition>|null>(null),text=useRef(onText);text.current=onText;
+ function cancel(message=''){controller.current?.cancel(message)}
+ useEffect(()=>{const hidden=()=>{if(document.hidden)cancel('با خروج از صفحه، دریافت صدا متوقف شد؛ دوباره میکروفن را بزنید.')};document.addEventListener('visibilitychange',hidden);return()=>{cancel();controller.current=null;document.removeEventListener('visibilitychange',hidden)}},[]);
+ useEffect(()=>{if(disabled)cancel()},[disabled]);useEffect(()=>()=>cancel(),[scope]);
+ function start(){if(disabled)return;if(!window.isSecureContext){setNotice('میکروفن به اتصال امن نیاز دارد؛ سایت را با آدرس https باز کنید.');return}const Constructor=(window as any).SpeechRecognition||(window as any).webkitSpeechRecognition;if(!Constructor){setNotice('این مرورگر ورودی صوتی را پشتیبانی نمی‌کند. سایت را مستقیم در مرورگر اصلی باز کنید یا از میکروفن صفحه‌کلید داخل کادر پیام استفاده کنید.');return}
+ if(!controller.current)controller.current=createVoiceRecognition({create:()=>new Constructor(),onState:setState,onNotice:setNotice,onText:s=>text.current(s)});controller.current.start(value);
  }
- return <div className="assistant-voice"><button type="button" className={'btn '+(listening?'voice-active':'')} disabled={!supported||disabled} aria-pressed={listening} onClick={start}>{listening?<Square size={18}/>:<Mic size={18}/>} {listening?'پایان صحبت':'فرمان صوتی'}</button><span role="status">{!supported?'ورودی صوتی در این مرورگر فعال نیست؛ می‌توانید تایپ کنید.':notice||'فارسی صحبت کنید؛ متن قبل از ارسال قابل اصلاح است.'}</span></div>;
+ const active=state!=='idle';
+ return <div className="assistant-voice"><button type="button" className={'btn '+(active?'voice-active':'')} disabled={disabled} aria-pressed={active} onClick={start}>{active?<Square size={18}/>:<Mic size={18}/>} {state==='starting'?'لغو راه‌اندازی':state==='stopping'?'پایان دریافت':active?'پایان صحبت':'فرمان صوتی'}</button><span role="status" aria-live="polite">{notice}</span></div>;
 }
