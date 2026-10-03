@@ -20,13 +20,13 @@ export function AssistantChat({admin,onSettings,accountId,accountName,onAccountC
   async function refresh(){clear();const generation=epoch.current;controller=new AbortController();setLoading(true);setError('');try{
    // Profiles are independent of history/actions migrations and must remain selectable if those fail.
    const options={cache:'no-store' as const,headers:{'x-assistant-account':accountId},signal:controller.signal};
-   const get=async(path:string)=>{const r=await fetch(path,options);let d:any;try{d=await r.json()}catch{throw new Error('پاسخ '+path+' معتبر نیست؛ مسیر API روی سرور را بررسی کنید.')};return {r,d}};
+   const get=async(path:string)=>{const timeout=new AbortController(),timer=setTimeout(()=>timeout.abort(),15000);try{const r=await fetch(path,{...options,signal:AbortSignal.any([controller.signal,timeout.signal])});let d:any;try{d=await r.json()}catch{throw new Error('پاسخ '+path+' معتبر نیست؛ مسیر API روی سرور را بررسی کنید.')};return {r,d}}catch(e){if(timeout.signal.aborted)throw new Error('دریافت اطلاعات دستیار بیش از حد طول کشید؛ تازه‌سازی مدل‌ها را بزنید.');throw e}finally{clearTimeout(timer)}};
    const results=await Promise.allSettled([get('/api/assistant/profiles'),get('/api/assistant')]);
    if(!active||generation!==epoch.current)return;
    const fulfilled=results.filter(x=>x.status==='fulfilled').map(x=>(x as PromiseFulfilledResult<any>).value);
    if(fulfilled.some(({r,d})=>r.status===401||r.status===409||r.ok&&d.accountId!==accountId)){changed.current();return;}
    const catalog=results[0].status==='fulfilled'&&results[0].value.r.ok?results[0].value.d:results[1].status==='fulfilled'&&results[1].value.r.ok?results[1].value.d:null;
-   if(catalog&&Array.isArray(catalog.profiles)){setProfiles(catalog.profiles);setProfile(p=>catalog.profiles.some((v:any)=>v.id===p)?p:catalog.profiles.length===1?catalog.profiles[0].id:'');}
+   if(catalog&&Array.isArray(catalog.profiles)){setProfiles(catalog.profiles);setProfile(p=>catalog.profiles.some((v:any)=>v.id===p)?p:catalog.profiles[0]?.id||'');}
    else{setProfiles([]);setProfile('');}
    const history=results[1];
    if(history.status==='fulfilled'&&history.value.r.ok){const d=history.value.d;setActions(d.actions||[]);setMessages(d.history.flatMap((h:any)=>[{role:'user',text:h.question},{role:'assistant',text:h.answer}]));}
