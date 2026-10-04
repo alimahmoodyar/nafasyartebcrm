@@ -11,6 +11,8 @@ export const resetTables:Record<string,string>={
 };
 export const resetFlowPreserved=['account_profile','position','duty_template','duty_catalog_install','transport_migration','development_request','as_agent'];
 export const resetFlowCatalog=['material','capacity','party','as_tariff','transport_vehicle'];
+// Service province/coverage lives inside as_agent (preserved identity) and
+// customer province inside as_case (operational reset); existing backup/freeze apply.
 export function resetWhere(table:string,scope:string){
  if(scope!=='operations'&&scope!=='full')throw Error('Invalid reset scope');
  if(!Object.hasOwn(resetTables,table))throw Error('Invalid reset table');
@@ -29,3 +31,6 @@ export const resetHelp=[
  'پس از حذف، شروع اصلی قفل پاک‌سازی را برای این نصب می‌بندد. حساب‌ها باقی می‌مانند؛ نشست‌های رمزعبوری و جریان‌های MCP نیاز به اتصال مجدد دارند. داده نمونه آموزشی نمایشی بخشی از داده شرکت نیست.',
  'فایل‌های اصلی پیوست در فضای خصوصی سرور برای بازیابی حفظ می‌شوند؛ JSON دانلودشده شامل متن رکوردها و فهرست فایل‌هاست، نه بایت تمام پیوست‌ها. فایل‌های پشتیبان فقط توسط ادمین قابل دریافت‌اند. بازگردانی با همکار فنی و راهنمای نسخه انجام شود.'
 ];
+
+// BOM imports use existing bom_versions, material flow_entities and inventory_operations;
+// existing freeze triggers and catalog/full reset semantics apply without new tables.
