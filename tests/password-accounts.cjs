@@ -18,6 +18,39 @@ const permissions={read:['batch'],write:[],eventStages:[],finance:'none'};
 async function enter(pass='Test-password-123'){return login.POST(request('/api/auth/login','POST',{username:'worker01',password:pass}));}
 (async()=>{
  identity=owner;await auth.session();
+ // Delegated service accounts use the real SQLite transaction and authentication stack.
+ const delegated=load('app/api/after-sales/agent-accounts/route.ts');
+ const managerPermissions={read:[],write:[],eventStages:[],serviceRoles:['manager'],serviceDomains:['home']};
+ const managerId=crypto.randomUUID();
+ sql.prepare("INSERT INTO app_members(id,email,name,unit,status,permissions,revision,created,updated) VALUES(?,?,?,?,?,?,1,?,?)").run(managerId,'manager@example.com','Service manager','service','active',JSON.stringify(managerPermissions),'2026-10-04','2026-10-04');
+ for(const [id,domain,active] of [['agent-home','home',true],['agent-hospital','hospital',true],['agent-disabled','home',false]])sql.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'as_agent',?,1,?,?)").run(id,JSON.stringify({domain,active,name:id,agentId:id}),'2026-10-04','2026-10-04');
+ identity={...owner,userId:'manager-subject',email:'manager@example.com'};
+ const delegatedBody={id:crypto.randomUUID(),domain:'home',agentId:'agent-home',revision:1,name:'Representative',username:'agent-login',password:'Private-agent-password-123',confirmed:true};
+ const createAgent=b=>delegated.POST(request('/api/after-sales/agent-accounts','POST',b));
+ assert.equal((await userApi.GET()).status,403);
+ assert.equal((await createAgent({...delegatedBody,domain:'hospital',agentId:'agent-hospital'})).status,403);
+ assert.equal((await createAgent({...delegatedBody,agentId:'agent-hospital'})).status,404);
+ assert.equal((await createAgent({...delegatedBody,agentId:'agent-disabled'})).status,409);
+ assert.equal((await createAgent({...delegatedBody,revision:2})).status,409);
+ assert.equal((await createAgent({...delegatedBody,permissions:{read:['device']}})).status,400);
+ assert.equal((await createAgent({...delegatedBody,confirmed:false})).status,400);
+ assert.equal((await delegated.POST(request('/api/after-sales/agent-accounts','POST',delegatedBody,{origin:'https://evil.test'}))).status,403);
+ assert.equal((await delegated.POST(request('/api/after-sales/agent-accounts','POST',delegatedBody,{'x-assistant-account':'other'}))).status,409);
+ let delegatedResponse=await createAgent(delegatedBody);assert.equal(delegatedResponse.status,201,await delegatedResponse.clone().text());
+ assert.ok(!JSON.stringify(await delegatedResponse.json()).includes(delegatedBody.password));
+ const delegatedMember=sql.prepare('SELECT * FROM app_members WHERE id=?').get(delegatedBody.id),delegatedPerms=JSON.parse(delegatedMember.permissions);
+ assert.deepEqual(delegatedPerms.serviceRoles,['agent']);assert.deepEqual(delegatedPerms.serviceDomains,['home']);assert.equal(delegatedPerms.serviceAgentId,'agent-home');assert.deepEqual(delegatedPerms.read,[]);assert.deepEqual(delegatedPerms.write,[]);
+ assert.equal((await createAgent(delegatedBody)).status,200);
+ assert.equal((await createAgent({...delegatedBody,name:'Changed'})).status,409);
+ const duplicateId=crypto.randomUUID();assert.equal((await createAgent({...delegatedBody,id:duplicateId})).status,409);assert.equal(sql.prepare('SELECT id FROM app_members WHERE id=?').get(duplicateId),undefined);
+ const accountList=await (await delegated.GET(request('/api/after-sales/agent-accounts?domain=home'))).json();assert.equal(accountList.accounts.length,1);assert.ok(!JSON.stringify(accountList).includes('password'));
+ assert.ok(!JSON.stringify(sql.prepare('SELECT * FROM access_audit').all()).includes(delegatedBody.password));
+ // A nonmanager (including representative) cannot provision accounts.
+ sql.prepare('UPDATE app_members SET permissions=? WHERE id=?').run(JSON.stringify({...managerPermissions,serviceRoles:['coordinator']}),managerId);
+ assert.equal((await createAgent({...delegatedBody,id:crypto.randomUUID()})).status,403);
+ assert.equal((await delegated.GET(request('/api/after-sales/agent-accounts?domain=home'))).status,403);
+ assert.ok(!load('lib/assistant-policy.ts').assistantWriteNames.has('create_service_agent_account'));
+ identity=owner;
  const body={username:'Worker01',password:'Test-password-123',name:'Worker',unit:'انبار',status:'active',permissions};
  let r=await userApi.POST(request('/api/users','POST',body));assert.equal(r.status,201);let m=(await r.json()).member;assert.equal(m.username,'worker01');assert.equal(m.email,'');assert.ok(!JSON.stringify(m).includes(body.password));
  assert.ok(!JSON.stringify(sql.prepare('SELECT * FROM access_audit').all()).includes(body.password));assert.ok(sql.prepare('SELECT password_hash FROM password_accounts').get().password_hash.startsWith('pbkdf2-sha256'));
