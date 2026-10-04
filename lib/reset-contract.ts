@@ -29,3 +29,6 @@ export const resetHelp=[
  'پس از حذف، شروع اصلی قفل پاک‌سازی را برای این نصب می‌بندد. حساب‌ها باقی می‌مانند؛ نشست‌های رمزعبوری و جریان‌های MCP نیاز به اتصال مجدد دارند. داده نمونه آموزشی نمایشی بخشی از داده شرکت نیست.',
  'فایل‌های اصلی پیوست در فضای خصوصی سرور برای بازیابی حفظ می‌شوند؛ JSON دانلودشده شامل متن رکوردها و فهرست فایل‌هاست، نه بایت تمام پیوست‌ها. فایل‌های پشتیبان فقط توسط ادمین قابل دریافت‌اند. بازگردانی با همکار فنی و راهنمای نسخه انجام شود.'
 ];
+
+// BOM imports use existing bom_versions, material flow_entities and inventory_operations;
+// existing freeze triggers and catalog/full reset semantics apply without new tables.
