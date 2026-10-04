@@ -55,6 +55,7 @@ const getFile=(id,user=qc)=>context.run(user,()=>filesApi.GET(request('/api/supp
  const renewal=await upload({previousId:doc.id,previousRevision:entity(doc.id).revision});assert.equal(entity(doc.id).data.state,'approved');assert.equal(entity(renewal.id).data.version,2);
  await change('document_review',{documentId:renewal.id,revision:1,result:'approved',requiredForPurchase:true,notes:'renewal verified'});
  assert.equal(entity(doc.id).data.state,'superseded');assert.deepEqual(entity(linkId).data.requiredDocumentIds,[renewal.id]);await supplierDomain.checkSupplierPurchase(linkId,'material:01','domestic',1000);
+ await change('document_review',{documentId:renewal.id,revision:entity(renewal.id).revision,result:'approved',requiredForPurchase:true,notes:'Recheck current renewal without superseding twice'});
  assert.equal((await getFile(doc.id)).status,200,'old bytes remain downloadable');await change('document_review',{documentId:doc.id,revision:entity(doc.id).revision,result:'approved',requiredForPurchase:true,notes:'rewrite old'},400);
  const docKey=entity(renewal.id).data.objectKey,original=objects.get(docKey);objects.set(docKey,new TextEncoder().encode('corrupt').buffer);assert.equal((await getFile(renewal.id)).status,503);objects.set(docKey,original);
  // D1 failure after R2 write cleans only its own orphan. A lost response after commit retains the linked file.
