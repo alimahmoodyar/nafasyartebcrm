@@ -16,8 +16,16 @@ result=true;await render().find(n=>n.type==='button'&&n.props.children==='تأی
 assert.equal(render().find(n=>n.type==='input').props.value,'','success clears secret');
 await render().find(n=>n.type==='button'&&n.props.children==='لغو').props.onClick();
 assert.equal(render().filter(n=>n.type==='article').length,0,'successful cancellation dismisses card');
-slots=[];action.state='cancelled';render().find(n=>n.props['aria-label']==='بستن کارت نتیجه').props.onClick();
-assert.equal(render().filter(n=>n.type==='article').length,0);
+for(const state of ['succeeded','cancelled','expired']){
+ slots=[];action.state=state;
+ assert.equal(render().filter(n=>n.type==='article').length,0,'terminal card hidden on fresh mount: '+state);
+ slots=[];assert.equal(render().filter(n=>n.type==='article').length,0,'terminal card stays hidden after reload: '+state);
+}
+for(const state of ['pending','running','review']){
+ slots=[];action.state=state;
+ assert.equal(render().filter(n=>n.type==='article').length,1,'unresolved card remains visible: '+state);
+}
+action.state='succeeded';assert.equal(render().filter(n=>n.type==='article').length,0,'completion closes card without remount');
 const chat=fs.readFileSync('components/trace/assistant-chat.tsx','utf8');assert.match(chat,/onDecide=\{decide\}/,'parent must forward password and promise directly');
 console.log('PASS: password forwarding, failed-submit preservation, success clearing, cancel and result dismissal');
 })().catch(e=>{console.error(e);process.exitCode=1});
