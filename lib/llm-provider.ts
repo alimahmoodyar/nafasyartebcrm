@@ -1,6 +1,19 @@
 import {AccessError} from '@/lib/authorization';
 export function providerBase(base:string){const u=new URL(base);if(u.protocol!=='https:'||u.username||u.password||u.search||u.hash)throw new AccessError('نشانی سرویس مدل معتبر نیست.',400);u.pathname=u.pathname.replace(/\/(chat\/completions|models)\/?$/,'').replace(/\/$/,'');return u.toString().replace(/\/$/,'');}
-export function completionBody(profile:any,messages:any[],extra:Record<string,unknown>={}){const reasoning=new URL(profile.base_url).hostname==='api.openai.com'&&/^(gpt-5|o[134](?:-|$))/.test(profile.model);return {model:profile.model,messages,...(reasoning?{max_completion_tokens:Math.min(profile.max_tokens,4096)}:{temperature:Number(profile.temperature),max_tokens:Math.min(profile.max_tokens,4096)}),...extra};}
+export function completionBody(profile:any,messages:any[],extra:Record<string,unknown>={}){
+ const body:any={model:profile.model,messages,temperature:Number(profile.temperature),max_tokens:Math.min(profile.max_tokens,4096),...extra};
+ const reasoning=new URL(profile.base_url).hostname==='api.openai.com'&&/^(gpt-5|o[134](?:-|$))/.test(profile.model);
+ if(reasoning){delete body.temperature;delete body.max_tokens;body.max_completion_tokens=Math.min(profile.max_tokens,4096);}
+ // GPT-6 Luna/Sol require none for Chat Completions function calling.
+ // Keep it on every round, including the final round with tool history but no tools.
+ // Match dated snapshots too; apply to compatible gateways serving these model IDs.
+ // https://developers.openai.com/api/docs/models/gpt-6-luna
+ if(/^gpt-6-(?:luna|sol)(?:-\d{4}-\d{2}-\d{2})?$/.test(profile.model)){
+  body.reasoning_effort='none';
+  delete body.max_tokens;body.max_completion_tokens=Math.min(profile.max_tokens,4096);
+ }
+ return body;
+}
 // Expose only bounded machine identifiers, never provider messages or request bodies.
 export function providerErrorDetail(error:any,body:any){
  const safe=(value:unknown)=>typeof value==='string'&&/^[A-Za-z0-9_.\[\]-]{1,120}$/.test(value)?value:'';
