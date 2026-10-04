@@ -67,6 +67,14 @@ const chat=load('app/api/assistant/route.ts');
  providerMode='missing-model';r=await diagnostic.POST(request('/api/llm-config/test','POST',{id:profileId,mode:'probe',confirmed:true}));assert.equal(r.status,502);const err=await r.text();assert.ok(err.includes('404'));assert.ok(!err.includes('provider-test-key'));
  const provider=load('lib/llm-provider.ts');const reasoningBody=provider.completionBody({model:'gpt-5',base_url:'https://api.openai.com/v1',max_tokens:1000,temperature:0.3},[]);assert.equal(reasoningBody.max_completion_tokens,1000);assert.ok(!('max_tokens' in reasoningBody));assert.ok(!('temperature' in reasoningBody));assert.equal(provider.providerBase('https://example.test/v1/chat/completions'),'https://example.test/v1');
  providerMode='temperature';providerCalls=0;await provider.providerRequest({model:'compatible-model',base_url:'https://example.test/v1'},'provider-test-key','/chat/completions',{model:'compatible-model',temperature:0.3,messages:[]});assert.equal(providerCalls,2);assert.ok(!('temperature' in sent.at(-1)));
+ const detail=provider.providerErrorDetail({code:'invalid_function_parameters',param:'tools[2].function.parameters',message:'PRIVATE provider-test-key'}, {tools:[{},{},{function:{name:'get_task_inbox'}}]});
+ assert.ok(detail.includes('get_task_inbox'));assert.ok(detail.includes('invalid_function_parameters'));assert.ok(!detail.includes('PRIVATE'));assert.ok(!detail.includes('provider-test-key'));
+ assert.equal(provider.providerErrorDetail({code:'secret with spaces',param:'https://private.test/?key=secret',message:'private'},{}),'');
+ // Ordinary password account can greet the assistant with its own tool catalog.
+ await enter('bob');providerMode='normal';providerCalls=0;sql.prepare('DELETE FROM login_attempts').run();
+ const greeting=await send('هستی');assert.equal(greeting.status,200,await greeting.clone().text());
+ assert.ok(sent.at(-1).tools.find(t=>t.function.name==='open_section').function.parameters.properties.section.enum.includes('tasks'));
+ assert.ok(!sent.at(-1).tools.some(t=>t.function.name==='create_password_user'));
  await enter('bob');assert.equal((await diagnostic.POST(request('/api/llm-config/test','POST',{id:profileId,mode:'models'}))).status,403);
 
  // Account proposal: collect fields with tools, keep password out of model and durable history.
