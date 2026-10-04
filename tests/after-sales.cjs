@@ -29,6 +29,24 @@ async function evidence(cid,user,id=crypto.randomUUID(),contents=new Uint8Array(
  seedEntity('material:01','material',{code:'01',name:'Compressor',unit:'عدد'});
  const raw='batch:TEST';sql.prepare("INSERT INTO records(id,kind,payload,created) VALUES(?,'batch',?,?)").run(raw,JSON.stringify({code:'B01',partCode:'01',part:'Compressor',unit:'عدد',status:'تأیید',supplier:'private supplier',quantity:'20'}),now);sql.prepare('INSERT INTO inventory_balances(id,item_id,warehouse,quantity) VALUES(?,?,?,?)').run(raw+'@raw',raw,'raw',20000);
  const a=(await op('agent',{name:'Agent A',code:'A',city:'A',phone:'0912',address:'A',active:true})).id,b=(await op('agent',{name:'Agent B',code:'B',city:'B',phone:'0913',address:'B',active:true})).id,agent=actor('agent',a),other=actor('agent',b);
+ const coverage=load('lib/service-coverage.ts');
+ assert.throws(()=>coverage.coverageRows([{province:'فارس',allCities:false,cities:''}]),/شهر/);
+ assert.throws(()=>coverage.coverageRows([{province:'نامعتبر',allCities:true,cities:''}]),/استان/);
+ assert.throws(()=>coverage.coverageRows([{province:'فارس',allCities:true,cities:''},{province:'فارس',allCities:true,cities:''}]),/غیرتکراری/);
+ await op('agent',{...entity(a).data,agentId:a,province:'فارس',coverage:[{province:'فارس',allCities:true,cities:''},{province:'بوشهر',allCities:false,cities:'بوشهر، گناوه'}]},200);
+ await op('agent',{...entity(b).data,agentId:b,province:'بوشهر',coverage:[{province:'فارس',allCities:true,cities:''}]},200);
+ const geoQuery='&suggestAgents=1&province='+encodeURIComponent('فارس')+'&city='+encodeURIComponent('شیراز');
+ assert.equal((await get(geoQuery)).suggestions.length,2);
+ assert.equal((await get(geoQuery,agent)).suggestions.length,1,'coverage must not reveal other representatives');
+ const geoTool=catalog.tools.find(t=>t.name==='suggest_service_agents');assert.equal(geoTool.write,false);
+ const viaMcp=await context.run(agent,()=>geoTool.run({domain:'home',province:'فارس',city:'شیراز'},base,{}));assert.equal(viaMcp.suggestions.length,1);assert.equal(viaMcp.suggestions[0].id,a);
+ assert.equal((await get('&suggestAgents=1&province='+encodeURIComponent('بوشهر')+'&city='+encodeURIComponent('گناوه'))).suggestions.length,1);
+ assert.equal((await get('&suggestAgents=1&province='+encodeURIComponent('بوشهر')+'&city='+encodeURIComponent('دیر'))).suggestions.length,0);
+ assert.equal(coverage.suggestedServiceAgents(entities('as_agent'),'hospital','فارس','شیراز').length,0);
+ await op('agent',{...entity(a).data,agentId:a,coverage:[]},403,agent);
+ // Old API clients omit geography: updates must retain it, not erase it.
+ await op('agent',{agentId:a,name:'Agent A',code:'A',city:'A',phone:'0912',address:'A',active:true});
+ assert.equal(entity(a).data.coverage.length,2);
  const part=(await op('tariff',{kind:'part',name:'Compressor',partCode:'01',priceRial:'100',costRial:'70',validFrom:today,active:true})).id,labor=(await op('tariff',{kind:'labor',name:'Replacement',priceRial:'50',costRial:'0',validFrom:today,active:true})).id;
  await op('order',{agentId:b,lines:[{tariffId:part,quantity:'1'}]},403,agent);
  const order=(await op('order',{agentId:a,lines:[{tariffId:part,quantity:'3'}],notes:'stock'},200,agent)).id;assert.equal((await service.ledger(a))[0].debit,'300');assert.equal(entity(order).data.due,service.monthsAfter(today,1));

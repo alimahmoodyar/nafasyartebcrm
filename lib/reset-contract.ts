@@ -11,6 +11,8 @@ export const resetTables:Record<string,string>={
 };
 export const resetFlowPreserved=['account_profile','position','duty_template','duty_catalog_install','transport_migration','development_request','as_agent'];
 export const resetFlowCatalog=['material','capacity','party','as_tariff','transport_vehicle'];
+// Service province/coverage lives inside as_agent (preserved identity) and
+// customer province inside as_case (operational reset); existing backup/freeze apply.
 export function resetWhere(table:string,scope:string){
  if(scope!=='operations'&&scope!=='full')throw Error('Invalid reset scope');
  if(!Object.hasOwn(resetTables,table))throw Error('Invalid reset table');
