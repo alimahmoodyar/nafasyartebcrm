@@ -20,7 +20,7 @@ export function resetFiles(tables:Record<string,any[]>){
  const files=new Map<string,{key:string;filename:string;size:number;sha256:string}>();
  for(const [table,rows] of Object.entries(tables))for(const r of rows){let f:any=null;
   if(['batch_files','quality_files','firmware_files','finance_files','duty_files','service_files'].includes(table))f={key:r.object_key,filename:r.filename,size:r.byte_size,sha256:r.sha256};
-  if(table==='flow_entities'&&['transport_file','inbox_file'].includes(r.type)){const d=JSON.parse(r.data);f={key:d.objectKey,filename:d.filename,size:d.byteSize||d.size,sha256:d.sha256};}
+  if(table==='flow_entities'&&['supplier_document','transport_file','inbox_file'].includes(r.type)){const d=JSON.parse(r.data);f={key:d.objectKey,filename:d.filename,size:d.byteSize||d.size,sha256:d.sha256};}
   if(f?.key)files.set(f.key,f);
  }return [...files.values()];
 }

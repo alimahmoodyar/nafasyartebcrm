@@ -1,0 +1,93 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),ts=require('typescript');
+const {DatabaseSync}=require('node:sqlite');const root=path.resolve(__dirname,'..');const sql=new DatabaseSync(':memory:');sql.exec('PRAGMA foreign_keys=ON');for(const f of fs.readdirSync(path.join(root,'drizzle')).filter(f=>f.endsWith('.sql')).sort())sql.exec(fs.readFileSync(path.join(root,'drizzle',f),'utf8'));
+const db={prepare(q){let args=[];return{bind(...a){args=a;return this},async first(){return sql.prepare(q).get(...args)||null},async all(){return {results:sql.prepare(q).all(...args)}},async run(){return {meta:{changes:sql.prepare(q).run(...args).changes}}}}},async batch(stmts){sql.exec('BEGIN');try{const r=[];for(const s of stmts)r.push(await s.run());sql.exec('COMMIT');return r;}catch(e){sql.exec('ROLLBACK');throw e;}}};
+const objects=new Map();const bucket={async put(k,b){objects.set(k,b.slice(0));return {key:k}},async get(k){const b=objects.get(k);return b?{arrayBuffer:async()=>b.slice(0)}:null},async delete(k){objects.delete(k)}};
+let identity=null;const env={TRACE_OWNER_EMAIL:'owner@example.com',LLM_CONFIG_ENCRYPTION_KEY:require('node:crypto').randomBytes(32).toString('base64'),DB:db,BUCKET:bucket};
+const cache={};function load(file){file=path.resolve(root,file);if(cache[file])return cache[file];const exports={};cache[file]=exports;const source=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+vm.runInNewContext(source,{exports,require:n=>{if(n==='cloudflare:workers')return {env};if(n==='@/app/chatgpt-auth')return {getChatGPTUser:async()=>identity};if(n.startsWith('@/')||n.startsWith('.')){const p=n.startsWith('@/')?path.join(root,n.slice(2)):path.resolve(path.dirname(file),n);return load(p+(path.extname(p)?'':'.ts'));}return require(n)},Response,Request,URL,URLSearchParams,Error,crypto:globalThis.crypto,Date,Intl,Set,Map,FormData,Blob,File,TextEncoder,TextDecoder,Uint8Array,ArrayBuffer,AbortController,ReadableStream,btoa,atob,setTimeout:(f,n)=>setTimeout(f,Math.min(n,10)),clearTimeout,console},{filename:file});return exports;}
+const auth=load('lib/authorization.ts'),http=load('app/mcp/route.ts'),sse=load('lib/mcp/sse.ts'),tokens=load('app/api/mcp-tokens/route.ts'),configs=load('app/api/llm-config/route.ts'),secrets=load('lib/llm-secrets.ts'),catalog=load('lib/mcp/tools.ts');
+const base='https://test.local';const owner={userId:'owner',email:'owner@example.com',displayName:'Owner',fullName:null};
+const request=(path,method='GET',body,headers={})=>new Request(base+path,{method,headers:{origin:base,...(body?{'Content-Type':'application/json'}:{}),...headers},...(body?{body:JSON.stringify(body)}:{})});
+const rpc=(method,params={},id=1)=>({jsonrpc:'2.0',method,params,id});
+let token;
+async function call(name,args={},key=token){const r=await http.POST(request('/mcp','POST',rpc('tools/call',{name,arguments:args}),key?{authorization:'Bearer '+key}:{}));assert.equal(r.status,200);const d=await r.json();if(d.result?.isError)return {error:d.result.content[0].text};return JSON.parse(d.result.content[0].text);}
+async function mint(scope='read'){return (await (await tokens.POST(request('/api/mcp-tokens','POST',{name:'test',scope,days:1}))).json());}
+
+const production=load('app/api/production/route.ts'),recordsApi=load('app/api/records/route.ts');
+async function create(kind,data){const r=await recordsApi.POST(request('/api/records','POST',{kind,data}));const d=await r.json();assert.equal(r.status,201,JSON.stringify(d));return d.record;}
+async function operate(b,status=200){const r=await production.POST(request('/api/production','POST',{id:crypto.randomUUID(),...b}));const d=await r.json();assert.equal(r.status,status,JSON.stringify(d));return d;}
+
+const flow=load('app/api/flow/route.ts'),templateApi=load('app/api/quality/templates/route.ts'),qualityApi=load('app/api/quality/reports/route.ts');
+async function op(mode,b={},status=200){const r=await flow.POST(request('/api/flow','POST',{id:crypto.randomUUID(),mode,...b}));const d=await r.json();assert.equal(r.status,status,JSON.stringify(d));return d;}
+const entities=type=>sql.prepare('SELECT * FROM flow_entities WHERE type=? ORDER BY created,id').all(type).map(x=>({...x,data:JSON.parse(x.data)}));
+const stock=(id,wh)=>sql.prepare('SELECT quantity FROM inventory_balances WHERE item_id=? AND warehouse=?').get(id,wh)?.quantity||0;
+// Serialize test transactions as D1 does; callers may still read the same stale version.
+let batchTail=Promise.resolve();const rawBatch=db.batch.bind(db);db.batch=stmts=>{const next=batchTail.then(()=>rawBatch(stmts));batchTail=next.catch(()=>{});return next};
+const sourcing=load('app/api/sourcing/route.ts'),context=load('lib/mcp/context.ts').mcpActor;
+const current=id=>entities('sourcing_plan').find(p=>p.id===id);
+const actor=role=>({userId:role+'User',email:role+'@test.local',name:role,isAdmin:false,permissions:{read:[],write:[],eventStages:[],supplyRoles:[role],flowRoles:role==='inventory'?['inventory']:[],warehouses:role==='inventory'?['quarantine','raw']:[]}});
+async function source(mode,b={},status=200,user){const body={id:crypto.randomUUID(),mode,...(b.planId?{revision:current(b.planId).revision}:{}),...b};const go=()=>sourcing.POST(request('/api/sourcing','POST',body));const r=user?await context.run(user,go):await go(),d=await r.json();assert.equal(r.status,status,mode+': '+JSON.stringify(d));return {...d,operationId:body.id};}
+async function detail(id,user){const go=()=>sourcing.GET(request('/api/sourcing?id='+id));const r=user?await context.run(user,go):await go();assert.equal(r.status,200);return r.json();}
+
+const quality=load('app/api/suppliers/quality/route.ts'),filesApi=load('app/api/suppliers/files/route.ts'),supplierDomain=load('lib/suppliers.ts'),qualityDomain=load('lib/supplier-quality.ts');
+const qc={...actor('qc'),permissions:{read:[],write:[],eventStages:[],supplyRoles:[],flowRoles:['qc']}};
+const seed=(id,type,data)=>sql.prepare('INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?)').run(id,type,JSON.stringify(data),new Date().toISOString(),new Date().toISOString());
+const entity=id=>{const e=sql.prepare('SELECT * FROM flow_entities WHERE id=?').get(id);return {...e,data:JSON.parse(e.data)}};
+const supplierId='s1',linkId='l1';
+async function change(mode,b={},status=200,user=qc){const body={id:crypto.randomUUID(),mode,supplierId,linkId,confirmed:true,...b};const r=await context.run(user,()=>quality.POST(request('/api/suppliers/quality','POST',body))),d=await r.json();assert.equal(r.status,status,mode+JSON.stringify(d));return {...d,body};}
+async function upload(b={},content='test-document',status=201,user=actor('domestic'),origin=base){const metadata={id:crypto.randomUUID(),confirmed:true,supplierId,linkId,title:'Quality certificate',kind:'certificate',visibility:'quality',issuer:'Test lab',reference:'DOC-1',issuedOn:load('lib/duties.ts').dayAt(),expiresOn:'2099-01-01',noExpiryReason:'',ownerId:'domesticUser',reviewerId:'qcUser',...b};const form=new FormData();form.set('metadata',JSON.stringify(metadata));form.set('file',new File([content],b.filename||'evidence.pdf'));const r=await context.run(user,()=>filesApi.POST(new Request(base+'/api/suppliers/files',{method:'POST',headers:{origin},body:form}))),d=await r.json();assert.equal(r.status,status,JSON.stringify(d));return {...d,metadata};}
+const getFile=(id,user=qc)=>context.run(user,()=>filesApi.GET(request('/api/suppliers/files?id='+id)));
+(async()=>{
+ identity=owner;await auth.session();const today=load('lib/duties.ts').dayAt(),now=new Date().toISOString();
+ for(const a of [actor('domestic'),actor('foreign'),qc])sql.prepare("INSERT INTO app_members(id,email,name,unit,status,subject,permissions,revision,created,updated) VALUES(?,?,?,'test','active',?,?,1,?,?)").run(a.userId,a.email,a.name,a.userId,JSON.stringify(a.permissions),now,now);
+ seed(supplierId,'supplier',{name:'Supplier',route:'domestic',active:true});seed('material:01','material',{code:'01',name:'Part',unit:'عدد',specs:'v1'});
+ seed(linkId,'supplier_material',{supplierId,materialId:'material:01',partCode:'01',unit:'عدد',specs:'v1',status:'approved',reviewDue:'2099-01-01',supplierRevision:1});
+ await upload({confirmed:false},'a',400);await upload({},'a',403,actor('foreign'));await upload({},'',400);await upload({filename:'../unsafe.pdf'},'a',400);await upload({},'a',403,actor('domestic'),'https://evil.test');assert.equal(objects.size,0);
+ const doc=await upload();assert.equal(objects.size,1);assert.equal((await upload(doc.metadata,'test-document',200)).repeated,true);await upload(doc.metadata,'changed',409);assert.equal(objects.size,1);
+ let r=await getFile(doc.id);assert.equal(r.status,200);assert.match(r.headers.get('content-disposition'),/^attachment/);assert.equal(r.headers.get('content-type'),'application/octet-stream');assert.equal(await r.text(),'test-document');assert.equal((await getFile(doc.id,actor('foreign'))).status,403);
+ const listing=await context.run(qc,()=>quality.GET(request('/api/suppliers/quality?supplier='+supplierId+'&link='+linkId)));const data=await listing.json();assert.ok(!JSON.stringify(data).includes('objectKey'));assert.ok(!JSON.stringify(data).includes('uploadSignature'));
+ await change('document_review',{documentId:doc.id,revision:1,result:'approved',requiredForPurchase:true,notes:'verified'},403,actor('domestic'));
+ await change('document_review',{documentId:doc.id,revision:1,result:'approved',requiredForPurchase:true,notes:'verified'});
+ assert.deepEqual(entity(linkId).data.requiredDocumentIds,[doc.id]);await supplierDomain.checkSupplierPurchase(linkId,'material:01','domestic',1000);
+ const altered=entity(doc.id);altered.data.expiresOn='2000-01-01';sql.prepare('UPDATE flow_entities SET data=? WHERE id=?').run(JSON.stringify(altered.data),doc.id);
+ await assert.rejects(()=>supplierDomain.checkSupplierPurchase(linkId,'material:01','domestic',1000),/مدرک الزامی/);
+ await qualityDomain.syncSupplierQuality();assert.ok(sql.prepare("SELECT id FROM duty_runs WHERE template_id LIKE ? AND state='open'").get('supplier-quality:'+doc.id+':renew%'));
+ const renewal=await upload({previousId:doc.id,previousRevision:entity(doc.id).revision});assert.equal(entity(doc.id).data.state,'approved');assert.equal(entity(renewal.id).data.version,2);
+ await change('document_review',{documentId:renewal.id,revision:1,result:'approved',requiredForPurchase:true,notes:'renewal verified'});
+ assert.equal(entity(doc.id).data.state,'superseded');assert.deepEqual(entity(linkId).data.requiredDocumentIds,[renewal.id]);await supplierDomain.checkSupplierPurchase(linkId,'material:01','domestic',1000);
+ assert.equal((await getFile(doc.id)).status,200,'old bytes remain downloadable');await change('document_review',{documentId:doc.id,revision:entity(doc.id).revision,result:'approved',requiredForPurchase:true,notes:'rewrite old'},400);
+ const docKey=entity(renewal.id).data.objectKey,original=objects.get(docKey);objects.set(docKey,new TextEncoder().encode('corrupt').buffer);assert.equal((await getFile(renewal.id)).status,503);objects.set(docKey,original);
+ // D1 failure after R2 write cleans only its own orphan. A lost response after commit retains the linked file.
+ const raw=db.batch;db.batch=async()=>{throw Error('D1 failure')};const before=objects.size;await upload({},'orphan',409);assert.equal(objects.size,before);db.batch=async stmts=>{const result=await raw(stmts);db.batch=raw;throw Error('lost response')};const recovered=await upload({},'committed');assert.equal((await getFile(recovered.id)).status,200);db.batch=raw;
+ const qcFinance={...qc,userId:'qcFinanceUser',email:'qcfinance@test.local',permissions:{...qc.permissions,supplyRoles:['finance']}};
+ sql.prepare("INSERT INTO app_members(id,email,name,unit,status,subject,permissions,revision,created,updated) VALUES(?,?,?,'test','active',?,?,1,?,?)").run(qcFinance.userId,qcFinance.email,'QC Finance',qcFinance.userId,JSON.stringify(qcFinance.permissions),now,now);
+ const commercial=await upload({kind:'contract',visibility:'commercial',reviewerId:'qcFinanceUser'},'PRIVATE PRICE');
+ assert.equal((await getFile(commercial.id,qc)).status,403);assert.equal((await getFile(commercial.id,actor('inventory'))).status,403);assert.equal((await getFile(commercial.id,actor('domestic'))).status,200);
+ const qualityList=await context.run(qc,()=>quality.GET(request('/api/suppliers/quality?supplier='+supplierId)));assert.ok(!(await qualityList.json()).documents.some(d=>d.id===commercial.id));
+ const capaBody={title:'Wrong thread',description:'RC1/4 mismatch',severity:'major',detectedOn:today,containment:'Segregated pending QC; warehouse action recorded separately',receiptIds:[],externalLots:'Legacy lot 340 units',ownerId:'domesticUser',reviewerId:'qcUser',responseDue:today,holdPurchase:true};
+ await change('capa_create',capaBody,403,actor('domestic'));await change('capa_create',{...capaBody,receiptIds:['missing']},404);
+ const capa=await change('capa_create',capaBody);assert.equal((await change('capa_create',capa.body)).repeated,true);await assert.rejects(()=>supplierDomain.checkSupplierPurchase(linkId,'material:01','domestic',1000),/اقدام اصلاحی/);
+ const task=sql.prepare("SELECT * FROM duty_runs WHERE template_id LIKE ? AND state='open'").get('supplier-quality:'+capa.id+':open%');assert.ok(task);const tasks=load('app/api/tasks/route.ts');assert.equal((await context.run(actor('domestic'),()=>tasks.POST(request('/api/tasks','POST',{id:crypto.randomUUID(),mode:'submit',taskId:task.id,revision:task.revision,note:'done'})))).status,400);
+ const evidence=await upload({kind:'capa',capaId:capa.id,noExpiryReason:'One-time test report',expiresOn:''},'corrective evidence');
+ const answer={capaId:capa.id,revision:entity(capa.id).revision,notes:'Supplier response received',supplierResponse:'Replaced tooling',rootCause:'Drawing revision not transferred',correction:'Replaced wrong fittings',correctiveAction:'Locked drawing revision and incoming gauge test',verificationMethod:'Check next batch with gauge',implementedOn:today,verificationDue:today,evidenceIds:[evidence.id]};
+ await change('capa_respond',{...answer,evidenceIds:[]},400,actor('domestic'));await change('capa_respond',answer,403,qc);await change('capa_respond',answer,200,actor('domestic'));
+ await change('capa_verify',{capaId:capa.id,revision:entity(capa.id).revision,result:'effective',notes:'Test passed',evidenceIds:[evidence.id]},403,actor('domestic'));
+ const premature=entity(capa.id);premature.data.verificationDue='2099-01-01';sql.prepare('UPDATE flow_entities SET data=? WHERE id=?').run(JSON.stringify(premature.data),capa.id);
+ await change('capa_verify',{capaId:capa.id,revision:premature.revision,result:'effective',notes:'too early',evidenceIds:[evidence.id]},400);
+ premature.data.verificationDue=today;sql.prepare('UPDATE flow_entities SET data=? WHERE id=?').run(JSON.stringify(premature.data),capa.id);
+ await change('capa_verify',{capaId:capa.id,revision:entity(capa.id).revision,result:'ineffective',notes:'Still incorrect',responseDue:today,evidenceIds:[evidence.id]});
+ assert.equal(entity(capa.id).data.state,'open');assert.equal(entity(capa.id).data.holdPurchase,true);
+ await change('capa_respond',{...answer,revision:entity(capa.id).revision},200,actor('domestic'));
+ await change('capa_verify',{capaId:capa.id,revision:entity(capa.id).revision,result:'effective',notes:'Next sample conforms',evidenceIds:[evidence.id]});assert.equal(entity(capa.id).data.state,'closed');await supplierDomain.checkSupplierPurchase(linkId,'material:01','domestic',1000);
+ await change('capa_reopen',{capaId:capa.id,revision:entity(capa.id).revision,notes:'Recurrence reported',responseDue:today});assert.equal(entity(capa.id).data.state,'open');assert.equal(entity(capa.id).data.history.filter(h=>h.mode==='capa_respond').length,2);
+ // Competing decisions with the same revision: only one commits.
+ const rev=entity(capa.id).revision,decisions=await Promise.all([true,false].map(holdPurchase=>context.run(qc,()=>quality.POST(request('/api/suppliers/quality','POST',{id:crypto.randomUUID(),confirmed:true,mode:'capa_hold',supplierId,linkId,capaId:capa.id,revision:rev,holdPurchase,notes:'Decision'})))));assert.equal(decisions.filter(r=>r.status===200).length,1);
+ const manifest=load('lib/system-reset.ts').resetFiles({flow_entities:[sql.prepare('SELECT * FROM flow_entities WHERE id=?').get(renewal.id)]});assert.equal(manifest.length,1);assert.equal(manifest[0].key,docKey);
+ const policy=load('lib/reset-contract.ts');for(const type of ['supplier_document','supplier_capa']){assert.ok(policy.resetFlowCatalog.includes(type));assert.ok(sql.prepare('SELECT id FROM flow_entities WHERE type=? AND '+policy.resetWhere('flow_entities','full')).get(type));assert.equal(sql.prepare('SELECT id FROM flow_entities WHERE type=? AND '+policy.resetWhere('flow_entities','operations')).get(type),undefined);}
+ const result=await catalog.executeTool('get_supplier_quality',{supplier:supplierId,link:linkId},base,{user:qc,scope:'read',tokenId:null});assert.equal(result.actions.length,1);
+ const linkResult=await catalog.executeTool('get_supplier_document_link',{id:evidence.id},base,{user:qc,scope:'read',tokenId:null});assert.ok(linkResult.downloadUrl.includes(evidence.id));
+ await assert.rejects(()=>catalog.executeTool('review_supplier_document',{id:crypto.randomUUID(),supplierId,linkId,documentId:evidence.id,revision:1,result:'approved',requiredForPurchase:false,notes:'review',confirmed:true},base,{user:qc,scope:'read',tokenId:null}),/read-only/);
+ const mcpUpload=await catalog.executeTool('upload_supplier_document',{id:crypto.randomUUID(),supplierId,linkId,title:'MCP report',kind:'sample',visibility:'quality',issuer:'Lab',reference:'MCP',issuedOn:today,expiresOn:'',noExpiryReason:'test report',ownerId:'domesticUser',reviewerId:'qcUser',previousId:'',previousRevision:0,capaId:'',filename:'report.txt',contentBase64:Buffer.from('MCP evidence').toString('base64'),confirmed:true},base,{user:actor('domestic'),scope:'read_write',tokenId:null});assert.ok(mcpUpload.saved);
+ assert.equal(sql.prepare('PRAGMA foreign_key_check').all().length,0);
+ console.log('Supplier quality passed: versioned/private attachments, role/origin/confirmation, idempotency, rollback and lost-response recovery, expiration purchase gate, renewal and immutable history, independent CAPA verification with evidence, holds/reopening/CAS, real workflow tasks, reset manifests and MCP parity.');
+})().catch(e=>{console.error(e);process.exit(1)});

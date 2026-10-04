@@ -1,3 +1,4 @@
+import {syncSupplierQuality} from '@/lib/supplier-quality';
 import {scanReplenishment} from '@/lib/replenishment';
 import {syncTransportTasks,installTransportPositions} from '@/lib/transport';
 import {syncServiceTasks,installServicePositions} from '@/lib/after-sales';
@@ -14,6 +15,7 @@ export async function POST(request:Request){try{
  const last:any=await storage().prepare("SELECT updated FROM flow_entities WHERE id='duty_scheduler'").first();if(source!=='background'&&last&&Date.now()-Date.parse(last.updated)<60000)return Response.json({skipped:true,at:last.updated},{headers:{'Cache-Control':'no-store'}});
  await scanReplenishment();
  await syncSourcingFollowups();
+ await syncSupplierQuality();
  await syncServiceTasks();
  await syncTransportTasks();
  const result=await tickDuties(new Date(),source);if(source==='background'){const now=new Date().toISOString();await storage().prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES('replenishment-background','workflow_health','{}',1,?,?) ON CONFLICT(id) DO UPDATE SET revision=flow_entities.revision+1,updated=excluded.updated").bind(now,now).run();}
