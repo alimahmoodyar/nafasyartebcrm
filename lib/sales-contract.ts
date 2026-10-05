@@ -1,0 +1,32 @@
+// Shared UI / HTTP / MCP vocabulary. Money is integer IRR, never floating point.
+export const salesRoles:Record<string,string>={manager:'مدیر فروش',staff:'کارشناس فروش',finance:'مالی فروش',viewer:'گزارش فروش',agent:'نماینده فروش'};
+export const salesStates:Record<string,string>={submitted:'منتظر بررسی فروش',sales_approved:'منتظر تأیید مالی',approved:'تأیید و فاکتور شده',rejected:'رد شده',cancelled:'لغو شده',pending:'منتظر بررسی مالی',received:'چک دریافت‌شده، وصول نشده',cleared:'وصول و تأیید شده',bounced:'چک برگشتی',reversed:'برگشت ثبت مالی',requested:'درخواست برگشت',returned:'دریافت در قرنطینه',credited:'بستانکار شده',reserved:'رزرو انبار',in_transit:'ارسال شده',delivered:'تحویل شده',active:'فعال',retired:'جایگزین شده'};
+export const salesMilestones:Record<string,string>={waiting_stock:'انتظار تأمین موجودی',production:'در حال تولید',preparing:'آماده‌سازی ارسال'};
+export const salesActions:Record<string,string>={terms:'شرایط اعتباری نماینده',agent:'پرونده نماینده',price:'قیمت فروش',target:'انتشار تارگت و پلکان تخفیف',order:'ثبت سفارش',order_review:'بررسی فروش',order_progress:'موعد و پیشرفت سفارش',order_cancel:'لغو سفارش فاکتورنشده',invoice:'تأیید مالی و صدور فاکتور',payment:'اعلام پرداخت',payment_review:'بررسی پرداخت',check_status:'وصول یا برگشت چک',allocate:'تخصیص اعتبار به قسط',payment_reverse:'برگشت ثبت پرداخت',return_request:'درخواست برگشت دستگاه',return_receive:'دریافت فیزیکی برگشتی',return_review:'بررسی مالی برگشت',opening:'پیش‌نویس مانده افتتاحیه',opening_review:'تطبیق و تأیید افتتاحیه'};
+export const salesHelp=[
+ 'تمام مبلغ‌ها ریال صحیح‌اند. قیمت واحد، مبلغ نهایی قابل پرداخت هر دستگاه است. قیمت و تخفیف و مهلت پرداخت هنگام تأیید پیش‌فاکتور نماینده ثابت می‌شوند. این بخش جای صدور صورتحساب قانونی یا اتصال به حسابداری را نمی‌گیرد؛ شماره مرجع حسابداری ثبت می‌شود.',
+ 'پرداخت اعلام‌شده بدهی را کم نمی‌کند. مالی پس از تطبیق با بانک تأیید می‌کند؛ چک تا وصول اعتبار نیست. تخصیص اعتبار وصول‌شده به اقساط، مانده همان قسط را کم می‌کند. مازاد به عنوان اعتبار تخصیص‌نیافته باقی می‌ماند. برگشت پرداخت، تخصیص‌های قبلی را بی‌اثر و بدهی را دوباره باز می‌کند.',
+ 'تارگت بر پایه خرید خالص فاکتورشده همین دوره (مبلغ یا تعداد محصولات انتخابی) است؛ افتتاحیه و سفارش لغوشده شمرده نمی‌شوند. برگشت تأییدشده از دوره فاکتور اصلی کم می‌شود. تخفیف پلکانی روی محصولات مشمول همان تارگت و برای سفارش بعدی است، روی سفارش قبلی اعمال نمی‌شود و با بدهی سررسیدگذشته متوقف می‌شود. قوانین و نسخه آن در سفارش ثبت می‌شوند.',
+ 'تحویل جزئی از حواله‌ها و سریال‌های واقعی محصول نهایی و مأموریت حمل خوانده می‌شود. ثبت پیشرفت تولید، به معنی موجود شدن کالا یا تحویل نیست. برگشتی فقط پس از دریافت فیزیکی انبار و سپس تأیید مالی اعتبار ایجاد می‌کند؛ کالای برگشتی مستقیم قابل فروش نمی‌شود.',
+ 'افتتاحیه ابتدا پیش‌نویس است: ردیف فاکتور باز، قسط، اعتبار یا چک وصول‌نشده، تاریخ مبنا و مرجع منبع. مالی جمع بدهی و اعتبار را با منبع تطبیق می‌دهد. ردیف و مرجع تکراری قابل ورود نیست. انتقال سوابق گارانتی و موجودی، گردش مستقل خود را دارد.',
+ 'پیگیری سفارش، پرداخت، سررسید و تارگت در کارتابل مسئول تعیین‌شده و نماینده ساخته می‌شود؛ اجرای خودکار به زمان‌بند موجود سامانه وابسته است. اعلان داخل سامانه است؛ پیامک و پیام بیرونی ارسال نمی‌شود.'
+];
+export const rial=(v:unknown)=>BigInt(String(v||'0'));
+export const total=(items:any[],value:(i:any)=>unknown)=>items.reduce((n,i)=>n+rial(value(i)),BigInt(0));
+export function salesAccounts(rows:any[],agentId:string,today:string){
+ const own=rows.filter(r=>r.data.agentId===agentId),payments=own.filter(r=>r.type==='sales_payment'),returns=own.filter(r=>r.type==='sales_return'),allocations=own.filter(r=>r.type==='sales_allocation');
+ const credits=[...payments.filter(r=>r.data.state==='cleared'),...returns.filter(r=>r.data.state==='credited')];
+ const valid=new Set(credits.map(r=>r.id));
+ const invoices=own.filter(r=>r.type==='sales_invoice').map(r=>{const installments=r.data.installments.map((i:any)=>{const paid=total(allocations.filter(a=>a.data.invoiceId===r.id&&a.data.installmentId===i.id&&valid.has(a.data.creditId)),a=>a.data.amount);const remaining=rial(i.amount)-paid;const days=Math.round((Date.parse(i.due)-Date.parse(today))/86400000);return {...i,paid:String(paid),remaining:String(remaining),days,overdue:remaining>BigInt(0)&&days<0};});return {...r,installments,remaining:String(total(installments,i=>i.remaining))};});
+ const creditRows=credits.map(c=>({...c,available:String(rial(c.data.amount)-total(allocations.filter(a=>a.data.creditId===c.id),a=>a.data.amount))}));
+ const debt=total(invoices,i=>i.remaining),available=total(creditRows,c=>c.available),overdue=total(invoices.flatMap(i=>i.installments).filter(i=>i.overdue),i=>i.remaining);
+ const aging=[{label:'سررسید نشده',min:-Infinity,max:0},{label:'۱ تا ۳۰ روز',min:1,max:30},{label:'۳۱ تا ۶۰ روز',min:31,max:60},{label:'۶۱ تا ۹۰ روز',min:61,max:90},{label:'بیش از ۹۰ روز',min:91,max:Infinity}].map(b=>({label:b.label,amount:String(total(invoices.flatMap(i=>i.installments).filter(i=>-i.days>=b.min&&-i.days<=b.max),i=>i.remaining))}));
+ return {invoices,credits:creditRows,payments,returns,allocations,debt:String(debt),credit:String(available),balance:String(debt-available),overdue:String(overdue),pending:String(total(payments.filter(p=>p.data.state==='pending'),p=>p.data.amount)),uncollectedChecks:String(total(payments.filter(p=>p.data.state==='received'),p=>p.data.amount)),aging};
+}
+export function salesTargetProgress(target:any,rows:any[],today:string){
+ const d=target.data,all=rows.filter(r=>r.data.agentId===d.agentId),invoices=all.filter(r=>r.type==='sales_invoice'&&!r.data.openingId&&r.data.day>=d.start&&r.data.day<=d.end);let progress=BigInt(0);
+ for(const i of invoices)for(const l of i.data.lines||[])if(!d.productIds.length||d.productIds.includes(l.productId))progress+=d.basis==='units'?BigInt(l.quantity):rial(l.net);
+ for(const r of all.filter(r=>r.type==='sales_return'&&r.data.state==='credited'&&invoices.some(i=>i.id===r.data.invoiceId)))for(const l of r.data.lines)if(!d.productIds.length||d.productIds.includes(l.productId))progress-=d.basis==='units'?BigInt(l.quantity):rial(l.net);
+ const earned=[...d.tiers].reverse().find((t:any)=>progress>=rial(t.threshold)),next=d.tiers.find((t:any)=>progress<rial(t.threshold)),overdue=rial(salesAccounts(rows,d.agentId,today).overdue)>BigInt(0);
+ return {progress:String(progress),earnedBps:earned?.discountBps||0,discountBps:overdue?0:earned?.discountBps||0,overdue,next:next?{...next,remaining:String(rial(next.threshold)-progress)}:null,active:d.state==='active'&&d.start<=today&&d.end>=today};
+}

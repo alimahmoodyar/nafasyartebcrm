@@ -1,3 +1,4 @@
+import {syncSalesTasks} from '@/lib/sales-tasks';
 import {syncSupplierQuality} from '@/lib/supplier-quality';
 import {scanReplenishment} from '@/lib/replenishment';
 import {syncTransportTasks,installTransportPositions} from '@/lib/transport';
@@ -16,6 +17,7 @@ export async function POST(request:Request){try{
  await scanReplenishment();
  await syncSourcingFollowups();
  await syncSupplierQuality();
+ await syncSalesTasks();
  await syncServiceTasks();
  await syncTransportTasks();
  const result=await tickDuties(new Date(),source);if(source==='background'){const now=new Date().toISOString();await storage().prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES('replenishment-background','workflow_health','{}',1,?,?) ON CONFLICT(id) DO UPDATE SET revision=flow_entities.revision+1,updated=excluded.updated").bind(now,now).run();}

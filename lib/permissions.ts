@@ -3,11 +3,15 @@ import type {Kind} from "./model";
 export const modules: Kind[] = ["product", "batch", "device", "event", "service", "action", "distribution", "firmware"];
 const productionModules:Kind[]=["batch", "device", "event", "service", "action"];
 export const stages = ["مصرف قطعه", "مونتاژ", "آزمون نهایی", "بسته‌بندی", "تحویل"];
-export type Permissions = {transportRoles?:string[];serviceRoles?:string[];serviceDomains?:string[];serviceAgentId?:string;supplyRoles?: string[];warehouses?: string[];flowRoles?: string[];read: Kind[]; write: Kind[]; eventStages: string[]; finance?: "none"|"read"|"write"};
+export type Permissions = {salesRoles?:string[];salesAgentId?:string;transportRoles?:string[];serviceRoles?:string[];serviceDomains?:string[];serviceAgentId?:string;supplyRoles?: string[];warehouses?: string[];flowRoles?: string[];read: Kind[]; write: Kind[]; eventStages: string[]; finance?: "none"|"read"|"write"};
 export type Session = {username?:string;authType?:"password"|"chatgpt";userId: string; email: string; name: string; isAdmin: boolean; permissions: Permissions};
 export type Member = {canDelete?:boolean;username?:string;id: string; email: string; name: string; unit: string; status: string; userId: string | null; permissions: Permissions; revision: number; created: string; updated: string};
-export const allPermissions: Permissions = {transportRoles:['manager','driver'],serviceRoles:["manager","support","intake","technician","coordinator","inventory","logistics","finance"],serviceDomains:["home","hospital"],supplyRoles:["sales","ceo","engineering","inventory","finance","domestic","foreign"],warehouses:["raw","line","quarantine","nonconforming","finished"],flowRoles:["inventory","qc","production","procurement","sales","logistics"],read: modules, write: modules, eventStages: stages, finance: "write"};
+export const allPermissions: Permissions = {salesRoles:["manager","staff","finance","viewer"],transportRoles:['manager','driver'],serviceRoles:["manager","support","intake","technician","coordinator","inventory","logistics","finance"],serviceDomains:["home","hospital"],supplyRoles:["sales","ceo","engineering","inventory","finance","domestic","foreign"],warehouses:["raw","line","quarantine","nonconforming","finished"],flowRoles:["inventory","qc","production","procurement","sales","logistics"],read: modules, write: modules, eventStages: stages, finance: "write"};
 export const presets: Record<string, Permissions> = {
+ "مدیر فروش": {salesRoles:["manager","staff"],flowRoles:["sales"],read:[],write:[],eventStages:[]},
+ "کارشناس فروش": {salesRoles:["staff"],flowRoles:["sales"],read:[],write:[],eventStages:[]},
+ "مالی فروش": {salesRoles:["finance"],read:[],write:[],eventStages:[]},
+ "نماینده فروش": {salesRoles:["agent"],read:[],write:[],eventStages:[]},
  "تأمین": {flowRoles:["procurement"],read:["batch"],write:[],eventStages:[]},
   "مسئول تدارکات": {transportRoles:["manager"],read:[],write:[],eventStages:[]},
   "کارشناس تدارکات و حمل‌ونقل": {transportRoles:["driver"],flowRoles:[],read:[],write:[],eventStages:[]},
@@ -41,8 +45,12 @@ export function validatePermissions(value: unknown): Permissions {
   if(p.serviceRoles!==undefined&&(!Array.isArray(p.serviceRoles)||p.serviceRoles.some(r=>!['manager','support','intake','technician','coordinator','inventory','logistics','finance','agent'].includes(r))))throw new Error('نقش خدمات معتبر نیست.');
   if(p.serviceDomains!==undefined&&(!Array.isArray(p.serviceDomains)||p.serviceDomains.some(r=>!['home','hospital'].includes(r))))throw new Error('حوزه خدمات معتبر نیست.');
   if(p.serviceAgentId!==undefined&&(typeof p.serviceAgentId!=='string'||p.serviceAgentId.length>200))throw new Error('نماینده معتبر نیست.');
-  if(p.serviceRoles?.includes('agent')&&(!p.serviceAgentId||p.serviceRoles.length!==1||p.read.length||p.write.length||p.flowRoles?.length||p.transportRoles?.length||p.supplyRoles?.length||p.finance&&p.finance!=='none'))throw new Error('حساب نماینده فقط نقش نماینده و حوزه خدمات خودش را دارد؛ مجوز عمومی شرکت ندهید.');
+  if(p.serviceRoles?.includes('agent')&&(p.salesRoles?.length||p.salesAgentId||!p.serviceAgentId||p.serviceRoles.length!==1||p.read.length||p.write.length||p.flowRoles?.length||p.transportRoles?.length||p.supplyRoles?.length||p.finance&&p.finance!=='none'))throw new Error('حساب نماینده فقط نقش نماینده و حوزه خدمات خودش را دارد؛ مجوز عمومی شرکت ندهید.');
   if(p.serviceRoles?.length&&!p.serviceDomains?.length)throw new Error('حوزه خدمات را انتخاب کنید.');
   if(p.serviceAgentId&&!p.serviceRoles?.includes('agent'))throw new Error('اتصال نماینده فقط با نقش نماینده مجاز است.');
-  return {transportRoles:[...new Set(p.transportRoles||[])],serviceRoles:[...new Set(p.serviceRoles||[])],serviceDomains:[...new Set(p.serviceDomains||[])],serviceAgentId:p.serviceAgentId||'',supplyRoles:[...new Set(p.supplyRoles||[])],...(p.warehouses!==undefined?{warehouses:[...new Set(p.warehouses)]}:{}),flowRoles:[...new Set(p.flowRoles||[])],finance:p.finance||"none",read: [...new Set(p.read)], write: [...new Set(p.write)], eventStages: p.write.includes("event") ? [...new Set(p.eventStages)] : []};
+  if(p.salesRoles!==undefined&&(!Array.isArray(p.salesRoles)||p.salesRoles.some(r=>!['manager','staff','finance','viewer','agent'].includes(r))))throw new Error('نقش فروش معتبر نیست.');
+  if(p.salesAgentId!==undefined&&(typeof p.salesAgentId!=='string'||p.salesAgentId.length>200))throw new Error('شناسه نماینده فروش معتبر نیست.');
+  if(p.salesRoles?.includes('agent')&&(!p.salesAgentId||p.salesRoles.length!==1||p.read.length||p.write.length||p.eventStages.length||p.flowRoles?.length||p.transportRoles?.length||p.supplyRoles?.length||p.serviceRoles?.length||p.serviceAgentId||p.finance&&p.finance!=='none'))throw new Error('حساب نماینده فروش فقط به پرونده خودش دسترسی دارد؛ مجوز عمومی شرکت ندهید.');
+  if(p.salesAgentId&&!p.salesRoles?.includes('agent'))throw new Error('ارتباط نماینده فروش فقط با نقش نماینده مجاز است.');
+  return {salesRoles:[...new Set(p.salesRoles||[])],salesAgentId:p.salesAgentId||'',transportRoles:[...new Set(p.transportRoles||[])],serviceRoles:[...new Set(p.serviceRoles||[])],serviceDomains:[...new Set(p.serviceDomains||[])],serviceAgentId:p.serviceAgentId||'',supplyRoles:[...new Set(p.supplyRoles||[])],...(p.warehouses!==undefined?{warehouses:[...new Set(p.warehouses)]}:{}),flowRoles:[...new Set(p.flowRoles||[])],finance:p.finance||"none",read: [...new Set(p.read)], write: [...new Set(p.write)], eventStages: p.write.includes("event") ? [...new Set(p.eventStages)] : []};
 }

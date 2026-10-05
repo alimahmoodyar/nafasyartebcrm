@@ -16,7 +16,7 @@ function payload(value: any) {
   if (!["active", "disabled"].includes(value.status)) throw new Error("وضعیت حساب معتبر نیست.");
   return {email, name, unit, status: value.status, permissions: JSON.stringify(validatePermissions(value.permissions))};
 }
-async function checkServiceAgent(permissions:string){const p=JSON.parse(permissions);if(p.serviceAgentId){const row:any=await storage().prepare("SELECT data FROM flow_entities WHERE id=? AND type='as_agent'").bind(p.serviceAgentId).first();if(!row||!JSON.parse(row.data).active||p.serviceDomains.length!==1||p.serviceDomains[0]!==JSON.parse(row.data).domain)throw new Error('نماینده فعال و حوزه منطبق را انتخاب کنید.');}}
+async function checkServiceAgent(permissions:string){const p=JSON.parse(permissions);if(p.salesAgentId){const row:any=await storage().prepare("SELECT data FROM flow_entities WHERE id=? AND type='sales_agent'").bind(p.salesAgentId).first();if(!row||!JSON.parse(row.data).active)throw new Error('نماینده فروش فعال انتخاب کنید.');}if(p.serviceAgentId){const row:any=await storage().prepare("SELECT data FROM flow_entities WHERE id=? AND type='as_agent'").bind(p.serviceAgentId).first();if(!row||!JSON.parse(row.data).active||p.serviceDomains.length!==1||p.serviceDomains[0]!==JSON.parse(row.data).domain)throw new Error('نماینده فعال و حوزه منطبق را انتخاب کنید.');}}
 function failure(error: unknown) {
   console.error(error);
   const denied = accessResponse(error); if (denied) return denied;
