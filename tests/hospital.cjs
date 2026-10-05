@@ -84,7 +84,7 @@ async function call(name,path,body){const role=roles.find(r=>r.name===name);cons
  await assert.rejects(()=>catalog.executeTool('list_records',{},base,principal),/Hospital portal/);
  const mcp=await tc.trainingContext.run({actor:'test',role:'test'},()=>catalog.executeTool('hospital_get_workspace',{},base,principal));assert.equal(mcp.centers.length,1);
  await assert.rejects(()=>catalog.executeTool('hospital_apply',{body:'{}',confirmed:true},base,{...principal,scope:'read'}),/read-only/);
- const accounts=load('app/api/hospital/accounts/route.ts');const body={id:crypto.randomUUID(),centerId:'training-hospital-1',revision:2,name:'مرکز تست',username:'hospital-test',password:'HospitalTest!1234',confirmed:true};
+ const accounts=load('app/api/hospital/accounts/route.ts');const body={id:crypto.randomUUID(),centerId:'training-hospital-1',revision:entity('training-hospital-1').revision,name:'مرکز تست',username:'hospital-test',password:'HospitalTest!1234',confirmed:true};
  const ar=await asRole(manager,()=>accounts.POST(request('/api/hospital/accounts',body)));assert.equal(ar.status,201,await ar.clone().text());assert.ok(!(await ar.text()).includes(body.password));
  const member=sql.prepare("SELECT permissions FROM training_app_members WHERE id=?").get(body.id);assert.equal(JSON.parse(member.permissions).hospitalCenterId,'training-hospital-1');
  assert.ok(!JSON.stringify(sql.prepare('SELECT * FROM training_access_audit').all()).includes(body.password));
