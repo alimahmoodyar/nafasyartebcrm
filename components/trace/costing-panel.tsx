@@ -1,4 +1,5 @@
 'use client';
+import {ExpenseRegisterPanel} from './expense-register-panel';
 import {PurchaseSettlementPanel} from './purchase-settlement-panel';
 import {useEffect,useState} from 'react';
 import {Dialog,DialogContent,DialogTitle,DialogDescription} from '@/components/ui/dialog';
@@ -22,8 +23,9 @@ export function CostingPanel({demo=false}:{demo?:boolean}){
  const intInput=(key:string,label:string)=> <label className="field">{label}<input required type="number" min="1" step="1" value={draft[key]??''} onChange={e=>field(key,Number(e.target.value))}/></label>;
  const table=(heads:string[],rows:any[][])=><div style={{overflowX:'auto'}}><table><thead><tr>{heads.map(h=><th key={h}>{h}</th>)}</tr></thead><tbody>{rows.map((r,i)=><tr key={i}>{r.map((v,j)=><td key={j}>{v}</td>)}</tr>)}</tbody></table>{!rows.length&&<p className="empty">هنوز رکوردی ثبت نشده است.</p>}</div>;
  return <div className="panel"><div className="panelhead"><div><h2>بهای تمام‌شده</h2><p>مواد، دستمزد و سربار تولید · همه مبالغ ریال</p></div><button className="btn" disabled={busy} onClick={()=>void load().catch(e=>setError(e.message))}>تازه‌سازی</button></div>
- <div className="tools" style={{flexWrap:'wrap'}}>{Object.entries({settlements:'تسویه خرید',devices:'هزینه دستگاه‌ها',prices:'قیمت خرید و موجودی',standards:'استاندارد تولید',periods:'دوره مالی',guide:'راهنما'}).map(([k,l])=><button key={k} className={'btn '+(tab===k?'primary':'')} onClick={()=>setTab(k)}>{l}</button>)}</div>
+ <div className="tools" style={{flexWrap:'wrap'}}>{Object.entries({expenses:'ثبت و تشخیص هزینه',settlements:'تسویه خرید',devices:'هزینه دستگاه‌ها',prices:'قیمت خرید و موجودی',standards:'استاندارد تولید',periods:'دوره مالی',guide:'راهنما'}).map(([k,l])=><button key={k} className={'btn '+(tab===k?'primary':'')} onClick={()=>setTab(k)}>{l}</button>)}</div>
  <p className="notice">بهای واقعی تا تکمیل قیمت‌ها و تأیید مالی موقت است. انتقال خودکار اطلاعات از سپیدار هنوز برقرار نشده است.</p>{error&&!draft&&<p className="notice error" role="alert">{error}</p>}{message&&<p role="status">{message}</p>}
+ {tab==='expenses'&&<ExpenseRegisterPanel/>}
  {tab==='settlements'&&<PurchaseSettlementPanel/>}
  {tab==='guide'&&<ul>{data.help.map((s:string)=><li key={s} style={{marginBottom:12}}>{s}</li>)}</ul>}
  {tab==='devices'&&<>{table(['سریال','محصول','وضعیت','مواد واقعی تجمعی','مواد استاندارد','اختلاف مواد','بررسی'],data.devices.map((d:any)=>[d.serial,product(d.productId),d.state==='finished'?'تحویل انبار نهایی':'در جریان ساخت',money(d.material),money(d.standard?.complete?d.standard.materials:null),money(d.materialVariance),<button className="btn" onClick={()=>setDetail(d)}>مصرف و زمان</button>]))}<p className="footnote">فقط دستگاه دارای خروج واقعی مواد نمایش داده می‌شود. رزرو و آماده‌سازی برگ تولید هزینه مصرف ایجاد نمی‌کند.</p></>}

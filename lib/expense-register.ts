@@ -1,0 +1,12 @@
+export const expenseGroups:Record<string,string>={materials:'مواد و قطعات مستقیم',purchase:'مخارج مستقیم خرید',labor:'دستمزد مستقیم',overhead:'سربار تولید',selling:'فروش و توزیع',admin:'اداری و عمومی',service:'خدمات پس از فروش',research:'تحقیق و توسعه',finance:'مالی'};
+export const expenseTreatments:Record<string,string>={inventory:'موجودی / بهای خرید',production:'بهای تولید',period:'هزینه دوره',asset:'دارایی؛ بررسی مالی',advance:'پیش‌پرداخت',settlement:'تسویه بدهی',transfer:'انتقال بین حساب‌ها',review:'نیازمند بررسی'};
+export const normalizeExpense=(s:string)=>s.normalize('NFKC').replace(/ي/g,'ی').replace(/ك/g,'ک').replace(/[\u200c\s]+/g,' ').trim().toLowerCase();
+export function suggestExpense(description:string,rules:any[]=[]){
+ const text=normalizeExpense(description);const matching=rules.filter(r=>r.data.active&&normalizeExpense(r.data.description)===text);
+ if(matching.length===1)return {...matching[0].data.classification,reason:'قاعده تأییدشده مالی برای همین شرح',ruleId:matching[0].id,confidence:'rule'};
+ const special=[[/پیش پرداخت|پیش‌پرداخت/,'advance'],[/انتقال.*حساب/,'transfer'],[/تسویه.*بدهی|بازپرداخت اصل/,'settlement'],[/خرید.*(ماشین آلات|دستگاه تزریق|تجهیزات خط)/,'asset']] as const;
+ for(const [pattern,treatment] of special)if(pattern.test(text))return {group:'',center:'',treatment,account:'',reason:'این پرداخت ممکن است هزینه دوره نباشد؛ مالی تعیین تکلیف کند.',confidence:'review'};
+ const candidates=[[/گارانتی|اعزام تکنسین|تعمیر مشتری/,'service','خدمات','period'],[/گمرک|ترخیص|حمل خرید|حمل.*از گمرک/,'purchase','بازرگانی','inventory'],[/پورسانت|تبلیغات|حمل.*مشتری|حمل.*نماینده/,'selling','فروش','period'],[/نمونه سازی|تحقیق|توسعه محصول/,'research','تحقیق و توسعه','review'],[/سود تسهیلات|بهره وام|تامین مالی|تأمین مالی/,'finance','مالی','period'],[/برق کارخانه|استهلاک خط|تعمیر تجهیزات|سرپرستی تولید/,'overhead','تولید','production'],[/دستمزد.*مونتاژ|حقوق.*مونتاژ/,'labor','تولید','production'],[/حقوق حسابداری|ملزومات اداری|اجاره دفتر/,'admin','اداری','period'],[/خرید.*(کمپرسور|زئولیت|برد|بدنه)/,'materials','تولید','inventory']] as const;
+ const found=candidates.filter(([p,g])=>p.test(text)&&!(g==='materials'&&/حمل|گمرک|ترخیص/.test(text)));if(found.length!==1)return {group:'',center:'',treatment:'review',account:'',reason:'شرح مبهم یا چندمنظوره است؛ ردیف‌ها را تفکیک و هدف را مشخص کنید.',confidence:'review'};
+ const [,group,center,treatment]=found[0];return {group,center,treatment,account:'',reason:'پیشنهاد بر اساس شرح؛ حساب معین و ارتباط مدرک را مالی تأیید کند.',confidence:'suggestion'};
+}
