@@ -1,3 +1,5 @@
+import * as expenses from '@/app/api/hospital/expenses/route';
+import * as expenseFiles from '@/app/api/hospital/expenses/files/route';
 import * as hospital from '@/app/api/hospital/route';
 import * as hospitalFiles from '@/app/api/hospital/files/route';
 import * as hospitalAssistant from '@/app/api/hospital/assistant/route';
@@ -44,6 +46,8 @@ import * as route38 from '@/app/api/sales/quote/route';
 import * as route39 from '@/app/api/sales/monitor/route';
 export const trainingRoutes:Record<string,Record<string,any>>={
  hospital,
+ "hospital/expenses":expenses,
+ "hospital/expenses/files":expenseFiles,
  "hospital/files":hospitalFiles,
  "hospital/assistant":hospitalAssistant,
  'firmware':route0,

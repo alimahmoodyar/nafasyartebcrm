@@ -24,7 +24,7 @@ export function resetWhere(table:string,scope:string){
 // replenishment_policy and workflow_health use flow_entities: covered by existing freeze triggers, backup and both reset predicates.
 // Supplier documents and CAPA (including receipt snapshots) are catalog data; full reset includes file manifests.
 // Supplier entities use the generic flow_entities freeze triggers from migration 0016.
-export const resetHelp=['قطعات مهم دستگاه بیمارستانی، قرائت‌های ساعت، تنظیمات و پیش‌بینی سرویس و پرونده‌های سرویس دوره‌ای در هر دو محدوده پاک‌سازی می‌شوند؛ در پشتیبان و قفل عمومی flow_entities پوشش دارند.','هویت مرکز بیمارستانی و حساب مسئول مرکز حفظ می‌شوند؛ دستگاه‌های متصل، مأموریت‌ها، پیش‌فاکتورها، فاکتورها، پرداخت‌ها، راهنماها، فرم‌ها و پاسخ‌های دستیار در هر دو محدوده پاک می‌شوند. پرونده و مدارک بیمارستانی در پشتیبان منظور می‌شوند.',
+export const resetHelp=['تنخواه مأموریت: سیاست سقف‌ها و زنجیره تأیید، هزینه‌ها و مدارک در هر دو محدوده حذف و در پشتیبان منظور می‌شوند. جدول جدید ندارد؛ قفل عمومی flow_entities و ترتیب حذف وظایف و مدارک برقرار است.','قطعات مهم دستگاه بیمارستانی، قرائت‌های ساعت، تنظیمات و پیش‌بینی سرویس و پرونده‌های سرویس دوره‌ای در هر دو محدوده پاک‌سازی می‌شوند؛ در پشتیبان و قفل عمومی flow_entities پوشش دارند.','هویت مرکز بیمارستانی و حساب مسئول مرکز حفظ می‌شوند؛ دستگاه‌های متصل، مأموریت‌ها، پیش‌فاکتورها، فاکتورها، پرداخت‌ها، راهنماها، فرم‌ها و پاسخ‌های دستیار در هر دو محدوده پاک می‌شوند. پرونده و مدارک بیمارستانی در پشتیبان منظور می‌شوند.',
  'اهداف مصوب فروش، گزارش‌های مدیریتی، هشدارها، ارتباط وصول جایگزین چک و تنظیمات پایش در هر دو محدوده پاک می‌شوند؛ پس از پاک‌سازی باید هدف‌ها و قواعد بررسی شوند. هویت نماینده و مسئول‌های پرونده حفظ می‌شوند.',
  'هویت نماینده فروش و حساب ورود و شرایط پایه او حفظ می‌شود. سفارش‌ها، فاکتورها، پرداخت‌ها، تخصیص‌ها، برگشتی‌ها، افتتاحیه و تارگت‌ها در هر دو محدوده پاک می‌شوند؛ قیمت‌های فروش فقط در پاک‌سازی کامل حذف می‌شوند. فایل رسیدها در فهرست پشتیبان هستند. ارتباط گیرنده ارسال در اولین حواله جدید بازسازی می‌شود.',
  'پاک‌سازی عملیات، تأمین‌کنندگان و ارزیابی‌های مستند را حفظ می‌کند؛ شاخص‌های جاری با حذف رسید و سفارش از نو محاسبه می‌شوند. پاک‌سازی کامل این تعاریف و ارزیابی‌ها را هم حذف می‌کند.',
@@ -49,3 +49,5 @@ export const resetHelp=['قطعات مهم دستگاه بیمارستانی، �
 // Isolated training_* schema (0018) is explicitly preserved by both company reset scopes.
 // No training table has a foreign key to a company table; training file keys are separately prefixed.
 // Company reset freeze triggers remain limited to company operations by design.
+
+// expense_policy, expense_claim and expense_file use flow_entities; generic 0016 freeze triggers cover every write. No new tables/FKs. expense_file manifests included in system-reset. Training isolated by existing wrappers.
