@@ -2,7 +2,7 @@ import {storage} from './storage';
 import {AccessError} from './authorization';
 import type {Session} from './permissions';
 import {dayAt,addDay,validDay,taskRequired,taskText} from './duties';
-import {salesAccounts,salesTargetProgress,rial,total} from './sales-contract';
+import {salesAccounts,salesTargetProgress,rial,total,salesRequestChannels} from './sales-contract';
 import {sha256} from './firmware';
 export const salesFail=(m:string,status=400):never=>{throw new AccessError(m,status)};
 export {salesRep,salesManager,salesStaff,salesFinance,salesRead,salesWarehouse} from './sales-access';
@@ -10,6 +10,12 @@ import {salesRep,salesRead,salesWarehouse} from './sales-access';
 export const sreq=taskRequired,stxt=taskText;
 export function money(v:unknown,positive=false){const s=sreq(v,18);if(!/^\d{1,18}$/.test(s)||positive&&BigInt(s)<=BigInt(0))salesFail('مبلغ باید ریال صحیح '+(positive?'مثبت':'نامنفی')+' باشد.');return BigInt(s).toString();}
 export function sday(v:unknown){const s=sreq(v,10);if(!validDay(s))salesFail('تاریخ معتبر لازم است.');return s;}
+export function salesSubmission(u:Session,agentId:string,source:any,at:string){
+ if(salesRep(u)){if(source!=null)salesFail('نماینده درخواست را مستقیماً از حساب خودش ثبت می‌کند.');return {actor:u.userId,actorName:u.name,agentId,onBehalf:false,channel:'portal',at};}
+ if(!source||typeof source!=='object'||Array.isArray(source)||!Object.hasOwn(salesRequestChannels,source.channel))salesFail('روش دریافت درخواست نماینده را مشخص کنید.');
+ const day=sday(source.day);if(day>dayAt())salesFail('تاریخ دریافت درخواست در آینده نباشد.');
+ return {actor:u.userId,actorName:u.name,agentId,onBehalf:true,channel:source.channel,contactName:sreq(source.contactName,200),day,reference:sreq(source.reference,1000),at};
+}
 export function integer(v:unknown,min=1,max=10000){if(typeof v!=='number'||!Number.isSafeInteger(v)||v<min||v>max)salesFail('عدد صحیح در محدوده مجاز وارد کنید.');return v as number;}
 export function arr(v:unknown,max=100){if(!Array.isArray(v)||!v.length||v.length>max)salesFail('فهرست غیرخالی معتبر لازم است.');return v as any[];}
 export const salesDecode=(r:any)=>({...r,data:JSON.parse(r.data)});
@@ -34,5 +40,5 @@ export async function salesDelivery(rows:any[],agentIds:string[]){
  const sales=(await storage().prepare("SELECT * FROM flow_entities WHERE type='sale'").all()).results.map(salesDecode).filter(s=>orderIds.has(s.data.salesOrderId));
  const missions=(await storage().prepare("SELECT * FROM flow_entities WHERE type='transport' AND json_extract(data,'$.kind')='sale'").all()).results.map(salesDecode);
  const devices=(await storage().prepare("SELECT id,payload FROM records WHERE kind='device'").all()).results as any[];
- return sales.map(s=>{const m=missions.find(m=>m.data.sourceId===s.id&&m.data.state!=='cancelled');return {id:s.id,revision:s.revision,orderId:s.data.salesOrderId,productId:s.data.productId,state:s.data.state,count:s.data.count,deviceIds:s.data.deviceIds,devices:s.data.deviceIds.map((id:string)=>({id,serial:devices.find(d=>d.id===id)?JSON.parse(devices.find(d=>d.id===id).payload).code:id})),dispatchedAt:s.data.dispatchedAt||'',deliveredAt:s.data.deliveredAt||'',transport:m?{id:m.id,revision:m.revision,state:m.data.state,code:m.data.code,due:m.data.due,carrier:m.data.carrier,waybill:m.data.waybill,tracking:m.data.tracking,packages:m.data.packages}:null};});
+ return sales.map(s=>{const m=missions.find(m=>m.data.sourceId===s.id&&m.data.state!=='cancelled');return {id:s.id,revision:s.revision,orderId:s.data.salesOrderId,productId:s.data.productId,state:s.data.state,count:s.data.count,deviceIds:s.data.deviceIds,devices:s.data.deviceIds.map((id:string)=>({id,serial:devices.find(d=>d.id===id)?JSON.parse(devices.find(d=>d.id===id).payload).code:id})),dispatchedAt:s.data.dispatchedAt||'',deliveredAt:s.data.deliveredAt||'',transport:m?{id:m.id,revision:m.revision,state:m.data.state,code:m.data.code,due:m.data.due,carrier:m.data.carrier,waybill:m.data.waybill,tracking:m.data.tracking,packages:m.data.packages,receipt:m.data.receipt||null}:null};});
 }

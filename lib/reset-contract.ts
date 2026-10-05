@@ -40,3 +40,5 @@ export const resetHelp=[
 // existing freeze triggers and catalog/full reset semantics apply without new tables.
 
 // sales_* flow entities use the generic freeze triggers (0016); sales_file is included in reset file manifests. No separate ledger tables.
+
+// Sales delegation: managerId remains in preserved sales_agent; submission metadata, transport receipt evidence and task supervisors follow existing operational rows and private transport_file manifests. Generic 0016 freeze triggers cover all writes; no new table or delete ordering.
