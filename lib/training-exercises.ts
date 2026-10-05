@@ -1,3 +1,4 @@
+import {prepareTechnicianTraining} from './technician-training';
 import {prepareExpenseTraining} from './expense-training';
 import {prepareHospitalTraining} from './hospital-training';
 import {storage} from './storage';
@@ -10,7 +11,7 @@ import {syncSourcingFollowups} from './sourcing';
 import {syncServiceTasks} from './after-sales';
 import {dayAt,addDay} from './duties';
 export async function prepareTrainingExercises(origin:string){
- const db=storage();await prepareHospitalTraining();await prepareExpenseTraining();if(await db.prepare("SELECT id FROM flow_entities WHERE id='training-ready'").first())return;
+ const db=storage();await prepareHospitalTraining();await prepareExpenseTraining();await prepareTechnicianTraining();if(await db.prepare("SELECT id FROM flow_entities WHERE id='training-ready'").first())return;
  const admin=trainingRoles.find(r=>r.name==='مدیر سامانه')!;
  await mcpActor.run(admin.session,async()=>{
   async function post(path:string,body:any){

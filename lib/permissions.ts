@@ -28,6 +28,8 @@ export const presets: Record<string, Permissions> = {
   "سفارشی": {read: [], write: [], eventStages: []},
   "مهندسی نرم‌افزار": {read: ["device", "firmware"], write: ["firmware"], eventStages: []},
 };
+presets['تکنسین فنی بیمارستانی']={serviceRoles:['technician'],serviceDomains:['hospital'],read:[],write:[],eventStages:[]};
+presets['تکنسین فنی خانگی']={serviceRoles:['technician'],serviceDomains:['home'],read:[],write:[],eventStages:[]};
 export function validatePermissions(value: unknown): Permissions {
   const p = value as Permissions;
   if (!p || !Array.isArray(p.read) || !Array.isArray(p.write) || !Array.isArray(p.eventStages)) throw new Error("دسترسی‌ها معتبر نیستند.");

@@ -51,3 +51,5 @@ export const resetHelp=['تنخواه مأموریت: سیاست سقف‌ها �
 // Company reset freeze triggers remain limited to company operations by design.
 
 // expense_policy, expense_claim and expense_file use flow_entities; generic 0016 freeze triggers cover every write. No new tables/FKs. expense_file manifests included in system-reset. Training isolated by existing wrappers.
+
+// Dedicated technician training fixtures use only training_* tables; existing company reset preservation is unchanged. Presets use existing app_members permissions, no schema changes.

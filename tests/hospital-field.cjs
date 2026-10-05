@@ -14,6 +14,13 @@ async function call(name,path,body){const role=roles.find(r=>r.name===name);cons
 
 (async()=>{
  await context.run(real,()=>training.trainingInitialize(request('/api/training',{confirmed:true})));
+ const specialist=roles.find(r=>r.name==='تکنسین فنی بیمارستانی');assert.deepEqual(Array.from(specialist.session.permissions.serviceDomains),['hospital']);assert.deepEqual(Array.from(specialist.session.permissions.serviceRoles),['technician']);
+ const before=sql.prepare('SELECT count(*) n FROM training_flow_entities').get().n;
+ await context.run(real,()=>training.trainingInitialize(request('/api/training',{confirmed:true})));
+ assert.equal(sql.prepare('SELECT count(*) n FROM training_flow_entities').get().n,before);
+ const specialistView=await call('تکنسین فنی بیمارستانی','hospital');assert.equal(specialistView.status,200);assert.equal(specialistView.d.memberId,specialist.memberId);assert.ok(specialistView.d.rows.some(r=>r.id==='training-technician-job'&&r.data.technicianId===specialist.memberId));
+ assert.equal((await call('تکنسین فنی خانگی','hospital')).status,403);
+ const specialistExpense=await call('تکنسین فنی بیمارستانی','hospital/expenses');assert.equal(specialistExpense.status,200);assert.ok(specialistExpense.d.policies.some(p=>p.data.assignments.some(a=>a.ownerId===specialist.memberId)));
  const tech='تکنسین خدمات',manager='هماهنگ‌کننده خدمات',center='مسئول مرکز بیمارستانی ۱',finance='مالی خدمات',aid='training-hospital-asset-1',job='field-test-job',today=load('lib/duties.ts').dayAt();
  const entity=id=>{const r=sql.prepare('SELECT * FROM training_flow_entities WHERE id=?').get(id);return {...r,data:JSON.parse(r.data)}};
  const act=async(role,mode,fields={},expected=200)=>{const b={id:crypto.randomUUID(),mode,confirmed:true,...fields},r=await call(role,'hospital',b);assert.equal(r.status,expected,JSON.stringify(r));return {id:b.id,...r.d};};
