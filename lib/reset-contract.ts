@@ -10,7 +10,7 @@ export const resetTables:Record<string,string>={
  serial_reservations:'سریال‌های رزروشده',serial_runs:'نوبت‌های چاپ سریال',inventory_operations:'عملیات کاری ثبت‌شده',quality_templates:'فرم‌های کنترل کیفیت',bom_versions:'نسخه‌های BOM',firmware_files:'فایل‌های نرم‌افزار دستگاه',flow_entities:'گردش‌های کاری و اطلاعات پایه',records:'سوابق دستگاه، کالا، بچ و خدمات'
 };
 export const resetFlowPreserved=['hospital_center','account_profile','position','duty_template','duty_catalog_install','transport_migration','development_request','as_agent','sales_agent'];
-export const resetFlowCatalog=['sales_price','supplier_document','supplier_capa','supplier','supplier_material','supplier_review','material','capacity','party','as_tariff','transport_vehicle'];
+export const resetFlowCatalog=['cost_material','cost_standard','sales_price','supplier_document','supplier_capa','supplier','supplier_material','supplier_review','material','capacity','party','as_tariff','transport_vehicle'];
 // Service province/coverage lives inside as_agent (preserved identity) and
 // customer province inside as_case (operational reset); existing backup/freeze apply.
 export function resetWhere(table:string,scope:string){
@@ -53,3 +53,7 @@ export const resetHelp=['مقایسه تعداد فاکتور و دریافت و
 // expense_policy, expense_claim and expense_file use flow_entities; generic 0016 freeze triggers cover every write. No new tables/FKs. expense_file manifests included in system-reset. Training isolated by existing wrappers.
 
 // Dedicated technician training fixtures use only training_* tables; existing company reset preservation is unchanged. Presets use existing app_members permissions, no schema changes.
+
+// Costing uses flow_entities only. Existing 0016 freeze triggers and backup apply to all cost_* types.
+// cost_material/cost_standard are catalog preserved by operational reset with BOM/materials.
+// cost_price/time/period/close and cost operations/audit reset with production; no new FKs or file manifests.
