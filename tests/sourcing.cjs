@@ -88,7 +88,7 @@ async function detail(id,user){const go=()=>sourcing.GET(request('/api/sourcing?
  await op('incoming_qc',{receiptId:arrival.id,accepted:'3',rejected:'1',values:{purity:'93'},notes:'1 rejected'});await op('shelve',{receiptId:arrival.id,location:'A-1-1-2'});
  d=await detail(pid);assert.equal(d.lines[0].stock,7000);assert.equal(d.lines[0].pipeline,3000);
  await source('close_order',{planId:pid,orderId:order,notes:'incomplete'},400,actor('inventory'));
- await source('receive',{planId:pid,orderId:order,day:today,quantity:'3',notes:'balance plus replacement'},200,actor('inventory'));
+ await source('receive',{planId:pid,orderId:order,day:today,quantity:'3',invoiceQuantity:'3',discrepancyNotes:'Replacement for one quality-rejected unit plus balance',notes:'balance plus replacement'},200,actor('inventory'));
  arrival=entities('receipt').filter(r=>r.data.purchaseOrderId===order).find(r=>r.data.state==='pending_qc');await op('incoming_qc',{receiptId:arrival.id,accepted:'3',rejected:'0',values:{purity:'94'},notes:'pass'});await op('shelve',{receiptId:arrival.id,location:'A-1-1-3'});
  await source('close_order',{planId:pid,orderId:order,notes:'fully accepted'},200,actor('inventory'));
  assert.equal((await detail(pid)).lines[0].stock,10000);await source('ready',{planId:pid,notes:'all stock checked'},200,actor('inventory'));

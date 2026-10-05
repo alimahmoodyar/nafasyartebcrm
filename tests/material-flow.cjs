@@ -97,6 +97,21 @@ const p=await create('product',{code:'FLOW',name:'FlowDevice',group:'G',model:'M
  assert.equal((await flow.GET()).status,200);
  const worker={userId:'worker',email:'worker@example.com',name:'Worker',isAdmin:false,permissions:{read:['batch'],write:['batch'],eventStages:[],flowRoles:['production']}};
  const denied=await load('lib/mcp/context.ts').mcpActor.run(worker,()=>flow.POST(request('/api/flow','POST',{id:crypto.randomUUID(),mode:'incoming_qc',receiptId:r1.id,accepted:'8',rejected:'2',values:{purity:'92'},notes:'not authorized'})));assert.equal(denied.status,403);
+
+ const mismatch={materialId:'material:01',day:'2026-10-05',quantity:'95',invoiceQuantity:'100',supplier:'Supplier',purchase:'INV-100',specs:'V1'};
+ await op('receipt',mismatch,400);
+ await op('receipt',{...mismatch,discrepancyNotes:'Warehouse counted five fewer items'});
+ const counted=entities('receipt').find(r=>r.data.quantityCheck?.invoiceQuantity===100000);
+ assert.equal(counted.data.quantityCheck.invoiceDifference,-5000);assert.equal(stock(counted.id,'quarantine'),95000);
+ await op('incoming_qc',{receiptId:counted.id,accepted:'96',values:{purity:'92'},notes:'over actual'},400);
+ await op('incoming_qc',{receiptId:counted.id,accepted:'-1',values:{purity:'92'},notes:'negative'},400);
+ const inspect={id:crypto.randomUUID(),receiptId:counted.id,accepted:'90',values:{purity:'92'},notes:'Five quality defects'};
+ await op('incoming_qc',inspect);await op('incoming_qc',inspect);
+ const result=entities('receipt').find(r=>r.id===counted.id);assert.equal(result.data.accepted,90000);assert.equal(result.data.rejected,5000);assert.equal(result.data.quantityCheck.invoiceDifference,-5000);
+ await op('shelve',{receiptId:counted.id,location:'Q-9-1-1'});assert.equal(stock(counted.id,'raw'),90000);assert.equal(stock(counted.id,'quarantine'),5000);
+ await op('receipt',{materialId:'material:01',day:'2026-10-05',quantity:'0.375',invoiceQuantity:'0.400',discrepancyNotes:'Measured shortage',supplier:'Supplier',specs:'V1'});
+ const fractional=entities('receipt').find(r=>r.data.quantity===375);await op('incoming_qc',{receiptId:fractional.id,accepted:'0',values:{purity:'70'},notes:'All failed'});assert.equal(entities('receipt').find(r=>r.id===fractional.id).data.rejected,375);
+ console.log('Actual receipt 95 / invoice 100 / accepted 90: shortage 5, QC reject 5; limits, full rejection, decimals and replay passed');
  identity=null;assert.equal((await flow.GET()).status,401);
  console.log('Material flow passed: partial incoming QC, quarantine, slot conflicts, FIFO/split batches, idempotency, role checks, serial capacity, assembler, stock rollback, actual consumption, repair and retained retest, procurement deduplication.');
 })().catch(e=>{console.error(e);process.exit(1)});
