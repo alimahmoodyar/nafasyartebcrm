@@ -57,7 +57,7 @@ export async function POST(request:Request){try{
  put(batchId,'receipt',{batchId,materialId:m.id,materialRevision:m.revision,fields:m.data.fields,specs:data.specs,quantity,accepted:0,rejected:0,state:'pending_qc',purchaseOrderId,qcOwner:m.data.qcOwner,warehouseOwner:m.data.warehouseOwner,expiry,day,actor:u.userId});
  }else if(mode==='incoming_qc'){
  const r=await get(needed(b.receiptId),'receipt');assigned(r,'qcOwner');if(r.data.state!=='pending_qc')fail('کنترل ورودی قبلاً ثبت شده است.',409);
- const accepted=zero(b.accepted),rejected=zero(b.rejected);if(accepted+rejected!==r.data.quantity)fail('جمع تعداد پذیرفته و ردشده باید برابر مقدار ورودی باشد.');const checked=qualityValues(r.data.fields,b.values);const notes=needed(b.notes,4000);if(checked.failed&&accepted===r.data.quantity)fail('با معیار مردود، تأیید کامل مجاز نیست.');
+ const accepted=zero(b.accepted),rejected=zero(b.rejected);if(accepted+rejected!==r.data.quantity)fail('جمع تعداد پذیرفته و ردشده باید برابر مقدار ورودی باشد.');if(!r.data.fields?.length)fail('فرم کنترل کیفیت این محموله تعریف نشده است؛ مسئول کیفیت باید مشخصات فرم را بررسی کند.');const checked=qualityValues(r.data.fields,b.values);const notes=needed(b.notes,4000);if(checked.failed&&accepted===r.data.quantity)fail('با معیار مردود، تأیید کامل مجاز نیست.');
  put(r.id,'receipt',{...r.data,accepted,rejected,state:accepted?'awaiting_warehouse':'rejected',qc:{values:checked.values,failed:checked.failed,notes,by:u.name,actor:u.userId,at:now}},r);
  const batch=await record(r.data.batchId,'batch');stmts.push(db.prepare('UPDATE records SET payload=? WHERE id=?').bind(JSON.stringify({...batch.data,status:accepted?'تأیید':'رد',test:notes}),batch.id));
  }else if(mode==='shelve'){

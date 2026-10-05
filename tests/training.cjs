@@ -31,8 +31,10 @@ async function call(name,path,body){const role=roles.find(r=>r.name===name);cons
  const qctask=qctasks.find(t=>t.data.materialWorkflow&&t.data.sourceId===receiptId);assert.ok(qctask,'QC task created for new receipt');
  assert.ok(sql.prepare('SELECT id FROM training_duty_notices WHERE task_id=?').get(qctask.id),'QC notification persisted');
  const denied=await call('انبار','flow',{id:crypto.randomUUID(),mode:'incoming_qc',receiptId,accepted:'4',rejected:'0',values:{appearance:'pass'},notes:'کیفیت فرضی'});assert.equal(denied.status,403);
+ const missingValues=await call('کنترل کیفیت','flow',{id:crypto.randomUUID(),mode:'incoming_qc',receiptId,accepted:'4',rejected:'0',values:{},notes:'همه تأیید'});assert.equal(missingValues.status,400,'QC cannot be completed without the material checklist');
  const qc=await call('کنترل کیفیت','flow',{id:crypto.randomUUID(),mode:'incoming_qc',receiptId,accepted:'4',rejected:'0',values:{appearance:'pass'},notes:'کیفیت فرضی'});assert.equal(qc.status,200,JSON.stringify(qc.d));
  assert.equal(sql.prepare('SELECT state FROM training_duty_runs WHERE id=?').get(qctask.id).state,'completed');
+ const refreshedQC=(await call('کنترل کیفیت','tasks')).d;assert.equal(refreshedQC.tasks.find(t=>t.id===qctask.id).state,'completed');assert.ok(!refreshedQC.notifications.some(n=>n.task_id===qctask.id),'completed QC must not leave an actionable notice');
  const warehouseTasks=(await call('انبار','tasks')).d.tasks;assert.ok(warehouseTasks.some(t=>t.data.materialWorkflow&&t.data.sourceId===receiptId&&t.state==='open'));
  const shelf=await call('انبار','flow',{id:crypto.randomUUID(),mode:'shelve',receiptId,location:'T-1-1-1'});assert.equal(shelf.status,200,JSON.stringify(shelf.d));
  assert.equal(sql.prepare("SELECT quantity FROM training_inventory_balances WHERE item_id=? AND warehouse='raw'").get(receiptId).quantity,4000);
