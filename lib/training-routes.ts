@@ -1,3 +1,4 @@
+import * as buildProjects from '@/app/api/build-projects/route';
 import * as expenseRegister from '@/app/api/expense-register/route';
 import * as purchaseSettlement from '@/app/api/purchase-settlement/route';
 import * as settlementFiles from '@/app/api/purchase-settlement/files/route';
@@ -53,6 +54,7 @@ export const trainingRoutes:Record<string,Record<string,any>>={
  "purchase-settlement":purchaseSettlement,
  "purchase-settlement/files":settlementFiles,
  "costing":costing,
+ "build-projects":buildProjects,
  "expense-register":expenseRegister,
  "hospital/expenses":expenses,
  "hospital/expenses/files":expenseFiles,
