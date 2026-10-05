@@ -1,3 +1,4 @@
+import {scanSalesMonitor} from '@/lib/sales-monitor';
 import {salesRep,salesStaff,salesSubmission,salesScope} from '@/lib/sales';
 import {syncSalesTasks} from '@/lib/sales-tasks';
 import {requireAccess,checkOrigin,accessResponse} from '@/lib/authorization';
@@ -53,5 +54,5 @@ export async function POST(request:Request){try{checkOrigin(request);const u=awa
  d.history.push({mode,actor:u.userId,actorName:u.name,at:now,notes,...detail});put(m.id,'transport',d,m);
  }
  await db.batch([db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(op,'transport_'+mode,signature,u.userId,now),...checks,...stmts,db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,target,'transport_'+mode,signature,now)]);
- let followup=true;try{await syncTransportTasks();await syncSalesTasks();}catch{followup=false;}return json({saved:true,id:target,followupPending:!followup});
+ let followup=true;try{await syncTransportTasks();await syncSalesTasks();await scanSalesMonitor({reports:false,source:'event'});}catch{followup=false;}return json({saved:true,id:target,followupPending:!followup});
  }catch(e){return accessResponse(e)||json({error:'ثبت حمل انجام نشد؛ وضعیت هم‌زمان تغییر کرده است. تازه‌سازی و بررسی کنید.'},409)}}

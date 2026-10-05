@@ -25,6 +25,7 @@ export function resetWhere(table:string,scope:string){
 // Supplier documents and CAPA (including receipt snapshots) are catalog data; full reset includes file manifests.
 // Supplier entities use the generic flow_entities freeze triggers from migration 0016.
 export const resetHelp=[
+ 'اهداف مصوب فروش، گزارش‌های مدیریتی، هشدارها، ارتباط وصول جایگزین چک و تنظیمات پایش در هر دو محدوده پاک می‌شوند؛ پس از پاک‌سازی باید هدف‌ها و قواعد بررسی شوند. هویت نماینده و مسئول‌های پرونده حفظ می‌شوند.',
  'هویت نماینده فروش و حساب ورود و شرایط پایه او حفظ می‌شود. سفارش‌ها، فاکتورها، پرداخت‌ها، تخصیص‌ها، برگشتی‌ها، افتتاحیه و تارگت‌ها در هر دو محدوده پاک می‌شوند؛ قیمت‌های فروش فقط در پاک‌سازی کامل حذف می‌شوند. فایل رسیدها در فهرست پشتیبان هستند. ارتباط گیرنده ارسال در اولین حواله جدید بازسازی می‌شود.',
  'پاک‌سازی عملیات، تأمین‌کنندگان و ارزیابی‌های مستند را حفظ می‌کند؛ شاخص‌های جاری با حذف رسید و سفارش از نو محاسبه می‌شوند. پاک‌سازی کامل این تعاریف و ارزیابی‌ها را هم حذف می‌کند.',
  'تنظیمات پایش خودکار تأمین، سلامت زمان‌بند و پرونده‌های آن در هر دو محدوده پاک می‌شوند؛ شروع مجدد نیاز به تعیین مسئول‌ها و فعال‌سازی دوباره پایش دارد.',
@@ -42,3 +43,5 @@ export const resetHelp=[
 // sales_* flow entities use the generic freeze triggers (0016); sales_file is included in reset file manifests. No separate ledger tables.
 
 // Sales delegation: managerId remains in preserved sales_agent; submission metadata, transport receipt evidence and task supervisors follow existing operational rows and private transport_file manifests. Generic 0016 freeze triggers cover all writes; no new table or delete ordering.
+
+// sales_goal, sales_alert, sales_report, sales_check_recovery, sales_monitor_policy and workflow_health use existing operational flow_entities. duty_runs/notices remain children-first. Generic 0016 freeze covers every new write; neither reset scope preserves these operational snapshots. No new schema or R2 data.
