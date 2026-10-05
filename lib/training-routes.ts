@@ -1,3 +1,6 @@
+import * as hospital from '@/app/api/hospital/route';
+import * as hospitalFiles from '@/app/api/hospital/files/route';
+import * as hospitalAssistant from '@/app/api/hospital/assistant/route';
 // Explicit allowlist: authentication, users, secrets, real reset and external AI are never delegated.
 import * as route0 from '@/app/api/firmware/route';
 import * as route1 from '@/app/api/finance/route';
@@ -40,6 +43,9 @@ import * as route37 from '@/app/api/sales/files/route';
 import * as route38 from '@/app/api/sales/quote/route';
 import * as route39 from '@/app/api/sales/monitor/route';
 export const trainingRoutes:Record<string,Record<string,any>>={
+ hospital,
+ "hospital/files":hospitalFiles,
+ "hospital/assistant":hospitalAssistant,
  'firmware':route0,
  'finance':route1,
  'session':route2,

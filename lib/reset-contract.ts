@@ -9,7 +9,7 @@ export const resetTables:Record<string,string>={
  production_materials:'مصرف مواد تولید',production_receipts:'رسید محصول',production_orders:'برگ‌های تولید',inventory_entries:'گردش انبار',inventory_balances:'موجودی انبار',inventory_batches:'بچ‌های انبار',flow_slots:'محل‌های دارای موجودی',
  serial_reservations:'سریال‌های رزروشده',serial_runs:'نوبت‌های چاپ سریال',inventory_operations:'عملیات کاری ثبت‌شده',quality_templates:'فرم‌های کنترل کیفیت',bom_versions:'نسخه‌های BOM',firmware_files:'فایل‌های نرم‌افزار دستگاه',flow_entities:'گردش‌های کاری و اطلاعات پایه',records:'سوابق دستگاه، کالا، بچ و خدمات'
 };
-export const resetFlowPreserved=['account_profile','position','duty_template','duty_catalog_install','transport_migration','development_request','as_agent','sales_agent'];
+export const resetFlowPreserved=['hospital_center','account_profile','position','duty_template','duty_catalog_install','transport_migration','development_request','as_agent','sales_agent'];
 export const resetFlowCatalog=['sales_price','supplier_document','supplier_capa','supplier','supplier_material','supplier_review','material','capacity','party','as_tariff','transport_vehicle'];
 // Service province/coverage lives inside as_agent (preserved identity) and
 // customer province inside as_case (operational reset); existing backup/freeze apply.
@@ -24,7 +24,7 @@ export function resetWhere(table:string,scope:string){
 // replenishment_policy and workflow_health use flow_entities: covered by existing freeze triggers, backup and both reset predicates.
 // Supplier documents and CAPA (including receipt snapshots) are catalog data; full reset includes file manifests.
 // Supplier entities use the generic flow_entities freeze triggers from migration 0016.
-export const resetHelp=[
+export const resetHelp=['هویت مرکز بیمارستانی و حساب مسئول مرکز حفظ می‌شوند؛ دستگاه‌های متصل، مأموریت‌ها، پیش‌فاکتورها، فاکتورها، پرداخت‌ها، راهنماها، فرم‌ها و پاسخ‌های دستیار در هر دو محدوده پاک می‌شوند. پرونده و مدارک بیمارستانی در پشتیبان منظور می‌شوند.',
  'اهداف مصوب فروش، گزارش‌های مدیریتی، هشدارها، ارتباط وصول جایگزین چک و تنظیمات پایش در هر دو محدوده پاک می‌شوند؛ پس از پاک‌سازی باید هدف‌ها و قواعد بررسی شوند. هویت نماینده و مسئول‌های پرونده حفظ می‌شوند.',
  'هویت نماینده فروش و حساب ورود و شرایط پایه او حفظ می‌شود. سفارش‌ها، فاکتورها، پرداخت‌ها، تخصیص‌ها، برگشتی‌ها، افتتاحیه و تارگت‌ها در هر دو محدوده پاک می‌شوند؛ قیمت‌های فروش فقط در پاک‌سازی کامل حذف می‌شوند. فایل رسیدها در فهرست پشتیبان هستند. ارتباط گیرنده ارسال در اولین حواله جدید بازسازی می‌شود.',
  'پاک‌سازی عملیات، تأمین‌کنندگان و ارزیابی‌های مستند را حفظ می‌کند؛ شاخص‌های جاری با حذف رسید و سفارش از نو محاسبه می‌شوند. پاک‌سازی کامل این تعاریف و ارزیابی‌ها را هم حذف می‌کند.',
