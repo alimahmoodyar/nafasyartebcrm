@@ -21,6 +21,16 @@ async function call(name,path,body){const role=roles.find(r=>r.name===name);cons
  assert.equal((await call(center,'hospital?center=training-hospital-2')).status,404);
  for(const p of ['records','inbox','tasks','sales','flow'])assert.equal((await call(center,p)).status,403,p);
  await act(center,'request',{assetId:'training-hospital-asset-2',kind:'fault',urgency:'normal',description:'test',contact:'test'},404);
+ const contacts=[{id:'contact-test',name:'مسئول تست',role:'تجهیزات پزشکی',mobile:'۰۹۱۲۱۲۳۴۵۶۷',landline:'02112345678',extension:'123',assetId:'training-hospital-asset-1',active:true,notes:'تماس هماهنگی'}];
+ const cb=()=>({centerId:'training-hospital-1',revision:entity('training-hospital-1').revision,contacts});
+ await act(center,'contacts',cb(),403);
+ await act(manager,'contacts',{...cb(),contacts:[{...contacts[0],assetId:'training-hospital-asset-2'}]},400);
+ await act(manager,'contacts',{...cb(),contacts:[{...contacts[0],mobile:'bad',landline:''}]},400);
+ await act(manager,'contacts',cb());
+ assert.equal((await call(center,'hospital')).d.centers[0].data.contacts[0].mobile,'09121234567');
+ assert.ok(!(await call(other,'hospital')).d.centers[0].data.contacts?.some(c=>c.id==='contact-test'));
+ await act(manager,'contacts',{...cb(),revision:1},409);
+ const cc=entity('training-hospital-1');await act(manager,'center',{...cc.data,centerId:cc.id,revision:cc.revision});assert.equal(entity(cc.id).data.contacts.length,1);
  const j=await act(center,'request',{assetId:'training-hospital-asset-1',kind:'fault',urgency:'normal',description:'خرابی آزمایشی',contact:'مرکز فرضی'});
  assert.ok(sql.prepare("SELECT id FROM training_duty_runs WHERE template_id LIKE ? AND state='open'").get('hospital:'+j.id+':%'));
  assert.equal((await call(center,'hospital',j.body)).status,200);assert.equal(entity(j.id).revision,1);
@@ -65,7 +75,7 @@ async function call(name,path,body){const role=roles.find(r=>r.name===name);cons
 
  const configs=load('app/api/llm-config/route.ts'),profileId=crypto.randomUUID();const admin=roles.find(r=>r.session.isAdmin);assert.ok(admin);
  const cfg=await asRole(admin.name,()=>configs.PUT(new Request(base+'/api/llm-config',{method:'PUT',headers:{origin:base,'Content-Type':'application/json'},body:JSON.stringify({id:profileId,revision:0,name:'Test',model:'test',baseUrl:'https://test.invalid/v1',systemPrompt:'',temperature:0.2,maxTokens:1000,apiToken:'test-secret'})})));assert.equal(cfg.status,201,await cfg.text());
- await act(manager,'center',{centerId:'training-hospital-1',revision:1,name:'مرکز فرضی',phone:'TEST',address:'TEST',active:true,profileId});
+ await act(manager,'center',{centerId:'training-hospital-1',revision:entity('training-hospital-1').revision,name:'مرکز فرضی',phone:'TEST',address:'TEST',active:true,profileId});
  const published=(await call(center,'hospital')).d.rows.find(r=>r.type==='hospital_manual');modelReply={sourceIds:[published.id+':0','invented'],unanswered:false};
  let answer=await call(center,'hospital/assistant',{id:crypto.randomUUID(),assetId:'training-hospital-asset-1',question:'راهنمای پنل؟',confirmed:true});assert.equal(answer.status,200,JSON.stringify(answer.d));assert.equal(answer.d.answer,published.data.body);assert.equal(answer.d.sources.length,1);
  assert.ok(!JSON.stringify(modelCalls).includes('test-secret'));assert.ok(!JSON.stringify(modelCalls).includes('training-hospital-2'));

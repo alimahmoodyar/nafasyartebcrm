@@ -22,7 +22,19 @@ export async function POST(request:Request){try{checkOrigin(request);const u=awa
  const get=async(eid:string,type:string,revision=false)=>{const r=await hrow(eid,type);const c=type==='hospital_center'&&mode==='center'&&manager?r:await hospitalCenter(u,type==='hospital_center'?r.id:r.data.centerId);guard('EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)',c.id,c.revision);guard('EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)',r.id,r.revision);if(revision&&r.revision!==b.revision)fail('پرونده تغییر کرده؛ تازه‌سازی کنید.',409);return r;};
  const need=(ok:boolean)=>{if(!ok)fail('مجوز این عملیات را ندارید.',403)};
  if(mode==='center'){
-  need(manager);const old=b.centerId?await get(hreq(b.centerId),'hospital_center',true):null;const profileId=htext(b.profileId||'',200);if(profileId&&!await db.prepare('SELECT id FROM llm_configs WHERE id=?').bind(profileId).first())fail('مدل پیکربندی‌شده انتخاب کنید.');if(typeof b.active!=='boolean')fail('وضعیت مرکز لازم است.');put(old?.id||id,'hospital_center',{name:hreq(b.name),phone:hreq(b.phone,50),address:hreq(b.address,2000),active:b.active,profileId},old);
+  need(manager);const old=b.centerId?await get(hreq(b.centerId),'hospital_center',true):null;const profileId=htext(b.profileId||'',200);if(profileId&&!await db.prepare('SELECT id FROM llm_configs WHERE id=?').bind(profileId).first())fail('مدل پیکربندی‌شده انتخاب کنید.');if(typeof b.active!=='boolean')fail('وضعیت مرکز لازم است.');put(old?.id||id,'hospital_center',{name:hreq(b.name),phone:hreq(b.phone,50),address:hreq(b.address,2000),active:b.active,profileId,contacts:old?.data.contacts||[]},old);
+ }else if(mode==='contacts'){
+  need(manager);const c=await get(hreq(b.centerId),'hospital_center',true);
+  if(!Array.isArray(b.contacts)||b.contacts.length>50)fail('حداکثر ۵۰ فرد تماس وارد کنید.');
+  const contacts=[];const seen=new Set();
+  for(const v of b.contacts){const contactId=hreq(v.id,100);if(seen.has(contactId))fail('شناسه فرد تماس تکراری است.');seen.add(contactId);
+   const assetId=htext(v.assetId||'',200);if(assetId){const a=await get(assetId,'hospital_asset');if(a.data.centerId!==c.id)fail('دستگاه متعلق به این مرکز نیست.');}
+   const phone=(x:any)=>{const n=htext(x||'',50).replace(/[۰-۹]/g,(d:string)=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))).replace(/[٠-٩]/g,(d:string)=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));if(n&&!/^[+()0-9 .-]{3,50}$/.test(n))fail('شماره تماس معتبر وارد کنید.');return n;};
+   const mobile=phone(v.mobile),landline=phone(v.landline);if(!mobile&&!landline)fail('حداقل یک شماره برای هر فرد لازم است.');
+   if(typeof v.active!=='boolean')fail('وضعیت فرد تماس لازم است.');
+   contacts.push({id:contactId,name:hreq(v.name,200),role:hreq(v.role,200),mobile,landline,extension:phone(v.extension),assetId,active:v.active,notes:htext(v.notes||'',1000)});
+  }
+  put(c.id,'hospital_center',{...c.data,contacts},c);
  }else if(mode==='asset'){
   need(manager);const center=await get(hreq(b.centerId),'hospital_center'),old=b.assetId?await get(hreq(b.assetId),'hospital_asset',true):null;if(old&&old.data.centerId!==center.id)fail('انتقال دستگاه به مرکز دیگر در این عملیات مجاز نیست.');const deviceId=hreq(b.deviceId),r:any=await db.prepare("SELECT payload FROM records WHERE id=? AND kind='device'").bind(deviceId).first();if(!r)fail('ابتدا شناسنامه دستگاه را ثبت کنید.');if(old&&old.data.deviceId!==deviceId)fail('شناسه دستگاه ثابت است.');guard("NOT EXISTS(SELECT 1 FROM flow_entities WHERE type='hospital_asset' AND json_extract(data,'$.deviceId')=? AND id<>?)",deviceId,old?.id||id);const p=JSON.parse(r.payload);put(old?.id||id,'hospital_asset',{centerId:center.id,deviceId,serial:p.code,model:p.model,productId:p.product||'',productName:p.productName||'',design:p.design||'',firmware:p.firmware||'',warrantyMonths:p.warrantyMonths||'',name:hreq(b.name),department:hreq(b.department),location:hreq(b.location),installedOn:sday(b.installedOn),notes:htext(b.notes||'')},old);
  }else if(mode==='request'){
