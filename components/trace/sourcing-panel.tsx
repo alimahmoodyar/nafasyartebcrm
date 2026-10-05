@@ -16,12 +16,12 @@ const routeName=(r:string)=>r==='domestic'?'داخلی':'خارجی';
 const orderNames:Record<string,string>={awaiting_funding:'منتظر تأمین مالی',issued:'دستور خرید صادرشده',paid:'گزارش پرداخت',preparing:'آماده‌سازی',shipped:'حمل',closed:'پذیرفته و بسته‌شده',cancelled:'لغوشده'};
 const actionNames:Record<string,string>={financial_review:'کنترل مالی پیشنهاد',refresh_suppliers:'شروع دور تازه استعلام',stock_confirm:'تأیید کسری و مقدار تأمین',stock_reject:'رد نیاز با ثبت علت',finish_replenishment:'پایان تأمین و آزادسازی موجودی',create:'درخواست تولید',approve:'تأیید برنامه تولید',reject:'رد درخواست',bom:'تثبیت نسخه BOM',finance:'برنامه مالی',calculate:'کنترل و تخصیص موجودی',routes:'مسیرهای مجاز تأمین',quote:'ثبت استعلام',technical:'بررسی فنی پیشنهاد',award:'انتخاب مسیر تأمین',issue_order:'صدور دستور خرید',track:'گزارش مرحله سفارش',receive:'دریافت کالا در قرنطینه',close_order:'بستن سفارش پذیرفته‌شده',cancel_order:'لغو انتخاب یا سفارش',ready:'اعلام آمادگی مواد',release:'تحویل برنامه به تولید',cancel:'لغو برنامه',followup:'ثبت پیگیری / بازسازی کارتابل'};
 function Pick({label,value,items,onChange}:{label:string;value:string;items:[string,string][];onChange:(v:string)=>void}){return <label className="field">{label}<Select dir="rtl" value={value||'none'} onValueChange={v=>onChange(v==='none'?'':v)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="none">انتخاب کنید</SelectItem>{items.map(([id,title])=><SelectItem value={id} key={id}>{title}</SelectItem>)}</SelectContent></Select></label>}
-export function SourcingPanel({demo,onNavigate}:{demo:boolean;onNavigate:(s:string)=>void}){
+export function SourcingPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:boolean;onNavigate:(s:string)=>void}){
  const [suppliersOpen,setSuppliersOpen]=useState(false);
  const [catalog,setCatalog]=useState<any>(null),[detail,setDetail]=useState<any>(null),[selected,setSelected]=useState(''),[draft,setDraft]=useState<any>(null),[search,setSearch]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');
  async function read(id=''){const r=await fetch('/api/sourcing'+(id?'?id='+encodeURIComponent(id):''),{cache:'no-store'});const d=await r.json() as any;if(!r.ok)throw new Error(d.error);return d;}
  async function refresh(id=selected){try{setError('');setCatalog(await read());if(id)setDetail(await read(id));}catch(e){setError((e as Error).message)}}
- useEffect(()=>{if(!demo)void refresh('')},[demo]);
+ useEffect(()=>{if(!demo){setSelected(targetId);void refresh(targetId)}},[demo,targetId]);
  async function open(id:string){setSelected(id);setDetail(null);try{setDetail(await read(id))}catch(e){setError((e as Error).message)}}
  const roles=catalog?.roles||[],can=(r:string)=>roles.includes(r),plan=detail?.plan,lines=detail?.lines||[],orders=detail?.orders||[],quotes=detail?.quotes||[];
  const change=(key:string,value:any)=>setDraft((d:any)=>({...d,[key]:value}));
