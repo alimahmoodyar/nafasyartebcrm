@@ -1,8 +1,9 @@
+import {trainingContext,trainingBucket} from "./training-context";
 import {env} from 'cloudflare:workers';
 import {storage} from '@/lib/storage';
 import {AccessError} from '@/lib/authorization';
 import type {Row} from '@/lib/model';
-export function firmwareBucket(){if(!env.BUCKET)throw new AccessError('فضای فایل‌ها موقتاً در دسترس نیست؛ دوباره تلاش کنید.',503);return env.BUCKET;}
+export function firmwareBucket(){if(!env.BUCKET)throw new AccessError('فضای فایل‌ها موقتاً در دسترس نیست؛ دوباره تلاش کنید.',503);return trainingContext.getStore()?trainingBucket(env.BUCKET):env.BUCKET;}
 export type FirmwareFile={version_id:string;object_key:string;filename:string;byte_size:number;sha256:string;uploaded_at:string;uploaded_by:string};
 export async function firmwareFile(id:string){return storage().prepare('SELECT * FROM firmware_files WHERE version_id=?').bind(id).first<FirmwareFile>();}
 export function withFirmwareFile(row:Row,file:FirmwareFile|null):Row{return file?{...row,data:{...row.data,fileName:file.filename,fileSize:String(file.byte_size),fileHash:file.sha256,fileUploadedAt:file.uploaded_at,fileUploadedBy:file.uploaded_by}}:row;}

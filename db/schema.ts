@@ -157,3 +157,5 @@ export const resetControl=sqliteTable('reset_control',{
 export const resetJobs=sqliteTable('reset_jobs',{
  id:text('id').primaryKey(),owner:text('owner').notNull(),scope:text('scope').notNull(),state:text('state').notNull(),created:text('created').notNull(),expires:text('expires').notNull(),backupKey:text('backup_key'),backupHash:text('backup_hash'),byteSize:integer('byte_size'),summary:text('summary'),downloadedAt:text('downloaded_at'),completed:text('completed'),guard:integer('guard').notNull().default(1),
 },t=>[check('reset_job_guard',sql`${t.guard}=1`)]);
+
+export * from "./training-schema";

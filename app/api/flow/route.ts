@@ -1,3 +1,4 @@
+import {syncMaterialTasks} from '@/lib/material-tasks';
 import {storage} from '@/lib/storage';
 import {holdChecks,supplyLock,allocateAcceptedPurchase} from '@/lib/sourcing';
 import {requireAccess,checkOrigin,AccessError,accessResponse} from '@/lib/authorization';
@@ -108,5 +109,6 @@ export async function POST(request:Request){try{
  const p=await get(needed(b.planId),'plan');put(id,'print',{planId:p.id,by:u.name,notes:text(b.notes||'')});
  }
  flush();await db.batch([db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(id,'flow_'+mode,signature,u.userId,now),...checks,...stmts,...holdChecks(db,id,touchedStock),db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,id,'flow_'+mode,signature,now)]);
+ try{await syncMaterialTasks();}catch{return json({saved:true,followupPending:true});}
  return json({saved:true});
  }catch(e){const denial=accessResponse(e);if(denial)return denial;const s=String(e);return Response.json({error:/constraint|SQLITE|D1|Database/i.test(s)?'اطلاعات هم‌زمان تغییر کرده، محل اشغال است یا موجودی کافی نیست؛ هیچ تغییری ثبت نشد. تازه‌سازی کنید.':e instanceof Error?e.message:'ثبت انجام نشد.'},{status:/constraint|SQLITE/i.test(s)?409:400});}}

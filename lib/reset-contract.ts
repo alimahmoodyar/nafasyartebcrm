@@ -1,5 +1,5 @@
 export const resetScopes:Record<string,string>={operations:'پاک‌سازی سوابق و موجودی؛ حفظ تعاریف کالا',full:'پاک‌سازی سوابق، موجودی و تعاریف کالا'};
-export const resetPreserved=['عکس‌های پروفایل کاربران (همراه حساب‌ها حفظ می‌شوند)','حساب‌ها، هش و نسخه رمزگذاری‌شده رمز ورود، الزام تغییر رمز اولیه، دسترسی‌ها و سمت‌های کارکنان','هویت نماینده‌های فروش و شرایط پایه اعتباری و ارتباط حساب آن‌ها','هویت نماینده‌های خدمات و ارتباط آن‌ها با حساب کاربران','تنظیمات مدل‌ها، کلیدهای اتصال و هویت سامانه','درخواست‌های توسعه و نتیجه تست‌های ثبت‌شده در آن بخش','سوابق امنیتی و نسخه پشتیبان پاک‌سازی','شرح وظایف و الگوهای برنامه کاری؛ پس از پاک‌سازی غیرفعال می‌شوند'];
+export const resetPreserved=['محیط آزمایش نقش‌ها (جدول‌های training_* و فایل‌های training/v1/) مستقل است و با پاک‌سازی شرکت تغییر نمی‌کند','عکس‌های پروفایل کاربران (همراه حساب‌ها حفظ می‌شوند)','حساب‌ها، هش و نسخه رمزگذاری‌شده رمز ورود، الزام تغییر رمز اولیه، دسترسی‌ها و سمت‌های کارکنان','هویت نماینده‌های فروش و شرایط پایه اعتباری و ارتباط حساب آن‌ها','هویت نماینده‌های خدمات و ارتباط آن‌ها با حساب کاربران','تنظیمات مدل‌ها، کلیدهای اتصال و هویت سامانه','درخواست‌های توسعه و نتیجه تست‌های ثبت‌شده در آن بخش','سوابق امنیتی و نسخه پشتیبان پاک‌سازی','شرح وظایف و الگوهای برنامه کاری؛ پس از پاک‌سازی غیرفعال می‌شوند'];
 export const resetCatalog=['قیمت‌های فروش نمایندگان','پرونده تأمین‌کنندگان، مدارک نسخه‌دار، اقدامات اصلاحی، ارتباط کالا و ارزیابی','محصولات و نسخه‌های نرم‌افزار دستگاه','تعاریف مواد اولیه، BOM و فرم‌های کنترل کیفیت','ظرفیت تولید، گیرندگان فروش، تعرفه خدمات و خودروها'];
 // Ordered children before parents. SQL identifiers and predicates are constant, never caller input.
 export const resetTables:Record<string,string>={
@@ -45,3 +45,7 @@ export const resetHelp=[
 // Sales delegation: managerId remains in preserved sales_agent; submission metadata, transport receipt evidence and task supervisors follow existing operational rows and private transport_file manifests. Generic 0016 freeze triggers cover all writes; no new table or delete ordering.
 
 // sales_goal, sales_alert, sales_report, sales_check_recovery, sales_monitor_policy and workflow_health use existing operational flow_entities. duty_runs/notices remain children-first. Generic 0016 freeze covers every new write; neither reset scope preserves these operational snapshots. No new schema or R2 data.
+
+// Isolated training_* schema (0018) is explicitly preserved by both company reset scopes.
+// No training table has a foreign key to a company table; training file keys are separately prefixed.
+// Company reset freeze triggers remain limited to company operations by design.

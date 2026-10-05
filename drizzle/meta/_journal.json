@@ -127,6 +127,13 @@
       "when": 1791020716000,
       "tag": "0017_password_self_service",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1791199087119,
+      "tag": "0018_training_workspace",
+      "breakpoints": true
     }
   ]
 }
