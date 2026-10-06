@@ -2,13 +2,17 @@ import {storage} from '@/lib/storage';
 import {requireAccess,can,checkOrigin,AccessError,accessResponse} from '@/lib/authorization';
 import {flowRole} from '@/lib/material-flow';
 import {boundedBody} from '@/lib/firmware-storage';
-import {importLines} from '@/lib/bom-import';
+import {importLines,parseMappedBomGrid} from '@/lib/bom-import';
 const json=(v:unknown)=>Response.json(v,{headers:{'Cache-Control':'private, no-store'}});
 const fail=(m:string,s=400):never=>{throw new AccessError(m,s)};
 export async function POST(request:Request){try{
  checkOrigin(request);const u=await requireAccess();
  if(!can(u,'product','write')||!flowRole(u,'inventory'))fail('ورود BOM به مجوز ویرایش محصول و تعریف مواد انبار نیاز دارد.',403);
  const b=JSON.parse(new TextDecoder().decode(await boundedBody(request,180000)));
+ if(b.mode==='parse'){
+  if(!Array.isArray(b.grid)||b.grid.some((r:unknown)=>!Array.isArray(r))||!b.mapping||typeof b.mapping!=='object')fail('ساختار ردیف‌ها و ستون‌ها معتبر نیست.');
+  return json(parseMappedBomGrid(b.grid,b.header,b.mapping));
+ }
  if(!['preview','commit'].includes(b.mode))fail('عملیات ورود معتبر نیست.');
  const lines=importLines(b.lines).sort((a,b)=>a.partCode.localeCompare(b.partCode));
  if(typeof b.productId!=='string'||b.productId.length>200)fail('محصول را انتخاب کنید.');
