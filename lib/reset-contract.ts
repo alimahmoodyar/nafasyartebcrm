@@ -3,7 +3,7 @@ export const resetPreserved=['محیط آزمایش نقش‌ها (جدول‌ه
 export const resetCatalog=['قیمت‌های فروش نمایندگان','پرونده تأمین‌کنندگان، مدارک نسخه‌دار، اقدامات اصلاحی، ارتباط کالا و ارزیابی','محصولات و نسخه‌های نرم‌افزار دستگاه','تعاریف مواد اولیه، BOM و فرم‌های کنترل کیفیت','ظرفیت تولید، گیرندگان فروش، تعرفه خدمات و خودروها'];
 // Ordered children before parents. SQL identifiers and predicates are constant, never caller input.
 export const resetTables:Record<string,string>={
- assistant_actions:'فرمان‌های دستیار',assistant_turns:'گفت‌وگوهای دستیار',duty_files:'پیوست‌های وظایف',duty_notices:'اعلان‌های وظایف',duty_runs:'سوابق انجام وظایف',
+ llm_usage:'مصرف درخواست‌های مدل',assistant_actions:'فرمان‌های دستیار',assistant_turns:'گفت‌وگوهای دستیار',duty_files:'پیوست‌های وظایف',duty_notices:'اعلان‌های وظایف',duty_runs:'سوابق انجام وظایف',
  service_offsets:'تهاتر خدمات',service_reservations:'رزرو قطعات خدمات',service_files:'پیوست‌های خدمات',service_ledger:'گردش مالی خدمات',service_lots:'موجودی قطعات خدمات',service_activations:'فعال‌سازی گارانتی',sourcing_holds:'تخصیص‌های تأمین',
  quality_files:'پیوست‌های کنترل کیفیت',quality_reports:'نتایج کنترل کیفیت',batch_files:'پیوست‌های بچ',finance_files:'فایل‌های کنترل مالی',finance_notes:'بررسی‌های مالی',
  production_materials:'مصرف مواد تولید',production_receipts:'رسید محصول',production_orders:'برگ‌های تولید',inventory_entries:'گردش انبار',inventory_balances:'موجودی انبار',inventory_batches:'بچ‌های انبار',flow_slots:'محل‌های دارای موجودی',
@@ -71,3 +71,5 @@ export const resetHelp=['پروژه‌های ساخت، BOM اختصاصی، ر�
 // routine_route/policy are versioned catalogs, retained by operations reset; full reset removes them.
 // routine_lot/job and cost_price are operational: generic 0016 freeze, backup and reset apply.
 // Output uses existing records, receipt and inventory tables, children-first reset order unchanged. Training is explicitly blocked.
+
+// llm_usage: numeric metadata only; included in both reset backups/deletions, no FKs. Migration adds maintenance freeze triggers. Training is explicitly blocked.

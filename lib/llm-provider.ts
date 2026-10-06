@@ -1,3 +1,4 @@
+import {beginUsage,finishUsage,type UsageContext} from '@/lib/llm-usage';
 import {AccessError} from '@/lib/authorization';
 export function providerBase(base:string){const u=new URL(base);if(u.protocol!=='https:'||u.username||u.password||u.search||u.hash)throw new AccessError('نشانی سرویس مدل معتبر نیست.',400);u.pathname=u.pathname.replace(/\/(chat\/completions|models)\/?$/,'').replace(/\/$/,'');return u.toString().replace(/\/$/,'');}
 export function completionBody(profile:any,messages:any[],extra:Record<string,unknown>={}){
@@ -22,12 +23,15 @@ export function providerErrorDetail(error:any,body:any){
  const tool=match?safe(body?.tools?.[Number(match[1]??match[2])]?.function?.name):'';
  return [code&&'کد: '+code,param&&'پارامتر: '+param,tool&&'ابزار: '+tool].filter(Boolean).join(' · ');
 }
-export async function providerRequest(profile:any,key:string,path:string,body?:any){
+export async function providerRequest(profile:any,key:string,path:string,body?:any,usage?:UsageContext){
+ if(body&&!usage)throw new AccessError('هویت ثبت مصرف مدل لازم است.',500);
  const endpoint=providerBase(profile.base_url)+path;let attemptBody=body?{...body}:undefined;
  for(let attempt=0;attempt<3;attempt++){
- const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),60000);let r:Response,d:any;
+ const ticket=body?await beginUsage(profile,usage!,attempt+1):null;
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),60000);let r:Response|undefined,d:any;
  try{r=await fetch(endpoint,{method:body?'POST':'GET',redirect:'manual',signal:controller.signal,headers:{...(body?{'Content-Type':'application/json'}:{}),...(key?{Authorization:'Bearer '+key}:{})},...(body?{body:JSON.stringify(attemptBody)}:{})});if(r.status>=300&&r.status<400)throw new AccessError('نشانی سرویس هدایت برگرداند؛ Base URL مستقیم API را وارد کنید.',502);try{d=await r.json()}catch{if(r.ok)throw new AccessError('سرویس به‌جای JSON پاسخ دیگری داد؛ Base URL را بررسی کنید.',502);d={};}}
- catch(e){if(e instanceof AccessError)throw e;throw new AccessError('اتصال به سرویس مدل برقرار نشد یا پس از ۶۰ ثانیه پاسخ نداد؛ شبکه و Base URL را بررسی کنید.',502)}finally{clearTimeout(timer)}
+ catch(e){if(ticket)await finishUsage(ticket,{status:controller.signal.aborted?'timeout':'failed',httpStatus:r?.status??null,errorCode:controller.signal.aborted?'timeout':'invalid_or_network_response'});if(e instanceof AccessError)throw e;throw new AccessError('اتصال به سرویس مدل برقرار نشد یا پس از ۶۰ ثانیه پاسخ نداد؛ شبکه و Base URL را بررسی کنید.',502)}finally{clearTimeout(timer)}
+ if(ticket)await finishUsage(ticket,{status:r.ok?'succeeded':'failed',httpStatus:r.status,payload:d,errorCode:d?.error?.code});
  if(r.ok)return d;
  const code=typeof d?.error?.code==='string'?d.error.code:'',param=d?.error?.param;
  // Only retry explicit parameter rejection: no retry of a successful or ambiguous request.
