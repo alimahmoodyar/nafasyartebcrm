@@ -17,6 +17,17 @@ const importer=load('app/api/bom-import/route.ts'),parser=load('lib/bom-import.t
 async function run(body,status=200){const r=await importer.POST(request('/api/bom-import','POST',body));const d=await r.json();assert.equal(r.status,status,JSON.stringify(d));return d;}
 (async()=>{
  identity=owner;await auth.session();
+ const simple=[['گزارش مواد'],['نام کالا','مقدار','کد کالا','واحد'],['قطعه تست','۲٫۵','۰۰۱۲۳','سانتی متر']];
+ const mapping=parser.guessImportMapping(simple[1]);
+ const mapped=parser.parseMappedBomGrid(simple,1,mapping);
+ assert.equal(mapped.lines[0].partCode,'00123');assert.equal(mapped.lines[0].quantity,'2.5');assert.equal(mapped.lines[0].unit,'سانتی‌متر');
+ assert.throws(()=>parser.parseMappedBomGrid([...simple,simple[2]],1,mapping),/ردیف 4.*تکراری/);
+ assert.throws(()=>parser.parseMappedBomGrid([...simple,['جمع','5','','']],1,mapping),/ردیف 4/);
+ assert.throws(()=>parser.parseMappedBomGrid(simple,1,{...mapping,name:mapping.partCode}),/جدا/);
+ assert.equal(parser.parseMappedBomGrid(simple,1,{...mapping,unit:-1}).lines[0].unit,'');
+ assert.throws(()=>parser.parseMappedBomGrid([simple[1],['قطعه','0','123','عدد']],0,mapping),/بیشتر از صفر/);
+ const parsed=await run({mode:'parse',grid:simple,header:1,mapping});assert.equal(parsed.lines[0].partCode,'00123');
+
  const grid=[['30100012','کد محصول:','سوشیا','نام محصول:','2040001358','کد فرمول:'],['1','مقدار:'],['ردیف','کد کالا','عنوان کالا','مقدار واحد اصلی','مقدار واحد فرعی']];
  for(let i=0;i<81;i++)grid.push([String(i+1),String(10000000+i),'قطعه '+i,'1','0']);
  grid[3]=['1','\u200f10100822','لوله','0/107','0/0001'];grid[4]=['2','10100021','ابر','4,200','0/21'];
@@ -44,9 +55,9 @@ async function run(body,status=200){const r=await importer.POST(request('/api/bo
  const newLine={partCode:'99999999',name:'Rollback',unit:'عدد',quantity:'1'};const rb={...body,previousVersion:2,lines:[...body.lines,newLine]};const rp=await run({...rb,mode:'preview'});const rid=crypto.randomUUID();
  sql.exec("CREATE TRIGGER reject_test_bom BEFORE INSERT ON bom_versions BEGIN SELECT RAISE(ABORT,'test failure'); END");await run({...rb,mode:'commit',confirmed:true,id:rid,catalogSnapshot:rp.catalogSnapshot},400);sql.exec('DROP TRIGGER reject_test_bom');assert.equal(sql.prepare("SELECT count(*) n FROM flow_entities WHERE id='material:99999999'").get().n,0);assert.equal(sql.prepare('SELECT count(*) n FROM inventory_operations WHERE id=?').get(rid).n,0);
  const readToken=await mint('read');token=readToken.token;identity=null;assert.ok((await call('commit_bom_import',{...rb,id:crypto.randomUUID(),catalogSnapshot:rp.catalogSnapshot,confirmed:true})).error);
- identity=owner;const writeToken=await mint('read_write');token=writeToken.token;identity=null;const mp=await call('preview_bom_import',rb);assert.ok(mp.catalogSnapshot,JSON.stringify(mp));const mc=await call('commit_bom_import',{...rb,id:crypto.randomUUID(),catalogSnapshot:mp.catalogSnapshot,confirmed:true});assert.equal(mc.saved,true);
+ identity=owner;const writeToken=await mint('read_write');token=writeToken.token;identity=null;const parsedMcp=await call('parse_material_spreadsheet',{grid:simple,header:1,mapping});assert.equal(parsedMcp.lines[0].partCode,'00123');const mp=await call('preview_bom_import',rb);assert.ok(mp.catalogSnapshot,JSON.stringify(mp));const mc=await call('commit_bom_import',{...rb,id:crypto.randomUUID(),catalogSnapshot:mp.catalogSnapshot,confirmed:true});assert.equal(mc.saved,true);
  identity=null;await run({...body,mode:'preview'},401);
- sql.prepare('INSERT INTO app_members(id,email,name,unit,status,subject,permissions,created,updated) VALUES(?,?,?,?,?,?,?,?,?)').run('reader','reader@example.com','Reader','unit','active','reader',JSON.stringify({read:['product'],write:[],eventStages:[]}),'now','now');identity={userId:'reader',email:'reader@example.com',displayName:'Reader',fullName:null};await run({...body,mode:'preview'},403);
+ sql.prepare('INSERT INTO app_members(id,email,name,unit,status,subject,permissions,created,updated) VALUES(?,?,?,?,?,?,?,?,?)').run('reader','reader@example.com','Reader','unit','active','reader',JSON.stringify({read:['product'],write:[],eventStages:[]}),'now','now');identity={userId:'reader',email:'reader@example.com',displayName:'Reader',fullName:null};await run({...body,mode:'preview'},403);await run({mode:'parse',grid:simple,header:1,mapping},403);
  const reset=load('lib/reset-contract.ts');assert.equal(reset.resetWhere('bom_versions','operations'),'0=1');assert.ok(reset.resetWhere('flow_entities','operations').includes("'material'"));assert.equal(reset.resetWhere('bom_versions','full'),'1=1');
  if(process.env.BOM_GRID){const actual=parser.applyApprovedFiveLitre(parser.parseBomGrid(JSON.parse(fs.readFileSync(process.env.BOM_GRID,'utf8'))));assert.equal(actual.lines.length,81);assert.equal(parser.importLines(actual.lines).length,81);assert.equal(actual.lines.find(l=>l.partCode==='10100326').quantity,'2');assert.equal(actual.lines.find(l=>l.partCode==='10100822').quantity,'107');console.log('Real uploaded accounting report: 81 rows parsed; approved units and aluminium correction validated.');}
  console.log('PASS: BOM parser, 81-row atomic import, retries, duplicate file, units, stale preview, immutable versions, rollback, permissions, MCP and reset coverage.');

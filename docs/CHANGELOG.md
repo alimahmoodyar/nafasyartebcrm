@@ -1,3 +1,9 @@
+## 2026-10-06 — Flexible accounting Excel import
+
+- Product BOM Excel import now supports selecting the header row and mapping accounting columns, with five sample rows and row-specific validation errors.
+- Existing materials are matched by code; reviewed units and per-device consumption use the existing atomic, versioned import without creating stock.
+- Added read-only MCP spreadsheet parsing through the same authenticated API. No database migration or reset required.
+
 ## 2026-10-06 — اصلاح آماده‌سازی و ورود به آزمایش تکنسین بیمارستانی
 - اصلاح اعتبارسنجی تأیید MCP برای آماده‌سازی و اجرای نقش‌های آموزشی؛ افزودن وضعیت آماده‌بودن داده بیمارستان، تنخواه و تکنسین به گزارش محیط.
 - آماده‌سازی افزونه‌های آموزشی در برابر ثبت تکراری مقاوم شد؛ داده‌های قبلی بازنویسی نمی‌شوند. خطای ناشناخته کد پیگیری دارد. بخش بیمارستانی به گروه منوی کیفیت و خدمات اضافه شد.

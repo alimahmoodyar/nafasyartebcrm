@@ -1,5 +1,5 @@
 import {parseBomGrid} from './bom-import';
-export async function readBomFile(file:File){
+export async function readBomGrid(file:File){
  if(file.size>5*1024*1024)throw Error('حداکثر حجم فایل ۵ مگابایت است.');
  const prefix=await file.slice(0,200).text();let grid:unknown[][];
  if(prefix.trimStart().startsWith('<')){
@@ -12,5 +12,8 @@ export async function readBomFile(file:File){
   if(!/\.xlsx$/i.test(file.name))throw Error('این XLS باینری است؛ در اکسل با فرمت XLSX ذخیره کنید. خروجی XML حسابداری با پسوند XLS پشتیبانی می‌شود.');
   const {readSheet}=await import('read-excel-file/browser');grid=await readSheet(file);
  }
- return parseBomGrid(grid);
+ if(grid.length>5000||grid.some(r=>r.length>200))throw Error("ابعاد فایل بیش از حد مجاز است.");
+ return grid;
 }
+
+export async function readBomFile(file:File){return parseBomGrid(await readBomGrid(file));}
