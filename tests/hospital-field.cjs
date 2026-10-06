@@ -18,6 +18,13 @@ async function call(name,path,body){const role=roles.find(r=>r.name===name);cons
  const before=sql.prepare('SELECT count(*) n FROM training_flow_entities').get().n;
  await context.run(real,()=>training.trainingInitialize(request('/api/training',{confirmed:true})));
  assert.equal(sql.prepare('SELECT count(*) n FROM training_flow_entities').get().n,before);
+ // Interrupted/racing upgrade: existing records without completion marker must resume without duplication.
+ sql.exec("DELETE FROM training_flow_entities WHERE id='training-technician-ready'");
+ sql.prepare("UPDATE training_flow_entities SET data=json_set(data,'$.description','Preserve trainee work') WHERE id='training-technician-job'").run();
+ const resumed=await context.run(real,()=>training.trainingInitialize(request('/api/training',{confirmed:true})));assert.equal(resumed.status,200);
+ assert.equal(JSON.parse(sql.prepare("SELECT data FROM training_flow_entities WHERE id='training-technician-job'").get().data).description,'Preserve trainee work');
+ assert.equal(sql.prepare("SELECT COUNT(*) n FROM training_flow_entities WHERE id='training-technician-job'").get().n,1);
+ assert.ok(fs.readFileSync(path.join(root,'components/trace/workspace-sidebar.tsx'),'utf8').includes('keys:["hospital","after-sales"'));
  const specialistView=await call('تکنسین فنی بیمارستانی','hospital');assert.equal(specialistView.status,200);assert.equal(specialistView.d.memberId,specialist.memberId);assert.ok(specialistView.d.rows.some(r=>r.id==='training-technician-job'&&r.data.technicianId===specialist.memberId));
  assert.equal((await call('تکنسین فنی خانگی','hospital')).status,403);
  const specialistExpense=await call('تکنسین فنی بیمارستانی','hospital/expenses');assert.equal(specialistExpense.status,200);assert.ok(specialistExpense.d.policies.some(p=>p.data.assignments.some(a=>a.ownerId===specialist.memberId)));

@@ -17,6 +17,7 @@ async function call(name,path,body){const role=roles.find(r=>r.name===name);cons
  assert.equal(sql.prepare('SELECT count(*) n FROM app_members').get().n,0);
  console.log('seed',await r.json());
  for(const [role,path] of [['انبار','flow'],['کنترل کیفیت','flow'],['تولید','production'],['مدیر فروش','sales'],['نماینده فروش','sales'],['مدیر خدمات پس از فروش','after-sales?domain=home'],['کارشناس خرید داخلی','suppliers'],['برنامه‌ریز فروش','sourcing'],['انبار','tasks'],['مدیر فروش','sales/monitor']]){const out=await call(role,path);assert.equal(out.status,200,role+' '+path+' '+JSON.stringify(out.d));console.log('read',role,path);}
+ const catalog=load('lib/mcp/tools.ts');assert.equal(catalog.validateToolArguments('initialize_training_workspace',{confirmed:true}),true);assert.equal(catalog.validateToolArguments('initialize_training_workspace',{confirmed:false}),false);assert.equal(catalog.validateToolArguments('training_workspace_request',{confirmed:true,roleId:'role-35',path:'hospital',method:'GET',body:''}),true);
  const forbidden=await call('مدیر سامانه','users');assert.equal(forbidden.status,403);
 
  const repeat=await context.run(real,()=>training.trainingInitialize(request('/api/training',{confirmed:true})));assert.equal(repeat.status,200);
