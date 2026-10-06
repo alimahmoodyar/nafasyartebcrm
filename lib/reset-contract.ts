@@ -10,7 +10,7 @@ export const resetTables:Record<string,string>={
  serial_reservations:'سریال‌های رزروشده',serial_runs:'نوبت‌های چاپ سریال',inventory_operations:'عملیات کاری ثبت‌شده',quality_templates:'فرم‌های کنترل کیفیت',bom_versions:'نسخه‌های BOM',firmware_files:'فایل‌های نرم‌افزار دستگاه',flow_entities:'گردش‌های کاری و اطلاعات پایه',records:'سوابق دستگاه، کالا، بچ و خدمات'
 };
 export const resetFlowPreserved=['hospital_center','account_profile','position','duty_template','duty_catalog_install','transport_migration','development_request','as_agent','sales_agent'];
-export const resetFlowCatalog=['cost_material','cost_standard','sales_price','supplier_document','supplier_capa','supplier','supplier_material','supplier_review','material','capacity','party','as_tariff','transport_vehicle'];
+export const resetFlowCatalog=['routine_route','routine_policy','cost_material','cost_standard','sales_price','supplier_document','supplier_capa','supplier','supplier_material','supplier_review','material','capacity','party','as_tariff','transport_vehicle'];
 // Service province/coverage lives inside as_agent (preserved identity) and
 // customer province inside as_case (operational reset); existing backup/freeze apply.
 export function resetWhere(table:string,scope:string){
@@ -67,3 +67,7 @@ export const resetHelp=['پروژه‌های ساخت، BOM اختصاصی، ر�
 // payable_file immutable R2 manifests are included by system-reset; generic flow freeze and both reset scopes apply.
 
 // build_project uses generic flow_entities freeze (0016), operational reset in both scopes and backups. sourcing_holds FK child deleted first; project:* balances/entries follow existing inventory reset. No new tables or blobs.
+
+// routine_route/policy are versioned catalogs, retained by operations reset; full reset removes them.
+// routine_lot/job and cost_price are operational: generic 0016 freeze, backup and reset apply.
+// Output uses existing records, receipt and inventory tables, children-first reset order unchanged. Training is explicitly blocked.
