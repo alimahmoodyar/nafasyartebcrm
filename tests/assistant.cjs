@@ -117,14 +117,21 @@ const chat=load('app/api/assistant/route.ts');
  await enter('bob');providerMode='normal';providerCalls=0;sql.prepare('DELETE FROM login_attempts').run();await send('کاربر بساز');assert.ok(!sent.at(-1).tools.some(t=>['create_password_user','update_user','delete_user','list_users','get_user_creation_guide'].includes(t.function.name)));
  console.log('Assistant account creation passed: admin-only proposal, secret-free schema/storage, secure confirmation, required password, concurrent/repeated execution once, staff tools hidden.');
 
+ // Diagnostics contain actionable stage/cause categories, never raw exception data.
+ const diagnostics=[],originalError=console.error;console.error=(...args)=>diagnostics.push(args);
+ const classify=load('lib/assistant-storage-errors.ts').assistantStorageError;
+ const nested=new Error('query failed: PRIVATE_QUESTION /private/path Bearer provider-test-key');nested.cause=new Error('no such column: assistant_actions.result');
+ const safe=classify(nested,{method:'GET',route:'/api/assistant',stage:'actions'});
+ let logged=JSON.parse(diagnostics.at(-1)[1]);assert.equal(logged.reason,'missing_column');assert.equal(logged.stage,'actions');assert.ok(logged.columns.includes('result'));assert.ok(safe.message.includes(logged.reference));
+ for(const secret of ['PRIVATE_QUESTION','/private/path','provider-test-key','query failed']){assert.ok(!JSON.stringify(diagnostics).includes(secret));assert.ok(!safe.message.includes(secret));}
  // Reproduce a server with working model settings but missing the newer assistant table.
  cookie='';identity=owner;const profileList=load('app/api/assistant/profiles/route.ts');
  sql.exec('DROP TABLE assistant_actions');
  r=await profileList.GET(request('/api/assistant/profiles'));assert.equal(r.status,200);d=await r.json();assert.equal(d.profiles.length,2);assert.ok(!JSON.stringify(d).includes('provider-test-key'));
- r=await chat.GET();assert.equal(r.status,503);assert.ok((await r.json()).error.includes('0012'));
+ r=await chat.GET();assert.equal(r.status,503);d=await r.json();assert.ok(d.error.includes('0012'));logged=JSON.parse(diagnostics.at(-1)[1]);assert.equal(logged.stage,'actions');assert.equal(logged.reason,'missing_table');assert.ok(d.error.includes(logged.reference));
  assert.equal((await profileList.GET(request('/api/assistant/profiles','GET',undefined,{'x-assistant-account':'another-user'}))).status,409);
- sql.exec('DROP TABLE assistant_turns');r=await chat.GET();assert.equal(r.status,503);assert.ok((await r.json()).error.includes('0010'));r=await profileList.GET();assert.equal((await r.json()).profiles.length,2);
- identity=null;assert.equal((await profileList.GET()).status,401);
+ sql.exec('DROP TABLE assistant_turns');r=await chat.GET();assert.equal(r.status,503);d=await r.json();assert.ok(d.error.includes('0010'));logged=JSON.parse(diagnostics.at(-1)[1]);assert.equal(logged.stage,'history');assert.ok(d.error.includes(logged.reference));r=await profileList.GET();assert.equal((await r.json()).profiles.length,2);
+ identity=null;const diagnosticCount=diagnostics.length;assert.equal((await profileList.GET()).status,401);assert.equal(diagnostics.length,diagnosticCount);console.error=originalError;
  console.log('Missing migration regression passed: both profiles remain independently available when actions/history tables are absent; exact migration diagnostics and account isolation.');
  console.log('Model checks passed: two saved profiles, exact selected model used, safe provider diagnostics, tool probe, admin-only access, parameter compatibility, no secret disclosure.');
  console.log('Commands passed: no write before explicit approval, concurrent/repeated confirmation at most once, owner isolation, expiry, cancellation, permission recheck, navigation and MCP read/write parity.');
