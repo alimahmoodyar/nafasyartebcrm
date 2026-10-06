@@ -1,3 +1,4 @@
+import {assistantStorageError} from '@/lib/assistant-storage-errors';
 import {inboxAssistantExecution} from '@/lib/inbox';
 import {password as validatePassword} from '@/lib/password-auth';
 import {requireAccess,checkOrigin,accessResponse,AccessError} from '@/lib/authorization';
@@ -8,8 +9,8 @@ import {boundedBody} from '@/lib/firmware-storage';
 const json=(v:unknown,status=200)=>Response.json(v,{status,headers:{'Cache-Control':'private, no-store','Vary':'Cookie, Authorization'}});
 export function publicAction(a:any){return {id:a.id,turnId:a.turn_id,tool:a.tool,title:actionTitles[a.tool]||a.tool,args:JSON.parse(a.args),state:a.state==='pending'&&a.expires<new Date().toISOString()?'expired':a.state,result:a.result?JSON.parse(a.result):null,expires:a.expires,section:actionSection(a.tool,JSON.parse(a.args))};}
 export async function userActions(owner:string){return (await storage().prepare('SELECT * FROM assistant_actions WHERE owner=? ORDER BY created DESC LIMIT 20').bind(owner).all()).results.map(publicAction);}
-export async function POST(request:Request){try{
- checkOrigin(request);const u=await requireAccess();const expected=request.headers.get('x-assistant-account');if(expected&&expected!==u.userId)throw new AccessError('حساب ورود تغییر کرده است؛ گفتگو را دوباره باز کنید.',409);
+export async function POST(request:Request){let admin=false;try{
+ checkOrigin(request);const u=await requireAccess();admin=u.isAdmin;const expected=request.headers.get('x-assistant-account');if(expected&&expected!==u.userId)throw new AccessError('حساب ورود تغییر کرده است؛ گفتگو را دوباره باز کنید.',409);
  const b=JSON.parse(new TextDecoder().decode(await boundedBody(request,2000)));if(typeof b.id!=='string'||!['confirm','cancel'].includes(b.decision))throw new AccessError('فرمان معتبر لازم است.',400);
  const db=storage();let a:any=await db.prepare('SELECT * FROM assistant_actions WHERE id=? AND owner=?').bind(b.id,u.userId).first();if(!a)throw new AccessError('فرمان یافت نشد.',404);
  if(a.state==='succeeded'||a.state==='cancelled')return json({accountId:u.userId,action:publicAction(a)});
@@ -31,4 +32,4 @@ export async function POST(request:Request){try{
  }
  }
  a=await db.prepare('SELECT * FROM assistant_actions WHERE id=? AND owner=?').bind(b.id,u.userId).first();return json({accountId:u.userId,action:publicAction(a)});
- }catch(e){return accessResponse(e)||json({error:'دریافت نتیجه اجرا ممکن نشد؛ وضعیت فرمان را تازه کنید و دوباره ثبت نکنید.'},503);}}
+ }catch(e){return accessResponse(e)||accessResponse(assistantStorageError(e,{method:'POST',route:'/api/assistant/actions',stage:'actions'},{admin}))!;}}

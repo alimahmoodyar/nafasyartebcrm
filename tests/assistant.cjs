@@ -117,21 +117,28 @@ const chat=load('app/api/assistant/route.ts');
  await enter('bob');providerMode='normal';providerCalls=0;sql.prepare('DELETE FROM login_attempts').run();await send('کاربر بساز');assert.ok(!sent.at(-1).tools.some(t=>['create_password_user','update_user','delete_user','list_users','get_user_creation_guide'].includes(t.function.name)));
  console.log('Assistant account creation passed: admin-only proposal, secret-free schema/storage, secure confirmation, required password, concurrent/repeated execution once, staff tools hidden.');
 
- // Diagnostics contain actionable stage/cause categories, never raw exception data.
+ // Temporary debug output is admin-only and secret-redacted, with no console logging.
  const diagnostics=[],originalError=console.error;console.error=(...args)=>diagnostics.push(args);
  const classify=load('lib/assistant-storage-errors.ts').assistantStorageError;
- const nested=new Error('query failed: PRIVATE_QUESTION /private/path Bearer provider-test-key');nested.cause=new Error('no such column: assistant_actions.result');
- const safe=classify(nested,{method:'GET',route:'/api/assistant',stage:'actions'});
- let logged=JSON.parse(diagnostics.at(-1)[1]);assert.equal(logged.reason,'missing_column');assert.equal(logged.stage,'actions');assert.ok(logged.columns.includes('result'));assert.ok(safe.message.includes(logged.reference));
- for(const secret of ['PRIVATE_QUESTION','/private/path','provider-test-key','query failed']){assert.ok(!JSON.stringify(diagnostics).includes(secret));assert.ok(!safe.message.includes(secret));}
- // Reproduce a server with working model settings but missing the newer assistant table.
+ const context={method:'GET',route:'/api/assistant',stage:'actions'};
+ const nested=new Error('query failed: Bearer provider-test-key password="VERY_SECRET" api_key=OTHER_SECRET\nparams: PRIVATE_QUESTION');nested.cause=new Error('no such column: assistant_actions.result');
+ const safe=classify(nested,context);assert.ok(!safe.message.includes('no such column'));assert.ok(!safe.message.includes('[DEBUG'));
+ const exposed=classify(nested,context,{admin:true,secrets:['provider-test-key']});assert.ok(exposed.message.includes('[DEBUG'));assert.ok(exposed.message.includes('no such column: assistant_actions.result'));assert.ok(exposed.message.includes('Caused by:'));assert.ok(exposed.message.includes('Stage: actions'));
+ for(const secret of ['PRIVATE_QUESTION','provider-test-key','VERY_SECRET','OTHER_SECRET'])assert.ok(!exposed.message.includes(secret),secret);
+ const envError=new Error('decrypt failed '+env.LLM_CONFIG_ENCRYPTION_KEY);assert.ok(!classify(envError,context,{admin:true}).message.includes(env.LLM_CONFIG_ENCRYPTION_KEY));
+ assert.equal(diagnostics.length,0);
+ // Reproduce the exact missing-actions failure and check browser/API role boundaries.
  cookie='';identity=owner;const profileList=load('app/api/assistant/profiles/route.ts');
  sql.exec('DROP TABLE assistant_actions');
- r=await profileList.GET(request('/api/assistant/profiles'));assert.equal(r.status,200);d=await r.json();assert.equal(d.profiles.length,2);assert.ok(!JSON.stringify(d).includes('provider-test-key'));
- r=await chat.GET();assert.equal(r.status,503);d=await r.json();assert.ok(d.error.includes('0012'));logged=JSON.parse(diagnostics.at(-1)[1]);assert.equal(logged.stage,'actions');assert.equal(logged.reason,'missing_table');assert.ok(d.error.includes(logged.reference));
+ r=await profileList.GET(request('/api/assistant/profiles'));assert.equal(r.status,200);d=await r.json();assert.equal(d.profiles.length,2);
+ r=await chat.GET();assert.equal(r.status,503);d=await r.json();assert.ok(d.error.includes('0012'));assert.ok(d.error.includes('[DEBUG'));assert.ok(d.error.includes('no such table: assistant_actions'));assert.ok(d.error.includes('Stage: actions'));
+ env.ASSISTANT_DEBUG='false';r=await chat.GET();d=await r.json();assert.ok(!d.error.includes('[DEBUG'));assert.ok(!d.error.includes('no such table'));delete env.ASSISTANT_DEBUG;
+ identity={userId:'reader',email:'reader@example.com',displayName:'Reader',fullName:null};r=await chat.GET();assert.equal(r.status,503);d=await r.json();assert.ok(!d.error.includes('[DEBUG'));assert.ok(!d.error.includes('no such table'));identity=owner;
  assert.equal((await profileList.GET(request('/api/assistant/profiles','GET',undefined,{'x-assistant-account':'another-user'}))).status,409);
- sql.exec('DROP TABLE assistant_turns');r=await chat.GET();assert.equal(r.status,503);d=await r.json();assert.ok(d.error.includes('0010'));logged=JSON.parse(diagnostics.at(-1)[1]);assert.equal(logged.stage,'history');assert.ok(d.error.includes(logged.reference));r=await profileList.GET();assert.equal((await r.json()).profiles.length,2);
- identity=null;const diagnosticCount=diagnostics.length;assert.equal((await profileList.GET()).status,401);assert.equal(diagnostics.length,diagnosticCount);console.error=originalError;
+ sql.exec('DROP TABLE assistant_turns');r=await chat.GET();d=await r.json();assert.equal(r.status,503);assert.ok(d.error.includes('0010'));assert.ok(d.error.includes('Stage: history'));assert.ok(d.error.includes('no such table: assistant_turns'));
+ r=await profileList.GET();assert.equal((await r.json()).profiles.length,2);
+ identity=null;assert.equal((await profileList.GET()).status,401);assert.equal(diagnostics.length,0);console.error=originalError;
+ console.log('Debug passed: immediate admin error/cause/stack, non-admin exclusion, server kill switch, credential/SQL-value redaction, no diagnostic logging.');
  console.log('Missing migration regression passed: both profiles remain independently available when actions/history tables are absent; exact migration diagnostics and account isolation.');
  console.log('Model checks passed: two saved profiles, exact selected model used, safe provider diagnostics, tool probe, admin-only access, parameter compatibility, no secret disclosure.');
  console.log('Commands passed: no write before explicit approval, concurrent/repeated confirmation at most once, owner isolation, expiry, cancellation, permission recheck, navigation and MCP read/write parity.');
