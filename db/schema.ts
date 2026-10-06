@@ -159,3 +159,11 @@ export const resetJobs=sqliteTable('reset_jobs',{
 },t=>[check('reset_job_guard',sql`${t.guard}=1`)]);
 
 export * from "./training-schema";
+
+// Numeric provider usage only. Snapshots survive user/profile deletion; no FK to mutable accounts.
+export const llmUsage=sqliteTable('llm_usage',{
+ id:text('id').primaryKey(),requestId:text('request_id').notNull(),userId:text('user_id').notNull(),userName:text('user_name').notNull(),username:text('username').notNull(),
+ profileId:text('profile_id').notNull(),profileName:text('profile_name').notNull(),model:text('model').notNull(),responseModel:text('response_model'),source:text('source').notNull(),round:integer('round').notNull(),attempt:integer('attempt').notNull(),
+ day:text('day').notNull(),startedAt:text('started_at').notNull(),finishedAt:text('finished_at'),durationMs:integer('duration_ms'),status:text('status').notNull(),httpStatus:integer('http_status'),errorCode:text('error_code'),responseId:text('response_id'),
+ inputTokens:integer('input_tokens'),outputTokens:integer('output_tokens'),totalTokens:integer('total_tokens'),reportedTotalTokens:integer('reported_total_tokens'),cachedTokens:integer('cached_tokens'),reasoningTokens:integer('reasoning_tokens'),usageJson:text('usage_json'),usageComplete:integer('usage_complete').notNull().default(0),totalMismatch:integer('total_mismatch').notNull().default(0),
+},t=>[index('idx_llm_usage_day').on(t.day,t.startedAt,t.id),index('idx_llm_usage_user_day').on(t.userId,t.day),index('idx_llm_usage_request').on(t.requestId)]);

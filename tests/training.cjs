@@ -18,6 +18,7 @@ async function call(name,path,body){const role=roles.find(r=>r.name===name);cons
  console.log('seed',await r.json());
  for(const [role,path] of [['انبار','flow'],['کنترل کیفیت','flow'],['تولید','production'],['مدیر فروش','sales'],['نماینده فروش','sales'],['مدیر خدمات پس از فروش','after-sales?domain=home'],['کارشناس خرید داخلی','suppliers'],['برنامه‌ریز فروش','sourcing'],['انبار','tasks'],['مدیر فروش','sales/monitor']]){const out=await call(role,path);assert.equal(out.status,200,role+' '+path+' '+JSON.stringify(out.d));console.log('read',role,path);}
  const catalog=load('lib/mcp/tools.ts');assert.equal(catalog.validateToolArguments('initialize_training_workspace',{confirmed:true}),true);assert.equal(catalog.validateToolArguments('initialize_training_workspace',{confirmed:false}),false);assert.equal(catalog.validateToolArguments('training_workspace_request',{confirmed:true,roleId:'role-35',path:'hospital',method:'GET',body:''}),true);
+ assert.equal((await call('مدیر سامانه','llm-usage')).status,403);
  const forbidden=await call('مدیر سامانه','users');assert.equal(forbidden.status,403);
 
  const repeat=await context.run(real,()=>training.trainingInitialize(request('/api/training',{confirmed:true})));assert.equal(repeat.status,200);
@@ -53,7 +54,7 @@ async function call(name,path,body){const role=roles.find(r=>r.name===name);cons
  assert.throws(()=>tc.trainingSQL('SELECT * FROM training_records'));
  const isolated=await Promise.all([tc.trainingContext.run({actor:'test',role:'test'},async()=>{await new Promise(r=>setTimeout(r,5));return (await st.storage().prepare('SELECT COUNT(*) n FROM records').first()).n}),st.storage().prepare('SELECT COUNT(*) n FROM records').first()]);assert.ok(isolated[0]>0);assert.equal(isolated[1].n,0);
  const files=load('lib/firmware-storage.ts');objects.set('same-key',new Uint8Array([1]).buffer);await tc.trainingContext.run({actor:'test',role:'test'},async()=>{await files.firmwareBucket().put('same-key',new Uint8Array([2]).buffer);await files.firmwareBucket().delete('same-key');});assert.ok(objects.has('same-key'));
- const allTables=sql.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'training_%'").all().map(r=>r.name).sort();assert.deepEqual(allTables,Array.from(load('lib/training-tables.ts').trainingTables).sort());
+ const allTables=sql.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'training_%' AND name!='llm_usage'").all().map(r=>r.name).sort();assert.deepEqual(allTables,Array.from(load('lib/training-tables.ts').trainingTables).sort());
  // Verify schema parity and no foreign key escapes to company tables.
  for(const table of load('lib/training-tables.ts').trainingTables){const plain=sql.prepare('PRAGMA table_info('+table+')').all(),clone=sql.prepare('PRAGMA table_info(training_'+table+')').all();const normalized=a=>a.map(({cid,...v})=>v).sort((a,b)=>a.name.localeCompare(b.name));assert.deepEqual(normalized(clone),normalized(plain),table);for(const fk of sql.prepare('PRAGMA foreign_key_list(training_'+table+')').all())assert.ok(fk.table.startsWith('training_'),table);}
  assert.equal(sql.prepare('PRAGMA foreign_key_check').all().length,0);
