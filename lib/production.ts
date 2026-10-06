@@ -1,4 +1,4 @@
-export const warehouses=[{id:'raw',name:'انبار مواد اولیه'},{id:'line',name:'خط تولید'},{id:'quarantine',name:'قرنطینه مواد اولیه'},{id:'nonconforming',name:'نامنطبق خط تولید'},{id:'finished',name:'انبار محصول نهایی'}];
+export const warehouses=[{id:'raw',name:'انبار مواد اولیه'},{id:'semi',name:'انبار نیمه‌ساخته (۳۵۱)',accountingCode:'351'},{id:'line',name:'خط تولید'},{id:'quarantine',name:'قرنطینه مواد اولیه'},{id:'nonconforming',name:'نامنطبق خط تولید'},{id:'finished',name:'انبار محصول نهایی'}];
 export type BomLine={partCode:string;name:string;unit:string;quantity:string};
 export const warehouseName=(id:string)=>warehouses.find(w=>w.id===id)?.name||(id.startsWith('hospital:staged:')?'قطعات بیمارستانی؛ منتظر ارسال':id.startsWith('hospital:transit:')?'قطعات بیمارستانی؛ در راه':id.startsWith('hospital:technician:')?'قطعات بیمارستانی؛ نزد تکنسین':id);
 export function scaled(value:unknown){const s=String(value??'');if(!/^\d{1,9}(\.\d{1,3})?$/.test(s))throw new Error('مقدار باید عدد مثبت با حداکثر سه رقم اعشار باشد.');const n=Math.round(Number(s)*1000);if(!Number.isSafeInteger(n)||n<=0)throw new Error('مقدار باید مثبت باشد.');return n;}

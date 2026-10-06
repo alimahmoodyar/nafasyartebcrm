@@ -39,6 +39,20 @@ const second=(await change('assign',lot.id,{...assign(),memberId:'worker2',stage
 await change('output',second,{good:9,scrap:0,reworkCount:0,overtime:false,allocations:[]});await change('close',second,{actualMinutes:60,overtimeMinutes:0});
 const qc=body('quality',{lotId:lot.id,revision:row(lot.id).revision,good:8,scrap:0,reworkCount:1,reference:'QC1'});await post(qc);await post(qc);assert.equal(sql.prepare("SELECT quantity FROM inventory_balances WHERE item_id=?").get('routine-batch:'+lot.id).quantity,8000);
 const rework=(await change('assign',lot.id,{...assign(),memberId:'worker2',start:'10:00',end:'10:30',stage:1,count:1,rework:true})).id;await change('output',rework,{good:1,scrap:0,reworkCount:0,overtime:false,allocations:[]});await change('close',rework,{actualMinutes:10,overtimeMinutes:0});await change('quality',lot.id,{good:1,scrap:0,reworkCount:0,reference:'QC2'});assert.equal(row(lot.id).data.received,9);assert.equal(row(lot.id).data.scrap,1);
+// A quality receipt is held separately until the warehouse moves it to the line.
+const bid='routine-batch:'+lot.id;
+const balance=wh=>sql.prepare('SELECT quantity FROM inventory_balances WHERE item_id=? AND warehouse=?').get(bid,wh)?.quantity||0;
+assert.equal(balance('semi'),9000);assert.equal(balance('line'),0);
+const prod=load('app/api/production/route.ts');
+async function move(x={},status=200){const r=await ctx.run(user,()=>prod.POST(new Request('https://test.local/api/production',{method:'POST',headers:{origin:'https://test.local'},body:JSON.stringify({id:crypto.randomUUID(),mode:'move',batchId:bid,from:'semi',to:'line',quantity:'3',...x})})));const d=await r.json();assert.equal(r.status,status,JSON.stringify(d));return d;}
+user={userId:'warehouse',isAdmin:false,permissions:{read:['batch'],write:['batch'],eventStages:[],flowRoles:['inventory'],warehouses:['line']}};await move({},403);
+user={...user,permissions:{...user.permissions,warehouses:['semi','line']}};
+const transferId=crypto.randomUUID();await move({id:transferId});await move({id:transferId});assert.equal(balance('semi'),6000);assert.equal(balance('line'),3000);
+await move({quantity:'7'},409);assert.equal(balance('semi'),6000);assert.equal(balance('line'),3000);
+await move({from:'line',to:'semi',quantity:'1'});assert.equal(balance('semi'),7000);assert.equal(balance('line'),2000);
+user=admin;await move({to:'raw'},400);
+const moveTool=load('lib/mcp/tools.ts').tools.find(t=>t.name==='move_batch_stock');
+await ctx.run(user,()=>moveTool.run({id:crypto.randomUUID(),confirmed:true,batchId:bid,from:'semi',to:'line',quantity:'1'},'https://test.local',{}));assert.equal(balance('semi'),6000);assert.equal(balance('line'),3000);
 const rates=[a.id,rw,second,rework].map(jobId=>({jobId,hourly:'60',overtimeHourly:'90'}));await change('cost',lot.id,{rates,overhead:'40',basis:'approved hours',reference:'C1'});assert.equal(row(lot.id).data.cost.total,'1180');assert.equal(row('cost-price:routine-batch:'+lot.id).data.unitCost,'131.111111');
 const priced=load('lib/costing.ts').calculateCosts({entities:sql.prepare('SELECT * FROM flow_entities').all(),records:sql.prepare('SELECT * FROM records').all(),entries:sql.prepare('SELECT * FROM inventory_entries').all(),operations:sql.prepare('SELECT rowid AS sequence,* FROM inventory_operations ORDER BY created,rowid').all(),boms:[],orders:[]});assert.equal(priced.pools.find(p=>p.partCode==='22').quantity,9);assert.equal(priced.pools.find(p=>p.partCode==='22').unitCost,'131.111111');
 user={userId:'worker',name:'Worker',isAdmin:false,permissions:{read:[],write:[],eventStages:[]}};let data=await get();assert.equal(data.jobs.length,2);assert.equal(data.lots.length,0);await change('reason',a.id,{notes:'machine stopped'});await change('reason',second,{notes:'not my work'},403);await change('output',a.id,{good:1},403);user={userId:'foreman',isAdmin:false,permissions:{flowRoles:['production']}};data=await get();assert.equal(data.lots[0].data.cost,undefined);await change('cost',lot.id,{rates,overhead:'1'},403);await change('review',a.id,{notes:'Delay reviewed; no payroll mutation'});user=admin;

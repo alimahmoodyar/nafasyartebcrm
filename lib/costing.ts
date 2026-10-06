@@ -29,7 +29,7 @@ export function calculateCosts(src:any){
  const ordered=[...src.operations].sort((a:any,b:any)=>a.created.localeCompare(b.created)||Number(a.sequence)-Number(b.sequence));
  for(const op of ordered){
   const entries=entriesByOp.get(op.id)||[],body=parse(op.payload);const groups=new Map<string,{delta:number;entries:any[]}>();
-  for(const e of entries){const b=batches.get(e.item_id);if(!b||!(['raw','line'].includes(e.warehouse)||e.warehouse.startsWith('project:')))continue;const key=b.data.partCode+'|'+b.data.unit;const g=groups.get(key)||{delta:0,entries:[]};g.delta+=e.delta;g.entries.push(e);groups.set(key,g);}
+  for(const e of entries){const b=batches.get(e.item_id);if(!b||!(['raw','semi','line'].includes(e.warehouse)||e.warehouse.startsWith('project:')))continue;const key=b.data.partCode+'|'+b.data.unit;const g=groups.get(key)||{delta:0,entries:[]};g.delta+=e.delta;g.entries.push(e);groups.set(key,g);}
   for(const [key,g] of groups){if(!g.delta)continue;const p=pool.get(key)||{q:0,v:BigInt(0)};const before=p.q>0&&p.v!==null?p.v*BigInt(1000)/BigInt(p.q):null;
    if(g.delta>0){let value:bigint|null=BigInt(0);for(const e of g.entries){if(e.delta<=0)continue;const price=prices.get(e.item_id);if(!price){value=null;warnings.add('قیمت بچ ثبت نشده: '+e.item_id);break;}value+=moneyMicro(price.data.unitCost)*BigInt(e.delta)/BigInt(1000);}
     p.v=p.v===null||value===null?null:p.v+value;p.q+=g.delta;
