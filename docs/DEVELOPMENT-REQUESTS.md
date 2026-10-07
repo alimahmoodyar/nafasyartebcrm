@@ -8,15 +8,17 @@
 
 مدیر وضعیت و پاسخ را ثبت می‌کند. کاربر می‌تواند توضیح تکمیلی بدهد. پاسخ به وضعیت «نیاز به توضیح» درخواست را به «جدید» برمی‌گرداند. سابقه اولیه بازنویسی نمی‌شود. در وضعیت انجام‌شده، مدیر نتیجه و نسخه انتشار را در پاسخ می‌نویسد. «کپی برای توسعه» مشخصات، نیاز و تمام پیگیری‌ها را با تاریخ شمسی و ساعت تهران می‌سازد؛ اگر Clipboard مجاز نباشد متن قابل انتخاب نمایش داده می‌شود.
 
+مدیر در جزئیات با «بستن درخواست» دلیل را می‌نویسد و در پنجره تأیید، «تأیید و بستن درخواست» را انتخاب می‌کند. بستن، انجام توسعه را تأیید نمی‌کند. وضعیت «بسته‌شده» در فیلتر و متن کپی دیده می‌شود؛ این وضعیت نیاز باز تکراری محسوب نمی‌شود.
+
 ## قرارداد فنی
 
 `GET /api/development`: `requestId` برای جزئیات و copyText؛ بدون آن فهرست ۵۰تایی با state/query/offset، total/nextOffset. `view=guide` قرارداد و `view=summary` شمار اعلان. همه پاسخ‌ها accountId دارند و private/no-store هستند.
 
-`POST /api/development`: mode=create/review/clarify، id جدید UUID برای عملیات، confirmed=true. review/clarify علاوه بر requestId به revision فعلی نیاز دارند. review فقط مدیر، clarify فقط مالک درخواست. همه عملیات SQL، ثبت audit و inventory_operations در تراکنش مشترک؛ guard از تعارض نسخه و ثبت هم‌زمان نیاز کاملاً یکسان جلوگیری می‌کند. شناسه id برای تکرار همان عملیات ثابت می‌ماند؛ requestId در review/clarify ارجاع به رکورد موجود است و نباید بازتولید شود.
+`POST /api/development`: mode=create/review/clarify/close، id جدید UUID برای عملیات، confirmed=true. review/clarify/close علاوه بر requestId به revision فعلی نیاز دارند. review و close فقط مدیر، clarify فقط مالک درخواست. close به note الزامی نیاز دارد و وضعیت را closed می‌کند؛ درخواست و تمام پیگیری‌ها حفظ می‌شوند. توضیح مالک روی درخواست بسته پذیرفته نمی‌شود؛ مدیر با review و وضعیت باز و دلیل آن را بازگشایی می‌کند. همه عملیات SQL، ثبت audit و inventory_operations در تراکنش مشترک؛ guard از تعارض نسخه و ثبت هم‌زمان نیاز کاملاً یکسان جلوگیری می‌کند. شناسه id برای تکرار همان عملیات ثابت می‌ماند؛ requestId در review/clarify/close ارجاع به رکورد موجود است و نباید بازتولید شود.
 
 ذخیره در flow_entities با type=development_request؛ بدون تغییر schema یا داده قبلی. owner از عضو فعال یا شناسه نشست گرفته می‌شود. source از context تأیید دستیار تعیین می‌شود، فیلد ارسالی کاربر پذیرفته نیست. نیازهای باز کاملاً یکسان هر حساب deduplicate می‌شوند؛ تشخیص شباهت معنایی خودکار نیست.
 
-MCP: get_development_guide، get_development_requests، get_development_attention، submit_development_request، review_development_request، clarify_development_request. ابزار review برای ادمین؛ ابزار نوشتنی به scope=read_write و confirmed نیاز دارد. دستیار داخلی فقط پیشنهاد می‌سازد و اجرا از endpoint تأیید owner-bound می‌گذرد؛ مجوز هنگام اجرا دوباره بررسی می‌شود.
+MCP: get_development_guide، get_development_requests، get_development_attention، submit_development_request، review_development_request، clarify_development_request، close_development_request. ابزار review و close برای ادمین؛ ابزار نوشتنی به scope=read_write و confirmed نیاز دارد. دستیار داخلی فقط پیشنهاد می‌سازد و اجرا از endpoint تأیید owner-bound می‌گذرد؛ مجوز هنگام اجرا دوباره بررسی می‌شود.
 
 ## اعتبارسنجی
 

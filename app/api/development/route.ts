@@ -31,10 +31,10 @@ export async function GET(request:Request){try{
 
 export async function POST(request:Request){try{
  checkOrigin(request);const u=await requireAccess();account(request,u);const me=await owner(u),db=storage(),b=JSON.parse(new TextDecoder().decode(await boundedBody(request,60000)));
- const mode=b?.mode;keys(b,['id','mode','confirmed',...(mode==='create'?['kind',...Object.keys(developmentFields)]:mode==='review'?['requestId','revision','state','note']:mode==='clarify'?['requestId','revision','note']:[])]);
- if(!['create','review','clarify'].includes(mode)||b.confirmed!==true)fail('نوع عملیات و تأیید صریح لازم است.');
+ const mode=b?.mode;keys(b,['id','mode','confirmed',...(mode==='create'?['kind',...Object.keys(developmentFields)]:mode==='review'?['requestId','revision','state','note']:['clarify','close'].includes(mode)?['requestId','revision','note']:[])]);
+ if(!['create','review','clarify','close'].includes(mode)||b.confirmed!==true)fail('نوع عملیات و تأیید صریح لازم است.');
  const id=taskRequired(b.id,100);if(!/^[a-f0-9-]{36}$/i.test(id))fail('شناسه عملیات معتبر نیست.');
- if(mode==='review'&&!u.isAdmin)fail('بررسی درخواست فقط برای مدیر سامانه مجاز است.',403);
+ if(['review','close'].includes(mode)&&!u.isAdmin)fail('بررسی و بستن درخواست فقط برای مدیر سامانه مجاز است.',403);
  let row=mode==='create'?null:await access(taskRequired(b.requestId,100),u,me);
  if(mode==='clarify'&&row!.data.owner!==me)fail('توضیح تکمیلی فقط توسط درخواست‌کننده ثبت می‌شود.',403);
  const signature=JSON.stringify(b),previous:any=await db.prepare("SELECT actor,payload,kind FROM inventory_operations WHERE id=?").bind(id).first();
@@ -50,7 +50,7 @@ export async function POST(request:Request){try{
   // Deduplicate the same open need for the same account, including retries with a new operation ID.
   const fingerprint=JSON.stringify([me,b.kind,...Object.keys(developmentFields).map(k=>fields[k])]);
   const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(fingerprint)))).map(x=>x.toString(16).padStart(2,'0')).join('');
-  const duplicateSql="type='development_request' AND json_extract(data,'$.fingerprint')=? AND json_extract(data,'$.state') NOT IN ('done','declined')";
+  const duplicateSql="type='development_request' AND json_extract(data,'$.fingerprint')=? AND json_extract(data,'$.state') NOT IN ('done','declined','closed')";
   const duplicate:any=await db.prepare('SELECT id FROM flow_entities WHERE '+duplicateSql).bind(hash).first();
   if(duplicate)return json({accountId:u.userId,saved:true,duplicate:true,requestId:duplicate.id});
   guard('NOT EXISTS(SELECT 1 FROM flow_entities WHERE '+duplicateSql+')',hash);
@@ -58,8 +58,11 @@ export async function POST(request:Request){try{
  }else{
   if(!Number.isInteger(b.revision)||b.revision!==row!.revision)fail('درخواست تغییر کرده است؛ تازه‌سازی و دوباره بررسی کنید.',409);
   const note=taskRequired(b.note,4000);if(mode==='review'&&!Object.hasOwn(developmentStates,b.state))fail('وضعیت معتبر نیست.');
+  if(mode==='clarify'&&row!.data.state==='closed')fail('درخواست بسته شده است؛ برای توضیح جدید مدیر باید آن را بازگشایی کند.',409);
+  if((mode==='close'||mode==='review'&&b.state==='closed')&&row!.data.state==='closed')fail('درخواست قبلاً بسته شده است.',409);
   if(row!.data.history.length>=200)fail('ظرفیت پیگیری این درخواست تکمیل شده است.');
-  d={...row!.data,state:mode==='review'?b.state:row!.data.state==='needs_info'?'new':row!.data.state,history:[...row!.data.history,{at:now,author:u.name,role:mode==='review'?'admin':'requester',note,state:mode==='review'?b.state:row!.data.state==='needs_info'?'new':row!.data.state}]};
+  const state=mode==='close'?'closed':mode==='review'?b.state:row!.data.state==='needs_info'?'new':row!.data.state;
+  d={...row!.data,state,history:[...row!.data.history,{at:now,author:u.name,role:mode==='clarify'?'requester':'admin',note,state}]};
   guard("EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND type='development_request' AND revision=?)",target,row!.revision);
   writes.push(db.prepare('UPDATE flow_entities SET data=?,revision=revision+1,updated=? WHERE id=? AND revision=?').bind(JSON.stringify(d),now,target,row!.revision));
  }
