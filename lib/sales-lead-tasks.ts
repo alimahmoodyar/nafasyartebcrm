@@ -1,0 +1,16 @@
+import {storage} from './storage';
+import {leadRows,leadMembers,leadEligible,leadOpen,leadMemberGuard} from './sales-leads';
+import {salesManager} from './sales-access';
+import {notice} from './duties';
+import {trainingContext} from './training-context';
+export async function syncLeadTasks(){
+ if(trainingContext.getStore())return;
+ const db=storage(),members=await leadMembers(),rows=await leadRows(),now=new Date().toISOString(),existing=(await db.prepare("SELECT * FROM duty_runs WHERE template_id='sales-lead' ORDER BY id").all()).results as any[],desired=new Set<string>();
+ const managers=members.filter(m=>leadEligible(m)&&salesManager({isAdmin:false,permissions:JSON.parse(m.permissions)} as any));
+ for(const r of rows){const d=r.data;if(!leadOpen(d)||!leadEligible(members.find(m=>m.id===d.ownerId)))continue;const id='sales-lead:'+r.id+':'+d.ownerId;desired.add(id);const old=existing.find(t=>t.id===id),supervisor=managers.find(m=>m.id!==d.ownerId)?.id||'@admin',due=d.nextDue+'T16:00:00+03:30';
+  const data={...(old?JSON.parse(old.data):{}),salesLeadWorkflow:true,remindHours:24,escalateHours:24,leadId:r.id,sourceSection:'sales',sourceId:'lead:'+r.id,title:'پیگیری '+d.title,instructions:d.nextAction,evidence:'text',history:old?JSON.parse(old.data).history||[]:[],answer:old?JSON.parse(old.data).answer||'':''};
+  if(old&&['open','blocked'].includes(old.state)&&old.due===due&&old.supervisor===supervisor&&JSON.parse(old.data).instructions===data.instructions&&JSON.parse(old.data).title===data.title&&JSON.parse(old.data).remindHours===24&&JSON.parse(old.data).escalateHours===24)continue;
+  const op=crypto.randomUUID();await db.batch([db.prepare("INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,'sales_lead_task','{}','scheduler',?,CASE WHEN EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?) AND COALESCE((SELECT revision FROM duty_runs WHERE id=?),0)=? THEN 1 ELSE 0 END)").bind(op,now,r.id,r.revision,id,old?.revision||0),leadMemberGuard(db,op,members),old?db.prepare("UPDATE duty_runs SET data=?,due=?,supervisor=?,state='open',revision=revision+1,updated=? WHERE id=?").bind(JSON.stringify(data),due,supervisor,now,id):db.prepare("INSERT INTO duty_runs(id,template_id,period,assignee,supervisor,due,state,data,revision,created,updated) VALUES(?,'sales-lead',?,?,?,?,'open',?,1,?,?)").bind(id,r.id,d.ownerId,supervisor,due,JSON.stringify(data),now,now),notice(id,d.ownerId,'followup:'+r.revision,'پیگیری سرنخ: '+d.title,now)]);
+ }
+ for(const t of existing.filter(t=>!desired.has(t.id)&&['open','blocked','submitted'].includes(t.state))){const r=rows.find(r=>r.id===JSON.parse(t.data).leadId),state=r&&!leadOpen(r.data)?'completed':'cancelled',op=crypto.randomUUID();await db.batch([db.prepare("INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,'sales_lead_task_retire','{}','scheduler',?,CASE WHEN COALESCE((SELECT revision FROM flow_entities WHERE id=?),0)=? AND EXISTS(SELECT 1 FROM duty_runs WHERE id=? AND revision=?) THEN 1 ELSE 0 END)").bind(op,now,JSON.parse(t.data).leadId,r?.revision||0,t.id,t.revision),leadMemberGuard(db,op,members),db.prepare('UPDATE duty_runs SET state=?,revision=revision+1,updated=? WHERE id=?').bind(state,now,t.id)]);}
+}

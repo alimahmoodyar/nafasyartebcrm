@@ -76,3 +76,6 @@ export const resetHelp=['پروژه‌های ساخت، BOM اختصاصی، ر�
 
 // bank_guarantee and guarantee_file are operational in both scopes, covered by flow freeze.
 resetHelp.push("پرونده‌های ضمانت‌نامه، تاریخچه تأیید، تمدید و استرداد و مدارک در هر دو محدوده پشتیبان و حذف می‌شوند؛ وظایف قبل از پرونده حذف می‌شوند و جایگاه‌های سازمانی حفظ می‌شوند.");
+
+// sales_lead is operational in both scopes. Generic 0016 flow freeze applies; no new tables.
+resetHelp.push("سرنخ‌ها، فرصت‌های فروش، تماس‌ها و سوابق ارجاع و تبدیل به سفارش در هر دو محدوده پشتیبان و حذف می‌شوند؛ اعلان‌ها و وظایف قبل از پرونده‌ها حذف می‌شوند. حساب‌ها و سمت‌های فروش حفظ می‌شوند.");
