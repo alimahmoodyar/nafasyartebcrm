@@ -265,7 +265,7 @@ api('decide_assistant_action','Confirm or cancel an immutable proposed assistant
 
 api('test_llm_connection','Admin: list models from a saved provider profile or probe Chat Completions tool calling. Probe may incur provider cost; confirmed must be true. Does not change saved settings or company data.',obj({id,mode:enumeration(['models','probe']),confirmed}),'/api/llm-config/test','POST',llmTest.POST,{admin:true,write:false},[],a=>a);
 
-api('list_assistant_profiles','List saved model names for the signed-in account independently of chat history/actions storage. Never returns provider keys.',obj({}),'/api/assistant/profiles','GET',assistantProfiles.GET);
+api('list_assistant_profiles','List saved model names and defaultProfileId for a new user, based on successful current configuration usage, independently of chat history/actions storage. Preserve an explicit profile choice; if defaultProfileId is empty and there are multiple profiles, ask the user to select. Never returns provider keys.',obj({}),'/api/assistant/profiles','GET',assistantProfiles.GET);
 
 flowPost('prepare_device_materials','Record actual installed batch allocations before final QC without deducting materials. Any edit invalidates QC. Oldest line batches are preferred; deviations require notes.', 'prepare',{deviceId:id,allocations:list(obj({batchId:id,quantity:text('',20)}),400),notes:text()});
 api('get_fulfillment','Read authorized finished-goods, printed line serial candidates, handoff inbox, sales reservations, recipients and assigned transport inbox.',obj({}),'/api/fulfillment','GET',fulfillment.GET);

@@ -1,3 +1,4 @@
+import {assistantProfiles} from '@/lib/assistant-profiles';
 import {inboxAccess,inboxDirectory} from '@/lib/inbox';
 import {username as validateUsername} from '@/lib/password-auth';
 import {validatePermissions} from '@/lib/permissions';
@@ -16,9 +17,9 @@ const json=(v:unknown,status=200)=>Response.json(v,{status,headers:{'Cache-Contr
 function checkAccount(request:Request|undefined,accountId:string){const expected=request?.headers.get('x-assistant-account');if(expected&&expected!==accountId)throw new AccessError('حساب ورود تغییر کرده است؛ گفتگو را دوباره باز کنید.',409);}
 export async function GET(request?:Request){let admin=false;let stage:AssistantStage='auth';try{
  const u=await requireAccess();admin=u.isAdmin;checkAccount(request,u.userId);stage='storage';const db=storage();
- stage='profiles';const profiles=(await db.prepare('SELECT id,name,model FROM llm_configs ORDER BY name,id').all()).results;
+ stage='profiles';const catalog=await assistantProfiles();
  stage='history';const history=(await db.prepare('SELECT id,question,answer,model,created FROM assistant_turns WHERE owner=? AND answer IS NOT NULL ORDER BY created DESC LIMIT 20').bind(u.userId).all()).results.reverse();
- stage='actions';const actions=await userActions(u.userId);return json({accountId:u.userId,profiles,history,actions});
+ stage='actions';const actions=await userActions(u.userId);return json({accountId:u.userId,...catalog,history,actions});
  }catch(e){return accessResponse(e)||accessResponse(assistantStorageError(e,{method:'GET',route:'/api/assistant',stage},{admin}))!;}}
 export async function POST(request:Request){let started=false,id='',owner='';let admin=false;const secrets:string[]=[];let stage:AssistantStage='auth';try{checkOrigin(request);const u=await requireAccess();admin=u.isAdmin;checkAccount(request,u.userId);owner=u.userId;const b=JSON.parse(new TextDecoder().decode(await boundedBody(request,14000)));if(typeof b.message!=='string'||!b.message.trim()||b.message.length>4000||typeof b.profileId!=='string'||typeof b.requestId!=='string'||! /^[a-f0-9-]{36}$/i.test(b.requestId))throw new AccessError('پیام، مدل و شناسه درخواست معتبر لازم است.',400);id=b.requestId;stage='storage';const db=storage();stage='check_duplicate';const existing:any=await db.prepare('SELECT * FROM assistant_turns WHERE id=?').bind(id).first();if(existing){if(existing.owner!==owner||existing.question!==b.message.trim())throw new AccessError('شناسه درخواست تکراری است.',409);if(existing.answer!==null){stage='actions';const actions=await userActions(owner);return json({accountId:owner,answer:existing.answer,model:existing.model,actions});}throw new AccessError('این پیام هنوز در حال پردازش است؛ کمی بعد دوباره امتحان کنید.',409);}
  stage='rate_limit';const now=new Date().toISOString();const count:any=await db.prepare('INSERT INTO login_attempts(key,count,reset) VALUES(?,1,?) ON CONFLICT(key) DO UPDATE SET count=CASE WHEN reset<=? THEN 1 ELSE count+1 END,reset=CASE WHEN reset<=? THEN excluded.reset ELSE reset END RETURNING count AS n').bind('assistant:'+owner,new Date(Date.now()+60000).toISOString(),now,now).first();if(count.n>6)throw new AccessError('حداکثر شش پیام در دقیقه؛ کمی صبر کنید.',429);
