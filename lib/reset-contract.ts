@@ -73,3 +73,6 @@ export const resetHelp=['پروژه‌های ساخت، BOM اختصاصی، ر�
 // Output uses existing records, receipt and inventory tables, children-first reset order unchanged. Training is explicitly blocked.
 
 // llm_usage: numeric metadata only; included in both reset backups/deletions, no FKs. Migration adds maintenance freeze triggers. Training is explicitly blocked.
+
+// bank_guarantee and guarantee_file are operational in both scopes, covered by flow freeze.
+resetHelp.push("پرونده‌های ضمانت‌نامه، تاریخچه تأیید، تمدید و استرداد و مدارک در هر دو محدوده پشتیبان و حذف می‌شوند؛ وظایف قبل از پرونده حذف می‌شوند و جایگاه‌های سازمانی حفظ می‌شوند.");

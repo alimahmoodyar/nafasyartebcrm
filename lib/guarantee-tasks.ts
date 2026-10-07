@@ -1,0 +1,33 @@
+import {storage} from './storage';
+import {guaranteeRows} from './guarantees';
+import {dayAt,notice} from './duties';
+import {trainingContext} from './training-context';
+export async function syncGuaranteeTasks(date=new Date()){
+ if(trainingContext.getStore())return {generated:0};
+ const db=storage(),rows=await guaranteeRows(),today=dayAt(date),now=date.toISOString(),members=(await db.prepare("SELECT id,status,permissions FROM app_members ORDER BY id").all()).results as any[];
+ const membershipSnapshot=JSON.stringify(members.map(m=>({id:m.id,status:m.status,permissions:m.permissions})));const eligible=members.filter(m=>{if(m.status!=='active')return false;const p=JSON.parse(m.permissions);return p.finance==='write'&&!p.salesAgentId&&!p.serviceAgentId&&!p.hospitalCenterId}).map(m=>m.id);
+ const owners=(name:string)=>[...new Set<string>(rows.filter(r=>r.type==='position'&&r.data.active&&r.data.name.replace(/[\s\u200c]/g,'').replace(/ي/g,'ی').replace(/ك/g,'ک')===name).flatMap(r=>r.data.members||[]).filter((id:string)=>eligible.includes(id)))];
+ const treasury=owners('خزانهدار'),managers=owners('مدیرمالی'),existing=(await db.prepare("SELECT * FROM duty_runs WHERE id LIKE 'guarantee:%'").all()).results as any[],desired=new Set<string>();let generated=0;
+ for(const r of rows.filter(r=>r.type==='bank_guarantee'&&r.data.state!=='closed')){
+  const d=r.data;const jobs:{key:string;role:string;due:string;title:string}[]=[];
+  if(d.state==='review')jobs.push({key:'review',role:'manager',due:today,title:'تأیید مستقل مالی'});
+  if(d.state==='approved')jobs.push({key:'issue',role:'treasury',due:d.actionDeadline,title:'ثبت صدور یا دریافت با مدرک'});
+  if(d.state==='active'){
+   const distance=Math.floor((Date.parse(d.actionDeadline+'T12:00:00Z')-Date.parse(today+'T12:00:00Z'))/86400000);
+   if(distance<=Math.max(...d.alertDays))jobs.push({key:'deadline:'+d.actionDeadline,role:'treasury',due:d.actionDeadline,title:'اقدام پیش از سررسید'});
+   if(d.amendment)jobs.push({key:'amend:'+d.amendment.actor+':'+d.amendment.actionDeadline,role:d.amendment.approved?'treasury':'manager',due:d.actionDeadline,title:d.amendment.approved?'ثبت مدرک اصلاح بانکی':'تأیید مستقل اصلاح'});
+   for(const request of d.requests.filter((x:any)=>!x.resolved))jobs.push({key:'request:'+request.id,role:'treasury',due:request.due,title:request.kind==='request_extension'?'پیگیری درخواست تمدید':'پیگیری درخواست آزادسازی'});
+  }
+  if(d.state==='terminated')jobs.push({key:'release',role:d.originalReturned&&d.releasedDeposit===d.deposit&&(!d.collateral||d.collateralReleased)&&d.demands.every((x:any)=>x.resolved)?'manager':'treasury',due:d.nextDue||today,title:'استرداد اسناد و وثایق و بستن پرونده'});
+  if(d.nextDue)jobs.push({key:'followup:'+d.nextDue,role:'treasury',due:d.nextDue,title:d.nextAction});
+  for(const demand of (d.demands||[]).filter((x:any)=>!x.resolved))jobs.push({key:'demand:'+demand.id,role:'manager',due:d.actionDeadline,title:'تعیین تکلیف مطالبه ضمانت‌نامه'});
+  const statements:D1PreparedStatement[]=[];
+  for(const job of jobs){const assigned=job.role==='manager'?managers:treasury;for(const assignee of assigned){const id='guarantee:'+r.id+':'+job.key+':'+job.role+':'+assignee;desired.add(id);const old=existing.find(x=>x.id===id),data={guaranteeWorkflow:true,guaranteeId:r.id,workflowRole:job.role,missingOwner:!assigned.length,sourceSection:'guarantees',sourceId:r.id,title:job.title+' — '+d.number,instructions:'در بخش ضمانت‌نامه‌ها مرحله واقعی را با مدرک انجام دهید. ثبت یادداشت این وظیفه را نمی‌بندد.',evidence:'مدرک واقعی بانکی یا استرداد',history:old?JSON.parse(old.data).history||[]:[],answer:old?JSON.parse(old.data).answer||'':''};
+   const due=old&&['review','release'].includes(job.key)?old.due:job.due+'T09:00:00+03:30';if(!old){statements.push(db.prepare("INSERT INTO duty_runs(id,template_id,period,assignee,supervisor,due,state,data,revision,created,updated) VALUES(?,?,?,?,?,?,'open',?,1,?,?)").bind(id,id,today,assignee,managers[0]||'@admin',due,JSON.stringify(data),now,now));generated++;}else if(old.state!=='open'&&old.state!=='blocked'||old.due!==due||JSON.parse(old.data).missingOwner!==data.missingOwner||old.supervisor!==(managers[0]||'@admin'))statements.push(db.prepare("UPDATE duty_runs SET state='open',due=?,data=?,supervisor=?,revision=revision+1,updated=? WHERE id=?").bind(due,JSON.stringify(data),managers[0]||'@admin',now,id));
+   if(job.key.startsWith('deadline:')){const distance=Math.floor((Date.parse(job.due+'T12:00:00Z')-Date.parse(today+'T12:00:00Z'))/86400000);for(const threshold of d.alertDays)if(distance<=threshold)statements.push(notice(id,assignee,'guarantee:'+job.due+':'+threshold,'هشدار سررسید ضمانت‌نامه '+d.number+'؛ بازه '+threshold+' روز',now));if(distance<0)statements.push(notice(id,managers[0]||'@admin','guarantee:overdue:'+today,'اقدام ضمانت‌نامه '+d.number+' از موعد گذشته است.',now));}
+  }}
+  if(statements.length){const op=crypto.randomUUID();const memberGuard=db.prepare("UPDATE inventory_operations SET guard=CASE WHEN (SELECT json_group_array(json_object('id',id,'status',status,'permissions',permissions)) FROM (SELECT * FROM app_members ORDER BY id))=? THEN 1 ELSE 0 END WHERE id=?").bind(membershipSnapshot,op);const guards=rows.filter(x=>x.type==='position').map(p=>db.prepare('UPDATE inventory_operations SET guard=CASE WHEN EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?) THEN 1 ELSE 0 END WHERE id=?').bind(p.id,p.revision,op));await db.batch([db.prepare("INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,'guarantee_task','{}','scheduler',?,CASE WHEN EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?) THEN 1 ELSE 0 END)").bind(op,now,r.id,r.revision),memberGuard,...guards,...statements]);}
+ }
+ for(const task of existing.filter(t=>!desired.has(t.id)&&['open','blocked','submitted'].includes(t.state))){const data=JSON.parse(task.data),stillAssigned=(data.workflowRole==='manager'?managers:treasury).includes(task.assignee),retiredState=stillAssigned?'completed':'cancelled';const op=crypto.randomUUID();await db.batch([db.prepare("INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,'guarantee_task_retire','{}','scheduler',?,CASE WHEN EXISTS(SELECT 1 FROM duty_runs WHERE id=? AND revision=?) AND (SELECT COALESCE(SUM(revision),0) FROM flow_entities WHERE type IN ('bank_guarantee','position'))=? THEN 1 ELSE 0 END)").bind(op,now,task.id,task.revision,rows.filter(r=>r.type!=='guarantee_file').reduce((n,r)=>n+r.revision,0)),db.prepare("UPDATE duty_runs SET state=?,revision=revision+1,updated=? WHERE id=?").bind(retiredState,now,task.id)]);}
+ return {generated};
+}
