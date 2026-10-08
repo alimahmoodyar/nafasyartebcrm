@@ -1,3 +1,4 @@
+import {advanceMonth} from './personnel-contract';
 import {storage} from './storage';
 import {AccessError} from './authorization';
 import {trainingContext} from './training-context';
@@ -77,7 +78,7 @@ export async function applyPersonnel(u:Session,b:any){
   }
   if(b.kind==='objection'){const target=findHr(rows,sreq(b.targetId));if(!hrVisible(target,a,rows)||!(target.type==='hr_payroll'&&target.data.memberId===mid||target.type==='hr_period'&&target.data.memberIds.includes(mid)))hrFail('فیش یا دوره کارکرد خود فرد انتخاب شود.');d.targetId=target.id;d.periodId=target.type==='hr_period'?target.id:target.data.periodId;}
   if(b.kind==='profile'){d.bankAccount=stxt(b.bankAccount||'',100);d.personal=stxt(b.personal||'',2000);if(!d.bankAccount&&!d.personal)hrFail('اطلاعات جدید لازم است.');}
-  if(['loan','advance'].includes(b.kind)){d.amount=money(b.amount,true);d.installments=integer(b.installments,1,60);d.repaymentStart=sday(b.repaymentStart);d.payments=[];d.recovered='0';}
+  if(['loan','advance'].includes(b.kind)){d.amount=money(b.amount,true);d.installments=integer(b.installments,1,60);d.repaymentStart=sday(b.repaymentStart);d.payments=[];d.recovered='0';if(b.kind==='advance'){d.requestDay=dayAt();d.requestMonth=advanceMonth(d.requestDay);d.limitAssessment={status:'unconfigured',policyId:null,limit:null};}}
   if(b.kind==='cancel'){const target=findHr(rows,sreq(b.targetId),'hr_request');if(target.data.memberId!==mid||target.data.state!=='approved'||!['leave','mission','overtime','shift','correction'].includes(target.data.kind))hrFail('فقط درخواست مصوب خود فرد قابل لغو است.');assertUnlocked(rows,mid,target.data.start,target.data.end);d.targetId=target.id;d.start=target.data.start;d.end=target.data.end;}
   if(!financialKinds.includes(b.kind)&&b.kind!=='certificate'&&!internal(members.find(m=>m.id===e.data.managerId)))hrFail('مدیر مستقیم فعال برای بررسی درخواست تعیین کنید.');
  }else if(mode==='reject'&&['hr_policy','hr_ruling','hr_document','hr_payroll'].includes(type)){role('approver');if(d.state!=='review')hrFail('پرونده در مرحله بررسی نیست.');independent();d.state='rejected';
