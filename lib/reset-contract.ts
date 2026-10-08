@@ -11,6 +11,10 @@ export const resetTables:Record<string,string>={
 };
 export const resetFlowPreserved=['hospital_center','account_profile','position','duty_template','duty_catalog_install','transport_migration','development_request','as_agent','sales_agent'];
 export const resetFlowCatalog=['routine_route','routine_policy','cost_material','cost_standard','sales_price','supplier_document','supplier_capa','supplier','supplier_material','supplier_review','material','capacity','party','as_tariff','transport_vehicle'];
+// Driver checklists, blockers and vehicle observations are embedded in operational
+// transport entities: backup, both reset scopes and 0016 freeze cover them.
+// Vehicle catalog stays preserved for operations-only reset. Browser drafts are local,
+// account-scoped, expire after seven days, and are never company backup records.
 // Service province/coverage lives inside as_agent (preserved identity) and
 // customer province inside as_case (operational reset); existing backup/freeze apply.
 export function resetWhere(table:string,scope:string){
@@ -86,3 +90,5 @@ resetHelp.push("پرونده پرسنلی، احکام، شیفت، درخواس
 
 // sales_template/contact/case/contract/commission_settlement: operational in both reset scopes; generic 0016 flow freeze and backup apply, no new FKs/blobs.
 resetHelp.push('الگوهای فروش، تماس و همکاری، قرارداد و تسویه پورسانت در هر دو محدوده پشتیبان و حذف می‌شوند؛ هویت و مسئول شریک فروش حفظ می‌شود.');
+
+resetHelp.push('چک‌لیست راننده، موانع و موعد پیگیری و گزارش‌های خودرو داخل مأموریت حمل در هر دو محدوده پشتیبان و حذف می‌شوند و قفل عمومی عملیات را دارند؛ مشخصات خودرو در پاک‌سازی عملیات حفظ می‌شود. پیش‌نویس‌های مرورگر جدا از پشتیبان سرورند و پس از هفت روز منقضی می‌شوند.');

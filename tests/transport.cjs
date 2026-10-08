@@ -28,7 +28,7 @@ async function get(user,id='',status=200){const r=await context.run(user,()=>api
 async function upload(user,id,purpose='waybill',bytes=new Uint8Array([137,80,78,71,13,10,26,10,1]),status=201){const key=crypto.randomUUID(),form=new FormData();form.set('file',new Blob([bytes]),'evidence.png');const r=await context.run(user,()=>filesApi.POST(new Request(base+'/api/transport/files?mission='+id+'&purpose='+purpose+'&requestId='+key,{method:'POST',headers:{origin:base},body:form})));assert.equal(r.status,status,await r.clone().text());return key}
 async function create(kind,id,user=manager){return op(user,'create',{sourceKey:kind+':'+id,packages:1,route:'carrier',pickup:'مبدأ',destination:'مقصد',recipient:'گیرنده',phone:'09000000000',due:day,receiverId:['as_claim','as_case'].includes(kind)?'receiver':''})}
 async function assign(id){return op(manager,'assign',{missionId:id,driverId:'driver',vehicleId:'car',due:day})}
-async function collect(id){return op(driver,'collect',{missionId:id,packages:1,day,condition:'سالم'})}
+async function collect(id){await op(driver,'checklist',{missionId:id,packagesChecked:true,itemsChecked:true,documentsChecked:true,conditionChecked:true});return op(driver,'collect',{missionId:id,packages:1,day,condition:'سالم'})}
 (async()=>{
  seed('A','as_agent',{name:'Agent A',active:true,domain:'home',phone:'090',address:'A address'});seed('B','as_agent',{name:'Agent B',active:true,domain:'home'});
  seed('car','transport_vehicle',{name:'Van',plate:'11 A 123',active:true});
@@ -38,6 +38,30 @@ async function collect(id){return op(driver,'collect',{missionId:id,packages:1,d
  let r=await create('as_shipment','shipment'),id=r.id;
  assert.equal((await get(driver)).missions.length,0);await get(agent2,id,404);await assign(id);
  assert.equal((await get(driver)).missions.length,1);assert.equal((await get(other)).missions.length,0);await get(other,id,404);
+ await op(driver,'collect',{missionId:id,packages:1,day,condition:'سالم'},400);
+ await op(driver,'checklist',{missionId:id,packagesChecked:true,itemsChecked:false,documentsChecked:true,conditionChecked:true},400);
+ await op(manager,'checklist',{missionId:id,packagesChecked:true,itemsChecked:true,documentsChecked:true,conditionChecked:true},403);
+ await op(driver,'blocker',{missionId:id,reason:'unknown',retryDay:day},400);
+ const blocked=await op(driver,'blocker',{missionId:id,reason:'cargo_not_ready',retryDay:day});
+ assert.equal(entity(id).data.state,'assigned','obstacle never fabricates collection');
+ assert.ok(sql.prepare("SELECT COUNT(*) n FROM duty_runs WHERE id LIKE ? AND state='open'").get('transport:'+id+':blocker:%').n>=2,'driver and manager get follow-up tasks');
+ await op(driver,'blocker',{missionId:id,reason:'recipient_absent',retryDay:day},409);
+ await op(driver,'collect',{missionId:id,packages:1,day,condition:'سالم'},400);
+ await op(manager,'blocker_resolve',{missionId:id});
+ assert.equal(entity(id).data.blocker.state,'resolved');
+ assert.equal(sql.prepare("SELECT COUNT(*) n FROM duty_runs WHERE id LIKE ? AND state='open'").get('transport:'+id+':blocker:%').n,0);
+ const reading=await op(driver,'vehicle_report',{missionId:id,reportKind:'reading',day,odometer:'1000'});
+ await op(driver,'vehicle_report',{missionId:id,reportKind:'reading',day,odometer:'999'},400);
+ await op(driver,'vehicle_report',{missionId:id,reportKind:'fuel',day,fuelLitres:'501',fuelCostRial:'10',reference:'fuel'},400);
+ await op(driver,'vehicle_report',{missionId:id,reportKind:'fuel',day,fuelLitres:'20.5',fuelCostRial:'250000',reference:'FUEL-PRIVATE'});
+ await op(driver,'vehicle_report',{missionId:id,reportKind:'fault',day,notes:'Observed tire fault'});
+ assert.equal((await get(driver)).vehicleReports.length,3);assert.equal((await get(other)).vehicleReports.length,0);
+ assert.ok(!JSON.stringify(await get(agent,id)).includes('FUEL-PRIVATE'),'fuel receipts stay private');
+ const mileageReplay=await context.run(driver,()=>api.POST(request('/api/transport','POST',reading.body)));assert.equal(mileageReplay.status,200);assert.equal(entity(id).data.vehicleReports.length,3);
+ const mileageStatus=await context.run(driver,()=>api.GET(request('/api/transport?id='+id+'&operation='+reading.body.id)));assert.equal((await mileageStatus.json()).saved,true);
+ const mismatch=await context.run(driver,()=>api.POST(request('/api/transport','POST',{...reading.body,id:crypto.randomUUID()},{'X-Transport-Account':'other-driver'})));assert.equal(mismatch.status,403,'queued data cannot cross accounts');
+ await op(driver,'checklist',{missionId:id,packagesChecked:true,itemsChecked:true,documentsChecked:true,conditionChecked:true});await assign(id);assert.equal(entity(id).data.checklist,undefined,'reassignment invalidates checklist');
+
  await op(other,'collect',{missionId:id,packages:1,day,condition:'good'},404);
  await op(driver,'receipt',{missionId:id,packages:1,day,result:'complete'},400);
  await collect(id);await upload(driver,id,'waybill',new Uint8Array([1,2,3]),400);const file=await upload(driver,id);
@@ -63,7 +87,10 @@ async function collect(id){return op(driver,'collect',{missionId:id,packages:1,d
  await transport.installTransportPositions(admin);await transport.installTransportPositions(admin);assert.equal(sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type='position' AND id LIKE 'transport-position:%'").get().n,2);
  await transport.syncTransportTasks();assert.ok(sql.prepare("SELECT COUNT(*) n FROM duty_runs WHERE template_id LIKE 'transport:%'").get().n>0);
  const user=await context.run(manager,()=>auth.requireAccess());let denied=false;try{await catalog.executeTool('transport_apply',{id:crypto.randomUUID(),mode:'vehicle',revision:0,data:{name:'X',plate:'X',active:true},confirmed:true},base,{user,scope:'read',tokenId:null})}catch{denied=true}assert.ok(denied);
- assert.ok(catalog.discoverTools().some(t=>t.name==='upload_transport_file'));
+ for(const name of ['upload_transport_file','record_transport_checklist','report_transport_blocker','resolve_transport_blocker','record_transport_vehicle_report'])assert.ok(catalog.discoverTools().some(t=>t.name===name));
+ const driverPrincipal=await context.run(driver,()=>auth.requireAccess());
+ const result=await catalog.executeTool('record_transport_vehicle_report',{id:crypto.randomUUID(),missionId:id,revision:entity(id).revision,reportKind:'reading',day,notes:'MCP mileage evidence',data:{odometer:'1001'},confirmed:true},base,{user:driverPrincipal,scope:'read_write',tokenId:null});assert.ok(result);assert.equal(entity(id).data.vehicleReports.at(-1).odometer,1001);
+ let deniedMCP=false;try{await catalog.executeTool('report_transport_blocker',{id:crypto.randomUUID(),missionId:id,revision:entity(id).revision,reason:'other',retryDay:day,notes:'No write scope',confirmed:true},base,{user:driverPrincipal,scope:'read',tokenId:null})}catch{deniedMCP=true}assert.ok(deniedMCP);
  const p=load('lib/permissions.ts');assert.throws(()=>p.validatePermissions({...empty,serviceRoles:['agent'],serviceDomains:['home'],serviceAgentId:'A',transportRoles:['manager']}));
  console.log('Transport passed: driver/agent isolation, private documents/prices, partial-damage hold, atomic final inventory receipt, idempotency, actual return custody without warranty credit, source links, costs, positions, tasks and MCP scopes.');
 })().catch(e=>{console.error(e);process.exit(1)});

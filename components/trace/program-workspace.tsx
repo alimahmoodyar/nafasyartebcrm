@@ -14,15 +14,15 @@ export function subprogramIcon(key:string,title:string):LucideIcon{
  if(/settings|polic|تنظیم|قواعد|استاندارد/.test(text))return Settings2;
  if(/report|analysis|overview|گزارش|تحلیل/.test(text))return ChartNoAxesCombined;
  if(/account|finance|pay|cost|price|expense|settlement|حقوق|فیش|مالی|هزینه|قیمت|تسویه|پرداخت|حساب/.test(text))return Wallet;
- if(/stock|lot|material|inventory|انبار|موجودی|قطعه|کالا|قرنطینه/.test(text))return Boxes;
- if(/ship|dispatch|transport|حمل|ارسال|تحویل|گیرنده/.test(text))return Truck;
+ if(/stock|lot|material|inventory|collect|انبار|موجودی|قطعه|کالا|قرنطینه/.test(text))return Boxes;
+ if(/ship|dispatch|transport|deliver|vehicle|حمل|ارسال|تحویل|گیرنده/.test(text))return Truck;
  if(/inbox|پیام/.test(text))return Mail;
  if(/employee|profile|agent|member|پرسنل|نمایند|سمت|جانشین/.test(text))return Users;
  if(/route|build|production|مونتاژ|ساخت|تولید/.test(text))return Factory;
  if(/maintenance|repair|service|تعمیر|خدمات|کارکرد/.test(text))return Wrench;
  if(/shift|period|time|day|تردد|شیفت|زمان|برنامه/.test(text))return CalendarDays;
  if(/guide|help|manual|راهنما/.test(text))return BookOpen;
- if(/quality|test|close|کنترل|کیفیت|آزمون/.test(text))return ShieldCheck;
+ if(/quality|test|close|followup|کنترل|کیفیت|آزمون/.test(text))return ShieldCheck;
  if(/file|document|form|سند|اسناد|فرم|احکام/.test(text))return FileText;
  return ClipboardList;
 }
