@@ -1,3 +1,4 @@
+import {trainingContext} from './training-context';
 import {storage} from './storage';
 import {AccessError} from './authorization';
 import type {Session} from './permissions';
@@ -6,7 +7,9 @@ import {salesAccounts,salesTargetProgress,rial,total,salesRequestChannels} from 
 import {sha256} from './firmware';
 export const salesFail=(m:string,status=400):never=>{throw new AccessError(m,status)};
 export {salesRep,salesManager,salesStaff,salesFinance,salesRead,salesWarehouse} from './sales-access';
-import {salesRep,salesRead,salesWarehouse} from './sales-access';
+import {salesRep,salesRead,salesWarehouse,salesStaff,salesManager,salesFinance} from './sales-access';
+import {memberId} from './duties';
+import {termsPlan} from './sales-network-contract';
 export const sreq=taskRequired,stxt=taskText;
 export function money(v:unknown,positive=false){const s=sreq(v,18);if(!/^\d{1,18}$/.test(s)||positive&&BigInt(s)<=BigInt(0))salesFail('مبلغ باید ریال صحیح '+(positive?'مثبت':'نامنفی')+' باشد.');return BigInt(s).toString();}
 export function sday(v:unknown){const s=sreq(v,10);if(!validDay(s))salesFail('تاریخ معتبر لازم است.');return s;}
@@ -21,17 +24,23 @@ export function arr(v:unknown,max=100){if(!Array.isArray(v)||!v.length||v.length
 export const salesDecode=(r:any)=>({...r,data:JSON.parse(r.data)});
 export async function salesRows(){return (await storage().prepare("SELECT * FROM flow_entities WHERE type GLOB 'sales_*' AND type<>'sales_report' ORDER BY created,id").all()).results.map(salesDecode);}
 export async function salesEntity(id:string,type:string){const r:any=await storage().prepare('SELECT * FROM flow_entities WHERE id=? AND type=?').bind(id,type).first();if(!r)salesFail('پرونده پیدا نشد.',404);return salesDecode(r);}
-export async function salesScope(u:Session,id:string){if(!salesRead(u)&&!salesWarehouse(u)||salesRep(u)&&id!==u.permissions.salesAgentId)salesFail('پرونده پیدا نشد یا دسترسی ندارید.',404);const a=await salesEntity(id,'sales_agent');if(salesRep(u)&&!a.data.active)salesFail('نمایندگی غیرفعال شده است.',403);return a;}
+export async function liveSalesUser(u:Session){if(u.isAdmin||trainingContext.getStore())return u;const m:any=await storage().prepare("SELECT status,permissions FROM app_members WHERE subject=? OR id=?").bind(u.userId,u.userId.startsWith('local:')?u.userId.slice(6):u.userId).first();if(!m||m.status!=='active')salesFail('دسترسی فعال لازم است.',403);return {...u,permissions:JSON.parse(m.permissions)};}
+export async function salesVisible(u:Session,a:any){return salesRep(u)?a.id===u.permissions.salesAgentId:!salesStaff(u)||salesManager(u)||salesFinance(u)||a.data.ownerId===await memberId(u);}
+export async function salesScope(u:Session,id:string){u=await liveSalesUser(u);if(!salesRead(u)&&!salesWarehouse(u)||salesRep(u)&&id!==u.permissions.salesAgentId)salesFail('پرونده پیدا نشد یا دسترسی ندارید.',404);const a=await salesEntity(id,'sales_agent');if(!await salesVisible(u,a))salesFail('پرونده در دسترسی شما نیست.',404);if(salesRep(u)&&!a.data.active)salesFail('نمایندگی غیرفعال شده است.',403);return a;}
 export async function salesLock(db:D1Database,id:string){const r:any=await db.prepare("SELECT revision FROM flow_entities WHERE id='sales-lock'").first();const now=new Date().toISOString();return [db.prepare("UPDATE inventory_operations SET guard=CASE WHEN COALESCE((SELECT revision FROM flow_entities WHERE id='sales-lock'),0)=? THEN guard ELSE 0 END WHERE id=?").bind(r?.revision||0,id),db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES('sales-lock','sales_lock','{}',1,?,?) ON CONFLICT(id) DO UPDATE SET revision=flow_entities.revision+1,updated=excluded.updated").bind(now,now)];}
-export async function salesQuote(agent:any,items:any[],rows:any[]){
- if(!agent.data.active)salesFail('نمایندگی غیرفعال است.');const today=dayAt();const targets=rows.filter(r=>r.type==='sales_target'&&r.data.agentId===agent.id&&r.data.state==='active'&&r.data.start<=today&&r.data.end>=today);if(targets.length>1)salesFail('بازه قوانین تخفیف تداخل دارد.',409);
+export async function salesQuote(agent:any,items:any[],rows:any[],options:any={}){
+ if(agent.data.kind==='referrer')salesFail('عامل معرف طرف حساب خرید نیست.');if(!agent.data.active)salesFail('نمایندگی غیرفعال است.');const today=dayAt();const targets=rows.filter(r=>r.type==='sales_target'&&r.data.agentId===agent.id&&r.data.state==='active'&&r.data.start<=today&&r.data.end>=today);if(targets.length>1)salesFail('بازه قوانین تخفیف تداخل دارد.',409);
  const target=targets[0],progress=target?salesTargetProgress(target,rows,today):null,discountBps=progress?.discountBps||0;
  const lines:any[]=[];for(const i of arr(items,30)){const productId=sreq(i.productId),quantity=integer(i.quantity,1,10000);if(lines.some(l=>l.productId===productId))salesFail('کالای تکراری را در یک ردیف ثبت کنید.');
  const r:any=await storage().prepare("SELECT payload FROM records WHERE id=? AND kind='product'").bind(productId).first();if(!r||JSON.parse(r.payload).status==='غیرفعال'||JSON.parse(r.payload).status==='توقف تولید')salesFail('محصول فعال موجود نیست.');const product=JSON.parse(r.payload);
  const prices=rows.filter(p=>p.type==='sales_price'&&p.data.productId===productId&&p.data.active&&(p.data.agentId===''||p.data.agentId===agent.id));const price=prices.find(p=>p.data.agentId===agent.id)||prices.find(p=>p.data.agentId==='');if(!price)salesFail('قیمت فعال برای محصول ثبت نشده است.');const lineBps=target&&target.data.productIds.length&&!target.data.productIds.includes(productId)?0:discountBps;const unitNet=(rial(price.data.unitPrice)*BigInt(10000-lineBps))/BigInt(10000);if(unitNet<=BigInt(0))salesFail('قیمت پس از تخفیف معتبر نیست.');
  lines.push({productId,name:product.name||product.model||product.code,model:product.model||'',quantity,priceId:price.id,priceRevision:price.revision,unitPrice:price.data.unitPrice,discountBps:lineBps,unitNet:String(unitNet),net:String(unitNet*BigInt(quantity)),discount:String((rial(price.data.unitPrice)-unitNet)*BigInt(quantity))});}
  if(total(lines,l=>l.net)>BigInt('999999999999999999'))salesFail('جمع سفارش از سقف مبلغ مجاز بیشتر است.');
- const quote={agentId:agent.id,agentRevision:agent.revision,day:today,lines,amount:String(total(lines,l=>l.net)),discount:String(total(lines,l=>l.discount)),discountBps,targetId:target?.id||'',targetRevision:target?.revision||0,targetProgress:progress?.progress||'0',discountPolicy:'net-invoiced-next-order-v1',termDays:agent.data.termDays,due:addDay(today,agent.data.termDays),recipient:{name:agent.data.name,phone:agent.data.phone,address:agent.data.address,province:agent.data.province,city:agent.data.city}};
+ const template=rows.filter(r=>r.type==='sales_template'&&r.data.kind===(agent.data.kind||'representative')).sort((a,b)=>(b.data.version||0)-(a.data.version||0)||b.created.localeCompare(a.created)||b.id.localeCompare(a.id))[0];
+ if(!template&&options.salesTerms)salesFail('ابتدا مدیر الگوی عمومی را تعریف کند.');
+ const terms=template?{templateId:template.id,templateRevision:template.revision,cashBps:integer(options.salesTerms?.cashBps??template.data.cashBps,0,10000),months:integer(options.salesTerms?.months??template.data.months,0,12),standardCashBps:template.data.cashBps,standardMonths:template.data.months}:null;
+ let referral:any=null;if(options.referrerId){const ref=rows.find(r=>r.type==='sales_agent'&&r.id===options.referrerId&&r.data.active&&r.data.kind==='referrer'),contracts=rows.filter(r=>r.type==='sales_contract'&&r.data.agentId===ref?.id&&r.data.state==='approved'&&r.data.start<=today&&r.data.end>=today);if(!ref||contracts.length!==1)salesFail('عامل معرف با قرارداد مصوب معتبر انتخاب کنید.');const c=contracts[0];referral={agentId:ref.id,contractId:c.id,bps:c.data.bps,basis:'net-collected-v1'};}
+ const quote={...(terms?{salesTerms:terms,installments:termsPlan(String(total(lines,l=>l.net)),terms,today)}:{}),...(referral?{referral}:{}),agentId:agent.id,agentRevision:agent.revision,day:today,lines,amount:String(total(lines,l=>l.net)),discount:String(total(lines,l=>l.discount)),discountBps,targetId:target?.id||'',targetRevision:target?.revision||0,targetProgress:progress?.progress||'0',discountPolicy:'net-invoiced-next-order-v1',termDays:agent.data.termDays,due:addDay(today,agent.data.termDays),recipient:{name:agent.data.name,phone:agent.data.phone,address:agent.data.address,province:agent.data.province,city:agent.data.city}};
  return {...quote,quoteHash:await sha256(new TextEncoder().encode(JSON.stringify(quote)).buffer)};
 }
 export function publicSalesFile(f:any){const {objectKey,uploadSignature,actor,...data}=f.data;return {...f,data};}

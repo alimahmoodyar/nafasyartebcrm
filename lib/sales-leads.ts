@@ -1,6 +1,6 @@
 import {storage} from './storage';
 import {salesManager,salesStaff} from './sales-access';
-import {salesLock,salesFail as fail,sreq,stxt,sday,money,integer} from './sales';
+import {salesScope,salesLock,salesFail as fail,sreq,stxt,sday,money,integer} from './sales';
 import {dayAt} from './duties';
 import {trainingContext} from './training-context';
 import type {Session} from './permissions';
@@ -45,7 +45,7 @@ export async function applyLead(u:Session,b:any){
   if(!Array.isArray(b.items)||b.items.length>30||new Set(b.items.map((l:any)=>l.productId)).size!==b.items.length)fail('محصولات تکراری یا نامعتبرند.');
   const items=[];for(const l of b.items){const p:any=await db.prepare("SELECT id,payload FROM records WHERE id=? AND kind='product'").bind(sreq(l.productId,200)).first();if(!p||JSON.parse(p.payload).status!=='فعال')fail('محصول فعال انتخاب کنید.');checks.push(db.prepare('UPDATE inventory_operations SET guard=CASE WHEN EXISTS(SELECT 1 FROM records WHERE id=? AND payload=?) THEN guard ELSE 0 END WHERE id=?').bind(p.id,p.payload,b.id));items.push({productId:p.id,quantity:integer(l.quantity,1,10000)});}
   if(['qualified','proposal','negotiation'].includes(d.stage)&&!items.length)fail('فرصت نیازسنجی‌شده باید محصول و تعداد داشته باشد.');
-  const agentId=stxt(b.agentId||'',200);if(agentId){const agent:any=await db.prepare("SELECT id,revision,data FROM flow_entities WHERE id=? AND type='sales_agent'").bind(agentId).first();if(!agent||!JSON.parse(agent.data).active)fail('طرف حساب فروش فعال انتخاب کنید.');checks.push(db.prepare('UPDATE inventory_operations SET guard=CASE WHEN EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?) THEN guard ELSE 0 END WHERE id=?').bind(agentId,agent.revision,b.id));}
+  const agentId=stxt(b.agentId||'',200);if(agentId){await salesScope(u,agentId);const agent:any=await db.prepare("SELECT id,revision,data FROM flow_entities WHERE id=? AND type='sales_agent'").bind(agentId).first();if(!agent||!JSON.parse(agent.data).active)fail('طرف حساب فروش فعال انتخاب کنید.');checks.push(db.prepare('UPDATE inventory_operations SET guard=CASE WHEN EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?) THEN guard ELSE 0 END WHERE id=?').bind(agentId,agent.revision,b.id));}
   d={...d,title:sreq(b.title,200),contactName:sreq(b.contactName,200),company:stxt(b.company||'',200),phone,email,city:sreq(b.city,100),source:b.source,sourceDetail:stxt(b.sourceDetail||'',500),segment:b.segment,ownerId,items,interest:sreq(b.interest,2000),estimatedAmount:b.estimatedAmount?money(b.estimatedAmount):'',expectedDay:b.expectedDay?sday(b.expectedDay):'',competitor:stxt(b.competitor||'',500),decisionMaker:stxt(b.decisionMaker||'',500),tenderDeadline:b.tenderDeadline?sday(b.tenderDeadline):'',agentId,stage:d.stage||'new',createdDay:d.createdDay||today,createdBy:d.createdBy||u.userId};followup();
  }else if(b.mode==='assign'){if(!a.manager)fail('انتقال مسئولیت فقط با مدیر فروش است.',403);open();d.ownerId=owner(sreq(b.ownerId,200));followup();}
  else if(b.mode==='stage'){open();if(!['new','contacted','qualified','proposal','negotiation','nurture'].includes(b.stage))fail('مرحله نامعتبر است.');if(['qualified','proposal','negotiation'].includes(b.stage)&&!d.items.length)fail('ابتدا محصول و تعداد موردنیاز را ثبت کنید.');d.stage=b.stage;followup();}
