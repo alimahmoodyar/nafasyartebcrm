@@ -7,7 +7,7 @@ export const stages = ["مصرف قطعه", "مونتاژ", "آزمون نهای
 export type Permissions = {qmsRoles?:string[];personnelRoles?:string[];hospitalCenterId?:string;salesRoles?:string[];salesAgentId?:string;transportRoles?:string[];serviceRoles?:string[];serviceDomains?:string[];serviceAgentId?:string;supplyRoles?: string[];warehouses?: string[];flowRoles?: string[];read: Kind[]; write: Kind[]; eventStages: string[]; finance?: "none"|"read"|"write"};
 export type Session = {username?:string;authType?:"password"|"chatgpt";userId: string; email: string; name: string; isAdmin: boolean; permissions: Permissions};
 export type Member = {canDelete?:boolean;username?:string;id: string; email: string; name: string; unit: string; status: string; userId: string | null; permissions: Permissions; revision: number; created: string; updated: string};
-export const allPermissions: Permissions = {personnelRoles:["hr","payroll","approver","finance","treasury"],salesRoles:["manager","staff","finance","viewer"],transportRoles:['manager','driver'],serviceRoles:["manager","support","intake","technician","coordinator","inventory","logistics","finance"],serviceDomains:["home","hospital"],supplyRoles:["sales","ceo","engineering","inventory","finance","domestic","foreign"],warehouses:["raw","semi","line","quarantine","nonconforming","finished"],flowRoles:["inventory","qc","production","procurement","sales","logistics"],read: modules, write: modules, eventStages: stages, finance: "write"};
+export const allPermissions: Permissions = {personnelRoles:["hr","payroll","approver","finance","treasury"],salesRoles:["manager","staff","finance","viewer"],transportRoles:['manager','driver'],serviceRoles:["manager","support","intake","technician","coordinator","inventory","logistics","finance"],serviceDomains:["home","hospital"],supplyRoles:["sales","ceo","engineering","inventory","finance","domestic","foreign","commerce_manager"],warehouses:["raw","semi","line","quarantine","nonconforming","finished"],flowRoles:["inventory","qc","production","procurement","sales","logistics"],read: modules, write: modules, eventStages: stages, finance: "write"};
 export const presets: Record<string, Permissions> = {
  "مدیر فروش": {salesRoles:["manager","staff"],flowRoles:["sales"],read:[],write:[],eventStages:[]},
  "کارشناس فروش": {salesRoles:["staff"],flowRoles:["sales"],read:[],write:[],eventStages:[]},
@@ -47,7 +47,7 @@ export function validatePermissions(value: unknown): Permissions {
   if(p.finance!==undefined&&!(["none","read","write"] as unknown[]).includes(p.finance))throw new Error("دسترسی مالی معتبر نیست.");
   if(p.flowRoles!==undefined&&(!Array.isArray(p.flowRoles)||p.flowRoles.some(r=>!['inventory','qc','production','procurement','sales','logistics'].includes(r))))throw new Error('نقش گردش مواد معتبر نیست.');
   if(p.warehouses!==undefined&&(!Array.isArray(p.warehouses)||p.warehouses.some(w=>!['raw','semi','line','quarantine','nonconforming','finished'].includes(w))))throw new Error('انبار مجاز معتبر نیست.');
-  if(p.supplyRoles!==undefined&&(!Array.isArray(p.supplyRoles)||p.supplyRoles.some(r=>!['sales','ceo','engineering','inventory','finance','domestic','foreign'].includes(r))))throw new Error('نقش برنامه‌ریزی تأمین معتبر نیست.');
+  if(p.supplyRoles!==undefined&&(!Array.isArray(p.supplyRoles)||p.supplyRoles.some(r=>!['sales','ceo','engineering','inventory','finance','domestic','foreign','commerce_manager'].includes(r))))throw new Error('نقش برنامه‌ریزی تأمین معتبر نیست.');
   if(p.transportRoles!==undefined&&(!Array.isArray(p.transportRoles)||p.transportRoles.some(r=>!['manager','driver'].includes(r))))throw new Error('نقش تدارکات معتبر نیست.');
   if(p.serviceRoles!==undefined&&(!Array.isArray(p.serviceRoles)||p.serviceRoles.some(r=>!['manager','support','intake','technician','coordinator','inventory','logistics','finance','agent'].includes(r))))throw new Error('نقش خدمات معتبر نیست.');
   if(p.serviceDomains!==undefined&&(!Array.isArray(p.serviceDomains)||p.serviceDomains.some(r=>!['home','hospital'].includes(r))))throw new Error('حوزه خدمات معتبر نیست.');
@@ -69,3 +69,6 @@ for(const [role,label] of Object.entries({hr:"اداری و منابع انسا�
 for(const [role,label] of Object.entries(qmsRoles))presets[label]={read:[],write:[],eventStages:[],qmsRoles:[role]};
 presets["تحقیق‌وتوسعه و مهندسی طراحی"]={read:["product"],write:[],eventStages:[],supplyRoles:["engineering"]};
 presets["مدیرعامل"]={read:["product"],write:[],eventStages:[],supplyRoles:["ceo"]};
+
+presets['مدیر بازرگانی']={read:[],write:[],eventStages:[],supplyRoles:['commerce_manager','foreign','domestic']};
+presets['بازرگانی خارجی']={read:[],write:[],eventStages:[],supplyRoles:['foreign']};

@@ -1,3 +1,5 @@
+import {syncForeignTasks} from '@/lib/foreign-purchase-tasks';
+import {installForeignPosition} from '@/lib/foreign-purchase';
 import {syncQmsTasks} from '@/lib/qms-tasks';
 import {syncPersonnelTasks} from '@/lib/personnel-tasks';
 import {syncLeadTasks} from '@/lib/sales-lead-tasks';
@@ -20,7 +22,7 @@ import {installDutyStarter} from '@/lib/duty-starter-install';
 import {sha256} from '@/lib/firmware';
 export async function POST(request:Request){try{
  let source='interactive';const supplied=request.headers.get('authorization');
- if(supplied){if(!env.TASK_SCHEDULER_TOKEN||await sha256(new TextEncoder().encode(supplied).buffer)!==await sha256(new TextEncoder().encode('Bearer '+env.TASK_SCHEDULER_TOKEN).buffer))throw new AccessError('دسترسی زمان‌بند مجاز نیست.',401);source='background';}else{checkOrigin(request);const user=await requireAccess();if(user.isAdmin){await installDutyStarter(user);await installSupplyPositions(user);await installServicePositions(user);await installTransportPositions(user);}}
+ if(supplied){if(!env.TASK_SCHEDULER_TOKEN||await sha256(new TextEncoder().encode(supplied).buffer)!==await sha256(new TextEncoder().encode('Bearer '+env.TASK_SCHEDULER_TOKEN).buffer))throw new AccessError('دسترسی زمان‌بند مجاز نیست.',401);source='background';}else{checkOrigin(request);const user=await requireAccess();if(user.isAdmin){await installDutyStarter(user);await installForeignPosition(user);await installSupplyPositions(user);await installServicePositions(user);await installTransportPositions(user);}}
  const last:any=await storage().prepare("SELECT updated FROM flow_entities WHERE id='duty_scheduler'").first();if(source!=='background'&&last&&Date.now()-Date.parse(last.updated)<60000)return Response.json({skipped:true,at:last.updated},{headers:{'Cache-Control':'no-store'}});
  await scanHospitalMaintenance(source);
  await syncHospitalTasks();
@@ -30,7 +32,7 @@ export async function POST(request:Request){try{
  await syncSupplierQuality();
  await syncSalesTasks();
  await syncLeadTasks();
- await syncPersonnelTasks();
+ await syncPersonnelTasks();await syncForeignTasks();
  await syncQmsTasks();
  await scanSalesMonitor({source});
  await syncServiceTasks();

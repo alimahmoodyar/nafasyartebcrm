@@ -6,7 +6,7 @@ import {taskRequired as req,taskText as txt,validDay,dayAt} from './duties';
 import {packingPrediction} from './shipment-contract';
 export const shipmentFail=(m:string,status=400):never=>{throw new AccessError(m,status)};
 export const shipmentVisible=(u:any,route:string)=>!u.permissions.salesAgentId&&!u.permissions.serviceAgentId&&!u.permissions.hospitalCenterId&&supplierCommercial(u,route);
-export const shipmentWrite=(u:any,route:string)=>shipmentVisible(u,route)&&hasSupply(u,route);
+export const shipmentWrite=(u:any,route:string)=>shipmentVisible(u,route)&&(hasSupply(u,route)||hasSupply(u,'commerce_manager'));
 export async function shipmentRows(){return supplierRows('purchase_shipment');}
 export async function shipmentBy(u:any,id:string){const s=await supplierEntity(id,'purchase_shipment');if(!shipmentVisible(u,s.data.route))shipmentFail('پرونده در دسترس نیست.',404);return s;}
 const number=(v:any,zero=false)=>{if(typeof v!=='string'||!/^\d{1,9}(\.\d{1,6})?$/.test(v)||!Number.isFinite(Number(v))||Number(v)<0||!zero&&Number(v)===0)shipmentFail('مقدار عددی معتبر و مثبت لازم است.');return v;};
@@ -37,12 +37,12 @@ export async function applyShipment(u:any,b:any){
  if(old)shipmentFail('برای ایجاد محموله جدید شناسه پرونده نفرستید.');const {supplier,lines}=await shipmentLines(u,req(b.supplierId),b.lines);if(!shipmentWrite(u,supplier.data.route))shipmentFail('مجوز بازرگانی مسیر لازم است.',403);guard(supplier);for(const l of lines){guard({id:l.linkId,revision:l.linkRevision});guard({id:l.materialId,revision:l.materialRevision});}
  if(!['IRR','IRT','USD','EUR','CNY'].includes(b.currency))shipmentFail('ارز معتبر لازم است.');put(id,'purchase_shipment',{supplierId:supplier.id,supplierName:supplier.data.name,route:supplier.data.route,currency:b.currency,title:req(b.title,200),reference:req(b.reference,200),state:'draft',initial:{day:date(b.day),lines},history:[{mode,actor:u.userId,at:now,notes}]});
  }else{
- if(!old)shipmentFail('محموله لازم است.');if(!shipmentWrite(u,old.data.route))shipmentFail('مجوز بازرگانی مسیر لازم است.',403);const data={...old.data,history:[...old.data.history,{mode,actor:u.userId,at:now,notes}]},files=await supplierRows('shipment_file');
+ if(!old)shipmentFail('محموله لازم است.');if(!shipmentWrite(u,old.data.route))shipmentFail('مجوز بازرگانی مسیر لازم است.',403);const data={...old.data,history:[...old.data.history,{mode,actor:u.userId,at:now,notes}]},files=[...await supplierRows('shipment_file'),...await supplierRows('foreign_file')];
  const evidence=(kind:string)=>{const f=files.find(f=>f.id===b.documentId&&f.data.shipmentId===old.id&&f.data.kind===kind);if(!f)shipmentFail('مدرک تاریخ‌دار همین مرحله و محموله لازم است.');guard(f);return {id:f!.id,sha256:f!.data.sha256,day:f!.data.issuedOn};};
- if(mode==='register'&&old.data.state==='draft'){data.registration={day:date(b.day),reference:req(b.reference,200),document:evidence('registration'),lines:old.data.initial.lines};data.state='registered';}
- else if(mode==='permit'&&old.data.state==='registered'){const day=date(b.day);if(day<old.data.registration.day)shipmentFail('مجوز قبل از ثبت سفارش نیست.');data.permit={day,reference:req(b.reference,200),document:evidence('permit')};data.state='permitted';}
+ if(mode==='register'&&!old.data.registration){data.registration={day:date(b.day),reference:req(b.reference,200),document:evidence('registration'),lines:old.data.initial.lines};data.state=old.data.actual?(old.data.amendments?.length?'amended':'loaded'):'registered';}
+ else if(mode==='permit'&&old.data.registration&&!old.data.permit){const day=date(b.day);if(day<old.data.registration.day)shipmentFail('مجوز قبل از ثبت سفارش نیست.');data.permit={day,reference:req(b.reference,200),document:evidence('permit')};data.state=old.data.actual?(old.data.amendments?.length?'amended':'loaded'):'permitted';}
  else if(mode==='historical'&&old.data.state==='draft'){const {lines}=await shipmentLines(u,old.data.supplierId,b.lines,true,old.data.initial.lines);data.actual={day:date(b.day),lines,document:evidence('packing'),historical:true};data.state='loaded';}
- else if(mode==='actual'&&old.data.state==='permitted'){const day=date(b.day);if(day<old.data.permit.day)shipmentFail('بارگیری قبل از مجوز نیست.');const {lines}=await shipmentLines(u,old.data.supplierId,b.lines,true,old.data.initial.lines);data.actual={day,lines,document:evidence('packing')};data.state='loaded';}
+ else if(mode==='actual'&&!old.data.actual){const day=date(b.day);const {lines}=await shipmentLines(u,old.data.supplierId,b.lines,true,old.data.initial.lines);data.actual={day,lines,document:evidence('packing')};data.state='loaded';}
  else if(mode==='amend'&&['loaded','amended'].includes(old.data.state)){const day=date(b.day);if(day<old.data.actual.day)shipmentFail('اصلاح قبل از بارگیری نیست.');const amendment={day,reference:req(b.reference,200),document:evidence('registration'),lines:old.data.actual.lines,notes};data.amendments=[...(old.data.amendments||[]),amendment];data.state='amended';}
  else shipmentFail('مرحله با وضعیت فعلی سازگار نیست.',409);put(old.id,'purchase_shipment',data,old);
  }

@@ -100,3 +100,6 @@ resetHelp.push('مشخصات نسخه‌دار کالا و تأمین‌کنند
 
 // QMS product records, immutable forms, files and chunks are one retained catalog in operations reset. Full reset backs up all three and removes them together. Generic 0016 flow_entities freeze covers all writes; no new FKs.
 resetHelp.push("پرونده‌های کیفیت و طراحی، نسخه‌های فرم و قطعه‌های فایل در پاک‌سازی عملیات حفظ می‌شوند؛ پاک‌سازی کامل همه را با فهرست قطعه‌های فایل پشتیبان می‌گیرد. پشتیبان محرمانه فقط با نقش صریح طراحی قابل دریافت است.");
+
+// foreign_selection/file/statement/statement_row and foreign shipment stages are operational flow_entities. Generic 0016 freeze and both reset scopes cover all; duty children first, private foreign_file manifests backed up. No new schema/FKs.
+resetHelp.push('انتخاب منبع خارجی، نمونه، مراحل ارز، اکسل صراف، رفع تعهد و خرید و حمل در هر دو محدوده پشتیبان و حذف می‌شوند؛ سمت مدیر بازرگانی و حساب‌ها حفظ می‌شوند.');

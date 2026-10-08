@@ -6,7 +6,7 @@ export const supplierTypes=['supplier','supplier_material','supplier_review'];
 export const supplierRead=(u:Session)=>u.isAdmin||!!u.permissions.supplyRoles?.some(r=>['ceo','engineering','finance','domestic','foreign','inventory'].includes(r))||!!u.permissions.flowRoles?.some(r=>['qc','inventory','procurement'].includes(r));
 export const supplierManage=(u:Session)=>u.isAdmin||!!u.permissions.supplyRoles?.some(r=>['domestic','foreign','engineering'].includes(r))||!!u.permissions.flowRoles?.includes('procurement');
 export const supplierQuality=(u:Session)=>u.isAdmin||!!u.permissions.flowRoles?.includes('qc');
-export const supplierCommercial=(u:Session,route:string)=>u.isAdmin||!!u.permissions.supplyRoles?.some(r=>['ceo','finance',route].includes(r));
+export const supplierCommercial=(u:Session,route:string)=>u.isAdmin||!!u.permissions.supplyRoles?.some(r=>['ceo','finance','commerce_manager',route].includes(r));
 export const supplierRoute=(u:Session,route:string)=>u.isAdmin||!!u.permissions.supplyRoles?.some(r=>['ceo','engineering','finance','inventory',route].includes(r))||!!u.permissions.flowRoles?.some(r=>['qc','inventory','procurement'].includes(r));
 export async function supplierRows(type:string){return (await storage().prepare('SELECT * FROM flow_entities WHERE type=? ORDER BY created,id').bind(type).all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}));}
 export async function supplierEntity(id:string,type:string){const r:any=await storage().prepare('SELECT * FROM flow_entities WHERE id=? AND type=?').bind(id,type).first();if(!r)throw new AccessError('رکورد مرتبط یافت نشد.',404);return {...r,data:JSON.parse(r.data)};}

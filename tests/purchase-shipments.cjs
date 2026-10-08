@@ -44,7 +44,7 @@ const today=load('lib/duties.ts').dayAt();
  const line={linkId:'link',quantity:'10',unitPrice:'5.5',packaging:'Box 10',netKg:'2',grossKg:'3',volumeM3:'0.04'},create={supplierId:'sup',title:'Valve shipment',reference:'REF-1',currency:'USD',day:today,lines:[line]};
  await ship('create',create,403,actor('domestic'));await ship('create',{...create,lines:[{...line,grossKg:'1'}]},400);await ship('create',{...create,lines:[line,line]},400);
  const a=await ship('create',create);assert.equal((await ship('create',a.body)).repeated,true);
- await ship('actual',{shipmentId:a.id,revision:1,day:today,lines:[line],documentId:'none'},409);
+ await ship('actual',{shipmentId:a.id,revision:1,day:today,lines:[line],documentId:'none'},400);
  const pack=await attach(a.id,'packing');await ship('historical',{shipmentId:a.id,revision:1,day:today,documentId:pack,lines:[line]});assert.equal(shipment(a.id).data.state,'loaded');
  let r=await context.run(actor('foreign'),()=>shipments.GET(request('/api/purchase-shipments?link=link&quantity=20&packaging=Box%2010')));let d=await r.json();assert.equal(d.prediction.netKg,4);assert.equal(d.prediction.grossKg,6);assert.equal(d.prediction.volumeM3,0.08);assert.equal(d.prediction.sampleCount,1);assert.ok(!JSON.stringify(d.files).includes('objectKey'));
  r=await context.run(actor('domestic'),()=>shipments.GET(request('/api/purchase-shipments')));d=await r.json();assert.equal(d.shipments.length,0);
