@@ -1,0 +1,10 @@
+import {storage} from './storage';
+import {AccessError} from './authorization';
+// Product activation is sticky while any release record exists, including drafts/holds.
+// Evaluated inside the warehouse transaction too: a concurrent QA hold cannot race dispatch.
+export const qmsReleaseSql=`EXISTS(SELECT 1 FROM records qd WHERE qd.id=? AND qd.kind='device' AND (
+ NOT EXISTS(SELECT 1 FROM flow_entities q WHERE q.type='qms_record' AND json_extract(q.data,'$.kind')='release' AND json_extract(q.data,'$.productId')=json_extract(qd.payload,'$.product'))
+ OR (EXISTS(SELECT 1 FROM flow_entities q WHERE q.type='qms_record' AND json_extract(q.data,'$.kind')='release' AND json_extract(q.data,'$.productId')=json_extract(qd.payload,'$.product') AND json_extract(q.data,'$.state')='approved' AND EXISTS(SELECT 1 FROM json_each(q.data,'$.serials') s WHERE s.value=json_extract(qd.payload,'$.code')) AND EXISTS(SELECT 1 FROM json_each(q.data,'$.qualityEvidence') e WHERE json_extract(e.value,'$.deviceId')=qd.id AND json_extract(e.value,'$.reportId')=(SELECT qr.id FROM quality_reports qr WHERE qr.device_id=qd.id ORDER BY qr.created DESC,qr.id DESC LIMIT 1) AND EXISTS(SELECT 1 FROM quality_reports qr WHERE qr.id=json_extract(e.value,'$.reportId') AND qr.verdict='pass')))
+ AND NOT EXISTS(SELECT 1 FROM flow_entities q WHERE q.type='qms_record' AND json_extract(q.data,'$.kind')='release' AND json_extract(q.data,'$.productId')=json_extract(qd.payload,'$.product') AND json_extract(q.data,'$.state')='hold' AND (json_array_length(q.data,'$.serials') IS NULL OR EXISTS(SELECT 1 FROM json_each(q.data,'$.serials') s WHERE s.value=json_extract(qd.payload,'$.code')))))
+))`;
+export async function qmsDispatchGuard(deviceId:string,op:string){const db=storage();if(!await db.prepare('SELECT 1 AS allowed WHERE '+qmsReleaseSql).bind(deviceId).first())throw new AccessError('این سریال آزادسازی مصوب تضمین کیفیت ندارد یا متوقف شده است.',409);return db.prepare('UPDATE inventory_operations SET guard=CASE WHEN '+qmsReleaseSql+' THEN guard ELSE 0 END WHERE id=?').bind(deviceId,op);}

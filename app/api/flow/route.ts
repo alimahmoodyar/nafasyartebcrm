@@ -16,7 +16,7 @@ const arr=(a:any,max=80)=>{if(!Array.isArray(a)||!a.length||a.length>max)fail('�
 const json=(data:unknown)=>Response.json(data,{headers:{'Cache-Control':'no-store'}});
 export async function GET(){try{
  const u=await requireAccess();if(!['inventory','qc','production','procurement'].some(r=>flowRole(u,r)))fail('دسترسی گردش مواد ندارید.',403);const db=storage();
- const all=(await db.prepare('SELECT * FROM flow_entities ORDER BY created DESC,id').all()).results.map(entity);
+ const all=(await db.prepare("SELECT * FROM flow_entities WHERE type NOT GLOB 'qms_*' ORDER BY created DESC,id").all()).results.map(entity);
  const rows=(await db.prepare("SELECT * FROM records WHERE kind IN ('batch','product','device')").all()).results.map((r:any)=>({...r,data:JSON.parse(r.payload),payload:undefined}));
  const balances=(await db.prepare('SELECT * FROM inventory_balances').all()).results;
  const boms=(await db.prepare('SELECT * FROM bom_versions ORDER BY version DESC').all()).results;

@@ -1,9 +1,10 @@
+import {qmsRoles} from './qms-contract';
 import type {Kind} from "./model";
 
 export const modules: Kind[] = ["product", "batch", "device", "event", "service", "action", "distribution", "firmware"];
 const productionModules:Kind[]=["batch", "device", "event", "service", "action"];
 export const stages = ["مصرف قطعه", "مونتاژ", "آزمون نهایی", "بسته‌بندی", "تحویل"];
-export type Permissions = {personnelRoles?:string[];hospitalCenterId?:string;salesRoles?:string[];salesAgentId?:string;transportRoles?:string[];serviceRoles?:string[];serviceDomains?:string[];serviceAgentId?:string;supplyRoles?: string[];warehouses?: string[];flowRoles?: string[];read: Kind[]; write: Kind[]; eventStages: string[]; finance?: "none"|"read"|"write"};
+export type Permissions = {qmsRoles?:string[];personnelRoles?:string[];hospitalCenterId?:string;salesRoles?:string[];salesAgentId?:string;transportRoles?:string[];serviceRoles?:string[];serviceDomains?:string[];serviceAgentId?:string;supplyRoles?: string[];warehouses?: string[];flowRoles?: string[];read: Kind[]; write: Kind[]; eventStages: string[]; finance?: "none"|"read"|"write"};
 export type Session = {username?:string;authType?:"password"|"chatgpt";userId: string; email: string; name: string; isAdmin: boolean; permissions: Permissions};
 export type Member = {canDelete?:boolean;username?:string;id: string; email: string; name: string; unit: string; status: string; userId: string | null; permissions: Permissions; revision: number; created: string; updated: string};
 export const allPermissions: Permissions = {personnelRoles:["hr","payroll","approver","finance","treasury"],salesRoles:["manager","staff","finance","viewer"],transportRoles:['manager','driver'],serviceRoles:["manager","support","intake","technician","coordinator","inventory","logistics","finance"],serviceDomains:["home","hospital"],supplyRoles:["sales","ceo","engineering","inventory","finance","domestic","foreign"],warehouses:["raw","semi","line","quarantine","nonconforming","finished"],flowRoles:["inventory","qc","production","procurement","sales","logistics"],read: modules, write: modules, eventStages: stages, finance: "write"};
@@ -32,6 +33,8 @@ presets['تکنسین فنی بیمارستانی']={serviceRoles:['technician']
 presets['تکنسین فنی خانگی']={serviceRoles:['technician'],serviceDomains:['home'],read:[],write:[],eventStages:[]};
 export function validatePermissions(value: unknown): Permissions {
   const p = value as Permissions;
+  if(p?.qmsRoles!==undefined&&(!Array.isArray(p.qmsRoles)||p.qmsRoles.some(r=>!Object.hasOwn(qmsRoles,r))))throw Error("نقش کیفیت معتبر نیست.");
+  if(p?.qmsRoles?.length&&(p.hospitalCenterId||p.salesAgentId||p.serviceAgentId||p.salesRoles?.includes("agent")||p.serviceRoles?.includes("agent")))throw Error("حساب بیرونی مجوز کیفیت ندارد.");
   if(p?.personnelRoles!==undefined&&(!Array.isArray(p.personnelRoles)||p.personnelRoles.some(r=>!["hr","payroll","approver","finance","treasury"].includes(r))))throw Error("دسترسی پرسنلی معتبر نیست.");
   if(p?.personnelRoles?.length&&(p.hospitalCenterId||p.salesAgentId||p.serviceAgentId||p.salesRoles?.includes("agent")||p.serviceRoles?.includes("agent")))throw Error("حساب بیرونی مجوز پرسنلی ندارد.");
   if (!p || !Array.isArray(p.read) || !Array.isArray(p.write) || !Array.isArray(p.eventStages)) throw new Error("دسترسی‌ها معتبر نیستند.");
@@ -58,7 +61,11 @@ export function validatePermissions(value: unknown): Permissions {
   if(p.salesAgentId&&!p.salesRoles?.includes('agent'))throw new Error('ارتباط نماینده فروش فقط با نقش نماینده مجاز است.');
   if(p.hospitalCenterId!==undefined&&(typeof p.hospitalCenterId!=='string'||p.hospitalCenterId.length>200))throw Error('شناسه مرکز معتبر نیست.');
   if(p.hospitalCenterId&&(p.read.length||p.write.length||p.eventStages.length||p.salesRoles?.length||p.salesAgentId||p.serviceRoles?.length||p.serviceDomains?.length||p.serviceAgentId||p.flowRoles?.length||p.transportRoles?.length||p.supplyRoles?.length||p.finance&&p.finance!=='none'))throw Error('حساب مسئول مرکز فقط به مرکز خودش دسترسی دارد.');
-  return {personnelRoles:[...new Set(p.personnelRoles||[])],hospitalCenterId:p.hospitalCenterId||'',salesRoles:[...new Set(p.salesRoles||[])],salesAgentId:p.salesAgentId||'',transportRoles:[...new Set(p.transportRoles||[])],serviceRoles:[...new Set(p.serviceRoles||[])],serviceDomains:[...new Set(p.serviceDomains||[])],serviceAgentId:p.serviceAgentId||'',supplyRoles:[...new Set(p.supplyRoles||[])],...(p.warehouses!==undefined?{warehouses:[...new Set(p.warehouses)]}:{}),flowRoles:[...new Set(p.flowRoles||[])],finance:p.finance||"none",read: [...new Set(p.read)], write: [...new Set(p.write)], eventStages: p.write.includes("event") ? [...new Set(p.eventStages)] : []};
+  return {qmsRoles:[...new Set(p.qmsRoles||[])],personnelRoles:[...new Set(p.personnelRoles||[])],hospitalCenterId:p.hospitalCenterId||'',salesRoles:[...new Set(p.salesRoles||[])],salesAgentId:p.salesAgentId||'',transportRoles:[...new Set(p.transportRoles||[])],serviceRoles:[...new Set(p.serviceRoles||[])],serviceDomains:[...new Set(p.serviceDomains||[])],serviceAgentId:p.serviceAgentId||'',supplyRoles:[...new Set(p.supplyRoles||[])],...(p.warehouses!==undefined?{warehouses:[...new Set(p.warehouses)]}:{}),flowRoles:[...new Set(p.flowRoles||[])],finance:p.finance||"none",read: [...new Set(p.read)], write: [...new Set(p.write)], eventStages: p.write.includes("event") ? [...new Set(p.eventStages)] : []};
 }
 
 for(const [role,label] of Object.entries({hr:"اداری و منابع انسانی",payroll:"تهیه حقوق‌ودستمزد",approver:"تأیید حقوق و احکام",finance:"تأیید پرداخت پرسنلی",treasury:"ثبت پرداخت پرسنلی"}))presets[label]={read:[],write:[],eventStages:[],personnelRoles:[role]};
+
+for(const [role,label] of Object.entries(qmsRoles))presets[label]={read:[],write:[],eventStages:[],qmsRoles:[role]};
+presets["تحقیق‌وتوسعه و مهندسی طراحی"]={read:["product"],write:[],eventStages:[],supplyRoles:["engineering"]};
+presets["مدیرعامل"]={read:["product"],write:[],eventStages:[],supplyRoles:["ceo"]};

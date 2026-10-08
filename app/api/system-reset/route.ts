@@ -1,3 +1,4 @@
+import {guardQmsBackup} from '@/lib/qms';
 import {requireAccess,requireAdmin,checkOrigin,accessResponse} from '@/lib/authorization';
 import {storage} from '@/lib/storage';
 import {boundedBody,firmwareBucket} from '@/lib/firmware-storage';
@@ -10,12 +11,12 @@ const uuid=(x:any)=>{if(typeof x!=='string'||! /^[a-f0-9-]{36}$/i.test(x))fail('
 function account(r:Request,u:any){const expected=r.headers.get('x-assistant-account');if(expected&&expected!==u.userId)fail('حساب تغییر کرده است؛ صفحه را تازه کنید.',409);}
 export async function GET(request:Request){try{
  const q=new URL(request.url).searchParams;if(q.get('view')==='state'){const u=await requireAccess();account(request,u);const c=await resetControl();return json({accountId:u.userId,phase:c.phase});}
- const u=await requireAdmin();account(request,u);const c=await resetControl(),db=storage(),scope=q.get('scope')||'operations';if(!Object.hasOwn(resetScopes,scope))fail('محدوده معتبر انتخاب کنید.');
+ const u=await requireAdmin();account(request,u);await guardQmsBackup(u);const c=await resetControl(),db=storage(),scope=q.get('scope')||'operations';if(!Object.hasOwn(resetScopes,scope))fail('محدوده معتبر انتخاب کنید.');
  const jobs=(await db.prepare('SELECT * FROM reset_jobs ORDER BY created DESC LIMIT 20').all()).results;
  return json({accountId:u.userId,phase:c.phase,hasPassword:!!c.password_hash,revision:c.revision,activeJobId:c.job_id,scopes:resetScopes,preserved:resetPreserved,catalog:resetCatalog,help:resetHelp,counts:await resetCounts(scope),scope,jobs:jobs.map(publicResetJob)});
  }catch(e){return accessResponse(e)||Response.json({error:'دریافت تنظیمات پاک‌سازی ممکن نشد؛ مهاجرت 0016 سرور را بررسی کنید.'},{status:503})}}
 export async function POST(request:Request){let preparing='';try{
- checkOrigin(request);const u=await requireAdmin();account(request,u);const b=JSON.parse(new TextDecoder().decode(await boundedBody(request,4000))),db=storage(),c=await resetControl();
+ checkOrigin(request);const u=await requireAdmin();account(request,u);await guardQmsBackup(u);const b=JSON.parse(new TextDecoder().decode(await boundedBody(request,4000))),db=storage(),c=await resetControl();
  if(b.confirmed!==true)fail('تأیید صریح این عملیات لازم است.');
  if(!['password','prepare','cancel','execute'].includes(b.mode))fail('عملیات معتبر نیست.');
  const allowed=['mode','confirmed',...(b.mode==='password'?['password','currentPassword','revision']:b.mode==='prepare'?['id','scope','password']:b.mode==='cancel'?['id']:['id','password','confirmationCode','backupAcknowledged'])];

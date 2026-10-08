@@ -10,7 +10,7 @@ export const resetTables:Record<string,string>={
  serial_reservations:'سریال‌های رزروشده',serial_runs:'نوبت‌های چاپ سریال',inventory_operations:'عملیات کاری ثبت‌شده',quality_templates:'فرم‌های کنترل کیفیت',bom_versions:'نسخه‌های BOM',firmware_files:'فایل‌های نرم‌افزار دستگاه',flow_entities:'گردش‌های کاری و اطلاعات پایه',records:'سوابق دستگاه، کالا، بچ و خدمات'
 };
 export const resetFlowPreserved=['hospital_center','account_profile','position','duty_template','duty_catalog_install','transport_migration','development_request','as_agent','sales_agent'];
-export const resetFlowCatalog=['purchase_specification','routine_route','routine_policy','cost_material','cost_standard','sales_price','supplier_document','supplier_capa','supplier','supplier_material','supplier_review','material','capacity','party','as_tariff','transport_vehicle'];
+export const resetFlowCatalog=['qms_record','qms_file','qms_part','purchase_specification','routine_route','routine_policy','cost_material','cost_standard','sales_price','supplier_document','supplier_capa','supplier','supplier_material','supplier_review','material','capacity','party','as_tariff','transport_vehicle'];
 // Driver checklists, blockers and vehicle observations are embedded in operational
 // transport entities: backup, both reset scopes and 0016 freeze cover them.
 // Vehicle catalog stays preserved for operations-only reset. Browser drafts are local,
@@ -97,3 +97,6 @@ resetHelp.push('چک‌لیست راننده، موانع و موعد پیگیر
 
 // purchase_shipment/shipment_file: operational flow records, generic 0016 freeze and backups; no new FKs. purchase_specification retained with catalogs in operations reset.
 resetHelp.push('مشخصات نسخه‌دار کالا و تأمین‌کننده همراه تعاریف حفظ می‌شوند؛ محموله، پکینگ، ثبت سفارش و اصلاحات و مدارک خصوصی در هر دو محدوده پشتیبان و حذف می‌شوند.');
+
+// QMS product records, immutable forms, files and chunks are one retained catalog in operations reset. Full reset backs up all three and removes them together. Generic 0016 flow_entities freeze covers all writes; no new FKs.
+resetHelp.push("پرونده‌های کیفیت و طراحی، نسخه‌های فرم و قطعه‌های فایل در پاک‌سازی عملیات حفظ می‌شوند؛ پاک‌سازی کامل همه را با فهرست قطعه‌های فایل پشتیبان می‌گیرد. پشتیبان محرمانه فقط با نقش صریح طراحی قابل دریافت است.");

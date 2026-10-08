@@ -1,3 +1,4 @@
+import {syncQmsTasks} from '@/lib/qms-tasks';
 import {syncPersonnelTasks} from '@/lib/personnel-tasks';
 import {syncLeadTasks} from '@/lib/sales-lead-tasks';
 import {syncGuaranteeTasks} from '@/lib/guarantee-tasks';
@@ -30,6 +31,7 @@ export async function POST(request:Request){try{
  await syncSalesTasks();
  await syncLeadTasks();
  await syncPersonnelTasks();
+ await syncQmsTasks();
  await scanSalesMonitor({source});
  await syncServiceTasks();
  await syncTransportTasks();

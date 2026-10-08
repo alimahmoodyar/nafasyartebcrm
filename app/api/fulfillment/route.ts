@@ -1,3 +1,4 @@
+import {qmsDispatchGuard} from '@/lib/qms-release';
 import {scanSalesMonitor} from '@/lib/sales-monitor';
 import {syncSalesTasks} from '@/lib/sales-tasks';
 import {salesStaff,salesLock} from '@/lib/sales';
@@ -73,7 +74,7 @@ export async function POST(request:Request){try{
  let selected:string[];
  if(Array.isArray(b.deviceIds)&&b.deviceIds.length)selected=ids(b.deviceIds);else selected=(await db.prepare("SELECT f.id FROM flow_entities f JOIN records r ON r.id=f.id WHERE f.type='build' AND json_extract(f.data,'$.state')='finished' AND json_extract(r.payload,'$.product')=? ORDER BY json_extract(f.data,'$.receivedAt'),f.id LIMIT ?").bind(productId,count).all()).results.map((r:any)=>r.id);
  if(selected.length!==count)fail('موجودی آزاد برای این تعداد کافی نیست.',409);
- for(const did of selected){const build=await get(did,'build'),d=await device(did);if(d.product!==productId||build.data.state!=='finished')fail('سریال هم‌مدل و آزاد در انبار انتخاب کنید.',409);guard("EXISTS(SELECT 1 FROM inventory_balances WHERE item_id=? AND warehouse='finished' AND quantity=1000)",did);put(did,'build',{...build.data,state:'reserved',saleId:id},build);event(did,'رزرو فروش',{notes:p.data.name});}
+ for(const did of selected){checks.push(await qmsDispatchGuard(did,id));const build=await get(did,'build'),d=await device(did);if(d.product!==productId||build.data.state!=='finished')fail('سریال هم‌مدل و آزاد در انبار انتخاب کنید.',409);guard("EXISTS(SELECT 1 FROM inventory_balances WHERE item_id=? AND warehouse='finished' AND quantity=1000)",did);put(did,'build',{...build.data,state:'reserved',saleId:id},build);event(did,'رزرو فروش',{notes:p.data.name});}
  put(id,'sale',{salesOrderId:order?.id||'',salesAgentId:order?.data.agentId||'',productId,partyId:p.id,recipient:p.data,deviceIds:selected,count,state:'reserved',by:u.name,actor:u.userId,notes:text(b.notes||'',4000)});
  }else if(mode==='cancel_sale'){
  const sale=await get(needed(b.saleId),'sale');if(sale.data.state!=='reserved')fail('فقط رزرو ارسال‌نشده قابل لغو است.');const reason=needed(b.reason,4000);
@@ -83,7 +84,7 @@ export async function POST(request:Request){try{
  guard("EXISTS(SELECT 1 FROM app_members WHERE id=? AND status='active' AND permissions=?)",carrier.id,carrier.permissions);
  const changed=JSON.stringify([...selected].sort())!==JSON.stringify([...sale.data.deviceIds].sort());const reason=text(b.reason||'',4000);if(changed&&!reason)fail('علت تغییر سریال‌های پیشنهادی را بنویسید.');if(b.handedOver!==true)fail('تحویل فیزیکی به تدارکات را تأیید کنید.');
  for(const did of sale.data.deviceIds.filter((d:string)=>!selected.includes(d))){const build=await get(did,'build');if(build.data.state!=='reserved'||build.data.saleId!==sale.id)fail('رزرو تغییر کرده است.',409);put(did,'build',{...build.data,state:'finished',saleId:null},build);event(did,'آزادسازی سریال رزرو',{notes:reason});}
- for(const did of selected){const build=await get(did,'build'),d=await device(did);if(d.product!==sale.data.productId||!(build.data.state==='finished'||build.data.state==='reserved'&&build.data.saleId===sale.id))fail('سریال خروج موجود نیست یا برای حواله دیگری رزرو شده است.',409);
+ for(const did of selected){checks.push(await qmsDispatchGuard(did,id));const build=await get(did,'build'),d=await device(did);if(d.product!==sale.data.productId||!(build.data.state==='finished'||build.data.state==='reserved'&&build.data.saleId===sale.id))fail('سریال خروج موجود نیست یا برای حواله دیگری رزرو شده است.',409);
  entry(did,'finished',-1000);entry(did,'in_transit',1000);put(did,'build',{...build.data,state:'in_transit',saleId:sale.id,dispatchedAt:now,carrierId:carrier.id,recipient:sale.data.recipient},build);event(did,'خروج انبار ـ تحویل تدارکات',{notes:'مقصد: '+sale.data.recipient.name+' · تحویل‌گیرنده: '+carrier.name,recipient:sale.data.recipient.name,carrier:carrier.name});}
  put(sale.id,'sale',{...sale.data,originalDeviceIds:sale.data.deviceIds,deviceIds:selected,state:'in_transit',carrierId:carrier.id,carrierSubject:carrier.subject||'',carrierName:carrier.name,dispatchedBy:u.name,dispatchedActor:u.userId,dispatchedAt:now,reason,receiptReference:text(b.receiptReference||'',300)},sale);
  }else if(mode==='acknowledge'){
