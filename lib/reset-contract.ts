@@ -10,7 +10,7 @@ export const resetTables:Record<string,string>={
  serial_reservations:'سریال‌های رزروشده',serial_runs:'نوبت‌های چاپ سریال',inventory_operations:'عملیات کاری ثبت‌شده',quality_templates:'فرم‌های کنترل کیفیت',bom_versions:'نسخه‌های BOM',firmware_files:'فایل‌های نرم‌افزار دستگاه',flow_entities:'گردش‌های کاری و اطلاعات پایه',records:'سوابق دستگاه، کالا، بچ و خدمات'
 };
 export const resetFlowPreserved=['hospital_center','account_profile','position','duty_template','duty_catalog_install','transport_migration','development_request','as_agent','sales_agent'];
-export const resetFlowCatalog=['routine_route','routine_policy','cost_material','cost_standard','sales_price','supplier_document','supplier_capa','supplier','supplier_material','supplier_review','material','capacity','party','as_tariff','transport_vehicle'];
+export const resetFlowCatalog=['purchase_specification','routine_route','routine_policy','cost_material','cost_standard','sales_price','supplier_document','supplier_capa','supplier','supplier_material','supplier_review','material','capacity','party','as_tariff','transport_vehicle'];
 // Driver checklists, blockers and vehicle observations are embedded in operational
 // transport entities: backup, both reset scopes and 0016 freeze cover them.
 // Vehicle catalog stays preserved for operations-only reset. Browser drafts are local,
@@ -94,3 +94,6 @@ resetHelp.push('الگوهای فروش، تماس و همکاری، قرارد�
 resetHelp.push('چک‌لیست راننده، موانع و موعد پیگیری و گزارش‌های خودرو داخل مأموریت حمل در هر دو محدوده پشتیبان و حذف می‌شوند و قفل عمومی عملیات را دارند؛ مشخصات خودرو در پاک‌سازی عملیات حفظ می‌شود. پیش‌نویس‌های مرورگر جدا از پشتیبان سرورند و پس از هفت روز منقضی می‌شوند.');
 
 // Advance requestMonth/limitAssessment are embedded in hr_request: generic 0016 freeze, existing backup and both reset scopes apply; no new table or FK.
+
+// purchase_shipment/shipment_file: operational flow records, generic 0016 freeze and backups; no new FKs. purchase_specification retained with catalogs in operations reset.
+resetHelp.push('مشخصات نسخه‌دار کالا و تأمین‌کننده همراه تعاریف حفظ می‌شوند؛ محموله، پکینگ، ثبت سفارش و اصلاحات و مدارک خصوصی در هر دو محدوده پشتیبان و حذف می‌شوند.');
