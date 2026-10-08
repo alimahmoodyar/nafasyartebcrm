@@ -5,7 +5,8 @@ import {PersonalHome} from './personal-home';
 
 const AccountContext=createContext<string|null>(null);
 export function LayoutAccountProvider({accountId,children}:{accountId:string;children:ReactNode}){return <AccountContext.Provider value={accountId}>{children}</AccountContext.Provider>}
-type Menu={items:[string,string][];value:string;onChange:(key:string)=>void};
+type Menu={items:[string,string][];value:string;onChange:(key:string)=>void|boolean};
+const ProgramPathContext=createContext('');
 type WorkspaceContext={register:(menu:Menu|null)=>void;showHome:boolean;open:()=>void;reveal:()=>void;select:(key:string)=>void};
 const NavigationContext=createContext<WorkspaceContext|null>(null);
 export function subprogramIcon(key:string,title:string):LucideIcon{
@@ -27,23 +28,31 @@ export function subprogramIcon(key:string,title:string):LucideIcon{
 }
 export function ProgramWorkspace({programId,title,direct=false,children}:{programId:string;title:string;direct?:boolean;children:ReactNode}){
  const accountId=useContext(AccountContext),[menu,setMenu]=useState<Menu|null>(null),[showHome,setShowHome]=useState(!direct);
+ const parentPath=useContext(ProgramPathContext),path=parentPath?parentPath+'/'+programId:programId;
  const register=useCallback((next:Menu|null)=>setMenu(next),[]);
- const select=useCallback((key:string)=>{if(!menu?.items.some(([id])=>id===key))return;menu.onChange(key);setShowHome(false)},[menu]);
+ const select=useCallback((key:string)=>{if(!menu?.items.some(([id])=>id===key))return;if(menu.onChange(key)!==false)setShowHome(false)},[menu]);
  const open=useCallback(()=>setShowHome(true),[]);
  const reveal=useCallback(()=>setShowHome(false),[]);
  useEffect(()=>{if(direct)setShowHome(false)},[direct]);
  const navigation=useMemo(()=>accountId?({register,showHome,open,reveal,select}):null,[accountId,register,showHome,open,reveal,select]);
  const canLaunch=!!accountId&&!!menu?.items.length;
  return <NavigationContext.Provider value={navigation}><div className="program-workspace">
- {canLaunch&&showHome&&<PersonalHome key={accountId+programId} accountId={accountId} name="" scope={programId} title={title} greeting={false} shortTitles={false} apps={menu!.items.map(([key,label])=>({key,title:label,icon:subprogramIcon(key,label)}))} onNavigate={select}/>}
- <div className="program-workspace-content" hidden={canLaunch&&showHome}>{children}</div>
+ {canLaunch&&showHome&&<PersonalHome key={accountId+path} accountId={accountId} name="" scope={path} title={title} greeting={false} shortTitles={false} apps={menu!.items.map(([key,label])=>({key,title:label,icon:subprogramIcon(key,label)}))} onNavigate={select}/>}
+ <ProgramPathContext.Provider value={path}><div className="program-workspace-content" hidden={canLaunch&&showHome}>{children}</div></ProgramPathContext.Provider>
  </div></NavigationContext.Provider>;
 }
-export function SubprogramNavigation({items,value,onChange}:{items:[string,string][];value:string;onChange:(key:string)=>void}){
+export function SubprogramNavigation({items,value,onChange}:{items:[string,string][];value:string;onChange:(key:string)=>void|boolean}){
  const context=useContext(NavigationContext),change=useRef(onChange),previous=useRef(value);change.current=onChange;
  const signature=JSON.stringify(items),register=context?.register;
  useLayoutEffect(()=>{if(!register)return;register({items:JSON.parse(signature),value,onChange:key=>change.current(key)});return()=>register(null)},[register,signature,value]);
  useEffect(()=>{if(previous.current!==value){previous.current=value;context?.reveal()}},[value,context?.reveal]);
  if(!context)return <nav className="tools" aria-label="زیر‌برنامه‌ها">{items.map(([key,title])=><button className={'btn '+(value===key?'primary':'')} key={key} onClick={()=>onChange(key)}>{title}</button>)}</nav>;
  return <nav className="program-return tools" aria-label="مسیر زیر‌برنامه"><button className="btn" onClick={context.open}><ArrowRight size={18}/>برنامه‌های این بخش</button><strong>{items.find(([key])=>key===value)?.[1]}</strong></nav>;
+}
+
+export function IconSections({scope,title='برنامه‌های این بخش',items}:{scope:string;title?:string;items:{key:string;title:string;content:ReactNode}[]}){
+ const [selected,setSelected]=useState(items[0]?.key||'');
+ const active=items.some(item=>item.key===selected)?selected:items[0]?.key||'';
+ if(!items.length)return null;
+ return <ProgramWorkspace programId={scope} title={title}><SubprogramNavigation items={items.map(item=>[item.key,item.title])} value={active} onChange={setSelected}/>{items.map(item=><div className="program-workspace-content" key={item.key} hidden={active!==item.key}>{item.content}</div>)}</ProgramWorkspace>;
 }
