@@ -79,3 +79,7 @@ resetHelp.push("پرونده‌های ضمانت‌نامه، تاریخچه ت�
 
 // sales_lead is operational in both scopes. Generic 0016 flow freeze applies; no new tables.
 resetHelp.push("سرنخ‌ها، فرصت‌های فروش، تماس‌ها و سوابق ارجاع و تبدیل به سفارش در هر دو محدوده پشتیبان و حذف می‌شوند؛ اعلان‌ها و وظایف قبل از پرونده‌ها حذف می‌شوند. حساب‌ها و سمت‌های فروش حفظ می‌شوند.");
+
+// hr_* records are operational in both scopes; generic 0016 flow freeze applies.
+// duty notices/runs precede HR records; immutable hr_file manifests participate in R2 backups.
+resetHelp.push("پرونده پرسنلی، احکام، شیفت، درخواست‌ها، تردد، فیش و پرداخت پرسنلی و مدارک در هر دو محدوده پشتیبان و پاک می‌شوند؛ حساب کاربران و دسترسی‌ها حفظ می‌شوند. وظایف پیش از پرونده‌ها حذف می‌شوند.");

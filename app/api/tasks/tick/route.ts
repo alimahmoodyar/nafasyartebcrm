@@ -1,3 +1,4 @@
+import {syncPersonnelTasks} from '@/lib/personnel-tasks';
 import {syncLeadTasks} from '@/lib/sales-lead-tasks';
 import {syncGuaranteeTasks} from '@/lib/guarantee-tasks';
 import {scanHospitalMaintenance} from '@/lib/hospital-maintenance';
@@ -28,6 +29,7 @@ export async function POST(request:Request){try{
  await syncSupplierQuality();
  await syncSalesTasks();
  await syncLeadTasks();
+ await syncPersonnelTasks();
  await scanSalesMonitor({source});
  await syncServiceTasks();
  await syncTransportTasks();
