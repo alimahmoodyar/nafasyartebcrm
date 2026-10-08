@@ -2,14 +2,14 @@
 import {useEffect,useState} from 'react';
 import {SolarDate} from './solar-date';
 import {formatDate,formatDateTime,localDay,parseCalendarDay,latinDigits} from '@/lib/persian-date';
-import {foreignSelectionStates,foreignPhysicalStates,foreignFileKinds,foreignMoney,foreignMoneyText} from '@/lib/foreign-purchase-contract';
+import {foreignModeTitles,foreignSelectionStates,foreignPhysicalStates,foreignFileKinds,foreignMoney,foreignMoneyText} from '@/lib/foreign-purchase-contract';
 import {Dialog,DialogContent,DialogTitle,DialogDescription} from '@/components/ui/dialog';
 import {Checkbox} from '@/components/ui/checkbox';
 import {Table,TableHeader,TableHead,TableRow,TableBody,TableCell} from '@/components/ui/table';
 import {SubprogramNavigation,IconActions,IconDisclosure} from './program-workspace';
 import {PurchaseShipmentsPanel} from './purchase-shipments-panel';
 import {PurchaseSettlementPanel} from './purchase-settlement-panel';
-const modeTitles:Record<string,string>={selection_create:'جست‌وجوی جدید تأمین‌کننده',selection_candidate:'انتخاب منبع و درخواست نمونه',sample_received:'ثبت دریافت نمونه',sample_review:'تأیید یا رد نمونه و تأمین‌کننده',selection_reopen:'جست‌وجوی مجدد منبع',configure:'تعیین مسئول‌ها و یادآوری',register:'ثبت سفارش سیستمی',permit:'ثبت مجوز واردات',fx_queue:'ورود به صف تخصیص ارز',fx_allocate:'ثبت تخصیص ارز',fx_buy:'ثبت خرید ارز',obligation_due:'تعیین / اصلاح مهلت رفع تعهد',fx_receipt:'تأیید دریافت صراف از حساب',fx_receipt_undo:'ابطال تطبیق دریافت',obligation_close:'ثبت رفع تعهد',order:'سفارش تولید به تأمین‌کننده',prepayment:'ثبت پیش‌پرداخت واقعی',delivery:'اصلاح وعده تحویل',actual:'ثبت قیمت و پکینگ واقعی بار',ready:'اعلام آمادگی بار',ship:'ثبت حمل',clearing:'ورود به ترخیص',clear:'ثبت ترخیص',receive:'تأیید دریافت انبار',cost_add:'ثبت هزینه همان بار',cost_review:'بررسی و تخصیص هزینه',amend:'اصلاح ثبت سفارش با پکینگ واقعی'};
+const modeTitles=foreignModeTitles;
 const evidenceKinds:Record<string,string>={sample_received:'sample',sample_review:'sample',register:'registration',permit:'permit',fx_allocate:'fx_allocation',fx_buy:'fx_purchase',obligation_close:'obligation',order:'production_order',prepayment:'payment',actual:'packing',ship:'shipping',clearing:'shipping',clear:'green_sheet',cost_add:'cost',amend:'registration'};
 type Grid=unknown[][];
 export function ForeignPurchasesPanel({targetId=''}:{targetId?:string}){

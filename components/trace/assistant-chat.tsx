@@ -1,4 +1,5 @@
 'use client';
+import type {OperationForm} from '@/lib/assistant-workspace';
 import {selectAssistantProfile} from '@/lib/assistant-profile-selection';
 import {useEffect,useRef,useState} from 'react';
 import {useAssistantPosition} from './use-assistant-position';
@@ -6,7 +7,7 @@ import {VoiceInput} from './voice-input';
 import {ActionCards,type AssistantAction} from './assistant-actions';
 import {Bot,BotMessageSquare,Move,GripHorizontal,Maximize2,Minimize2,SlidersHorizontal,Send,X,LoaderCircle,RefreshCw} from 'lucide-react';
 type Message={role:'user'|'assistant';text:string};
-export function AssistantChat({admin,onSettings,accountId,accountName,onAccountChanged,onNavigate,onMutation}:{admin:boolean;onSettings:()=>void;accountId:string;accountName:string;onAccountChanged:()=>void;onNavigate:(section:string)=>void;onMutation:()=>void}){
+export function AssistantChat({admin,onSettings,accountId,accountName,onAccountChanged,onNavigate,onMutation,onWorkspace,workspace}:{admin:boolean;onSettings:()=>void;accountId:string;accountName:string;onAccountChanged:()=>void;onNavigate:(section:string)=>void;onMutation:()=>void;onWorkspace:(form:OperationForm)=>void;workspace:OperationForm|null}){
  const [open,setOpen]=useState(false),[messages,setMessages]=useState<Message[]>([]),[profiles,setProfiles]=useState<{id:string;name:string;model:string}[]>([]),[profile,setProfile]=useState(''),[input,setInput]=useState(''),[busy,setBusy]=useState(false),[loading,setLoading]=useState(false),[error,setError]=useState('');
  const [compact,setCompact]=useState(true),[showOptions,setShowOptions]=useState(false);
  const taskPrompt=useRef('');
@@ -14,6 +15,7 @@ export function AssistantChat({admin,onSettings,accountId,accountName,onAccountC
  const [actions,setActions]=useState<AssistantAction[]>([]);
  const bottom=useRef<HTMLDivElement>(null),messageArea=useRef<HTMLDivElement>(null),editor=useRef<HTMLTextAreaElement>(null),launcher=useRef<HTMLButtonElement>(null),pending=useRef<{id:string;text:string}|null>(null);
  const position=useAssistantPosition(launcher,accountId,compact);
+ useEffect(()=>{const receive=(event:Event)=>{const d=(event as CustomEvent).detail;if(d?.accountId!==accountId)return;setActions(old=>[d.action,...old.filter(a=>a.id!==d.action.id)].map(a=>a.id!==d.action.id&&a.state==='pending'?{...a,state:'cancelled'}:a));};window.addEventListener('nafasyar-form-action',receive);return()=>window.removeEventListener('nafasyar-form-action',receive);},[accountId]);
  const epoch=useRef(0),changed=useRef(onAccountChanged);changed.current=onAccountChanged;
  useEffect(()=>{setMessages([]);setActions([]);setInput('');pending.current=null;try{setProfile(localStorage.getItem('nafasyar-model:'+accountId)||'')}catch{setProfile('')}return()=>{epoch.current++}},[accountId]);
  useEffect(()=>{if(!open)return;let active=true;let controller:AbortController;
@@ -47,20 +49,21 @@ export function AssistantChat({admin,onSettings,accountId,accountName,onAccountC
  useEffect(()=>{if(open&&!loading&&taskPrompt.current){setInput(taskPrompt.current);taskPrompt.current=''}},[open,loading]);
  function close(){epoch.current++;setMessages([]);setActions([]);setInput('');pending.current=null;setBusy(false);setOpen(false);launcher.current?.focus();}
  async function send(){const question=input.trim();const normalized=question.replace(/[ي]/g,'ی').replace(/[أإآ]/g,'ا').replace(/[‌\s.!؟،]/g,'');const proposed=actions.filter(a=>a.state==='pending');if(proposed.length===1&&['تاییداجرا','تأییداجرا','لغوفرمان'].includes(normalized)){await decide(proposed[0].id,normalized==='لغوفرمان'?'cancel':'confirm');return;}if(!question||busy||!profile||loading)return;const generation=epoch.current;setBusy(true);setError('');if(pending.current?.text!==question)pending.current={id:crypto.randomUUID(),text:question};try{
- const r=await fetch('/api/assistant',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json','x-assistant-account':accountId},body:JSON.stringify({requestId:pending.current.id,profileId:profile,message:question})});const d=await r.json() as any;
+ const r=await fetch('/api/assistant',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json','x-assistant-account':accountId},body:JSON.stringify({requestId:pending.current.id,profileId:profile,message:question,workspace:workspace?{tool:workspace.tool,args:workspace.args}:null})});const d=await r.json() as any;
  if(generation!==epoch.current)return;
  if(r.status===401||r.status===409&&d.error?.includes('حساب ورود')){setMessages([]);changed.current();return;}if(!r.ok)throw new Error(d.error);
  const check=await fetch('/api/session',{cache:'no-store'}),current=await check.json() as any;if(generation!==epoch.current)return;
  if(!check.ok||current.userId!==accountId||d.accountId!==accountId){setMessages([]);changed.current();return;}
- setActions(d.actions||[]);if(d.navigation){setCompact(true);onNavigate(d.navigation);}setMessages(m=>[...m,{role:'user',text:question},{role:'assistant',text:d.answer}]);setInput('');pending.current=null;
+ if(d.workspace)onWorkspace(d.workspace);else if(workspace?.actionId){const a=d.actions?.find((a:AssistantAction)=>a.id===workspace.actionId);if(a)onWorkspace({...workspace,state:a.state,result:a.result});}setActions(d.actions||[]);if(d.navigation){setCompact(true);onNavigate(d.navigation);}setMessages(m=>[...m,{role:'user',text:question},{role:'assistant',text:d.answer}]);setInput('');pending.current=null;
  }catch(e){if(generation===epoch.current)setError(e instanceof Error?e.message:'ارسال انجام نشد.')}finally{if(generation===epoch.current)setBusy(false)}}
  async function decide(id:string,decision:'confirm'|'cancel',password?:string){
- if(busy||loading)return false;const generation=epoch.current;setBusy(true);setError('');try{
+ if(busy||loading)return false;const generation=epoch.current;setBusy(true);setError('');if(decision==='confirm'){const action=actions.find(a=>a.id===id);if(action){setCompact(true);onNavigate(action.section);}}try{
  const r=await fetch('/api/assistant/actions',{method:'POST',headers:{'Content-Type':'application/json','x-assistant-account':accountId},body:JSON.stringify({id,decision,confirmed:decision==='confirm',...(password?{password}:{})})}),d=await r.json() as any;
  if(generation!==epoch.current)return;if(r.status===401||r.status===409&&d.error?.includes('حساب ورود')){changed.current();return;}if(!r.ok)throw new Error(d.error);
  const check=await fetch('/api/session',{cache:'no-store'}),current=await check.json() as any;if(generation!==epoch.current)return;
  if(!check.ok||current.userId!==accountId||d.accountId!==accountId){changed.current();return;}
  setActions(old=>old.map(a=>a.id===id?d.action:a));setInput('');pending.current=null;
+ if(workspace?.actionId===id)onWorkspace({...workspace,state:d.action.state,result:d.action.result,args:d.action.args});
  if(d.action.state==='succeeded'){setCompact(true);onMutation();window.dispatchEvent(new Event('nafasyar-inbox-changed'));window.dispatchEvent(new Event('nafasyar-tasks-changed'));onNavigate(d.action.section);}
  return true;
  }catch(e){if(generation===epoch.current)setError(e instanceof Error?e.message:'نتیجه اجرا دریافت نشد؛ گفتگو را دوباره باز کنید و وضعیت را بررسی کنید.')}finally{if(generation===epoch.current)setBusy(false)}
