@@ -1,4 +1,5 @@
 "use client";
+import {IconActions} from "./program-workspace";
 import {persianDigits} from '@/lib/persian-date';
 import {useEffect, useState} from "react";
 import {RefreshCw, Hash} from "lucide-react";
@@ -48,7 +49,7 @@ export function BatchNumberHelper({partCode, date, code, scheme, demoCodes, onAp
         <p className="subtle">کد قطعه: <bdi>{suggestion.partCode}</bdi> · ورود شمسی: <bdi>{persianDigits(suggestion.jalaliDate)}</bdi> · ترتیب: <bdi>{suggestion.sequence}</bdi></p>
       </> : <p className="subtle">کد ثابت قطعه و تاریخ ورود را در فرم زیر وارد کنید تا شماره بعدی پیشنهاد شود.</p>}
     </div>
-    <div className="tools"><button type="button" className="btn primary" disabled={!suggestion || loading || applied} onClick={() => suggestion && onApply(suggestion.code, suggestion.scheme)}>{applied ? "پیشنهاد در فرم قرار گرفت" : "استفاده از این پیشنهاد"}</button><button type="button" className="btn" disabled={!partCode || !date || loading} onClick={() => setRevision(v => v + 1)}><RefreshCw size={15}/>بررسی مجدد</button></div>
+    <IconActions scope="batch-number-helper-actions-99cbaf7327"><button type="button" className="btn primary" disabled={!suggestion || loading || applied} onClick={() => suggestion && onApply(suggestion.code, suggestion.scheme)}>{applied ? "پیشنهاد در فرم قرار گرفت" : "استفاده از این پیشنهاد"}</button><button type="button" className="btn" disabled={!partCode || !date || loading} onClick={() => setRevision(v => v + 1)}><RefreshCw size={15}/>بررسی مجدد</button></IconActions>
     <p className="subtle" style={{marginTop: 12}}>این شماره تا زمان ذخیره رزرو نیست. فیلد «کد یکتای بچ» قابل‌ویرایش است؛ کد پس از ثبت ثابت می‌ماند.</p>
     <p className="subtle">هر بچ داخلی: یک نوع قطعه، یک تأمین‌کننده، یک لات سازنده و یک نوبت ورود. لات‌های متفاوت را جدا ثبت کنید. شماره لات سازنده را نیز در فیلد مستقل وارد کنید.</p>
     {scheme === BATCH_SCHEME && suggestion && !applied && <p className="batch-error">ورودی یا شماره بعدی تغییر کرده است؛ پیشنهاد جدید را بررسی و در فرم اعمال کنید.</p>}

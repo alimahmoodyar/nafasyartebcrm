@@ -1,5 +1,5 @@
 "use client";
-import {createContext,useCallback,useContext,useEffect,useLayoutEffect,useMemo,useRef,useState,type ReactNode} from 'react';
+import {Fragment,isValidElement,createContext,useCallback,useContext,useEffect,useLayoutEffect,useMemo,useRef,useState,type ReactNode,type ReactElement,type CSSProperties} from 'react';
 import {ArrowRight,Boxes,ClipboardList,FileText,Users,Settings2,ChartNoAxesCombined,Wallet,Truck,Wrench,Factory,CalendarDays,BookOpen,Mail,ShieldCheck,type LucideIcon} from 'lucide-react';
 import {PersonalHome} from './personal-home';
 
@@ -38,7 +38,7 @@ export function ProgramWorkspace({programId,title,direct=false,children}:{progra
  const canLaunch=!!accountId&&!!menu?.items.length;
  return <NavigationContext.Provider value={navigation}><div className="program-workspace">
  {canLaunch&&showHome&&<PersonalHome key={accountId+path} accountId={accountId} name="" scope={path} title={title} greeting={false} shortTitles={false} apps={menu!.items.map(([key,label])=>({key,title:label,icon:subprogramIcon(key,label)}))} onNavigate={select}/>}
- <ProgramPathContext.Provider value={path}><div className="program-workspace-content" hidden={canLaunch&&showHome}>{children}</div></ProgramPathContext.Provider>
+ <ProgramPathContext.Provider value={path+(menu?.value?'/'+menu.value:'')}><div className="program-workspace-content" hidden={canLaunch&&showHome}>{children}</div></ProgramPathContext.Provider>
  </div></NavigationContext.Provider>;
 }
 export function SubprogramNavigation({items,value,onChange}:{items:[string,string][];value:string;onChange:(key:string)=>void|boolean}){
@@ -56,3 +56,15 @@ export function IconSections({scope,title='برنامه‌های این بخش',
  if(!items.length)return null;
  return <ProgramWorkspace programId={scope} title={title}><SubprogramNavigation items={items.map(item=>[item.key,item.title])} value={active} onChange={setSelected}/>{items.map(item=><div className="program-workspace-content" key={item.key} hidden={active!==item.key}>{item.content}</div>)}</ProgramWorkspace>;
 }
+
+function menuText(value:ReactNode):string{if(typeof value==='string'||typeof value==='number')return String(value);if(Array.isArray(value))return value.map(menuText).join('');if(isValidElement<{children?:ReactNode}>(value))return menuText(value.props.children);return '';}
+function menuChildren(value:ReactNode):ReactNode[]{return (Array.isArray(value)?value:[value]).flatMap(child=>Array.isArray(child)?menuChildren(child):isValidElement<{children?:ReactNode}>(child)&&child.type===Fragment?menuChildren(child.props.children):[child]);}
+export function IconActions({scope,children,className='tools'}:{scope:string;children:ReactNode;className?:string}){
+ const accountId=useContext(AccountContext),path=useContext(ProgramPathContext),nodes=menuChildren(children);
+ const actions=nodes.filter((n):n is ReactElement<any>=>isValidElement(n)&&n.type==='button');
+ if(!accountId||!actions.length)return <div className={className}>{children}</div>;
+ const extra=nodes.filter(n=>n!==null&&n!==undefined&&n!==false&&(!isValidElement(n)||n.type!=='button'));
+ const counts=new Map<string,number>();const apps=actions.map(control=>{const title=menuText(control.props.children).trim()||control.props['aria-label']||'باز کردن',base=String(control.key||title),index=counts.get(base)||0;counts.set(base,index+1);return {key:base+':'+index,title,icon:subprogramIcon(base,title),control}});
+ return <div className="icon-actions">{extra.length>0&&<div className={className}>{extra}</div>}<PersonalHome key={accountId+path+scope} accountId={accountId} name="" scope={path+'/'+scope} title="ابزارهای این بخش" greeting={false} shortTitles={false} compact apps={apps} onNavigate={()=>{}}/></div>;
+}
+export function IconDisclosure({scope,title,children,className,style}:{scope:string;title:ReactNode;children:ReactNode;className?:string;style?:CSSProperties}){return <div className={className} style={style}><IconSections scope={scope} title={menuText(title).trim()} items={[{key:'content',title:menuText(title).trim(),content:<>{children}</>}]}/></div>;}
