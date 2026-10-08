@@ -1,4 +1,5 @@
 'use client';
+import {ProgramWorkspace,SubprogramNavigation} from "./program-workspace";
 import {useEffect,useState} from 'react';
 import {Dialog,DialogContent,DialogTitle,DialogDescription} from '@/components/ui/dialog';
 import {SolarDate} from './solar-date';
@@ -20,7 +21,7 @@ export function SalesMonitorPanel({onOpenAgent,onTasks}:{onOpenAgent:(id:string,
  const agentName=(id:string)=>data.agents.find((a:any)=>a.id===id)?.name||id,memberName=(id:string)=>data.members.find((m:any)=>m.id===id)?.name||'تعیین نشده';
  const alerts=data.alerts.filter((a:any)=>filter==='all'||filter==='closed'?filter==='all'||['resolved','reviewed'].includes(a.data.state):!['resolved','reviewed'].includes(a.data.state));
  const reportData=report?.data;
- return <div className="sales-monitor"><div className="tools"><button className={'btn '+(tab==='alerts'?'primary':'')} onClick={()=>setTab('alerts')}>هشدارها و پیگیری</button>{data.manager&&<button className={'btn '+(tab==='reports'?'primary':'')} onClick={()=>setTab('reports')}>گزارش‌های مدیر</button>}<button className={'btn '+(tab==='goals'?'primary':'')} onClick={()=>setTab('goals')}>اهداف مصوب فروش</button>{data.manager&&<button className={'btn '+(tab==='settings'?'primary':'')} onClick={()=>setTab('settings')}>قواعد و زمان‌بندی</button>}<button className="btn" onClick={()=>void load().catch(e=>setError(e.message))}>تازه‌سازی</button><button className="btn" onClick={onTasks}>کارتابل</button></div>
+ return <ProgramWorkspace programId="sales-monitor-panel" title="پایش فروش"><div className="sales-monitor"><div className="tools"><SubprogramNavigation items={[["alerts","هشدارها و پیگیری"],["goals","اهداف مصوب فروش"],...(data.manager?[["reports","گزارش‌های مدیر"],["settings","قواعد و زمان‌بندی"]] as [string,string][]:[])]} value={tab} onChange={setTab}/><button className="btn" onClick={()=>void load().catch(e=>setError(e.message))}>تازه‌سازی</button><button className="btn" onClick={onTasks}>کارتابل</button></div>
  <p className={'notice '+(data.health.backgroundStale?'error':'')}>آخرین بررسی: {formatDateTime(data.health.lastScan)} · زمان‌بند سرور شرکت: {formatDateTime(data.health.lastBackground)}{data.health.backgroundStale?' — اجرای زمان‌بند سرور شرکت تأیید نشده؛ این شاخص وضعیت زمان‌بندی ابری را نشان نمی‌دهد.':' — اجرای پس‌زمینه اخیراً ثبت شده است.'}{data.health.managers===0?' مدیر فروش فعالی برای اعلان کارتابل تعریف نشده است.':''}{data.policy&&!data.policy.data.enabled?' پایش متوقف است.':''}</p>
  {error&&!draft&&<p className="notice error" role="alert">{error}</p>}{message&&<p className="notice" role="status">{message}</p>}
  {tab==='alerts'&&<><div className="tools"><label className="field">نمایش<select value={filter} onChange={e=>setFilter(e.target.value)}><option value="open">باز و در پیگیری</option><option value="closed">بسته‌شده</option><option value="all">همه سوابق</option></select></label>{data.manager&&<button className="btn" onClick={()=>begin('scan')}>بررسی الآن و تهیه گزارش‌های سررسیده</button>}</div>{!alerts.length&&<p className="empty">هشداری در این فیلتر و دسترسی ثبت نشده است. زمان آخرین بررسی را در بالای صفحه ببینید.</p>}
@@ -59,5 +60,5 @@ export function SalesMonitorPanel({onOpenAgent,onTasks}:{onOpenAgent:(id:string,
  {draft.mode==='review_goal'&&<p className="notice wide">این اقدام، هدف محقق‌نشده پایان دوره را با جمع‌بندی مدیریتی می‌بندد؛ هدف را محقق‌شده اعلام نمی‌کند. علت مستند و برنامه اصلاحی را بنویسید.</p>}
  {!['scan','report_read'].includes(draft.mode)&&<label className="field wide">توضیح، دلیل یا نتیجه مستند<textarea required maxLength={4000} rows={3} value={draft.notes} onChange={e=>set('notes',e.target.value)}/></label>}
  </div>{error&&<p className="notice error" role="alert">{error}</p>}<div className="tools"><button className="btn primary" disabled={busy}>{busy?'در حال ثبت…':'تأیید و ثبت'}</button><button type="button" className="btn" onClick={()=>setDraft(null)}>انصراف</button></div></fieldset></form>}</DialogContent></Dialog>
- </div>;
+ </div></ProgramWorkspace>;
 }

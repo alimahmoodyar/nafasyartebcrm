@@ -1,4 +1,5 @@
 'use client';
+import {ProgramWorkspace,SubprogramNavigation} from "./program-workspace";
 import {PurchasePayablesPanel} from './purchase-payables-panel';
 import {ExpenseRegisterPanel} from './expense-register-panel';
 import {PurchaseSettlementPanel} from './purchase-settlement-panel';
@@ -23,8 +24,8 @@ export function CostingPanel({demo=false}:{demo?:boolean}){
  const input=(key:string,label:string,numeric=false)=> <label className="field">{label}<input required value={draft[key]??''} inputMode={numeric?'decimal':undefined} onChange={e=>field(key,numeric?latinDigits(e.target.value):e.target.value)}/></label>;
  const intInput=(key:string,label:string)=> <label className="field">{label}<input required type="number" min="1" step="1" value={draft[key]??''} onChange={e=>field(key,Number(e.target.value))}/></label>;
  const table=(heads:string[],rows:any[][])=><div style={{overflowX:'auto'}}><table><thead><tr>{heads.map(h=><th key={h}>{h}</th>)}</tr></thead><tbody>{rows.map((r,i)=><tr key={i}>{r.map((v,j)=><td key={j}>{v}</td>)}</tr>)}</tbody></table>{!rows.length&&<p className="empty">هنوز رکوردی ثبت نشده است.</p>}</div>;
- return <div className="panel"><div className="panelhead"><div><h2>بهای تمام‌شده</h2><p>مواد، دستمزد و سربار تولید · همه مبالغ ریال</p></div><button className="btn" disabled={busy} onClick={()=>void load().catch(e=>setError(e.message))}>تازه‌سازی</button></div>
- <div className="tools" style={{flexWrap:'wrap'}}>{Object.entries({payables:'بدهی و پرداخت خرید',expenses:'ثبت و تشخیص هزینه',settlements:'تسویه خرید',devices:'هزینه دستگاه‌ها',prices:'قیمت خرید و موجودی',standards:'استاندارد تولید',periods:'دوره مالی',guide:'راهنما'}).map(([k,l])=><button key={k} className={'btn '+(tab===k?'primary':'')} onClick={()=>setTab(k)}>{l}</button>)}</div>
+ return <ProgramWorkspace programId="costing-panel" title="هزینه و مالی"><div className="panel"><div className="panelhead"><div><h2>بهای تمام‌شده</h2><p>مواد، دستمزد و سربار تولید · همه مبالغ ریال</p></div><button className="btn" disabled={busy} onClick={()=>void load().catch(e=>setError(e.message))}>تازه‌سازی</button></div>
+ <SubprogramNavigation items={(Object.entries({payables:'بدهی و پرداخت خرید',expenses:'ثبت و تشخیص هزینه',settlements:'تسویه خرید',devices:'هزینه دستگاه‌ها',prices:'قیمت خرید و موجودی',standards:'استاندارد تولید',periods:'دوره مالی',guide:'راهنما'})).map(([key,title])=>[String(key),String(title)] as [string,string])} value={tab} onChange={setTab}/>
  <p className="notice">بهای واقعی تا تکمیل قیمت‌ها و تأیید مالی موقت است. انتقال خودکار اطلاعات از سپیدار هنوز برقرار نشده است.</p>{error&&!draft&&<p className="notice error" role="alert">{error}</p>}{message&&<p role="status">{message}</p>}
  {tab==='payables'&&<PurchasePayablesPanel/>}
  {tab==='expenses'&&<ExpenseRegisterPanel/>}
@@ -43,5 +44,5 @@ export function CostingPanel({demo=false}:{demo?:boolean}){
  {draft.mode==='period'&&<>{input('title','عنوان دوره')}<SolarDate label="شروع دوره" value={draft.start} disabled={draft.revision>0} onChange={v=>field('start',v)}/><SolarDate label="پایان دوره" value={draft.end} onChange={v=>field('end',v)}/>{input('laborTotal','کل دستمزد مستقیم دوره (ریال)',true)}{input('fixedOverhead','کل سربار ثابت تولید (ریال)',true)}{input('variableOverhead','کل سربار متغیر تولید (ریال)',true)}{intInput('normalMinutes','ظرفیت عادی دوره، دقیقه کار مستقیم')}{input('nonproduction','هزینه اداری و فروش، جدا از تولید (ریال)',true)}<label><input type="checkbox" checked={draft.methodConfirmed||false} onChange={e=>field('methodConfirmed',e.target.checked)}/> روش میانگین موزون متحرک و مبنای تخصیص با حسابداری تطبیق و تأیید شده است.</label></>}
  {draft.mode==='close'&&<p>گزارش «{draft.title}» با منابع پیش‌نمایش ذخیره می‌شود. هزینه‌ها و کامل‌بودن زمان‌های واقعی را پیش از تأیید بررسی کنید. این اقدام سند سپیدار صادر نمی‌کند.</p>}
  <label className="field">توضیح و مستند تصمیم<textarea required value={draft.notes||''} onChange={e=>field('notes',e.target.value)}/></label>{error&&<p role="alert" className="notice error">{error}</p>}<button className="btn primary" disabled={busy}>{busy?'در حال ثبت…':'تأیید و ثبت'}</button></form>}</DialogContent></Dialog>
- </div>;
+ </div></ProgramWorkspace>;
 }
