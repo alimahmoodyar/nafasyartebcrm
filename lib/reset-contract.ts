@@ -103,3 +103,11 @@ resetHelp.push("پرونده‌های کیفیت و طراحی، نسخه‌ها
 
 // foreign_selection/file/statement/statement_row and foreign shipment stages are operational flow_entities. Generic 0016 freeze and both reset scopes cover all; duty children first, private foreign_file manifests backed up. No new schema/FKs.
 resetHelp.push('انتخاب منبع خارجی، نمونه، مراحل ارز، اکسل صراف، رفع تعهد و خرید و حمل در هر دو محدوده پشتیبان و حذف می‌شوند؛ سمت مدیر بازرگانی و حساب‌ها حفظ می‌شوند.');
+
+// Activation-code audit uses inventory_operations: existing 0016 freeze triggers, backup and deletion ordering apply.
+resetHelp.push('سوابق تولید دستی کد پنج‌رقمی همراه inventory_operations در هر دو محدوده پشتیبان‌گیری و حذف می‌شوند؛ حساب‌ها و دسترسی کاربران حفظ می‌شوند.');
+
+// asset_item, asset_clearance, asset_confirmation and asset_file are operational flow_entities.
+// Both reset scopes include them; existing 0016 freeze triggers and generic backups apply.
+// asset_file is included in private R2 backup manifests; duty children are removed first.
+// The asset-custodian position is preserved with other positions, with members/permissions unchanged.

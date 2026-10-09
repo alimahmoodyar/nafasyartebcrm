@@ -779,3 +779,10 @@
 
 - Show details before the request list, scroll and focus the panel, display loading and errors, and allow returning without reopening cancelled requests.
 - Validation: development detail UI regression and development API permission/idempotency tests.
+
+## 2026-10-09 — Company assets and entrusted custody
+
+- Assignable asset custodian, registry/specifications/location, versioned employee/contractor handovers, employee dossier view and exit clearance gated by actual returns.
+- Annual Persian-calendar contractor tasks require actual private letter, signer and date; only domain confirmation completes a task. New confirmations require unused letter files.
+- UI, HTTP, MCP and assistant reuse authenticated roles, revision/idempotency guards and audit. Generic freeze/reset backups include assets and file manifests.
+- Validated asset privacy, race/rollback, exit/HR gate, file access, MCP, personnel and reset regressions; browser checked registry and annual letter form with sample data.
