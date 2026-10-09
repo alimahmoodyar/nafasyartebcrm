@@ -35,7 +35,7 @@ export function MobileAppProvider({children}:{children:ReactNode}){
  return <MobileContext.Provider value={{ready,installed,online,secure,workerError,install,installing,message}}>{!online&&<div className="mobile-offline" role="alert"><WifiOff size={18}/>اینترنت قطع است؛ ثبت اطلاعات و دریافت سوابق تا اتصال دوباره انجام نمی‌شود.</div>}{children}</MobileContext.Provider>;
 }
 export function MobileInstall({iphoneTest=false}:{iphoneTest?:boolean}={}){
- const state=useContext(MobileContext);const [url,setUrl]=useState(''),[copied,setCopied]=useState(false),[showGuide,setShowGuide]=useState(iphoneTest),[ios,setIos]=useState(false);
+ const state=useContext(MobileContext);const [url,setUrl]=useState(''),[copied,setCopied]=useState(false),[showGuide,setShowGuide]=useState(iphoneTest),[ios,setIos]=useState(iphoneTest);
  const guide=useRef<HTMLDivElement>(null);
  useEffect(()=>{setUrl(window.location.origin+(iphoneTest?'/install/iphone':'/'));setIos(iphoneTest||/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1));},[iphoneTest]);
  useEffect(()=>{if(showGuide){guide.current?.scrollIntoView?.({behavior:'smooth',block:'nearest'});guide.current?.focus({preventScroll:true});}},[showGuide]);
