@@ -15,5 +15,6 @@ win.isSecureContext=false;assert.equal(await provider().install(),false);assert.
 handlers.appinstalled();assert.equal(provider().installed,true);
 slots=[];cursor=0;state={ready:false,installed:false,online:true,secure:true,workerError:false,installing:false,message:'',install:async()=>false};
 let tree=nodes(out.MobileInstall());const button=tree.find(n=>n.type==='button'&&n.props.className==='btn primary');assert.equal(button.props.disabled,false,'fallback must remain clickable without browser event');await button.props.onClick();cursor=0;tree=nodes(out.MobileInstall());assert.ok(tree.some(n=>n.props.id==='mobile-install-guide'),'fallback opens actual instructions');
+slots=[];cursor=0;tree=nodes(out.MobileInstall({iphoneTest:true}));assert.ok(tree.some(n=>n.props.id==='mobile-install-guide'),'iPhone test route opens instructions immediately');assert.ok(tree.some(n=>n.props['aria-label']==='وضعیت تست آیفون'));slots=[];cursor=0;tree=nodes(out.MobileInstall());assert.ok(tree.some(n=>n.type==='a'&&n.props.href==='/install/iphone'),'normal install page links to dedicated iPhone test');
 console.log('PASS: no-event fallback, cancellation, prompt error, offline/HTTP feedback, installed state and clickable installation guide');
 })().catch(e=>{console.error(e);process.exitCode=1});

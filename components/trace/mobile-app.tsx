@@ -34,19 +34,21 @@ export function MobileAppProvider({children}:{children:ReactNode}){
  }
  return <MobileContext.Provider value={{ready,installed,online,secure,workerError,install,installing,message}}>{!online&&<div className="mobile-offline" role="alert"><WifiOff size={18}/>اینترنت قطع است؛ ثبت اطلاعات و دریافت سوابق تا اتصال دوباره انجام نمی‌شود.</div>}{children}</MobileContext.Provider>;
 }
-export function MobileInstall(){
- const state=useContext(MobileContext);const [url,setUrl]=useState(''),[copied,setCopied]=useState(false),[showGuide,setShowGuide]=useState(false),[ios,setIos]=useState(false);
+export function MobileInstall({iphoneTest=false}:{iphoneTest?:boolean}={}){
+ const state=useContext(MobileContext);const [url,setUrl]=useState(''),[copied,setCopied]=useState(false),[showGuide,setShowGuide]=useState(iphoneTest),[ios,setIos]=useState(false);
  const guide=useRef<HTMLDivElement>(null);
- useEffect(()=>{setUrl(window.location.origin+'/');setIos(/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1));},[]);
+ useEffect(()=>{setUrl(window.location.origin+(iphoneTest?'/install/iphone':'/'));setIos(iphoneTest||/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1));},[iphoneTest]);
  useEffect(()=>{if(showGuide){guide.current?.scrollIntoView?.({behavior:'smooth',block:'nearest'});guide.current?.focus({preventScroll:true});}},[showGuide]);
  if(!state)return null;
  return <section className="panel mobile-install" aria-labelledby="mobile-title">
-  <div className="mobile-install-heading"><img src="/brand/hamnafas-192.png" width="76" height="76" alt="نشان هم‌نفس"/><div><h2 id="mobile-title">هم‌نفس روی گوشی</h2><p>با حساب خودتان وارد شوید و کارهای روزانه را انجام دهید.</p></div></div>
+  <div className="mobile-install-heading"><img src="/brand/hamnafas-192.png" width="76" height="76" alt="نشان هم‌نفس"/><div><h2 id="mobile-title">{iphoneTest?'تست نصب هم‌نفس روی آیفون':'هم‌نفس روی گوشی'}</h2><p>با حساب خودتان وارد شوید و کارهای روزانه را انجام دهید.</p></div></div>
   <div className="mobile-install-status" role="status">{state.installed?<><CheckCircle2 size={22}/>هم‌نفس در حالت برنامه باز است یا نصب آن در این نشست تأیید شده است.</>:<><Smartphone size={22}/>نصب هم‌نفس از مرورگر</>}</div>
   <p>این نسخه مستقیماً از مرورگر نصب می‌شود؛ فایل APK برای دانلود ندارد.</p>
+  {!iphoneTest&&<a className="btn primary" href="/install/iphone">تست نصب روی آیفون</a>}
+  {iphoneTest&&<><p className="notice">این صفحه را مستقیم در Safari باز کنید. در آیفون، نصب از دکمهٔ اشتراک‌گذاری و «افزودن به صفحه اصلی» انجام می‌شود.</p><section aria-label="وضعیت تست آیفون" className="mobile-install-guide"><h3>وضعیت همین صفحه</h3><p>بازشدن صفحهٔ تست: موفق</p><p>اتصال مرورگر: {state.online?'وصل':'قطع'}</p><p>آدرس امن: {state.secure?'HTTPS فعال است':'آدرس امن نیست؛ نصب ممکن نیست'}</p><p>آماده‌سازی نصب: {state.workerError?'خطا گزارش شده؛ صفحه را دوباره باز کنید':'خطایی گزارش نشده است'}</p><p>اجرای برنامه: {state.installed?'از آیکون برنامه / حالت مستقل':'داخل مرورگر؛ بعد از افزودن، از آیکون هم‌نفس باز کنید'}</p></section><a className="btn" href="/">بازگشت به سامانه</a></>}
   {!state.secure&&<p role="alert">برای نصب، این سامانه باید با آدرس امن HTTPS باز شود.</p>}
   {state.workerError&&<p role="alert">آماده‌سازی نسخهٔ نصب‌شدنی کامل نشد. اتصال را بررسی و صفحه را دوباره باز کنید.</p>}
-  {!state.installed&&<button className="btn primary" type="button" disabled={state.installing} aria-controls="mobile-install-guide" onClick={async()=>{if(!await state.install())setShowGuide(true)}}><Download size={20}/>{state.installing?'در انتظار پاسخ به پنجره نصب…':state.ready?'نصب هم‌نفس روی گوشی':'راهنمای نصب روی گوشی'}</button>}
+  {!state.installed&&<button className="btn primary" type="button" disabled={state.installing} aria-controls="mobile-install-guide" onClick={async()=>{if(iphoneTest||!await state.install())setShowGuide(true)}}><Download size={20}/>{state.installing?'در انتظار پاسخ به پنجره نصب…':iphoneTest?'نمایش روش نصب آیفون':state.ready?'نصب هم‌نفس روی گوشی':'راهنمای نصب روی گوشی'}</button>}
   {state.message&&<p role="status">{state.message}</p>}
   {!state.installed&&<><button type="button" className="btn" aria-expanded={showGuide} aria-controls="mobile-install-guide" onClick={()=>setShowGuide(v=>!v)}>{showGuide?'بستن راهنما':'روش نصب از منوی مرورگر'}</button>{showGuide&&<div id="mobile-install-guide" ref={guide} tabIndex={-1} className="mobile-install-guide"><h3>{ios?'روش نصب در آیفون و آیپد':'روش نصب در اندروید'}</h3>{ios?<ol><li>آدرس همین سامانه را مستقیم در Safari باز کنید.</li><li>دکمهٔ اشتراک‌گذاری را بزنید و <b>Add to Home Screen / افزودن به صفحه اصلی</b> را انتخاب کنید.</li><li>افزودن را تأیید کنید و از آیکون هم‌نفس وارد شوید.</li></ol>:<ol><li>آدرس سامانه شرکت را مستقیم در <b>Chrome</b> گوشی اندروید باز کنید؛ اگر داخل پیام‌رسان هستید، آدرس پایین را کپی و در Chrome باز کنید.</li><li>منوی سه‌نقطهٔ مرورگر را بزنید و <b>افزودن به صفحه اصلی / Add to Home screen</b> یا <b>نصب برنامه / Install app</b> را انتخاب کنید.</li><li>نصب یا افزودن را تأیید کنید؛ سپس آیکون <b>هم‌نفس</b> را روی گوشی باز کنید.</li></ol>}<p>اگر برنامه قبلاً نصب شده، از آیکون آن وارد شوید. اگر روی رایانه هستید، آدرس پایین را روی گوشی باز کنید. اگر گزینه نصب وجود ندارد، نام مرورگر و تصویر منوی آن را برای پشتیبانی بفرستید.</p></div>}</>}
 
