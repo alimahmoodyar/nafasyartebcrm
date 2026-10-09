@@ -1,0 +1,46 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),ts=require('typescript');
+const {DatabaseSync}=require('node:sqlite');const root=path.resolve(__dirname,'..');const sql=new DatabaseSync(':memory:');sql.exec('PRAGMA foreign_keys=ON');for(const f of fs.readdirSync(path.join(root,'drizzle')).filter(f=>f.endsWith('.sql')).sort())sql.exec(fs.readFileSync(path.join(root,'drizzle',f),'utf8'));
+const db={prepare(q){let args=[];return{bind(...a){args=a;return this},async first(){return sql.prepare(q).get(...args)||null},async all(){return {results:sql.prepare(q).all(...args)}},async run(){return {meta:{changes:sql.prepare(q).run(...args).changes}}}}},async batch(stmts){sql.exec('BEGIN');try{const r=[];for(const s of stmts)r.push(await s.run());sql.exec('COMMIT');return r;}catch(e){sql.exec('ROLLBACK');throw e;}}};
+const objects=new Map();const bucket={async put(k,b){objects.set(k,b.slice(0));return {key:k}},async get(k){const b=objects.get(k);return b?{arrayBuffer:async()=>b.slice(0)}:null},async delete(k){objects.delete(k)}};
+let identity=null;const env={TRACE_OWNER_EMAIL:'owner@example.com',LLM_CONFIG_ENCRYPTION_KEY:require('node:crypto').randomBytes(32).toString('base64'),DB:db,BUCKET:bucket};
+const cache={};function load(file){file=path.resolve(root,file);if(cache[file])return cache[file];const exports={};cache[file]=exports;const source=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+vm.runInNewContext(source,{exports,require:n=>{if(n==='cloudflare:workers')return {env};if(n==='@/app/chatgpt-auth')return {getChatGPTUser:async()=>identity};if(n.startsWith('@/')||n.startsWith('.')){const p=n.startsWith('@/')?path.join(root,n.slice(2)):path.resolve(path.dirname(file),n);return load(p+(path.extname(p)?'':'.ts'));}return require(n)},Response,Request,URL,URLSearchParams,Error,crypto:globalThis.crypto,Date,Intl,Set,Map,FormData,Blob,File,TextEncoder,TextDecoder,Uint8Array,ArrayBuffer,AbortController,ReadableStream,btoa,atob,setTimeout:(f,n)=>setTimeout(f,Math.min(n,10)),clearTimeout,console},{filename:file});return exports;}
+const auth=load('lib/authorization.ts'),http=load('app/mcp/route.ts'),sse=load('lib/mcp/sse.ts'),tokens=load('app/api/mcp-tokens/route.ts'),configs=load('app/api/llm-config/route.ts'),secrets=load('lib/llm-secrets.ts'),catalog=load('lib/mcp/tools.ts');
+const base='https://test.local';const owner={userId:'owner',email:'owner@example.com',displayName:'Owner',fullName:null};
+const request=(path,method='GET',body,headers={})=>new Request(base+path,{method,headers:{origin:base,...(body?{'Content-Type':'application/json'}:{}),...headers},...(body?{body:JSON.stringify(body)}:{})});
+const rpc=(method,params={},id=1)=>({jsonrpc:'2.0',method,params,id});
+let token;
+async function call(name,args={},key=token){const r=await http.POST(request('/mcp','POST',rpc('tools/call',{name,arguments:args}),key?{authorization:'Bearer '+key}:{}));assert.equal(r.status,200);const d=await r.json();if(d.result?.isError)return {error:d.result.content[0].text};return JSON.parse(d.result.content[0].text);}
+async function mint(scope='read'){return (await (await tokens.POST(request('/api/mcp-tokens','POST',{name:'test',scope,days:1}))).json());}
+
+
+const api=load('app/api/after-sales/route.ts'),fileApi=load('app/api/after-sales/files/route.ts'),printApi=load('app/api/after-sales/print/route.ts'),context=load('lib/mcp/context.ts').mcpActor,service=load('lib/after-sales.ts');
+let tail=Promise.resolve();const batch=db.batch.bind(db);db.batch=s=>{const next=tail.then(()=>batch(s));tail=next.catch(()=>{});return next};
+const entities=type=>sql.prepare('SELECT * FROM flow_entities WHERE type=?').all(type).map(x=>({...x,data:JSON.parse(x.data)}));
+const entity=id=>{const r=sql.prepare('SELECT * FROM flow_entities WHERE id=?').get(id);return {...r,data:JSON.parse(r.data)}};
+const actor=(role,agent='')=>({userId:role+(agent||'User'),email:role+'@test.local',name:role+(agent||''),isAdmin:false,permissions:{read:[],write:[],eventStages:[],serviceDomains:['home'],serviceRoles:[role],serviceAgentId:agent,warehouses:['raw']}});
+async function op(mode,b={},status=200,user){const key=['caseId','orderId','shipmentId','claimId','tariffId'].find(k=>b[k])||(mode==='agent'&&b.agentId?'agentId':'');const body={id:crypto.randomUUID(),mode,domain:'home',...(key?{revision:entity(b[key]).revision}:{}),...b};const go=()=>api.POST(request('/api/after-sales','POST',body)),r=user?await context.run(user,go):await go(),d=await r.json();assert.equal(r.status,status,mode+': '+JSON.stringify(d));return {...d,body};}
+async function get(query='',user,status=200){const go=()=>api.GET(request('/api/after-sales?domain=home'+query)),r=user?await context.run(user,go):await go(),d=await r.json();assert.equal(r.status,status,JSON.stringify(d));return d;}
+function seedEntity(id,type,data){const now=new Date().toISOString();sql.prepare('INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?)').run(id,type,JSON.stringify(data),now,now);}
+async function evidence(cid,user,id=crypto.randomUUID(),contents=new Uint8Array([137,80,78,71,13,10,26,10,1]),status=201){const form=new FormData();form.set('file',new Blob([contents]),'serial.png');const r=await context.run(user,()=>fileApi.POST(new Request(base+'/api/after-sales/files?case='+cid+'&purpose=before&requestId='+id,{method:'POST',headers:{origin:base},body:form})));const d=await r.json();assert.equal(r.status,status,JSON.stringify(d));return {id,d};}
+
+const lookup=load('app/api/after-sales/warranty/route.ts');
+(async()=>{
+ const today=load('lib/duties.ts').dayAt(),earlier=load('lib/duties.ts').addDay(today,-10),now=new Date().toISOString();
+ const support=actor('support'),finance=actor('finance'),hospital={...support,permissions:{...support.permissions,serviceDomains:['hospital']}};
+ const query=(serial,day=today,domain='home')=>request('/api/after-sales/warranty?'+new URLSearchParams({serial,day,domain}));
+ const read=async(u,serial,day=today,domain='home')=>{const r=await context.run(u,()=>lookup.GET(query(serial,day,domain)));return {status:r.status,d:await r.json()};};
+ assert.equal((await lookup.GET(query('S1'))).status,401);
+ for(const code of ['S1','NO-ACT'])sql.prepare("INSERT INTO records(id,kind,payload,created) VALUES(?,'device',?,?)").run('device:'+code,JSON.stringify({code,model:'Home ventilator',warrantyMonths:'12',product:'private-product',customer:'PRIVATE_CUSTOMER'}),now);
+ sql.prepare('INSERT INTO service_activations(serial,day,months,source,created,actor) VALUES(?,?,?,?,?,?)').run('S1',earlier,12,'PRIVATE_SOURCE',now,support.userId);
+ const end=service.monthsAfter(earlier,12);let result=await read(support,'S1');assert.equal(result.status,200);assert.equal(result.d.warranty.state,'active');assert.ok(result.d.warranty.remainingDays>0);assert.equal(result.d.warranty.model,'Home ventilator');assert.equal(result.d.technicalCoverageApproved,false);assert.ok(!JSON.stringify(result.d).includes('PRIVATE'));assert.ok(!('deviceId' in result.d.warranty));
+ assert.equal((await service.warranty('S1',end)).state,'expired');assert.equal((await service.warranty('S1',load('lib/duties.ts').addDay(end,-1))).remainingDays,1);assert.equal((await read(support,'S1',load('lib/duties.ts').addDay(earlier,-1))).d.warranty.state,'not_started');
+ assert.equal((await read(support,'NO-ACT')).d.warranty.state,'not_activated');assert.equal((await read(support,'MISSING')).d.warranty.state,'unknown');assert.equal((await read(support,'MISSING')).d.warranty.remainingDays,null);
+ assert.equal((await read(finance,'S1')).status,403);assert.equal((await read(hospital,'S1')).status,403);assert.equal((await read(support,'S1',today,'hospital')).status,403);assert.equal((await read(support,'S1',load('lib/duties.ts').addDay(today,1))).status,400);assert.equal((await read(support,'S1','bad')).status,400);
+ const mismatch=await context.run(support,()=>lookup.GET(new Request(query('S1'),{headers:{'x-assistant-account':'other'}})));assert.equal(mismatch.status,409);
+ seedEntity('agent:test','as_agent',{domain:'home',active:true});const agent=actor('agent','agent:test');assert.equal((await read(agent,'S1')).status,200);
+ const tool=catalog.tools.find(t=>t.name==='get_service_warranty');assert.ok(tool&&!tool.write);const r=await context.run(support,()=>tool.run({domain:'home',serial:'S1',day:today},base));assert.ok(JSON.stringify(r).includes('active'));assert.ok(load('lib/assistant-policy.ts').assistantReadNames.has(tool.name));
+ // A preview makes no case or activation changes. Creation rechecks on the server.
+ assert.equal(entities('as_case').length,0);const initial=await op('create',{serial:'S1',customer:'Customer',phone:'0912',day:today,complaint:'Check'},200,support);assert.equal(entity(initial.id).data.warranty.state,'active');
+ console.log('PASS warranty intake: active/exclusive expiry/remaining days, missing and unactivated records, pre-start contact, private data, agent/role/domain/account access, future/invalid dates, read-only MCP and server recheck on create.');
+})().catch(e=>{console.error(e);process.exit(1)});

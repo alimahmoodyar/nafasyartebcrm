@@ -1,0 +1,1 @@
+export const serviceWarrantyStates:Record<string,string>={active:'گارانتی فعال',expired:'گارانتی پایان‌یافته',not_activated:'فعال‌سازی ثبت نشده',not_started:'بازهٔ گارانتی هنوز شروع نشده',unknown:'اطلاعات گارانتی نامشخص'};

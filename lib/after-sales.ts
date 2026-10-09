@@ -28,7 +28,15 @@ export const total=(price:string,q:number)=>((BigInt(price)*BigInt(q)+BigInt(999
 export function array(v:any,max=40):any[]{if(!Array.isArray(v)||v.length>max)fail('تعداد ردیف‌ها معتبر نیست.');return v;}
 export const unique=(v:string[])=>new Set(v).size===v.length;
 export const warehouse=(owner:string,domain:string)=>'service:'+domain+':'+owner;
-export async function warranty(serial:string,at:string){const db=storage(),s=normalizeSerial(serial),a:any=await db.prepare('SELECT * FROM service_activations WHERE serial=?').bind(s).first();const row:any=await db.prepare("SELECT * FROM records WHERE kind='device' AND json_extract(payload,'$.code')=?").bind(s).first();const device=row?{...row,data:JSON.parse(row.payload)}:null;const activation=a?.day||(device?localDay(await firstWarrantyCodeIssuedAt(device.id)||''):'');const months=a?.months||Number(device?.data.warrantyMonths||0);const end=activation&&months?monthsAfter(activation,months):'';return {serial:s,deviceId:device?.id||'',model:device?.data.model||'',productId:device?.data.product||'',activatedAt:activation,months,endsAt:end,state:end?(at>=activation&&at<end?'active':'expired'):'unknown',checkedAt:at,source:a?.source||'activation-history'};}
+export async function warranty(serial:string,at:string){
+ const db=storage(),s=normalizeSerial(serial),a:any=await db.prepare('SELECT * FROM service_activations WHERE serial=?').bind(s).first();
+ const row:any=await db.prepare("SELECT * FROM records WHERE kind='device' AND json_extract(payload,'$.code')=?").bind(s).first();const device=row?{...row,data:JSON.parse(row.payload)}:null;
+ const activation=a?.day||(device?localDay(await firstWarrantyCodeIssuedAt(device.id)||''):''),months=Number(a?.months??device?.data.warrantyMonths??0);
+ const validMonths=Number.isSafeInteger(months)&&months>0,end=activation&&validMonths?monthsAfter(activation,months):'';
+ const state=end?(at<activation?'not_started':at<end?'active':'expired'):device&&!activation?'not_activated':'unknown';
+ const remainingDays=state==='active'?Math.max(0,Math.round((Date.parse(end+'T00:00:00Z')-Date.parse(at+'T00:00:00Z'))/86400000)):null;
+ return {serial:s,deviceId:device?.id||'',model:device?.data.model||'',productId:device?.data.product||'',activatedAt:activation,months:validMonths?months:0,endsAt:end,state,checkedAt:at,remainingDays,source:a?.source||'activation-history'};
+}
 export async function lineage(serial:string){
  const cases=(await list('as_case')).filter(c=>c.data.serial===serial),d:any=await storage().prepare("SELECT id FROM records WHERE kind='device' AND json_extract(payload,'$.code')=?").bind(serial).first(),events:any[]=[],installed:any[]=[];
  if(d){const rows=(await storage().prepare("SELECT * FROM records WHERE json_extract(payload,'$.device')=? AND kind IN ('event','service') ORDER BY created,id").bind(d.id).all()).results as any[];for(const r of rows){const p=JSON.parse(r.payload);if(p.serviceCase)continue;if(p.stage==='مصرف قطعه'&&p.batch)events.push({at:r.created,batchId:p.batch,quantity:Number(p.quantity)*1000,source:r.id});if(p.replacement)events.push({at:r.created,batchId:p.replacement,oldBatchId:p.batch,quantity:Number(p.quantity||1)*1000,source:r.id});}}
