@@ -33,6 +33,27 @@ const forms=load('app/api/assistant/forms/route.ts'),workspace=load('lib/assista
  assert.equal(workspace.operationForm(leadTool,{mode:'save',leadId:'existing',revision:3},'sales','Generic').title,'ویرایش سرنخ فروش');
  const activity=workspace.operationForm(leadTool,{mode:'activity'},'sales','Generic');assert.equal(activity.title,'ثبت تماس و پیگیری سرنخ');assert.equal(activity.schema.properties.company.uiHidden,true);assert.equal(activity.schema.properties.activityType.uiHidden,false);assert.equal(activity.schema.properties.activityType.enumLabels.call,'تماس تلفنی');
  const restored=load('lib/assistant-form-presentation.ts').formPresentation(leadTool.name,leadArgs,leadTool.inputSchema,'Old cached title');assert.equal(restored.title,lead.title);assert.equal(restored.schema.properties.company.title,lead.schema.properties.company.title);
+ // Every current tool schema and every mode must have named fields and translated options.
+ const presentation=load('lib/assistant-form-presentation.ts');let inspected=0;
+ for(const tool of catalog.tools){const original=JSON.stringify(tool.inputSchema);for(const mode of tool.inputSchema.properties?.mode?.enum||['']){
+  const args={mode},before=JSON.stringify(args),form=workspace.operationForm(tool,args,'test','عنوان عملیات');
+  function check(s,path=[]){for(const [key,f] of Object.entries(s.properties||{})){
+   if(!f.uiHidden){assert.ok(f.title&&!f.title.startsWith('فیلد تعریف‌نشده'),tool.name+':'+path.concat(key).join('.'));inspected++;}
+   check(f,path.concat(key));
+  }if(s.enum)for(const v of s.enum)assert.ok(/[\u0600-\u06ff]/.test(s.enumLabels?.[v]||v),'Untranslated option '+tool.name+':'+path.join('.')+'='+v);if(s.items)check(s.items,path.concat('*'));}
+  check(form.schema);assert.equal(JSON.stringify(args),before);assert.equal(JSON.stringify(tool.inputSchema),original);
+  const normalized=presentation.formPresentation(tool.name,args,form.schema,form.title);assert.equal(normalized.title,form.title,'Repeated normalization must not repeat title');
+ }}
+ const repair=workspace.operationForm(catalog.tools.find(t=>t.name==='after_sales_apply'),{mode:'diagnose',data:{}},'after-sales','خدمات');assert.equal(repair.schema.properties.data.properties.lines.items.properties.coverage.enumLabels.warranty,'گارانتی دستگاه');
+ const foreign=workspace.operationForm(catalog.tools.find(t=>t.name==='foreign_purchase_apply'),{mode:'fx_buy',data:{}},'sourcing','بازرگانی');assert.equal(foreign.schema.properties.data.properties.account.title,'شناسه حساب صراف');assert.equal(foreign.schema.properties.data.properties.documentId.title,'مدرک همین مرحله');
+ const rootIds=presentation.formPresentation('delete_record',{id:'target'},{type:'object',properties:{id:{type:'string'}}},'حذف');assert.ok(!rootIds.schema.properties.id.uiHidden,'Deletion target must stay visible');
+ assert.equal(presentation.displayedValue('sales_apply',['notes'],'bank'),'bank','Free text must never be translated');
+ assert.equal(presentation.displayedValue('sales_apply',['method'],'bank'),'واریز بانکی');
+ assert.equal(presentation.displayedValue('personnel_apply',['kind'],'advance'),'مساعده');
+ assert.equal(presentation.displayedValue('guarantee_apply',['kind'],'advance'),'پیش‌پرداخت');
+ assert.equal(presentation.displayedValue('create_password_user',['permissions','salesRoles','*'],'manager'),'مدیر فروش');
+ assert.equal(presentation.displayedValue('create_password_user',['permissions','serviceRoles','*'],'manager'),'مدیر خدمات');
+ console.log('PASS presentation coverage:',catalog.tools.length,'tool schemas,',inspected,'visible field/mode combinations; immutable arguments, contextual options and target identifiers.');
  const send=(u,body,headers={})=>run(u,()=>forms.POST(request('/api/assistant/forms','POST',body,{'x-assistant-account':u.userId,...headers})));
  const id=crypto.randomUUID(),body={id,tool:'submit_development_request',args:{...fields,title:'Manual teaching form'}};
  assert.equal((await send(a,{...body,tool:'delete_user'})).status,403);
