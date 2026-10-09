@@ -767,3 +767,8 @@
 - مدیر خدمات هر حوزه، پس از تعریف نمایندگی فعال، در تنظیمات خدمات نام کاربری و رمز حساب نماینده را تعیین می‌کند؛ مجوز حساب فقط همان نمایندگی و حوزه است.
 - API و MCP مشترک، کنترل نقش و حوزه سمت سرور، تأیید صریح، ثبت اتمی و جلوگیری از حساب تکراری در تلاش مجدد. رمز فقط هش می‌شود و در خروجی، audit یا گفتگوی دستیار ذخیره نمی‌شود.
 - حساب‌ها از جداول موجود استفاده می‌کنند و همان سیاست حفظ حساب‌ها در reset برقرار است؛ تغییر schema یا پاک‌سازی داده ندارد.
+
+## 2026-10-09 — Development request detail visibility
+
+- Show details before the request list, scroll and focus the panel, display loading and errors, and allow returning without reopening cancelled requests.
+- Validation: development detail UI regression and development API permission/idempotency tests.
