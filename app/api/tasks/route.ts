@@ -1,3 +1,4 @@
+import {guidanceOutline} from '@/lib/workflow-guidance';
 import {syncForeignTasks} from '@/lib/foreign-purchase-tasks';
 import {installForeignPosition} from '@/lib/foreign-purchase';
 import {requireAccess,checkOrigin,accessResponse,AccessError} from '@/lib/authorization';
@@ -26,7 +27,7 @@ export async function GET(request?:Request){try{const u=await requireAccess(),db
  const starterInstalled=u.isAdmin?!!await db.prepare('SELECT id FROM flow_entities WHERE id=?').bind('duty_catalog:'+DUTY_STARTER_VERSION).first():undefined;
  const members=u.isAdmin?(await db.prepare("SELECT id,name,unit,status FROM app_members ORDER BY name").all()).results:[];
  const scheduler:any=u.isAdmin?await db.prepare("SELECT data FROM flow_entities WHERE id='duty_scheduler'").first():null;
- return json({accountId:u.userId,memberId:mid,isAdmin:u.isAdmin,tasks:allowedTasks,limited:tasks.length===300,notifications:notifications.filter((n:any)=>allowedTasks.some(t=>t.id===n.task_id&&!['completed','cancelled'].includes(t.state))),definitions:definitions.filter((p:any)=>!p.data.mergedInto),ownPositions,starterInstalled,members,scheduler:scheduler?JSON.parse(scheduler.data):null});
+ return json({accountId:u.userId,memberId:mid,isAdmin:u.isAdmin,tasks:allowedTasks.map(t=>{const g=guidanceOutline(t);return {...t,guidance:{kind:g.kind,steps:g.steps,evidence:g.evidence}};}),limited:tasks.length===300,notifications:notifications.filter((n:any)=>allowedTasks.some(t=>t.id===n.task_id&&!['completed','cancelled'].includes(t.state))),definitions:definitions.filter((p:any)=>!p.data.mergedInto),ownPositions,starterInstalled,members,scheduler:scheduler?JSON.parse(scheduler.data):null});
  }catch(e){return accessResponse(e)||Response.json({error:'کارتابل در دسترس نیست؛ نصب مهاجرت 0013 را بررسی کنید.'},{status:503})}}
 export async function POST(request:Request){try{checkOrigin(request);const u=await requireAccess(),db=storage(),b=JSON.parse(new TextDecoder().decode(await boundedBody(request,80000))),mode=required(b.mode),id=required(b.id),now=new Date().toISOString();if(!/^[a-f0-9-]{36}$/i.test(id))fail('شناسه عملیات معتبر نیست.');const signature=JSON.stringify(b),oldOp:any=await db.prepare('SELECT payload,actor FROM inventory_operations WHERE id=?').bind(id).first();if(oldOp){if(oldOp.actor!==u.userId||oldOp.payload!==signature)fail('شناسه عملیات تکراری است.',409);return json({saved:true,repeated:true});}
  if(mode==='install_starter')return json(await installDutyStarter(u,id,signature));

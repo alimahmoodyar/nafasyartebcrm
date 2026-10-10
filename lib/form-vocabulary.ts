@@ -1246,3 +1246,5 @@ Object.assign(fieldTitles,{reminderId:"یادآور موردنظر",dueAt:"تا�
 Object.assign(fieldTitles,{delegationKind:"نوع ارجاع",completionHours:"مهلت انجام پس از فعال‌شدن ارجاع (ساعت)"});
 
 toolFieldTitles.control_purchase_technical={targetId:'کالا یا منبع تأمین',scope:'محدوده کنترل فنی',authority:'واحد صاحب اختیار',decision:'تصمیم فنی',reason:'دلیل تصمیم',evidence:'شواهد واقعی',specs:'مشخصات جدید طراحی'};
+
+toolFieldTitles.get_workflow_guidance={taskId:'وظیفه کارتابل',threadId:'گفت‌وگوی کاری'};

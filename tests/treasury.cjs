@@ -91,6 +91,16 @@ assert.equal(by(race).data.state,'ceo_review');assert.equal(by(race).data.ceoApp
 assert.equal(sql.prepare("SELECT COUNT(*) n FROM access_audit WHERE target=? AND action='treasury_ceo_approve'").get(race).n,0);
 sql.prepare('UPDATE app_members SET permissions=? WHERE id=?').run(JSON.stringify(ceo.permissions),'ceo');
 sql.exec("UPDATE reset_control SET phase='maintenance'");await action('ceo_approve',race,{},409);assert.equal(by(race).data.ceoApproval,undefined);sql.exec("UPDATE reset_control SET phase='testing'");await action('ceo_approve',race);
+// Live guide uses the same authenticated source and cannot approve or mutate anything.
+const guideApi=load('app/api/tasks/guide/route.ts');user=treasurer;const guideId='treasury:'+gated+':execute:treasurer';
+const auditBefore=sql.prepare('SELECT COUNT(*) n FROM access_audit').get().n,opsBefore=sql.prepare('SELECT COUNT(*) n FROM inventory_operations').get().n;
+let response=await guideApi.GET(new Request('https://test.local/api/tasks/guide?taskId='+guideId));assert.equal(response.status,200);let guide=await response.json();assert.equal(guide.kind,'treasury');assert.equal(guide.checks.find(c=>c.key==='ceo').status,'passed');assert.ok(guide.submitChecks.every(c=>c.status==='on_submit'));assert.ok(!JSON.stringify(guide).includes('approved-bank-account'));assert.equal(sql.prepare('SELECT COUNT(*) n FROM access_audit').get().n,auditBefore);assert.equal(sql.prepare('SELECT COUNT(*) n FROM inventory_operations').get().n,opsBefore);
+sql.prepare("UPDATE flow_entities SET data=json_remove(data,'$.ceoApproval'),revision=revision+1 WHERE id=?").run(gated);
+response=await guideApi.GET(new Request('https://test.local/api/tasks/guide?taskId='+guideId));guide=await response.json();assert.equal(guide.checks.find(c=>c.key==='ceo').status,'attention');await authorize(gated);
+user=clerk;assert.equal((await guideApi.GET(new Request('https://test.local/api/tasks/guide?taskId='+guideId))).status,404);
+assert.equal((await guideApi.GET(new Request('https://test.local/api/tasks/guide?taskId=x&threadId=y'))).status,400);
+assert.equal((await guideApi.GET(new Request('https://test.local/api/tasks/guide'))).status,400);
+user=manager;
 // Both resets remove all treasury operational data, preserve roles, roll back safely.
 const reset=load('lib/reset-contract.ts');for(const scope of ['operations','full']){sql.exec('BEGIN');for(const t of Object.keys(reset.resetTables))sql.exec('DELETE FROM '+t+' WHERE '+reset.resetWhere(t,scope));assert.equal(sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type LIKE 'treasury_%'").get().n,0);assert.equal(sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type='position'").get().n,4);sql.exec('ROLLBACK');}assert.ok(by(aid));
 sql.exec("UPDATE reset_control SET phase='maintenance'");await action('request',null,request(),409);sql.exec("UPDATE reset_control SET phase='testing'");
