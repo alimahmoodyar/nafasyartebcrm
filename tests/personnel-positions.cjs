@@ -1,0 +1,12 @@
+const assert=require('node:assert/strict'),ts=require('typescript'),fs=require('node:fs'),vm=require('node:vm');
+const out={};
+vm.runInNewContext(ts.transpileModule(fs.readFileSync('lib/personnel-positions.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,{exports:out,require:()=>({storage:()=>{throw Error('Unexpected database call')}})});
+const rows=[{id:'a',type:'position',data:{active:true,name:'A',members:['me'],supervisor:'private'}},{id:'b',type:'position',data:{active:true,name:'B',members:['me']}},{id:'c',type:'position',data:{active:true,members:['other']}},{id:'d',type:'position',data:{active:false,members:['me']}},{type:'duty_template',data:{active:true,positionId:'a',title:'Own',instructions:'Steps'}},{type:'duty_template',data:{active:true,positionId:'c',title:'Private'}}];
+const profiles=out.ownPositionProfiles(rows,'me');
+assert.deepEqual(Array.from(profiles,p=>p.id),['a','b']);
+assert.equal(profiles[0].tasks[0].title,'Own');
+assert.equal(profiles[1].tasks.length,0);
+assert.equal(JSON.stringify(profiles).includes('private'),false);
+assert.equal(JSON.stringify(profiles).includes('members'),false);
+assert.equal(out.ownPositionProfiles(rows,'').length,0);
+console.log('Personnel position self-scope and multiple assignments passed');
