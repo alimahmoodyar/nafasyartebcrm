@@ -102,7 +102,10 @@ export const toolOptions:Record<string,Record<string,Record<string,string>>>={
    "reviewing": "در حال بررسی",
    "needs_info": "نیاز به توضیح کاربر",
    "planned": "برنامه‌ریزی‌شده",
-   "done": "انجام‌شده",
+   "done": "انجام‌شده — منتظر تأیید کاربر",
+   "in_progress": "در حال توسعه",
+   "ready_test": "آماده تست و تأیید درخواست‌کننده",
+   "changes_requested": "نیازمند اصلاح پس از تست",
    "declined": "پذیرفته‌نشده",
    "closed": "بسته‌شده"
   }
@@ -121,11 +124,15 @@ export const toolOptions:Record<string,Record<string,Record<string,string>>>={
    "reviewing": "در حال بررسی",
    "needs_info": "نیاز به توضیح کاربر",
    "planned": "برنامه‌ریزی‌شده",
-   "done": "انجام‌شده",
+   "done": "انجام‌شده — منتظر تأیید کاربر",
+   "in_progress": "در حال توسعه",
+   "ready_test": "آماده تست و تأیید درخواست‌کننده",
+   "changes_requested": "نیازمند اصلاح پس از تست",
    "declined": "پذیرفته‌نشده",
    "closed": "بسته‌شده"
   }
  },
+ "respond_development_request": {"decision":{"accept":"نیاز برطرف شد؛ پایان درخواست","return":"هنوز برطرف نشده؛ بازگشت به توسعه"}},
  "get_record_schema": {
   "kind": {
    "product": "محصول",

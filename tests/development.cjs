@@ -60,7 +60,7 @@ let chain=Promise.resolve();const batch=db.batch.bind(db);db.batch=s=>{const p=c
  assert.equal((await post(admin,closeBody)).data.repeated,true);
  assert.equal(entity(closeRequest).revision,3);assert.equal(entity(closeRequest).data.history.length,2);
  assert.equal(entity(closeRequest).data.state,'closed');assert.equal(entity(closeRequest).data.history.at(-1).role,'admin');
- assert.equal((await get(a,'view=summary')).data.summary.attention,0);
+ assert.equal(entity(closeRequest).data.requesterAttention,true);
  assert.equal((await get(a,'state=closed')).data.requests.some(r=>r.id===closeRequest),true);
  assert.ok((await get(a,'requestId='+closeRequest)).data.copyText.includes('بسته‌شده'));
  assert.equal((await post(a,{mode:'clarify',requestId:closeRequest,revision:3,note:'Late detail'})).status,409);
@@ -81,6 +81,48 @@ let chain=Promise.resolve();const batch=db.batch.bind(db);db.batch=s=>{const p=c
  assert.equal(closeRace.filter(r=>r.status===200).length,1);assert.equal(entity(closeRaceId).revision,2);
  assert.equal(entity(closeRaceId).data.history.length,1);
  assert.equal(sql.prepare("SELECT COUNT(*) n FROM access_audit WHERE target=? AND action='development_close'").get(closeRaceId).n,1);
+ // Requester test loop: ownership, actual stage, attention routing, closure attribution and replay.
+ const loopId=(await post(a,{mode:'create',...fields,title:'Requester test loop'})).data.requestId;
+ const feedback=(decision,note='')=>({mode:'feedback',requestId:loopId,revision:entity(loopId).revision,decision,note});
+ assert.equal((await post(a,feedback('accept'))).status,409);
+ assert.equal((await post(admin,{mode:'review',requestId:loopId,revision:1,state:'ready_test',note:'Change implemented; test the form'})).status,200);
+ assert.equal(entity(loopId).data.requesterAttention,true);assert.equal(entity(loopId).data.adminAttention,false);
+ assert.equal((await get(a)).data.ownerId,'alice');
+ assert.equal((await post(b,feedback('accept'))).status,404);
+ assert.equal((await post(admin,feedback('accept'))).status,403);
+ assert.equal((await post(a,{...feedback('accept'),confirmed:false})).status,400);
+ assert.equal((await post(a,feedback('return',' '))).status,400);
+ assert.equal((await post(a,feedback('invalid','test'))).status,409);
+ const ack={mode:'acknowledge',requestId:loopId,revision:entity(loopId).revision};
+ assert.equal((await post(b,ack)).status,404);
+ assert.equal((await post(a,ack)).status,200);assert.equal(entity(loopId).data.state,'ready_test');assert.equal(entity(loopId).data.requesterAttention,false);
+ assert.equal((await post(a,feedback('return','The required export is missing'))).status,200);
+ assert.equal(entity(loopId).data.state,'changes_requested');assert.equal(entity(loopId).data.adminAttention,true);
+ const rev=entity(loopId).revision;
+ assert.equal((await post(admin,{mode:'review',requestId:loopId,revision:rev,state:'done',note:'Legacy completion; test again'})).status,200);
+ assert.equal((await post(a,{mode:'create',...fields,title:'Requester test loop'})).data.duplicate,true);
+ const accept={...feedback('accept'),id:crypto.randomUUID()};
+ const principal={user:a,scope:'read_write',tokenId:null},args={id:accept.id,requestId:loopId,revision:accept.revision,decision:'accept',note:'',confirmed:true};
+ await assert.rejects(()=>catalog.executeTool('respond_development_request',args,base,{...principal,scope:'read'}),/read-only/);
+ await assert.rejects(()=>catalog.executeTool('respond_development_request',{...args,confirmed:false},base,principal));
+ assert.equal((await catalog.executeTool('respond_development_request',args,base,principal)).saved,true);
+ assert.equal((await catalog.executeTool('respond_development_request',args,base,principal)).repeated,true);
+ assert.equal(entity(loopId).data.state,'closed');assert.equal(entity(loopId).data.closedBy.role,'requester');assert.equal(entity(loopId).data.closedBy.actor,'alice');assert.equal(entity(loopId).data.adminAttention,true);
+ assert.ok((await get(admin,'requestId='+loopId)).data.copyText.includes('بسته‌شده با تأیید درخواست‌کننده'));
+ assert.equal((await post(a,feedback('return','Late return'))).status,409);
+ const ackArgs={id:crypto.randomUUID(),requestId:loopId,revision:entity(loopId).revision,confirmed:true};
+ assert.equal((await catalog.executeTool('acknowledge_development_request',ackArgs,base,{user:admin,scope:'read_write',tokenId:null})).saved,true);
+ assert.equal(entity(loopId).data.adminAttention,false);assert.equal(entity(loopId).data.state,'closed');
+ await post(admin,{mode:'review',requestId:loopId,revision:entity(loopId).revision,state:'planned',note:'Reopened by manager'});
+ assert.equal(entity(loopId).data.closedBy,null);
+ await post(a,{mode:'clarify',requestId:loopId,revision:entity(loopId).revision,note:'An additional detail'});
+ assert.equal(entity(loopId).data.adminAttention,true);
+ await post(admin,{mode:'review',requestId:loopId,revision:entity(loopId).revision,state:'ready_test',note:'Ready'});
+ const concurrentRevision=entity(loopId).revision;
+ const outcomes=await Promise.all([post(a,{...feedback('accept'),revision:concurrentRevision}),post(admin,{mode:'close',requestId:loopId,revision:concurrentRevision,note:'Exceptional closure'})]);
+ assert.equal(outcomes.filter(r=>r.status===200).length,1);assert.equal(entity(loopId).revision,concurrentRevision+1);
+ assert.equal(entity(closeRequest).data.closedBy.role,'admin');
+ console.log('Requester test workflow passed: scoped accept/return, required rejection reason, old done compatibility, notifications/acknowledgment, MCP scopes, closure history and concurrent closure.');
  // Mock provider proposes unsupported need; persisted only after same-owner confirmation.
  const profileId=crypto.randomUUID();await run(admin,()=>configs.PUT(request('/api/llm-config','PUT',{id:profileId,revision:0,name:'Mock',model:'mock-model',baseUrl:'https://example.test/v1',systemPrompt:'',temperature:0.4,maxTokens:1000,apiToken:'test-key'})));
  proposedArgs={...fields,title:'Assistant need'};const send=()=>run(a,()=>chat.POST(request('/api/assistant','POST',{requestId:crypto.randomUUID(),profileId,message:'این گزارش در سیستم نیست، نیازش را ثبت کن'})));
@@ -102,6 +144,12 @@ let chain=Promise.resolve();const batch=db.batch.bind(db);db.batch=s=>{const p=c
  ar=await confirm(admin);assert.equal((await ar.json()).action.state,'succeeded');await confirm(admin);
  assert.equal(entity(aid).data.state,'closed');assert.equal(entity(aid).revision,4);assert.equal(entity(aid).data.history.length,3);
  assert.ok(sql.prepare("SELECT COUNT(*) n FROM access_audit WHERE action LIKE 'development_%'").get().n>=7);
+ // Assistant feedback preserves the selected request identity and needs independent confirmation.
+ await post(admin,{mode:'review',requestId:aid,revision:entity(aid).revision,state:'ready_test',note:'Test updated result'});
+ proposedTool='respond_development_request';proposedArgs={requestId:aid,revision:entity(aid).revision,decision:'accept',note:''};
+ response=await send();answer=await response.json();action=answer.actions.find(x=>x.state==='pending');assert.ok(action,JSON.stringify(answer));assert.equal(action.args.requestId,aid);
+ assert.equal(entity(aid).data.state,'ready_test');assert.equal((await confirm(b)).status,404);
+ ar=await confirm(a);assert.equal((await ar.json()).action.state,'succeeded');assert.equal(entity(aid).data.closedBy.role,'requester');
  // Pagination and count restricted at SQL level, with stable ordering and independent copies per requester.
  for(let i=0;i<52;i++)assert.equal((await post(b,{mode:'create',...fields,title:'Bob '+i})).status,200);
  const bp=(await get(b)).data;assert.equal(bp.total,52);assert.equal(bp.requests.length,50);assert.equal(bp.nextOffset,50);const bp2=(await get(b,'offset=50')).data;assert.equal(bp2.requests.length,2);assert.equal(bp2.nextOffset,null);assert.equal(new Set([...bp.requests,...bp2.requests].map(r=>r.id)).size,52);
