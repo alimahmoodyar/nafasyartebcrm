@@ -60,7 +60,15 @@ async function evidence(cid,user,id=crypto.randomUUID(),contents=new Uint8Array(
  await op('activation_import',{source:'legacy',rows:[{serial:'S1',day:today,months:12}]});assert.equal(sql.prepare('SELECT COUNT(*) n FROM service_activations').get().n,1);
  const prev=await op('activation_preview',{source:'legacy',rows:[{serial:'S1',day:'2025-01-01',months:12}]});assert.equal(prev.preview[0].status,'conflict');await op('activation_import',{source:'legacy',rows:[{serial:'S1',day:'2025-01-01',months:12}]},400);
  const cid=(await op('create',{serial:'S1',customer:'Customer',phone:'0912',day:today,model:'NF5',complaint:'stopped'},200,agent)).id;
- await get('&case='+cid,other,404);await op('intake',{caseId:cid,day:today,hours:'100',deliverer:'Customer',accessories:'Cable',appearance:'Good'},200,agent);
+ await get('&case='+cid,other,404);
+ await op('intake',{caseId:cid,day:today,deliverer:'Courier',accessories:'Cable',appearance:'Good'},400,agent);
+ await op('intake',{caseId:cid,day:today,deliverer:'Courier',delivererPhone:'bad',accessories:'Cable',appearance:'Good'},400,agent);
+ assert.equal(entity(cid).data.state,'contact');
+await op('intake',{caseId:cid,day:today,hours:'100',deliverer:'Customer',delivererPhone:'۰۹۱۲۳۴۵۶۷۸۹',accessories:'Cable',appearance:'Good'},200,agent);
+ assert.equal(entity(cid).data.intake.delivererPhone,'09123456789');assert.equal(entity(cid).data.intake.delivererNationalId,'');assert.equal(entity(cid).data.phone,'0912');
+ const intakeFields=load('lib/after-sales-contract.ts').serviceForms.intake;assert.equal(intakeFields.find(f=>f.key==='delivererNationalId').optional,true);assert.ok(!intakeFields.find(f=>f.key==='delivererPhone').optional);
+ const contact=load('lib/service-intake-contact.ts').intakeContact;assert.equal(contact({delivererPhone:'+۹۸ ۹۱۲ ۳۴۵ ۶۷۸۹',delivererNationalId:'۰۰۱۲۳۴۵۶۷۸'}).delivererNationalId,'0012345678');assert.throws(()=>contact({delivererPhone:'09123456789',delivererNationalId:'123'}));
+ const receipt=await context.run(agent,()=>printApi.GET(request('/api/after-sales/print?case='+cid+'&kind=receipt')));assert.equal(receipt.status,200);const receiptText=await receipt.text();assert.ok(receiptText.includes('شماره تماس تحویل‌دهنده'));assert.ok(receiptText.includes('09123456789'));
  const diagnosisFields=load('lib/after-sales-contract.ts').serviceForms.diagnose.find(f=>f.key==='lines');
  assert.ok(!JSON.stringify(diagnosisFields).includes('oldBatchId'));assert.ok(!JSON.stringify(diagnosisFields).includes('unknownReason'));
  const installed=[{partCode:'01',batchId:'old-a',quantity:2000,warrantyStart:today,warrantyEnd:service.monthsAfter(today,6)},{partCode:'02',batchId:'wrong-part',quantity:5000}];
@@ -93,10 +101,10 @@ async function evidence(cid,user,id=crypto.randomUUID(),contents=new Uint8Array(
  const claim=entities('as_claim')[0].id;await op('return_receive',{claimId:claim,day:today,location:'RETURN-A',notes:'received'},200,actor('inventory'));await op('return_review',{claimId:claim,approved:true,notes:'matches evidence'},200,actor('coordinator'));await op('credit',{claimId:claim,notes:'credit'},200,actor('finance'));
  led=await service.ledger(a);assert.equal(led.find(r=>r.kind==='return_credit').remaining,'100');assert.equal(led.find(r=>r.kind==='invoice').remaining,'0');await op('credit',{claimId:claim,notes:'again'},400,actor('finance'));
  // Prior replacement warranty is traceable and date based, not inferred from main warranty.
- const next=(await op('create',{serial:'S1',customer:'Customer',phone:'0912',day:today,complaint:'again'},200,agent)).id;await op('intake',{caseId:next,day:today,hours:'101',deliverer:'Customer',accessories:'Cable',appearance:'Good'},200,agent);
+ const next=(await op('create',{serial:'S1',customer:'Customer',phone:'0912',day:today,complaint:'again'},200,agent)).id;await op('intake',{caseId:next,day:today,hours:'101',deliverer:'Customer',delivererPhone:'۰۹۱۲۳۴۵۶۷۸۹',accessories:'Cable',appearance:'Good'},200,agent);
  await op('diagnose',{...quote,caseId:next,lines:[{...quote.lines[0],coverage:'part_warranty',oldBatchId:'forged-client-batch',unknownReason:'ignored'}]},200,agent);
  // Paid repair requires consent even after company authorization.
- const paid=(await op('create',{serial:'PAID',customer:'Paid Customer',phone:'0914',day:today,complaint:'fault'},200,agent)).id;await op('intake',{caseId:paid,day:today,hours:'0',deliverer:'Customer',accessories:'none',appearance:'normal'},200,agent);
+ const paid=(await op('create',{serial:'PAID',customer:'Paid Customer',phone:'0914',day:today,complaint:'fault'},200,agent)).id;await op('intake',{caseId:paid,day:today,hours:'0',deliverer:'Customer',delivererPhone:'۰۹۱۲۳۴۵۶۷۸۹',accessories:'none',appearance:'normal'},200,agent);
  assert.equal(entity(next).data.lines[0].oldBatchId,raw,'old batch is derived, never trusted from caller');assert.equal(entity(next).data.lines[0].traceStatus,'automatic');
  const paidQuote={...quote,caseId:paid,lines:[{...quote.lines[0],coverage:'paid',customerUnitRial:'100'}],laborLines:[]};await op('diagnose',paidQuote,200,agent);await op('authorize',{caseId:paid,approved:true,notes:'review'},200,actor('coordinator'));assert.equal(entity(paid).data.state,'diagnosed');await op('reserve',{caseId:paid,allocations:[]},400,agent);
  await op('consent',{caseId:paid,approved:true,person:'Customer',method:'phone',notes:'approved 100 IRR'},200,agent);assert.equal(entity(paid).data.state,'approved');

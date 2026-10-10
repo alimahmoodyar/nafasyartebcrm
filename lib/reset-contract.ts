@@ -1,3 +1,4 @@
+// Intake contact fields are embedded in as_case; existing backup, both reset scopes and flow freeze cover them.
 // purchase_service is operational flow_entities data: both resets delete it; 0016 freezes it. Output files reuse payable_file backup/object cleanup; private design remains in qms_file under existing rules.
 // Development test results, closure identity and attention flags remain embedded in preserved development_request; existing backup and 0016 freeze apply.
 // CEO payment approval, decision and basis are embedded in treasury_request; existing flow_entities backup, both reset scopes and 0016 freeze cover them.
