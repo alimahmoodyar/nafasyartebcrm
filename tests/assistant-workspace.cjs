@@ -71,5 +71,17 @@ const forms=load('app/api/assistant/forms/route.ts'),workspace=load('lib/assista
  const providerFile=path.resolve(root,'lib/llm-provider.ts'),original=cache[providerFile].providerRequest;
  let round=0;cache[providerFile].providerRequest=async()=>({choices:[{message:round++%2===0?{tool_calls:[{id:'form',type:'function',function:{name:proposedTool,arguments:JSON.stringify(proposedArgs)}}]}:{content:'مشکل فعلی چیست؟'}}]});
  response=await run(a,()=>chat.POST(request('/api/assistant','POST',{requestId:crypto.randomUUID(),profileId,message:'یک درخواست ثبت کن'})));assert.equal(response.status,200,await response.clone().text());const shown=await response.json();assert.equal(shown.workspace.args.title,'Partial');assert.equal(shown.workspace.section,'development');assert.equal(shown.navigation,'development');assert.ok(!JSON.stringify(shown.workspace).includes('NEVER'));assert.equal(shown.actions.filter(x=>x.state==='pending').length,0);
+ // A provider that only navigates must still return an actual visible user draft.
+ round=0;let forcedChoice;
+ cache[providerFile].providerRequest=async(_p,_k,_path,body)=>{forcedChoice ||= body.tool_choice;return {choices:[{message:round++===0?{tool_calls:[{id:'nav',type:'function',function:{name:'open_section',arguments:JSON.stringify({section:'users'})}}]}:{content:'نام کاربر چیست؟'}}]};};
+ const memberCount=sql.prepare('SELECT COUNT(*) n FROM app_members').get().n;
+ response=await run(admin,()=>chat.POST(request('/api/assistant','POST',{requestId:crypto.randomUUID(),profileId,message:'یک کاربر جدید ایجاد کن'})));
+ assert.equal(response.status,200,await response.clone().text());let userForm=await response.json();assert.equal(userForm.workspace.tool,'create_password_user');assert.equal(userForm.navigation,'users');assert.equal(forcedChoice.function.name,'show_operation_form');assert.equal(sql.prepare('SELECT COUNT(*) n FROM app_members').get().n,memberCount);
+ // Even a text-only model cannot hide a requested existing form or its known fields.
+ cache[providerFile].providerRequest=async()=>({choices:[{message:{content:'فرم را تکمیل کنید.'}}]});
+ response=await run(admin,()=>chat.POST(request('/api/assistant','POST',{requestId:crypto.randomUUID(),profileId,message:'فرمو بیار',workspace:{tool:'create_password_user',args:{name:'Known person',password:'PRIVATE'}}})));
+ assert.equal(response.status,200,await response.clone().text());userForm=await response.json();assert.equal(userForm.workspace.args.name,'Known person');assert.equal(userForm.navigation,'users');assert.ok(!JSON.stringify(userForm.workspace).includes('PRIVATE'));
+ assert.equal(workspace.requestedOperationForm('کاربر جدید ایجاد کن',null,catalog.tools.filter(t=>!t.admin)),undefined);
+ assert.equal(workspace.requestedOperationForm('کاربر جدید ایجاد نکن',null,catalog.tools),undefined);
  console.log('PASS assistant workspace: secret-free partial form, authorized navigation, manual preparation without model, confirmation-only execution, origin/account/owner checks and idempotent preparation.');
 })().catch(e=>{console.error(e);process.exit(1)});
