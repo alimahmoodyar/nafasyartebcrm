@@ -78,10 +78,28 @@ const forms=load('app/api/assistant/forms/route.ts'),workspace=load('lib/assista
  response=await run(admin,()=>chat.POST(request('/api/assistant','POST',{requestId:crypto.randomUUID(),profileId,message:'یک کاربر جدید ایجاد کن'})));
  assert.equal(response.status,200,await response.clone().text());let userForm=await response.json();assert.equal(userForm.workspace.tool,'create_password_user');assert.equal(userForm.navigation,'users');assert.equal(forcedChoice.function.name,'show_operation_form');assert.equal(sql.prepare('SELECT COUNT(*) n FROM app_members').get().n,memberCount);
  // Even a text-only model cannot hide a requested existing form or its known fields.
- cache[providerFile].providerRequest=async()=>({choices:[{message:{content:'فرم را تکمیل کنید.'}}]});
+ cache[providerFile].providerRequest=async(_p,_k,_path,body)=>{assert.ok(!JSON.stringify(body).includes('PRIVATE'),'Browser secrets must not enter model context');return {choices:[{message:{content:'فرم را تکمیل کنید.'}}]};};
  response=await run(admin,()=>chat.POST(request('/api/assistant','POST',{requestId:crypto.randomUUID(),profileId,message:'فرمو بیار',workspace:{tool:'create_password_user',args:{name:'Known person',password:'PRIVATE'}}})));
  assert.equal(response.status,200,await response.clone().text());userForm=await response.json();assert.equal(userForm.workspace.args.name,'Known person');assert.equal(userForm.navigation,'users');assert.ok(!JSON.stringify(userForm.workspace).includes('PRIVATE'));
  assert.equal(workspace.requestedOperationForm('کاربر جدید ایجاد کن',null,catalog.tools.filter(t=>!t.admin)),undefined);
  assert.equal(workspace.requestedOperationForm('کاربر جدید ایجاد نکن',null,catalog.tools),undefined);
+ // Universal catalog: every assistant write operation has a read-only visible form.
+ const policy=load('lib/assistant-policy.ts'),eligible=catalog.tools.filter(t=>t.write&&policy.assistantWriteNames.has(t.name));
+ const allChoices=workspace.operationChoices(eligible,policy.actionSection,s=>policy.canOpenSection(admin,s),policy.actionTitles);
+ for(const t of eligible){assert.ok(allChoices.some(c=>c.tool===t.name),'Missing operation '+t.name);const prior={tool:t.name,args:{notes:'Known fact'}};const draft=workspace.requestedOperationForm('ادامه بده',prior,eligible);assert.equal(draft.tool,t.name);assert.equal(draft.args.notes,'Known fact');}
+ const readForm=(u,key)=>run(u,()=>forms.GET(request('/api/assistant/forms'+(key?'?choice='+encodeURIComponent(key):''),'GET',undefined,{'x-assistant-account':u.userId})));
+ let opened=await readForm(admin);assert.equal(opened.status,200);const formCatalog=await opened.json();assert.ok(formCatalog.choices.length>=eligible.length);
+ for(const tool of ['sales_lead_apply','treasury_apply','after_sales_apply','personal_reminder_apply','receive_material_batch','create_sourcing_plan','personnel_apply','guarantee_apply']){
+  const choice=formCatalog.choices.find(c=>c.tool===tool);assert.ok(choice,tool);opened=await readForm(admin,choice.key);assert.equal(opened.status,200);const d=await opened.json();assert.equal(d.workspace.tool,tool);assert.equal(d.workspace.section,choice.section);assert.ok(Object.keys(d.workspace.schema.properties).length);assert.equal(d.workspace.actionId,undefined);
+ }
+ assert.equal((await readForm(a,formCatalog.choices.find(c=>c.tool==='create_password_user').key)).status,403);
+ // Missing display calls open a form chooser in the same authorized section.
+ const pickerBody={requestId:crypto.randomUUID(),profileId,message:'فرم یک عملیات جدید را نمایش بده'};response=await run(admin,()=>chat.POST(request('/api/assistant','POST',pickerBody)));
+ assert.equal(response.status,200,await response.clone().text());const picker=await response.json();assert.ok(picker.workspace.choices.length);assert.equal(picker.navigation,picker.workspace.section);
+ response=await run(admin,()=>chat.POST(request('/api/assistant','POST',pickerBody)));assert.equal(response.status,200);assert.ok((await response.json()).workspace.choices.length,'Replay must reopen forms without another provider request');
+ assert.equal(workspace.matchedOperationForm('فرم ایجاد سرنخ فروش را بیار',allChoices,eligible).tool,'sales_lead_apply');
+ for(const [tool,section] of [['generate_serials','serials'],['create_quality_template','product'],['move_batch_stock','inventory'],['create_production_sheet','event']])assert.equal(policy.actionSection(tool,{}),section);
+ assert.equal(sql.prepare('SELECT COUNT(*) n FROM app_members').get().n,memberCount);
+ console.log('PASS universal operation forms: catalog coverage, cross-section opening, continuation, ambiguous-request chooser, permission denial and no writes.');
  console.log('PASS assistant workspace: secret-free partial form, authorized navigation, manual preparation without model, confirmation-only execution, origin/account/owner checks and idempotent preparation.');
 })().catch(e=>{console.error(e);process.exit(1)});

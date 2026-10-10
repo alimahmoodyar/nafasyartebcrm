@@ -1,7 +1,7 @@
 import {requireAccess,checkOrigin,accessResponse,AccessError,can} from '@/lib/authorization';
 import {tools,validateToolArguments} from '@/lib/mcp/tools';
 import {assistantWriteNames,actionTitles,actionSection,canOpenSection} from '@/lib/assistant-policy';
-import {cleanFormArgs} from '@/lib/assistant-workspace';
+import {cleanFormArgs,operationChoices,operationForm} from '@/lib/assistant-workspace';
 import {boundedBody} from '@/lib/firmware-storage';
 import {storage} from '@/lib/storage';
 import {publicAction} from '../actions/route';
@@ -21,3 +21,14 @@ export async function POST(request:Request){try{
  await db.batch([db.prepare('INSERT INTO assistant_turns(id,owner,question,answer,model,created) VALUES(?,?,?,?,?,?)').bind(turn,u.userId,'تکمیل دستی فرم '+(actionTitles[tool.name]||tool.name),'فرم آماده تأیید است؛ هنوز تغییری اعمال نشده است.','manual-form',now),db.prepare("UPDATE assistant_actions SET state='cancelled' WHERE owner=? AND state='pending'").bind(u.userId),db.prepare("INSERT INTO assistant_actions(id,owner,turn_id,tool,args,state,created,expires) VALUES(?,?,?,?,?,'pending',?,?)").bind(b.id,u.userId,turn,tool.name,JSON.stringify(args),now,expires)]);
  const action:any=await db.prepare('SELECT * FROM assistant_actions WHERE id=? AND owner=?').bind(b.id,u.userId).first();return Response.json({accountId:u.userId,action:publicAction(action)},{headers:{'Cache-Control':'private, no-store'}});
  }catch(e){return accessResponse(e)||Response.json({error:'آماده‌سازی فرم انجام نشد.'},{status:400,headers:{'Cache-Control':'no-store'}});}}
+
+// Read-only opening of any assistant-supported operation. Mutations still use POST + confirmation.
+export async function GET(request:Request){try{
+ const u=await requireAccess();if(request.headers.get('x-assistant-account')!==u.userId)throw new AccessError('حساب ورود تغییر کرده است.',409);
+ const available=tools.filter(t=>t.write&&assistantWriteNames.has(t.name)&&(!t.admin||u.isAdmin)&&(!t.kind||can(u,t.kind,'write'))&&(!t.finance||u.isAdmin||u.permissions.finance==='write'));
+ const choices=operationChoices(available,actionSection,s=>canOpenSection(u,s),actionTitles),key=new URL(request.url).searchParams.get('choice');
+ if(!key)return Response.json({accountId:u.userId,choices},{headers:{'Cache-Control':'private, no-store'}});
+ const choice=choices.find(c=>c.key===key);if(!choice)throw new AccessError('این فرم برای شما مجاز نیست.',403);
+ const tool=available.find(t=>t.name===choice.tool)!;
+ return Response.json({accountId:u.userId,workspace:operationForm(tool,choice.args,choice.section,actionTitles[tool.name]||choice.title)},{headers:{'Cache-Control':'private, no-store'}});
+ }catch(e){return accessResponse(e)||Response.json({error:'بازکردن فرم انجام نشد.'},{status:400,headers:{'Cache-Control':'no-store'}});}}

@@ -2,7 +2,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
 const source=fs.readFileSync('components/trace/assistant-actions.tsx','utf8');
 let slots=[],cursor=0;const exportsObject={};
 const jsx=(type,props)=>({type,props});
-vm.runInNewContext(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText,{exports:exportsObject,require:n=>n==='react'?{useState:init=>{const i=cursor++;if(!(i in slots))slots[i]=init;return [slots[i],v=>slots[i]=typeof v==='function'?v(slots[i]):v]},useEffect:()=>{}}:n==='react/jsx-runtime'?{jsx,jsxs:jsx}:{}});
+vm.runInNewContext(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText,{exports:exportsObject,require:n=>n==='react'?{useState:init=>{const i=cursor++;if(!(i in slots))slots[i]=init;return [slots[i],v=>slots[i]=typeof v==='function'?v(slots[i]):v]},useEffect:()=>{}}:n==='react/jsx-runtime'?{jsx,jsxs:jsx}:n==='@/lib/assistant-form-presentation'?{formPresentation:(_t,_a,schema,title)=>({schema,title}),fieldTitle:(_t,k)=>k,displayedValue:(_t,_p,v)=>v}:{}});
 function elements(node){if(!node)return [];if(Array.isArray(node))return node.flatMap(elements);if(typeof node!=='object')return [];return [node,...elements(node.props?.children)]}
 let result=false,calls=[];
 const action={id:'test',title:'create',tool:'create_password_user',state:'pending',args:{},section:'users'};
