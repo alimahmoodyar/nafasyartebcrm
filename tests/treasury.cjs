@@ -53,5 +53,8 @@ sql.exec("UPDATE reset_control SET phase='maintenance'");await action('request',
 assert.ok(sql.prepare("SELECT COUNT(*) n FROM access_audit WHERE action LIKE 'treasury_%'").get().n>10);
 assert.equal(sql.prepare('SELECT state FROM duty_runs WHERE id LIKE ?').get('treasury:'+rid+':execute:%').state,'completed');
 assert.ok(sql.prepare('SELECT COUNT(*) n FROM duty_notices WHERE task_id LIKE ?').get('treasury:'+rid+':%').n>0);
+const policy={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(root,'lib/assistant-policy.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:policy,Set,require:()=>({costRead:load('lib/costing.ts').costRead})});
+assert.ok(policy.assistantReadNames.has('get_treasury')&&policy.assistantReadNames.has('get_treasury_guide'));
+assert.ok(policy.assistantWriteNames.has('treasury_apply'));assert.equal(policy.actionSection('treasury_apply',{}),'treasury');assert.equal(policy.actionSection('get_treasury',{}),'treasury');assert.equal(policy.canOpenSection(reader,'treasury'),true);assert.equal(policy.canOpenSection({permissions:{finance:'write',salesAgentId:'rep'}},'treasury'),false);
 console.log('PASS treasury: position+grant access, independent approval and reconciliation, partial payments, duplicate/reference/retry, balanced statement and suggestions, check reservation/settlement, petty cash ceilings, live purchase allowance and atomic integration, private evidence, stale permission, maintenance freeze and FK-safe reset rollback.');
 })().catch(e=>{console.error(e);process.exit(1)});
