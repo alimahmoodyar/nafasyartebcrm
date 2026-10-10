@@ -2,7 +2,7 @@ import {requireAccess,checkOrigin,accessResponse,AccessError} from '@/lib/author
 import {storage} from '@/lib/storage';
 import {boundedBody} from '@/lib/firmware-storage';
 import {taskRequired as required,taskText as text,validDay} from '@/lib/duties';
-import {inboxAccess,inboxAssistantExecution,inboxClosed,inboxDecode,inboxDirectory,inboxIdentity,inboxLink,inboxList,inboxState,inboxView} from '@/lib/inbox';
+import {prepareInboxCreate,inboxCreateGuards,inboxAccess,inboxAssistantExecution,inboxClosed,inboxDecode,inboxDirectory,inboxIdentity,inboxLink,inboxList,inboxState,inboxView} from '@/lib/inbox';
 import {inboxModes,inboxStates,inboxHelp} from '@/lib/inbox-contract';
 const json=(x:unknown)=>Response.json(x,{headers:{'Cache-Control':'private, no-store','Vary':'Cookie, Authorization'}});
 const fail=(s:string,status=400):never=>{throw new AccessError(s,status)};
@@ -19,9 +19,7 @@ export async function POST(request:Request){try{checkOrigin(request);const u=awa
   const sid='inbox-state:'+target+':'+me;statements.push(db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'inbox_state',?,1,?,?) ON CONFLICT(id) DO UPDATE SET data=json_set(flow_entities.data,'$.readRevision',MAX(COALESCE(json_extract(flow_entities.data,'$.readRevision'),0),?),'$.snoozeUntil',?),revision=flow_entities.revision+1,updated=excluded.updated").bind(sid,JSON.stringify(s),now,now,s.readRevision||0,s.snoozeUntil||''));
  }else{
   if(mode==='create'){
-   const dir=await inboxDirectory(u);if(!['person','position'].includes(b.recipientType))fail('نوع گیرنده معتبر نیست.');const list=b.recipientType==='person'?dir.people:dir.positions,recipient:any=list.find((x:any)=>x.id===b.recipientId);if(!recipient)fail('گیرنده فعال انتخاب کنید.');if(b.recipientType==='person'&&recipient.id===me||b.recipientType==='position'&&!(recipient as any).members.some((x:string)=>x!==me))fail('گیرنده باید شخص دیگری یا سمتی دارای همکار فعال باشد.');if(!['message','request'].includes(b.kind)||!['normal','urgent'].includes(b.priority))fail('نوع یا اولویت معتبر نیست.');body=required(b.body,12000);const link=b.link?.id?await inboxLink(u,b.link):null;d={title:required(b.title,180),kind:b.kind,priority:b.priority,sender:me,senderName:u.name,recipientType:b.recipientType,recipientId:recipient.id,recipientName:recipient.name,assignee:b.recipientType==='person'?recipient.id:'',state:'open',due:b.kind==='request'?due(b.due):'',link};
-   // Protect against a recipient/position being disabled while sending.
-   if(b.recipientType==='person'&&recipient.id!=='@owner')guard("EXISTS(SELECT 1 FROM app_members WHERE id=? AND status='active')",recipient.id);if(b.recipientType==='position')guard("EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND type='position' AND json_extract(data,'$.active')=1)",recipient.id);
+   const prepared=await prepareInboxCreate(u,{...b,body});d=prepared.data;body=prepared.body;statements.push(...inboxCreateGuards(db,id,b.recipientType,prepared.recipient.id));
   }else{
    if(b.revision!==t.revision)fail('گفت‌وگو تغییر کرده است؛ تازه‌سازی و دوباره بررسی کنید.',409);guard('EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)',target,t.revision);
    if(inboxClosed(d.state))fail('این گفت‌وگو بسته است.');

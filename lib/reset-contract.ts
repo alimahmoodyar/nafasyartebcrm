@@ -118,3 +118,5 @@ resetHelp.push('نوع رسمی یا غیررسمی، سند متصل و ساب�
 // treasury_* entities and treasury_file use flow_entities: 0016 generic freeze, both reset scopes and backup include every request, movement, match and document.
 
 // personal_reminders: private owner-facing reminders and captured event facts; both reset scopes, backup and 0020 maintenance freeze apply. No new foreign keys.
+
+// Scheduled delegation configuration is in personal_reminders; resulting inbox_thread/message/state are operational flow_entities. Existing 0020/0016 freeze and both reset backups/deletions cover them; no new table or migration.

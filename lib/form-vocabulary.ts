@@ -1242,3 +1242,5 @@ toolFieldTitles.treasury_apply={entityId:'پرونده خزانه',sourceKey:'ق
 toolModeTitles.treasury_apply={account:'تعریف بانک / صندوق',approve_account:'تأیید مستقل حساب',request:'درخواست دریافت / پرداخت',approve:'تأیید پرداخت و حساب مقصد',reject:'رد درخواست',cancel:'توقف مانده درخواست',execute:'ثبت اجرای واقعی',statement:'ورود صورتحساب',match:'تأیید تطبیق بانکی',unmatch:'برگشت تطبیق',check:'ثبت چک',check_issue:'تأیید صدور / دریافت چک',check_settle:'ثبت وصول واقعی',check_cancel:'ابطال / برگشت چک',expense:'ثبت هزینه تنخواه',expense_review:'بررسی مستقل هزینه',advance_return:'ثبت برگشت مانده تنخواه'};
 
 Object.assign(fieldTitles,{reminderId:"یادآور موردنظر",dueAt:"تاریخ و ساعت یادآوری با منطقه زمانی",trigger:"نوع یادآوری",linkType:"فرایند مرتبط",linkId:"پرونده مرتبط",eventField:"نقطه موردنظر در فرایند",eventCondition:"شرط رویداد",eventValue:"مرحله مقصد"});
+
+Object.assign(fieldTitles,{delegationKind:"نوع ارجاع",completionHours:"مهلت انجام پس از فعال‌شدن ارجاع (ساعت)"});
