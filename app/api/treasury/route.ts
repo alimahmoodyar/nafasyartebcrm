@@ -1,0 +1,6 @@
+import {requireAccess,checkOrigin,accessResponse} from '@/lib/authorization';
+import {boundedBody} from '@/lib/firmware-storage';
+import {treasuryRows,treasuryRoles,treasuryView,treasuryHelp,applyTreasury} from '@/lib/treasury';
+import {syncTreasuryTasks} from '@/lib/treasury-tasks';
+export async function GET(){try{const u=await requireAccess(),rows=await treasuryRows(),r=await treasuryRoles(u,rows);return Response.json({...treasuryView(rows),roles:{read:r.read,write:r.write,treasury:r.treasury,manager:r.manager,accountant:r.accountant},files:rows.filter(r=>r.type==='treasury_file').map(r=>({id:r.id,caseId:r.data.caseId,filename:r.data.filename})),help:treasuryHelp},{headers:{'Cache-Control':'private, no-store'}});}catch(e){return accessResponse(e)||Response.json({error:'دریافت خزانه ممکن نشد.'},{status:503});}}
+export async function POST(request:Request){try{checkOrigin(request);const u=await requireAccess(),b=JSON.parse(new TextDecoder().decode(await boundedBody(request,800000))),result=await applyTreasury(u,b);let tasksPending=false;try{await syncTreasuryTasks();}catch{tasksPending=true;}return Response.json({...result,tasksPending},{headers:{'Cache-Control':'private, no-store'}});}catch(e){return accessResponse(e)||Response.json({error:'ثبت تأیید نشد؛ اطلاعات و نسخه را تازه کنید.'},{status:409});}}

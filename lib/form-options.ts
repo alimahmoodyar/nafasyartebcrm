@@ -1542,3 +1542,6 @@ Object.assign(toolOptions.purchase_payables_apply,{invoiceType:{formal:'رسمی
 toolOptions.get_formal_purchase_invoices={state:toolOptions.purchase_payables_apply.taxState};
 
 toolOptions.purchase_payables_apply.mode.invoice_classify='تعیین نوع فاکتور قدیمی';
+
+// Treasury manual forms and assistant proposals share labels.
+toolOptions.treasury_apply={currency:{IRR:'ریال',USD:'دلار آمریکا',EUR:'یورو',AED:'درهم امارات',CNY:'یوان چین',GBP:'پوند بریتانیا',TRY:'لیر ترکیه'},direction:{in:'دریافت',out:'پرداخت'},category:{purchase:'خرید از پرونده موجود',expense:'هزینه',advance:'تنخواه',foreign:'پرداخت ارزی / صراف',sales:'دریافت فروش',other:'سایر'},kind:{bank:'بانک',cash:'صندوق'},'rows.*.direction':{in:'دریافت',out:'پرداخت'}};

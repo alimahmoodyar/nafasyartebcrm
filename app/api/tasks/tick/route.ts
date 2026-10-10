@@ -1,3 +1,4 @@
+import {syncTreasuryTasks} from '@/lib/treasury-tasks';
 import {syncPurchaseInvoiceTasks} from '@/lib/purchase-invoice-tasks';
 import {syncAssetTasks} from '@/lib/assets-tasks';
 import {syncForeignTasks} from '@/lib/foreign-purchase-tasks';
@@ -40,7 +41,7 @@ export async function POST(request:Request){try{
  await scanSalesMonitor({source});
  await syncServiceTasks();
  await syncTransportTasks();
- await syncGuaranteeTasks();
+ await syncGuaranteeTasks();await syncTreasuryTasks();
  const result=await tickDuties(new Date(),source);if(source==='background'){const now=new Date().toISOString();await storage().prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES('replenishment-background','workflow_health','{}',1,?,?) ON CONFLICT(id) DO UPDATE SET revision=flow_entities.revision+1,updated=excluded.updated").bind(now,now).run();}
  return Response.json(result,{headers:{'Cache-Control':'no-store'}});
  }catch(e){return accessResponse(e)||Response.json({error:'زمان‌بند اجرا نشد؛ مهاجرت‌های 0013، 0014 و 0015 و تنظیمات سرور را بررسی کنید.'},{status:503})}}

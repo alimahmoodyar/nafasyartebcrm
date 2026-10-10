@@ -1,0 +1,120 @@
+import {storage} from './storage';
+import {AccessError} from './authorization';
+import {costRead,costWrite,moneyMicro,moneyText} from './costing';
+import {apView,active,releaseBasis} from './purchase-payables';
+import {trainingContext} from './training-context';
+import type {Session} from './permissions';
+
+export const treasuryModes=['account','approve_account','request','approve','reject','cancel','execute','statement','match','unmatch','check','check_issue','check_settle','check_cancel','expense','expense_review','advance_return'] as const;
+export const treasuryHelp=[
+ 'مدیر مالی درخواست و حساب مقصد را مستقل تأیید می‌کند؛ خزانه‌دار اجرای واقعی را با مدرک ثبت می‌کند؛ مدیر حسابداری تطبیق بانکی را مستقل تأیید می‌کند. عضویت در سمت و مجوز نوشتن مالی هر دو لازم‌اند.',
+ 'ثبت در این دفتر انتقال بانکی یا سند حسابداری ایجاد نمی‌کند. ارقام و پیش‌بینی هر ارز جداست؛ مانده دفتر با مانده تأییدشده بانک یکسان فرض نمی‌شود.',
+ 'خرید از اقساط یا پیش‌پرداخت آزادشده انتخاب می‌شود. هنگام اجرا، اجازه و مانده زنده دوباره کنترل و پرداخت در همان پرونده خرید ثبت می‌شود. حقوق از مسیر پرسنلی موجود پرداخت می‌شود؛ در این دفتر دوباره ثبت نکنید.',
+ 'صورتحساب اکسل ستون‌های تاریخ میلادی YYYY-MM-DD، شناسه یکتای تراکنش بانک، مرجع پیگیری، دریافت، پرداخت و شرح دارد. مبلغ بدون جداکننده و به ارز حساب است. نبود مرجع، تطبیق خودکار ندارد. پیشنهاد تطبیق به معنی تأیید نیست.',
+ 'تنخواه: پرداخت مصوب، هزینه مستند با تأیید مستقل و برگشت مانده واقعی جدا ثبت می‌شوند. چک صادره تا وصول تعهد باز است و مانده درخواست را رزرو می‌کند؛ برگشت یا ابطال بدون وصول مانده بانک را تغییر نمی‌دهد.'
+];
+export const tFail=(m:string,s=400):never=>{throw new AccessError(m,s)};
+export function tText(v:unknown,max=2000){if(typeof v!=='string'||!v.trim()||v.length>max)tFail('متن الزامی یا نامعتبر است.');return (v as string).trim();}
+export function tDay(v:unknown){const s=tText(v,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(s)||!Number.isFinite(Date.parse(s))||new Date(s).toISOString().slice(0,10)!==s)tFail('تاریخ معتبر میلادی لازم است.');return s;}
+export const tToday=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tehran',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+export function tMoney(v:unknown,zero=false){try{const n=moneyMicro(v);if(n<BigInt(0)||!zero&&n===BigInt(0))tFail('مبلغ مثبت لازم است.');return moneyText(n);}catch{return tFail('مبلغ عددی معتبر بدون جداکننده لازم است.');}}
+export const tUUID=(v:unknown)=>{if(typeof v!=='string'||!/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(v))tFail('UUID معتبر لازم است.');return v as string;};
+const norm=(v:string)=>v.replace(/[\s\u200c]/g,'').replace(/ي/g,'ی').replace(/ك/g,'ک');
+const types="'treasury_account','treasury_request','treasury_movement','treasury_statement','treasury_check','treasury_expense','treasury_file','position','purchase_payable','payable_file','purchase_order','receipt','hr_payroll','hr_request'";
+export async function treasuryRows(){return (await storage().prepare('SELECT * FROM flow_entities WHERE type IN ('+types+') ORDER BY id').all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}));}
+export async function treasuryRoles(u:Session,rows:any[]){
+ if(trainingContext.getStore()||!costRead(u))tFail('دسترسی مالی داخلی شرکت لازم است.',403);
+ const members=(await storage().prepare('SELECT id,subject,status,permissions FROM app_members ORDER BY id').all()).results as any[];
+ const m=members.find(m=>m.status==='active'&&(m.subject===u.userId||m.id===(u.userId.startsWith('local:')?u.userId.slice(6):u.userId)));
+ const p=m?JSON.parse(m.permissions):null;
+ if(!u.isAdmin&&(!p||!costRead({isAdmin:false,permissions:p})))tFail('دسترسی فعال مالی لازم است.',403);
+ const write=costWrite(u)&&(u.isAdmin||costWrite({isAdmin:false,permissions:p}));
+ const has=(name:string)=>write&&(u.isAdmin||rows.some(r=>r.type==='position'&&r.data.active&&norm(r.data.name)===norm(name)&&r.data.members?.includes(m?.id)));
+ return {read:true,write,treasury:has('خزانه دار'),manager:has('مدیر مالی'),accountant:has('مدیر حسابداری'),memberId:m?.id||'',membersSnapshot:JSON.stringify(members)};
+}
+const rowsOf=(rows:any[],type:string)=>rows.filter(r=>r.type===type);
+export const tPaid=(id:string,rows:any[])=>rowsOf(rows,'treasury_movement').filter(r=>r.data.requestId===id&&r.data.kind!=='advance_return').reduce((n,r)=>n+moneyMicro(r.data.amount),BigInt(0));
+export const tReserved=(id:string,rows:any[])=>rowsOf(rows,'treasury_check').filter(r=>r.data.requestId===id&&r.data.state==='issued').reduce((n,r)=>n+moneyMicro(r.data.amount),BigInt(0));
+export function treasurySources(rows:any[]){return rowsOf(rows,'purchase_payable').flatMap(c=>{const v=apView(c.data,rows);return [...v.invoices.flatMap((i:any)=>i.queue.filter((q:any)=>q.released&&moneyMicro(q.remaining)>BigInt(0)).map((q:any)=>({key:c.id+':'+i.id+':'+q.id,caseId:c.id,itemId:i.id,installmentId:q.id,kind:'invoice',title:c.data.supplier+' — '+i.reference,amount:q.remaining,due:q.due,party:c.data.supplier,currency:'IRR'}))),...v.advances.filter((a:any)=>a.released&&moneyMicro(a.remaining)>BigInt(0)).map((a:any)=>({key:c.id+':'+a.id,caseId:c.id,itemId:a.id,kind:'advance',title:c.data.supplier+' — پیش‌پرداخت',amount:a.remaining,due:a.due,party:c.data.supplier,currency:'IRR'}))];});}
+export function treasuryView(rows:any[],today=tToday()){
+ const movements=rowsOf(rows,'treasury_movement'),statements=rowsOf(rows,'treasury_statement');
+ const accounts=rowsOf(rows,'treasury_account').map(r=>{const ledger=movements.filter(m=>m.data.accountId===r.id).reduce((n,m)=>n+(m.data.direction==='in'?BigInt(1):BigInt(-1))*moneyMicro(m.data.amount),moneyMicro(r.data.opening));const imports=statements.filter(s=>s.data.accountId===r.id).sort((a,b)=>b.data.to.localeCompare(a.data.to)||b.created.localeCompare(a.created));return {...r,ledger:moneyText(ledger),latestStatement:imports[0]?{from:imports[0].data.from,to:imports[0].data.to,closing:imports[0].data.closing}:null};});
+ const requests=rowsOf(rows,'treasury_request').map(r=>({...r,paid:moneyText(tPaid(r.id,rows)),reserved:moneyText(tReserved(r.id,rows)),remaining:moneyText(moneyMicro(r.data.amount)-tPaid(r.id,rows)),overdue:['approved','partial'].includes(r.data.state)&&r.data.due<today}));
+ const matched=new Set(statements.flatMap(s=>s.data.rows.filter((b:any)=>b.match).map((b:any)=>b.match.movementId)));
+ const bankRows=statements.flatMap(s=>s.data.rows.map((b:any)=>({...b,statementId:s.id,statementRevision:s.revision,accountId:s.data.accountId,currency:s.data.currency,importer:s.data.actor,candidates:b.match?[]:movements.filter(m=>!matched.has(m.id)&&m.data.accountId===s.data.accountId&&m.data.direction===b.direction&&m.data.amount===b.amount&&m.data.day===b.day&&b.reference&&norm(m.data.reference)===norm(b.reference)).map(m=>({id:m.id,title:m.data.party,reference:m.data.reference,amount:m.data.amount,day:m.data.day}))})));
+ const forecast=[7,15,30].map(days=>{const to=new Date(Date.parse(today+'T12:00:00Z')+days*86400000).toISOString().slice(0,10),currencies:Record<string,any>={};for(const a of accounts.filter(a=>a.data.state==='active')){const c=currencies[a.data.currency]||{opening:'0',in:'0',out:'0'};c.opening=moneyText(signed(c.opening)+signed(a.ledger));currencies[a.data.currency]=c;}for(const r of requests.filter(r=>['approved','partial'].includes(r.data.state)&&r.data.due<=to)){const c=currencies[r.data.currency]||{opening:'0',in:'0',out:'0'};c[r.data.direction]=moneyText(moneyMicro(c[r.data.direction])+moneyMicro(r.remaining));currencies[r.data.currency]=c;}return {days,currencies:Object.entries(currencies).map(([currency,c])=>({currency,...c,projected:moneyText(signed(c.opening)+moneyMicro(c.in)-moneyMicro(c.out))}))};});
+ return {accounts,requests,movements,checks:rowsOf(rows,'treasury_check'),expenses:rowsOf(rows,'treasury_expense'),bankRows,statements:statements.map(s=>({...s,data:{...s.data,rows:undefined}})),sources:treasurySources(rows),forecast,unmatched:movements.filter(m=>!matched.has(m.id))};
+}
+function signed(v:string){return v.startsWith('-')?-moneyMicro(v.slice(1)):moneyMicro(v);}
+export async function applyTreasury(u:Session,b:any){
+ const db=storage(),rows=await treasuryRows(),roles=await treasuryRoles(u,rows);
+ if(b.confirmed!==true||!treasuryModes.includes(b.mode))tFail('عملیات معتبر و تأیید لازم است.');tUUID(b.id);
+ const payload=JSON.stringify(b),prior:any=await db.prepare('SELECT payload,actor FROM inventory_operations WHERE id=?').bind(b.id).first();if(prior){if(prior.payload!==payload||prior.actor!==u.userId)tFail('شناسه برای عملیات دیگری استفاده شده است.',409);return {saved:true,repeated:true,id:b.entityId||b.id};}
+ const old=b.entityId?rows.find(r=>r.id===b.entityId&&r.type.startsWith('treasury_')):null;if(b.entityId&&!old)tFail('پرونده یافت نشد.',404);if(!Number.isInteger(b.revision)||b.revision!==(old?.revision||0))tFail('نسخه تغییر کرده؛ تازه‌سازی کنید.',409);
+ const requireRole=(role:'write'|'treasury'|'manager'|'accountant')=>{if(!roles[role])tFail('سمت و دسترسی مجاز این مرحله لازم است.',403);};
+ const independent=(...actors:string[])=>{if(actors.includes(u.userId))tFail('این مرحله باید توسط فرد دیگری انجام شود.',403);};
+ const notes=tText(b.notes,4000),now=new Date().toISOString(),id=old?.id||b.id,stamp={actor:u.userId,at:now,notes};let type=old?.type||'',d:any=old?structuredClone(old.data):{};const extra:any[]=[];
+ const get=(rid:string,kind:string)=>{const r=rows.find(r=>r.id===rid&&r.type===kind);if(!r)tFail('مرجع مرتبط یافت نشد.');return r!;};
+ const account=(rid:string,currency?:string)=>{const a=get(rid,'treasury_account');if(a.data.state!=='active'||currency&&a.data.currency!==currency)tFail('حساب تأییدشده با ارز منطبق لازم است.');return a;};
+ const evidence=(fid:string)=>{const f=get(fid,'treasury_file');if(f.data.caseId!==id)tFail('مدرک همین پرونده لازم است.');return f.id;};
+ const realDay=()=>{const day=tDay(b.day);if(day>tToday())tFail('تاریخ وقوع واقعی در آینده نیست.');return day;};
+ const insist=(kind:string,...states:string[])=>{if(!old||type!==kind||!states.includes(d.state))tFail('عملیات در وضعیت فعلی مجاز نیست.',409);};
+ const put=(r:any,data:any)=>extra.push(db.prepare('UPDATE flow_entities SET data=?,revision=revision+1,updated=? WHERE id=?').bind(JSON.stringify(data),now,r.id));
+ const movement=(request:any,amount:string,accountId:string,kind='payment',proof?:string)=>{
+  const reference=tText(b.reference,200),day=realDay(),a=account(accountId,request.data.currency);if(day<a.data.openingDay)tFail('تاریخ اجرا پیش از مانده اولیه حساب است.');
+  if(rowsOf(rows,'treasury_movement').some(m=>norm(m.data.reference)===norm(reference))||rowsOf(rows,'purchase_payable').some(c=>active(c.data.payments).some((p:any)=>norm(p.reference)===norm(reference)))||rows.filter(r=>['hr_payroll','hr_request'].includes(r.type)).some(r=>r.data.payments?.some((p:any)=>norm(p.reference)===norm(reference))))tFail('مرجع پرداخت یا دریافت قبلاً ثبت شده است.',409);
+  const data={requestId:request.id,accountId,currency:request.data.currency,direction:kind==='advance_return'?'in':request.data.direction,amount,reference,day,party:request.data.party,kind,fileId:proof||evidence(b.fileId),...stamp};
+  extra.push(db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'treasury_movement',?,1,?,?)").bind(b.id+':movement',JSON.stringify(data),now,now));return data;
+ };
+ const consumeSource=(request:any,amount:string,m:any)=>{
+  const s=request.data.source;if(!s)return;
+  const c=get(s.caseId,'purchase_payable'),v=apView(c.data,rows),cd=structuredClone(c.data);
+  if(s.kind==='invoice'){const i=v.invoices.find((i:any)=>i.id===s.itemId),q=i?.queue.find((q:any)=>q.id===s.installmentId);if(!q?.released||moneyMicro(q.remaining)<moneyMicro(amount))tFail('اجازه یا مانده قسط خرید تغییر کرده است.',409);cd.allocations.push({id:b.id+':allocation',invoiceId:i.id,paymentId:b.id+':movement',amount,...stamp});}
+  else{const a=v.advances.find((a:any)=>a.id===s.itemId);if(!a?.released||moneyMicro(a.remaining)<moneyMicro(amount))tFail('اجازه یا مانده پیش‌پرداخت تغییر کرده است.',409);}
+  cd.payments.push({id:b.id+':movement',reference:m.reference,day:m.day,amount,evidence:'treasury_file:'+m.fileId,purpose:request.data.title,advanceId:s.kind==='advance'?s.itemId:'',orderId:s.kind==='advance'?cd.advances.find((a:any)=>a.id===s.itemId).orderId||'':'',treasuryRequestId:request.id,...stamp});
+  // New payment/allocation must not silently invalidate the existing invoice approval.
+  if(s.kind==='invoice'){const i=cd.invoices.find((i:any)=>i.id===s.itemId);i.release={...i.release,basis:releaseBasis(cd,i,rows)};}put(c,cd);
+ };
+ if(b.mode==='account'){
+  requireRole('treasury');if(old)tFail('حساب قابل بازنویسی نیست؛ حساب جدید با تأیید مستقل ثبت کنید.');type='treasury_account';const currency=tText(b.currency,3);if(!['IRR','USD','EUR','AED','CNY','GBP','TRY'].includes(currency)||!['bank','cash'].includes(b.kind))tFail('نوع حساب یا ارز نامعتبر است.');
+  const number=tText(b.number,100);if(rowsOf(rows,type).some(a=>norm(a.data.number)===norm(number)))tFail('حساب قبلاً ثبت شده است.',409);d={title:tText(b.title,200),number,currency,kind:b.kind,opening:tMoney(b.opening,true),openingDay:realDay(),state:'review',createdBy:u.userId};
+ }else if(b.mode==='approve_account'){requireRole('manager');insist('treasury_account','review');independent(d.createdBy);d.state='active';d.approvedBy=u.userId;
+ }else if(b.mode==='request'){
+  requireRole('write');if(old)tFail('درخواست جدید بسازید.');type='treasury_request';if(!['in','out'].includes(b.direction)||!['purchase','expense','advance','foreign','sales','other'].includes(b.category))tFail('جهت یا گروه نامعتبر است.');const currency=tText(b.currency,3);if(!['IRR','USD','EUR','AED','CNY','GBP','TRY'].includes(currency))tFail('ارز نامعتبر است.');
+  const source=b.sourceKey?treasurySources(rows).find(s=>s.key===b.sourceKey):null;if(b.sourceKey&&!source)tFail('منبع خرید آزادشده یافت نشد.',409);const amount=tMoney(b.amount);if(source&&(b.direction!=='out'||b.category!=='purchase'||currency!=='IRR'||moneyMicro(amount)>moneyMicro(source.amount)))tFail('مبلغ، ارز یا گروه با منبع خرید منطبق نیست.');
+  if(b.category==='purchase'&&!source)tFail('برای پرداخت خرید منبع آزادشده را انتخاب کنید.');
+  if(source&&rowsOf(rows,type).some(r=>r.data.source?.key===source.key&&['review','approved','partial'].includes(r.data.state)))tFail('درخواست باز همین قسط یا پیش‌پرداخت وجود دارد.',409);
+  d={title:tText(b.title,200),party:source?.party||tText(b.party,200),destination:tText(b.destination,200),currency,direction:b.direction,category:b.category,amount,due:tDay(b.due),beneficiaryMemberId:b.beneficiaryMemberId||'',source:source||null,referenceDocument:tText(b.referenceDocument,500),state:'review',createdBy:u.userId};
+  if(d.beneficiaryMemberId){const members=JSON.parse(roles.membersSnapshot);if(!members.some((m:any)=>m.id===d.beneficiaryMemberId&&m.status==='active'))tFail('کارمند ذی‌نفع فعال نیست.');}
+ }else if(['approve','reject','cancel'].includes(b.mode)){
+  requireRole('manager');insist('treasury_request',...(b.mode==='cancel'?['review','approved','partial']:['review']));independent(d.createdBy);if(tReserved(id,rows)>BigInt(0))tFail('ابتدا چک باز را تعیین تکلیف کنید.');d.state=b.mode==='approve'?'approved':b.mode==='reject'?'rejected':'cancelled';d.approvedBy=b.mode==='approve'?u.userId:d.approvedBy;
+ }else if(b.mode==='execute'){
+  requireRole('treasury');insist('treasury_request','approved','partial');independent(d.approvedBy);if(d.beneficiaryMemberId===roles.memberId&&roles.memberId)tFail('پرداخت به خود نیازمند خزانه‌دار دیگری است.',403);const amount=tMoney(b.amount),remaining=moneyMicro(d.amount)-tPaid(id,rows)-tReserved(id,rows);if(moneyMicro(amount)>remaining)tFail('مبلغ از مانده آزاد بیشتر است.');const m=movement(old,amount,b.accountId);consumeSource(old,amount,m);d.state=tPaid(id,rows)+moneyMicro(amount)===moneyMicro(d.amount)?'paid':'partial';
+ }else if(b.mode==='statement'){
+  requireRole('treasury');if(old)tFail('صورتحساب قابل بازنویسی نیست.');type='treasury_statement';const a=account(b.accountId),from=tDay(b.from),to=tDay(b.to);if(to<from||to>tToday()||from<a.data.openingDay)tFail('بازه صورتحساب معتبر نیست.');if(!Array.isArray(b.rows)||!b.rows.length||b.rows.length>1000)tFail('۱ تا ۱۰۰۰ ردیف لازم است.');
+  const existing=rowsOf(rows,type).filter(s=>s.data.accountId===a.id).flatMap(s=>s.data.rows),ids=new Set<string>();const entries=b.rows.map((x:any,n:number)=>{const bankId=tText(x.bankId,200),day=tDay(x.day);if(day<from||day>to||ids.has(bankId)||existing.some((e:any)=>e.bankId===bankId))tFail('ردیف تکراری یا تاریخ خارج از بازه است.',409);ids.add(bankId);if(!['in','out'].includes(x.direction))tFail('جهت ردیف بانکی لازم است.');return {id:b.id+':'+n,bankId,day,direction:x.direction,amount:tMoney(x.amount),reference:typeof x.reference==='string'?x.reference.trim().slice(0,200):'',description:typeof x.description==='string'?x.description.slice(0,1000):'',match:null};});
+  const opening=tMoney(b.opening,true),closing=tMoney(b.closing,true),expected=entries.reduce((n:bigint,e:any)=>n+(e.direction==='in'?BigInt(1):BigInt(-1))*moneyMicro(e.amount),moneyMicro(opening));if(expected!==moneyMicro(closing))tFail('جمع گردش با مانده ابتدا و انتهای صورتحساب برابر نیست.');d={accountId:a.id,currency:a.data.currency,from,to,opening,closing,filename:tText(b.filename,180),referenceDocument:tText(b.referenceDocument,500),rows:entries,actor:u.userId,state:'imported'};
+ }else if(b.mode==='match'||b.mode==='unmatch'){
+  requireRole('accountant');insist('treasury_statement','imported');const row=d.rows.find((r:any)=>r.id===b.rowId);if(!row)tFail('ردیف بانکی یافت نشد.');independent(d.actor);
+  if(b.mode==='unmatch'){if(!row.match)tFail('تطبیقی ثبت نشده است.');row.previousMatches=[...(row.previousMatches||[]),row.match];row.match=null;}
+  else{if(row.match)tFail('ردیف قبلاً تطبیق شده است.');const m=get(b.movementId,'treasury_movement');independent(m.data.actor);if(m.data.accountId!==d.accountId||m.data.currency!==d.currency||m.data.direction!==row.direction||m.data.amount!==row.amount)tFail('حساب، ارز، جهت یا مبلغ منطبق نیست.');if(rowsOf(rows,'treasury_statement').some(s=>s.data.rows.some((r:any)=>r.match?.movementId===m.id)))tFail('گردش قبلاً تطبیق شده است.',409);row.match={movementId:m.id,...stamp};}
+ }else if(b.mode==='check'){
+  requireRole('treasury');if(old)tFail('چک جدید ثبت کنید.');type='treasury_check';const number=tText(b.number,100);if(rowsOf(rows,type).some(c=>c.data.number===number&&c.data.bank===b.bank))tFail('چک قبلاً ثبت شده است.',409);if(!['in','out'].includes(b.direction))tFail('جهت چک معتبر نیست.');const a=account(b.accountId);let request:any=null;if(b.direction==='out'){request=get(b.requestId,'treasury_request');if(!['approved','partial'].includes(request.data.state)||request.data.direction!=='out'||request.data.currency!==a.data.currency)tFail('درخواست پرداخت مصوب و ارز منطبق لازم است.');}
+  d={number,bank:tText(b.bank,200),accountId:a.id,currency:a.data.currency,direction:b.direction,amount:tMoney(b.amount),party:request?.data.party||tText(b.party,200),requestId:request?.id||'',due:tDay(b.due),location:tText(b.location,200),state:'review',createdBy:u.userId};
+ }else if(b.mode==='check_issue'){
+  requireRole('manager');insist('treasury_check','review');independent(d.createdBy);if(d.requestId){const r=get(d.requestId,'treasury_request');if(!['approved','partial'].includes(r.data.state)||moneyMicro(d.amount)>moneyMicro(r.data.amount)-tPaid(r.id,rows)-tReserved(r.id,rows))tFail('مانده آزاد درخواست کافی نیست.');}d.fileId=evidence(b.fileId);d.state='issued';d.approvedBy=u.userId;
+ }else if(b.mode==='check_cancel'){requireRole('manager');insist('treasury_check','review','issued');independent(d.createdBy);d.fileId=evidence(b.fileId);d.state='cancelled';
+ }else if(b.mode==='check_settle'){
+  requireRole('treasury');insist('treasury_check','issued');independent(d.approvedBy);const r=d.requestId?get(d.requestId,'treasury_request'):{id, data:{...d}};if(d.requestId){independent(r.data.approvedBy);if(!['approved','partial'].includes(r.data.state)||tPaid(r.id,rows)+tReserved(r.id,rows)>moneyMicro(r.data.amount))tFail('درخواست پرداخت فعال یا مانده آن کافی نیست.');}if(r.data.beneficiaryMemberId===roles.memberId&&roles.memberId)tFail('پرداخت به خود مجاز نیست.',403);const m=movement(r,d.amount,d.accountId,'check',evidence(b.fileId));consumeSource(r,d.amount,m);if(d.requestId)put(r,{...r.data,state:tPaid(r.id,rows)+moneyMicro(d.amount)===moneyMicro(r.data.amount)?'paid':'partial'});d.state='settled';d.settledBy=u.userId;
+ }else if(b.mode==='expense'){
+  requireRole('write');if(old)tFail('هزینه جدید ثبت کنید.');type='treasury_expense';const r=get(b.requestId,'treasury_request');if(r.data.category!=='advance'||r.data.direction!=='out'||tPaid(r.id,rows)===BigInt(0))tFail('تنخواه پرداخت‌شده لازم است.');const reference=tText(b.reference,200);if(rowsOf(rows,type).some(e=>norm(e.data.reference)===norm(reference)))tFail('رسید هزینه تکراری است.',409);d={requestId:r.id,currency:r.data.currency,amount:tMoney(b.amount),reference,day:realDay(),title:tText(b.title,200),referenceDocument:tText(b.referenceDocument,500),createdBy:u.userId,state:'review'};
+ }else if(b.mode==='expense_review'){
+  requireRole('manager');insist('treasury_expense','review');independent(d.createdBy);const r=get(d.requestId,'treasury_request'),used=rowsOf(rows,'treasury_expense').filter(e=>e.data.requestId===r.id&&e.data.state==='approved').reduce((n,e)=>n+moneyMicro(e.data.amount),BigInt(0)),returned=rowsOf(rows,'treasury_movement').filter(m=>m.data.requestId===r.id&&m.data.kind==='advance_return').reduce((n,m)=>n+moneyMicro(m.data.amount),BigInt(0));if(b.accepted!==true&&b.accepted!==false)tFail('نتیجه بررسی لازم است.');if(b.accepted&&used+returned+moneyMicro(d.amount)>tPaid(r.id,rows))tFail('هزینه بیشتر از مانده تنخواه است.');if(b.accepted)d.fileId=evidence(b.fileId);d.state=b.accepted?'approved':'rejected';d.reviewedBy=u.userId;
+ }else if(b.mode==='advance_return'){
+  requireRole('treasury');insist('treasury_request','paid','partial','cancelled');if(d.category!=='advance'||d.direction!=='out')tFail('درخواست تنخواه لازم است.');const used=rowsOf(rows,'treasury_expense').filter(e=>e.data.requestId===id&&['approved','review'].includes(e.data.state)).reduce((n,e)=>n+moneyMicro(e.data.amount),BigInt(0)),returned=rowsOf(rows,'treasury_movement').filter(m=>m.data.requestId===id&&m.data.kind==='advance_return').reduce((n,m)=>n+moneyMicro(m.data.amount),BigInt(0)),amount=tMoney(b.amount);if(used+returned+moneyMicro(amount)>tPaid(id,rows))tFail('برگشت بیشتر از مانده آزاد تنخواه است.');movement(old,amount,b.accountId,'advance_return');
+ }
+ d.history=[...(d.history||[]),{mode:b.mode,...stamp,fileId:b.fileId||''}];if(d.history.length>2000)tFail('سقف تاریخچه پرونده رسیده است.');
+ const snapshot=rows.reduce((n,r)=>n+r.revision,0),guard="(SELECT COUNT(*) FROM flow_entities WHERE type IN ("+types+"))=? AND (SELECT COALESCE(SUM(revision),0) FROM flow_entities WHERE type IN ("+types+"))=? AND (SELECT json_group_array(json_object('id',id,'subject',subject,'status',status,'permissions',permissions)) FROM (SELECT id,subject,status,permissions FROM app_members ORDER BY id))=?";
+ await db.batch([db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,CASE WHEN '+guard+' THEN 1 ELSE 0 END)').bind(b.id,'treasury_'+b.mode,payload,u.userId,now,rows.length,snapshot,roles.membersSnapshot),...extra,old?db.prepare('UPDATE flow_entities SET data=?,revision=revision+1,updated=? WHERE id=?').bind(JSON.stringify(d),now,id):db.prepare('INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?)').bind(id,type,JSON.stringify(d),now,now),db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,id,'treasury_'+b.mode,JSON.stringify(d),now)]);
+ return {saved:true,id};
+}
