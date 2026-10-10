@@ -1,6 +1,6 @@
 import {storage} from './storage';
 import {AccessError} from './authorization';
-import {supplierRows,supplierEntity,supplierCommercial} from './suppliers';
+import {supplierRows,supplierEntity,supplierCommercial,checkPurchaseTechnical,technicalBlock} from './suppliers';
 import {hasSupply} from './sourcing';
 import {taskRequired as req,taskText as txt,validDay,dayAt} from './duties';
 import {packingPrediction} from './shipment-contract';
@@ -15,7 +15,8 @@ export async function shipmentLines(u:any,supplierId:string,input:any[],actual=f
  if(!Array.isArray(input)||!input.length||input.length>60||new Set(input.map(l=>l.linkId)).size!==input.length)shipmentFail('۱ تا ۶۰ ردیف کالای غیرتکراری لازم است.');
  const supplier=await supplierEntity(supplierId,'supplier');if(!shipmentVisible(u,supplier.data.route))shipmentFail('مجوز مسیر خرید ندارید.',403);
  const lines=[];for(const raw of input){const link=await supplierEntity(req(raw.linkId),'supplier_material'),m=await supplierEntity(link.data.materialId,'material');if(link.data.supplierId!==supplierId)shipmentFail('کالا به تأمین‌کننده محموله متصل نیست.');const prior=base?.find(l=>l.linkId===link.id);if(base&&!prior)shipmentFail('کالای پکینگ در ثبت سفارش اولیه نیست.');
- const l:any={linkId:link.id,materialId:m.id,code:m.data.code,name:m.data.name,unit:prior?.unit||m.data.unit,generalSpecs:prior?.generalSpecs??m.data.specs??'',supplierSpecs:prior?.supplierSpecs??link.data.supplierSpecs??'',supplierCode:prior?.supplierCode??link.data.supplierCode??'',materialRevision:prior?.materialRevision??m.revision,linkRevision:prior?.linkRevision??link.revision,packaging:req(raw.packaging,500),quantity:number(raw.quantity),unitPrice:number(raw.unitPrice,true)};
+ if(!actual)await checkPurchaseTechnical(m.id,link.id);
+ const l:any={designVersion:prior?.designVersion??m.data.designVersion??0,linkId:link.id,materialId:m.id,code:m.data.code,name:m.data.name,unit:prior?.unit||m.data.unit,generalSpecs:prior?.generalSpecs??m.data.specs??'',supplierSpecs:prior?.supplierSpecs??link.data.supplierSpecs??'',supplierCode:prior?.supplierCode??link.data.supplierCode??'',materialRevision:prior?.materialRevision??m.revision,linkRevision:prior?.linkRevision??link.revision,packaging:req(raw.packaging,500),quantity:number(raw.quantity),unitPrice:number(raw.unitPrice,true)};
  if(!l.generalSpecs||!l.supplierSpecs)shipmentFail('مشخصات عمومی و مشخصات محصول تأمین‌کننده را تکمیل کنید.');
  for(const k of ['netKg','grossKg','volumeM3'])l[k]=number(raw[k]);if(Number(l.grossKg)<Number(l.netKg))shipmentFail('وزن ناخالص کمتر از خالص است.');
  if(!actual)l.prediction=packingPrediction((await shipmentRows()).filter(s=>shipmentVisible(u,s.data.route)),l);lines.push(l);
@@ -28,9 +29,9 @@ export async function applyShipment(u:any,b:any){
  const put=(eid:string,type:string,data:any,old?:any)=>writes.push(old?db.prepare('UPDATE flow_entities SET data=?,revision=revision+1,updated=? WHERE id=? AND revision=?').bind(JSON.stringify(data),now,eid,old.revision):db.prepare('INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?)').bind(eid,type,JSON.stringify(data),now,now));
  let target=id;const notes=req(b.notes,3000);
  if(mode==='specifications'){
- const link=await supplierEntity(req(b.linkId),'supplier_material'),supplier=await supplierEntity(link.data.supplierId,'supplier'),m=await supplierEntity(link.data.materialId,'material');if(!shipmentWrite(u,supplier.data.route))shipmentFail('مجوز بازرگانی مسیر لازم است.',403);if(b.revision!==link.revision||b.materialRevision!==m.revision)shipmentFail('مشخصات تغییر کرده است.',409);guard(link);guard(supplier);guard(m);const generalSpecs=req(b.generalSpecs,10000),supplierSpecs=req(b.supplierSpecs,10000);
+ const link=await supplierEntity(req(b.linkId),'supplier_material'),supplier=await supplierEntity(link.data.supplierId,'supplier'),m=await supplierEntity(link.data.materialId,'material');if(!shipmentWrite(u,supplier.data.route))shipmentFail('مجوز بازرگانی مسیر لازم است.',403);if(b.revision!==link.revision||b.materialRevision!==m.revision)shipmentFail('مشخصات تغییر کرده است.',409);guard(link);guard(supplier);guard(m);const generalSpecs=req(b.generalSpecs,10000),supplierSpecs=req(b.supplierSpecs,10000);if(technicalBlock(m)||technicalBlock(link))shipmentFail('برای تغییر مشخصات کالای متوقف‌شده از کنترل فنی استفاده کنید.',409);if(generalSpecs!==(m.data.specs||'')&&!u.isAdmin&&!u.permissions.supplyRoles?.includes('engineering'))shipmentFail('تغییر طراحی عمومی با تحقیق‌وتوسعه است.',403);
  put(id,'purchase_specification',{linkId:link.id,materialId:m.id,supplierId:supplier.id,route:supplier.data.route,generalSpecs,supplierSpecs,previousGeneralSpecs:m.data.specs||'',previousSupplierSpecs:link.data.supplierSpecs||'',day:date(b.day),actor:u.userId,notes});
- if(generalSpecs!==m.data.specs)put(m.id,'material',{...m.data,specs:generalSpecs},m);put(link.id,'supplier_material',{...link.data,supplierSpecs,status:'pending'},link);target=link.id;
+ if(generalSpecs!==m.data.specs)put(m.id,'material',{...m.data,specs:generalSpecs,designVersion:(m.data.designVersion||0)+1},m);put(link.id,'supplier_material',{...link.data,supplierSpecs,status:'pending'},link);target=link.id;
  }else{
  const old=b.shipmentId?await shipmentBy(u,req(b.shipmentId)):null;if(old&&b.revision!==old.revision)shipmentFail('پرونده تغییر کرده است.',409);if(old){guard(old);target=old.id;}
  if(mode==='create'){
