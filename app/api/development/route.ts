@@ -23,7 +23,9 @@ export async function GET(request:Request){try{
  if(q.get('requestId')){const r=await access(q.get('requestId')!,u,me);return json({...base,request:r,copyText:developmentCopy(r)});}
  const state=q.get('state')||'',query=(q.get('query')||'').trim().slice(0,180),offset=Number(q.get('offset')||0);
  if(state&&!Object.hasOwn(developmentStates,state)||!Number.isInteger(offset)||offset<0||offset>1000000)fail('فیلتر معتبر نیست.');
- const where="type='development_request' AND (?=1 OR json_extract(data,'$.owner')=?) AND (?='' OR json_extract(data,'$.state')=?) AND (?='' OR instr(lower(json_extract(data,'$.title')||' '||json_extract(data,'$.requester')||' '||json_extract(data,'$.section')),lower(?))>0)",args=[u.isAdmin?1:0,me,state,state,query,query];
+ const queue=q.get('queue')||'all';if(!['all','inbox','waiting'].includes(queue))fail('کارتابل معتبر نیست.');
+ const queueSql=queue==='all'?'':queue==='waiting'?" AND json_extract(data,'$.state') IN ('needs_info','ready_test','done')":u.isAdmin?" AND (json_extract(data,'$.state') IN ('new','reviewing','planned','in_progress','changes_requested') OR (json_extract(data,'$.state') NOT IN ('closed','declined') AND json_extract(data,'$.adminAttention')=1))":" AND json_extract(data,'$.state') NOT IN ('closed','declined')";
+ const where="type='development_request' AND (?=1 OR json_extract(data,'$.owner')=?) AND (?='' OR json_extract(data,'$.state')=?) AND (?='' OR instr(lower(json_extract(data,'$.title')||' '||json_extract(data,'$.requester')||' '||json_extract(data,'$.section')),lower(?))>0)"+queueSql,args=[u.isAdmin?1:0,me,state,state,query,query];
  const count:any=await db.prepare('SELECT COUNT(*) AS n FROM flow_entities WHERE '+where).bind(...args).first();
  const rows=(await db.prepare('SELECT * FROM flow_entities WHERE '+where+' ORDER BY updated DESC,id DESC LIMIT 50 OFFSET ?').bind(...args,offset).all()).results.map(decode);
  return json({...base,requests:rows,total:count.n,nextOffset:offset+rows.length<count.n?offset+rows.length:null});
@@ -57,7 +59,7 @@ export async function POST(request:Request){try{
   writes.push(db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'development_request',?,1,?,?)").bind(target,JSON.stringify({...d,fingerprint:hash}),now,now));
  }else{
   if(!Number.isInteger(b.revision)||b.revision!==row!.revision)fail('درخواست تغییر کرده است؛ تازه‌سازی و دوباره بررسی کنید.',409);
-  const note=mode==='acknowledge'?'پاسخ بررسی شد':mode==='feedback'&&b.decision==='accept'?(taskText(b.note??'',4000)||'نیاز برطرف شد؛ تأیید و پایان درخواست توسط درخواست‌کننده'):taskRequired(b.note,4000);if(mode==='review'&&!Object.hasOwn(developmentStates,b.state))fail('وضعیت معتبر نیست.');
+  const note=mode==='review'&&developmentTestStates.includes(b.state)?(taskText(b.note??'',4000)||'تغییرات انجام شد؛ لطفاً تست کنید و نتیجه را تأیید یا برای اصلاح برگردانید.'):mode==='acknowledge'?'پاسخ بررسی شد':mode==='feedback'&&b.decision==='accept'?(taskText(b.note??'',4000)||'نیاز برطرف شد؛ تأیید و پایان درخواست توسط درخواست‌کننده'):taskRequired(b.note,4000);if(mode==='review'&&!Object.hasOwn(developmentStates,b.state))fail('وضعیت معتبر نیست.');
   if(mode==='clarify'&&row!.data.state==='closed')fail('درخواست بسته شده است؛ برای توضیح جدید مدیر باید آن را بازگشایی کند.',409);
   if((mode==='close'||mode==='review'&&b.state==='closed')&&row!.data.state==='closed')fail('درخواست قبلاً بسته شده است.',409);
   if(row!.data.history.length>=200)fail('ظرفیت پیگیری این درخواست تکمیل شده است.');

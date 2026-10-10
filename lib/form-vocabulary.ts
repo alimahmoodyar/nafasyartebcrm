@@ -1256,3 +1256,5 @@ Object.assign(toolFieldTitles.purchase_payables_apply,{serviceId:'تعهد خد�
 toolFieldTitles.upload_purchase_service_output={serviceId:'تعهد خدمت',filename:'نام فایل خروجی',base64:'محتوای واقعی فایل'};
 
 toolFieldTitles.download_purchase_service_output={id:'فایل خروجی خدمت',offset:'شروع بخش فایل',length:'اندازه بخش فایل'};
+
+toolFieldTitles.get_development_requests={...toolFieldTitles.get_development_requests,queue:'کارتابل درخواست‌های توسعه'};

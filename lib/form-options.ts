@@ -96,6 +96,7 @@ export const toolOptions:Record<string,Record<string,Record<string,string>>>={
   }
  },
  "get_development_requests": {
+  "queue":{"all":"همه درخواست‌ها و بایگانی","inbox":"کارتابل جاری","waiting":"منتظر پاسخ و تست کاربر"},
   "state": {
    "": "انتخاب نشده",
    "new": "جدید",

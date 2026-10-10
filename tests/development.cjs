@@ -85,7 +85,9 @@ let chain=Promise.resolve();const batch=db.batch.bind(db);db.batch=s=>{const p=c
  const loopId=(await post(a,{mode:'create',...fields,title:'Requester test loop'})).data.requestId;
  const feedback=(decision,note='')=>({mode:'feedback',requestId:loopId,revision:entity(loopId).revision,decision,note});
  assert.equal((await post(a,feedback('accept'))).status,409);
- assert.equal((await post(admin,{mode:'review',requestId:loopId,revision:1,state:'ready_test',note:'Change implemented; test the form'})).status,200);
+ assert.equal((await post(admin,{mode:'review',requestId:loopId,revision:1,state:'ready_test',note:''})).status,200);
+ assert.ok(entity(loopId).data.history.at(-1).note.includes('تست'));
+ assert.ok(!(await get(admin,'queue=inbox')).data.requests.some(r=>r.id===loopId));assert.ok((await get(admin,'queue=waiting')).data.requests.some(r=>r.id===loopId));assert.ok((await get(a,'queue=inbox')).data.requests.some(r=>r.id===loopId));assert.ok(!(await get(b,'queue=waiting')).data.requests.some(r=>r.id===loopId));assert.equal((await get(admin,'queue=bad')).status,400);
  assert.equal(entity(loopId).data.requesterAttention,true);assert.equal(entity(loopId).data.adminAttention,false);
  assert.equal((await get(a)).data.ownerId,'alice');
  assert.equal((await post(b,feedback('accept'))).status,404);
@@ -97,6 +99,7 @@ let chain=Promise.resolve();const batch=db.batch.bind(db);db.batch=s=>{const p=c
  assert.equal((await post(b,ack)).status,404);
  assert.equal((await post(a,ack)).status,200);assert.equal(entity(loopId).data.state,'ready_test');assert.equal(entity(loopId).data.requesterAttention,false);
  assert.equal((await post(a,feedback('return','The required export is missing'))).status,200);
+ assert.ok((await get(admin,'queue=inbox')).data.requests.some(r=>r.id===loopId));
  assert.equal(entity(loopId).data.state,'changes_requested');assert.equal(entity(loopId).data.adminAttention,true);
  const rev=entity(loopId).revision;
  assert.equal((await post(admin,{mode:'review',requestId:loopId,revision:rev,state:'done',note:'Legacy completion; test again'})).status,200);
@@ -108,6 +111,7 @@ let chain=Promise.resolve();const batch=db.batch.bind(db);db.batch=s=>{const p=c
  assert.equal((await catalog.executeTool('respond_development_request',args,base,principal)).saved,true);
  assert.equal((await catalog.executeTool('respond_development_request',args,base,principal)).repeated,true);
  assert.equal(entity(loopId).data.state,'closed');assert.equal(entity(loopId).data.closedBy.role,'requester');assert.equal(entity(loopId).data.closedBy.actor,'alice');assert.equal(entity(loopId).data.adminAttention,true);
+ assert.ok(!(await get(admin,'queue=inbox')).data.requests.some(r=>r.id===loopId));assert.ok((await get(admin,'queue=all')).data.requests.some(r=>r.id===loopId));
  assert.ok((await get(admin,'requestId='+loopId)).data.copyText.includes('بسته‌شده با تأیید درخواست‌کننده'));
  assert.equal((await post(a,feedback('return','Late return'))).status,409);
  const ackArgs={id:crypto.randomUUID(),requestId:loopId,revision:entity(loopId).revision,confirmed:true};

@@ -1,7 +1,7 @@
 import {formatDateTime} from './persian-date';
 
 export const developmentKinds:Record<string,string>={feature:'قابلیت جدید',improvement:'بهبود قابلیت موجود',bug:'اشکال فنی',access:'درخواست دسترسی'};
-export const developmentStates:Record<string,string>={new:'جدید',reviewing:'در حال بررسی',needs_info:'نیاز به توضیح کاربر',planned:'در برنامه توسعه',in_progress:'در حال توسعه',ready_test:'آماده تست و تأیید درخواست‌کننده',changes_requested:'نیازمند اصلاح پس از تست',done:'انجام‌شده — منتظر تأیید کاربر',declined:'پذیرفته‌نشده',closed:'بسته‌شده'};
+export const developmentStates:Record<string,string>={new:'جدید',reviewing:'در حال بررسی',needs_info:'نیاز به توضیح کاربر',planned:'در برنامه توسعه',in_progress:'در حال توسعه',ready_test:'انجام شد؛ تست کنید',changes_requested:'نیازمند اصلاح پس از تست',done:'انجام‌شده — منتظر تأیید کاربر',declined:'پذیرفته‌نشده',closed:'بسته‌شده'};
 export const developmentTestStates=['ready_test','done'];
 export function developmentAttention(d:DevelopmentRequest['data'],admin:boolean){return admin?(d.adminAttention??['new','changes_requested'].includes(d.state)):(d.requesterAttention??['needs_info',...developmentTestStates].includes(d.state));}
 export function developmentClosureLabel(d:DevelopmentRequest['data']){return d.closedBy?.role==='requester'?'بسته‌شده با تأیید درخواست‌کننده':d.closedBy?.role==='admin'?'بسته‌شده با تصمیم مدیر':'بسته‌شده';}
@@ -17,7 +17,7 @@ export const developmentHelp=[
  'برای نیاز پشتیبانی‌نشده، یک سؤال کوتاه در هر مرحله بپرس: کدام بخش، چه کاری، انتظار چه خروجی و چرا. عنوان، نوع، مشکل و نتیجه مطلوب را با زبان کاربر خلاصه کن؛ مثال و اهمیت اختیاری‌اند.',
  'قبل از پیشنهاد ثبت، درخواست‌های خود کاربر را بررسی کن تا نیاز باز تکراری ساخته نشود. سپس submit_development_request را پیشنهاد بده؛ فقط پس از تأیید مستقل کاربر ذخیره می‌شود. به مدیر یا کاربر قبل از موفقیت ثبت ادعای ارسال نکن.',
  'فقط خلاصه مرتبط و تأییدشده ارسال شود؛ کل چت، رمز، توکن، اطلاعات بیمار یا جزئیات محرمانه مالی را کپی نکن. کاربر فقط نیازهای خود را می‌بیند و مدیر سامانه همه نیازها را برای توسعه می‌بیند.',
- 'مدیر با review_development_request تغییر اجراشده و روش تست را می‌نویسد و وضعیت ready_test را انتخاب می‌کند. درخواست به توجه درخواست‌کننده برمی‌گردد. done قدیمی نیز منتظر تأیید کاربر است.',
+ 'مدیر با review_development_request وضعیت ready_test را انتخاب می‌کند؛ توضیح تست اختیاری است و در نبود آن پیام استاندارد ثبت می‌شود. کارتابل جاری مدیر با queue=inbox و بایگانی با queue=all خوانده می‌شود. درخواست به توجه درخواست‌کننده برمی‌گردد. done قدیمی نیز منتظر تأیید کاربر است.',
  'فقط صاحب درخواست با respond_development_request نتیجه تست را ثبت می‌کند: accept نیاز را برطرف‌شده اعلام و درخواست را می‌بندد؛ return با توضیح اجباری به changes_requested برمی‌گردد. مدیر به جای کاربر تأیید نمی‌کند. توضیح تکمیلی هم توجه مدیر را فعال می‌کند.',
  'acknowledge_development_request فقط اعلان پاسخ را دیده‌شده می‌کند؛ جای تست، تأیید یا تغییر وضعیت نیست.',
  'مدیر با close_development_request درخواست را با دلیل و تأیید صریح می‌بندد؛ بستن به معنی انجام توسعه نیست. درخواست و سابقه حذف نمی‌شوند. توضیح کاربر در وضعیت بسته پذیرفته نمی‌شود؛ مدیر برای بازگشایی با review_development_request وضعیت باز و دلیل را ثبت می‌کند. شناسه عملیات در تکرار ثابت و revision از آخرین جزئیات خوانده شود.'
