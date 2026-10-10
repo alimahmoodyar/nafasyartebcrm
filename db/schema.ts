@@ -167,3 +167,6 @@ export const llmUsage=sqliteTable('llm_usage',{
  day:text('day').notNull(),startedAt:text('started_at').notNull(),finishedAt:text('finished_at'),durationMs:integer('duration_ms'),status:text('status').notNull(),httpStatus:integer('http_status'),errorCode:text('error_code'),responseId:text('response_id'),
  inputTokens:integer('input_tokens'),outputTokens:integer('output_tokens'),totalTokens:integer('total_tokens'),reportedTotalTokens:integer('reported_total_tokens'),cachedTokens:integer('cached_tokens'),reasoningTokens:integer('reasoning_tokens'),usageJson:text('usage_json'),usageComplete:integer('usage_complete').notNull().default(0),totalMismatch:integer('total_mismatch').notNull().default(0),
 },t=>[index('idx_llm_usage_day').on(t.day,t.startedAt,t.id),index('idx_llm_usage_user_day').on(t.userId,t.day),index('idx_llm_usage_request').on(t.requestId)]);
+
+// Private owner-only reminders; separate from broadly readable workflow entities.
+export const personalReminders=sqliteTable('personal_reminders',{id:text('id').primaryKey(),owner:text('owner').notNull(),data:text('data').notNull(),revision:integer('revision').notNull().default(1),created:text('created').notNull(),updated:text('updated').notNull()},t=>[index('idx_personal_reminders_owner').on(t.owner,t.updated)]);

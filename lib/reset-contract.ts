@@ -3,7 +3,7 @@ export const resetPreserved=['محیط آزمایش نقش‌ها (جدول‌ه
 export const resetCatalog=['قیمت‌های فروش نمایندگان','پرونده تأمین‌کنندگان، مدارک نسخه‌دار، اقدامات اصلاحی، ارتباط کالا و ارزیابی','محصولات و نسخه‌های نرم‌افزار دستگاه','تعاریف مواد اولیه، BOM و فرم‌های کنترل کیفیت','ظرفیت تولید، گیرندگان فروش، تعرفه خدمات و خودروها'];
 // Ordered children before parents. SQL identifiers and predicates are constant, never caller input.
 export const resetTables:Record<string,string>={
- llm_usage:'مصرف درخواست‌های مدل',assistant_actions:'فرمان‌های دستیار',assistant_turns:'گفت‌وگوهای دستیار',duty_files:'پیوست‌های وظایف',duty_notices:'اعلان‌های وظایف',duty_runs:'سوابق انجام وظایف',
+ personal_reminders:'یادآورهای شخصی و اعلان‌های آن‌ها',llm_usage:'مصرف درخواست‌های مدل',assistant_actions:'فرمان‌های دستیار',assistant_turns:'گفت‌وگوهای دستیار',duty_files:'پیوست‌های وظایف',duty_notices:'اعلان‌های وظایف',duty_runs:'سوابق انجام وظایف',
  service_offsets:'تهاتر خدمات',service_reservations:'رزرو قطعات خدمات',service_files:'پیوست‌های خدمات',service_ledger:'گردش مالی خدمات',service_lots:'موجودی قطعات خدمات',service_activations:'فعال‌سازی گارانتی',sourcing_holds:'تخصیص‌های تأمین',
  quality_files:'پیوست‌های کنترل کیفیت',quality_reports:'نتایج کنترل کیفیت',batch_files:'پیوست‌های بچ',finance_files:'فایل‌های کنترل مالی',finance_notes:'بررسی‌های مالی',
  production_materials:'مصرف مواد تولید',production_receipts:'رسید محصول',production_orders:'برگ‌های تولید',inventory_entries:'گردش انبار',inventory_balances:'موجودی انبار',inventory_batches:'بچ‌های انبار',flow_slots:'محل‌های دارای موجودی',
@@ -116,3 +116,5 @@ resetHelp.push('سوابق تولید دستی کد پنج‌رقمی همراه
 resetHelp.push('نوع رسمی یا غیررسمی، سند متصل و سابقه پیگیری مؤدیان همراه پرونده خرید در هر دو محدوده پشتیبان‌گیری و حذف می‌شوند؛ اعلان‌ها و وظایف هفت‌روزه قبل از پرونده حذف می‌شوند.');
 
 // treasury_* entities and treasury_file use flow_entities: 0016 generic freeze, both reset scopes and backup include every request, movement, match and document.
+
+// personal_reminders: private owner-facing reminders and captured event facts; both reset scopes, backup and 0020 maintenance freeze apply. No new foreign keys.

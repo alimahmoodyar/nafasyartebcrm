@@ -1,3 +1,4 @@
+import {reminderLinks,reminderTriggers,reminderModes,reminderConditions,reminderFields} from './reminder-contract';
 import {trainingRoles} from './training-contract';
 // Enumerated wire values with display-only Persian captions. Keys include the full field path.
 export const toolOptions:Record<string,Record<string,Record<string,string>>>={
@@ -1545,3 +1546,6 @@ toolOptions.purchase_payables_apply.mode.invoice_classify='تعیین نوع ف�
 
 // Treasury manual forms and assistant proposals share labels.
 toolOptions.treasury_apply={currency:{IRR:'ریال',USD:'دلار آمریکا',EUR:'یورو',AED:'درهم امارات',CNY:'یوان چین',GBP:'پوند بریتانیا',TRY:'لیر ترکیه'},direction:{in:'دریافت',out:'پرداخت'},category:{purchase:'خرید از پرونده موجود',expense:'هزینه',advance:'تنخواه',foreign:'پرداخت ارزی / صراف',sales:'دریافت فروش',other:'سایر'},kind:{bank:'بانک',cash:'صندوق'},'rows.*.direction':{in:'دریافت',out:'پرداخت'}};
+
+toolOptions.personal_reminder_apply={mode:reminderModes,trigger:reminderTriggers,linkType:reminderLinks,eventField:reminderFields,eventCondition:reminderConditions};
+toolOptions.get_reminder_links={kind:reminderLinks};
