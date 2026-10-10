@@ -1,3 +1,4 @@
+import {financialWorkflowRole} from './financial-workflow-roles';
 import {storage} from './storage';
 import {AccessError} from './authorization';
 import {costRead,costWrite,moneyMicro,moneyText} from './costing';
@@ -19,7 +20,7 @@ export async function guaranteeRoles(u:Session,rows?:any[]){
  const positions=all.filter(r=>r.type==='position'&&r.data.active),treasury=positions.filter(r=>normalized(r.data.name)==='خزانه دار'.replace(/ /g,'')),manager=positions.filter(r=>normalized(r.data.name)==='مدیرمالی');
  const principal=mid?{...u,permissions:JSON.parse(mid.permissions)}:u;if(principal.permissions.salesAgentId||principal.permissions.serviceAgentId||principal.permissions.hospitalCenterId)gFail('این بخش برای کاربران داخلی است.',403);const canRead=u.isAdmin||!!mid&&costRead(principal),canWrite=u.isAdmin||!!mid&&costWrite(principal);
  const has=(list:any[])=>list.some(r=>r.data.members?.includes(mid?.id));
- return {memberId:mid?.id||'',read:canRead,treasury:canWrite&&(u.isAdmin||has(treasury)),manager:canWrite&&(u.isAdmin||has(manager)),positions,treasuryPositions:treasury,managers:manager};
+ return {memberId:mid?.id||'',read:canRead,treasury:u.isAdmin||!!mid&&financialWorkflowRole(principal.permissions,mid.id,all,'treasury'),manager:u.isAdmin||!!mid&&financialWorkflowRole(principal.permissions,mid.id,all,'manager'),positions,treasuryPositions:treasury,managers:manager};
 }
 export function guaranteeBy(rows:any[],id:string,u:Session,roles:any){const r=rows.find(x=>x.type==='bank_guarantee'&&x.id===id);if(!r||!roles.read&&!r.data.viewerIds?.includes(roles.memberId))gFail('پرونده در دسترس نیست.',404);return r;}
 export function guaranteeEvidence(rows:any[],caseId:string,id:unknown){const f=rows.find(r=>r.type==='guarantee_file'&&r.id===id&&r.data.caseId===caseId);if(!f)gFail('مدرک بارگذاری‌شده همین پرونده لازم است.');return f.id;}

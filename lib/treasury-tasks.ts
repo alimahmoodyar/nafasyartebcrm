@@ -1,13 +1,12 @@
+import {financialWorkflowRole, type FinancialWorkflowRole} from './financial-workflow-roles';
 import {storage} from './storage';
 import {treasuryRows,tToday,treasuryNeedsCeo,treasuryPaymentAuthorized} from './treasury';
 import {trainingContext} from './training-context';
 export async function syncTreasuryTasks(date=new Date()){
  if(trainingContext.getStore())return {generated:0,missingOwners:[]};
  const db=storage(),rows=await treasuryRows(),today=tToday(),now=date.toISOString(),members=(await db.prepare('SELECT id,subject,status,permissions FROM app_members ORDER BY id').all()).results as any[];
- const eligible=members.filter(m=>{const p=JSON.parse(m.permissions);return m.status==='active'&&p.finance==='write'&&!p.salesAgentId&&!p.serviceAgentId&&!p.hospitalCenterId;});
- const norm=(s:string)=>s.replace(/[\s\u200c]/g,'').replace(/ي/g,'ی').replace(/ك/g,'ک');
- const owners=(name:string)=>eligible.filter(m=>rows.some(p=>p.type==='position'&&p.data.active&&norm(p.data.name)===norm(name)&&p.data.members?.includes(m.id))).map(m=>m.id);
- const roles={treasury:owners('خزانه دار'),manager:owners('مدیر مالی'),accountant:owners('مدیر حسابداری'),ceo:owners('مدیر عامل')},desired=new Set<string>(),missingOwners=new Set<string>(),existing=(await db.prepare("SELECT * FROM duty_runs WHERE id LIKE 'treasury:%'").all()).results as any[],statements:any[]=[];let generated=0;
+ const owners=(role:FinancialWorkflowRole)=>members.filter(m=>m.status==='active'&&financialWorkflowRole(JSON.parse(m.permissions),m.id,rows,role)).map(m=>m.id);
+ const roles={treasury:owners('treasury'),manager:owners('manager'),accountant:owners('accountant'),ceo:owners('ceo')},desired=new Set<string>(),missingOwners=new Set<string>(),existing=(await db.prepare("SELECT * FROM duty_runs WHERE id LIKE 'treasury:%'").all()).results as any[],statements:any[]=[];let generated=0;
  const job=(r:any,key:string,role:keyof typeof roles,title:string,due:string)=>{if(!roles[role].length)missingOwners.add(role);for(const assignee of roles[role]){const id='treasury:'+r.id+':'+key+':'+assignee,old=existing.find(t=>t.id===id),data={treasuryWorkflow:true,recordId:r.id,workflowRole:role,sourceSection:'treasury',sourceId:r.id,title:title+' — '+(r.data.title||r.data.number||r.data.filename),instructions:'مرحله واقعی را در خزانه‌داری انجام دهید؛ پاسخ وظیفه جای تأیید یا اجرا نیست.',evidence:'مدرک واقعی و نتیجه بررسی مستقل',history:old?JSON.parse(old.data).history||[]:[],answer:old?JSON.parse(old.data).answer||'':''},deadline=(old&&key==='review'?old.due:due+'T09:00:00+03:30');desired.add(id);
   if(!old){statements.push(db.prepare("INSERT INTO duty_runs(id,template_id,period,assignee,supervisor,due,state,data,revision,created,updated) VALUES(?,?,?,?,?,?,'open',?,1,?,?)").bind(id,id,today,assignee,roles.manager[0]||'@admin',deadline,JSON.stringify(data),now,now));generated++;}
   else if(!['open','blocked'].includes(old.state)||old.due!==deadline||old.supervisor!==(roles.manager[0]||'@admin'))statements.push(db.prepare("UPDATE duty_runs SET state='open',due=?,data=?,supervisor=?,revision=revision+1,updated=? WHERE id=?").bind(deadline,JSON.stringify(data),roles.manager[0]||'@admin',now,id));

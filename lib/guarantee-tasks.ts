@@ -1,3 +1,4 @@
+import {financialWorkflowRole, type FinancialWorkflowRole} from './financial-workflow-roles';
 import {storage} from './storage';
 import {guaranteeRows} from './guarantees';
 import {dayAt,notice} from './duties';
@@ -5,9 +6,8 @@ import {trainingContext} from './training-context';
 export async function syncGuaranteeTasks(date=new Date()){
  if(trainingContext.getStore())return {generated:0};
  const db=storage(),rows=await guaranteeRows(),today=dayAt(date),now=date.toISOString(),members=(await db.prepare("SELECT id,status,permissions FROM app_members ORDER BY id").all()).results as any[];
- const membershipSnapshot=JSON.stringify(members.map(m=>({id:m.id,status:m.status,permissions:m.permissions})));const eligible=members.filter(m=>{if(m.status!=='active')return false;const p=JSON.parse(m.permissions);return p.finance==='write'&&!p.salesAgentId&&!p.serviceAgentId&&!p.hospitalCenterId}).map(m=>m.id);
- const owners=(name:string)=>[...new Set<string>(rows.filter(r=>r.type==='position'&&r.data.active&&r.data.name.replace(/[\s\u200c]/g,'').replace(/ي/g,'ی').replace(/ك/g,'ک')===name).flatMap(r=>r.data.members||[]).filter((id:string)=>eligible.includes(id)))];
- const treasury=owners('خزانهدار'),managers=owners('مدیرمالی'),existing=(await db.prepare("SELECT * FROM duty_runs WHERE id LIKE 'guarantee:%'").all()).results as any[],desired=new Set<string>();let generated=0;
+ const membershipSnapshot=JSON.stringify(members.map(m=>({id:m.id,status:m.status,permissions:m.permissions})));const owners=(role:FinancialWorkflowRole)=>members.filter(m=>m.status==='active'&&financialWorkflowRole(JSON.parse(m.permissions),m.id,rows,role)).map(m=>m.id);
+ const treasury=owners('treasury'),managers=owners('manager'),existing=(await db.prepare("SELECT * FROM duty_runs WHERE id LIKE 'guarantee:%'").all()).results as any[],desired=new Set<string>();let generated=0;
  for(const r of rows.filter(r=>r.type==='bank_guarantee'&&r.data.state!=='closed')){
   const d=r.data;const jobs:{key:string;role:string;due:string;title:string}[]=[];
   if(d.state==='review')jobs.push({key:'review',role:'manager',due:today,title:'تأیید مستقل مالی'});

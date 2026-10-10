@@ -133,7 +133,7 @@ async function enter(pass='Test-password-123'){return login.POST(request('/api/a
  // Role-based account creation must derive permissions on the same authenticated API/MCP path.
  const policy=load('lib/permissions.ts');
  const roleInput=roles=>({read:[],write:[],eventStages:[],roleAssignment:{roles}});
- for(const role of policy.jobRoles){const assignment={roles:[role.id]};if(role.scope==='warehouses')assignment.warehouses=['raw','quarantine'];if(['services','serviceAgent'].includes(role.scope))assignment.serviceDomains=['home'];if(role.scope==='salesAgent')assignment.salesAgentId='test-sales';if(role.scope==='serviceAgent')assignment.serviceAgentId='test-service';assert.doesNotThrow(()=>policy.validatePermissions({roleAssignment:assignment}),role.id);}
+ for(const role of policy.jobRoles){const assignment={roles:[role.id]};if(role.scope==='warehouses')assignment.warehouses=role.id==='production_store_assistant'?['line']:['raw','quarantine'];if(['services','serviceAgent'].includes(role.scope))assignment.serviceDomains=['home'];if(role.scope==='salesAgent')assignment.salesAgentId='test-sales';if(role.scope==='serviceAgent')assignment.serviceAgentId='test-service';assert.doesNotThrow(()=>policy.validatePermissions({roleAssignment:assignment}),role.id);}
  assert.throws(()=>policy.validatePermissions(roleInput(['unknown'])));
  assert.throws(()=>policy.validatePermissions(roleInput(['inventory'])));
  assert.throws(()=>policy.validatePermissions(roleInput(['service_technician'])));

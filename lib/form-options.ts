@@ -1,3 +1,4 @@
+import {jobRoles} from './permissions';
 import {supplyRoles} from './sourcing-labels';
 import {reminderLinks,reminderTriggers,reminderModes,reminderConditions,reminderFields,reminderDelegationKinds} from './reminder-contract';
 import {trainingRoles} from './training-contract';
@@ -1565,3 +1566,7 @@ for(const fields of Object.values(toolOptions))if(fields['permissions.supplyRole
 toolOptions.control_purchase_technical={scope:{material:'کالا',supplier_material:'منبع تأمین کالا'},authority:{engineering:'تحقیق و توسعه',quality:'تضمین و کنترل کیفیت'},decision:{hold:'توقف خرید',release:'آزادسازی توقف',change:'تغییر مشخصات طراحی'}};
 
 toolOptions.purchase_service_apply={'costs.*.kind':{receipt:'بچ کالای خریداری‌شده',project:'پروژه ساخت',qms:'پروژه تحقیق‌وتوسعه / کیفیت'}};
+
+for(const name of ['create_user','create_password_user','update_user','update_password_user']){toolOptions[name] ||= {};toolOptions[name]['permissions.treasuryWorkflowRoles.*']={treasury:'خزانه‌دار',manager:'مدیر مالی',accountant:'رئیس حسابداری',ceo:'مجوز نهایی مدیرعامل'};}
+
+for(const name of ['create_user','create_password_user','update_user','update_password_user']){toolOptions[name]['permissions.roleAssignment.roles.*']=Object.fromEntries(jobRoles.map(r=>[r.id,r.label]));toolOptions[name]['permissions.roleAssignment.warehouses.*']=toolOptions[name]['permissions.warehouses.*'];toolOptions[name]['permissions.roleAssignment.serviceDomains.*']=toolOptions[name]['permissions.serviceDomains.*'];}

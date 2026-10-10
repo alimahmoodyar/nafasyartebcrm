@@ -1,3 +1,4 @@
+import {financialWorkflowRole, type FinancialWorkflowRole} from './financial-workflow-roles';
 import {storage} from './storage';
 import {AccessError} from './authorization';
 import {costRead,costWrite,moneyMicro,moneyText} from './costing';
@@ -7,7 +8,7 @@ import type {Session} from './permissions';
 
 export const treasuryModes=['account','approve_account','request','approve','ceo_approve','ceo_reject','reject','cancel','execute','statement','match','unmatch','check','check_issue','check_settle','check_cancel','expense','expense_review','advance_return'] as const;
 export const treasuryHelp=[
- 'مدیر مالی درخواست و حساب مقصد را مستقل تأیید می‌کند؛ مدیرعامل مجوز نهایی پرداخت را مستقل صادر می‌کند؛ خزانه‌دار پس از این مجوز اجرای واقعی را با مدرک ثبت می‌کند؛ مدیر حسابداری تطبیق بانکی را مستقل تأیید می‌کند. عضویت در سمت و مجوز نوشتن مالی هر دو لازم‌اند.',
+ 'مدیر مالی درخواست و حساب مقصد را مستقل تأیید می‌کند؛ مدیرعامل مجوز نهایی پرداخت را مستقل صادر می‌کند؛ خزانه‌دار پس از این مجوز اجرای واقعی را با مدرک ثبت می‌کند؛ مدیر حسابداری تطبیق بانکی را مستقل تأیید می‌کند. نقش مرحله‌ای انتخاب‌شده در حساب کاربر لازم است؛ حساب‌های قدیمی با عضویت در سمت و مجوز نوشتن مالی نیز پشتیبانی می‌شوند.',
  'ثبت در این دفتر انتقال بانکی یا سند حسابداری ایجاد نمی‌کند. ارقام و پیش‌بینی هر ارز جداست؛ مانده دفتر با مانده تأییدشده بانک یکسان فرض نمی‌شود.',
  'خرید از اقساط یا پیش‌پرداخت آزادشده انتخاب می‌شود. هنگام اجرا، اجازه و مانده زنده دوباره کنترل و پرداخت در همان پرونده خرید ثبت می‌شود. حقوق از مسیر پرسنلی موجود پرداخت می‌شود؛ در این دفتر دوباره ثبت نکنید.',
  'صورتحساب اکسل ستون‌های تاریخ میلادی YYYY-MM-DD، شناسه یکتای تراکنش بانک، مرجع پیگیری، دریافت، پرداخت و شرح دارد. مبلغ بدون جداکننده و به ارز حساب است. نبود مرجع، تطبیق خودکار ندارد. پیشنهاد تطبیق به معنی تأیید نیست.',
@@ -29,8 +30,8 @@ export async function treasuryRoles(u:Session,rows:any[]){
  const p=m?JSON.parse(m.permissions):null;
  if(!u.isAdmin&&(!p||!costRead({isAdmin:false,permissions:p})))tFail('دسترسی فعال مالی لازم است.',403);
  const write=costWrite(u)&&(u.isAdmin||costWrite({isAdmin:false,permissions:p}));
- const has=(name:string)=>write&&(u.isAdmin||rows.some(r=>r.type==='position'&&r.data.active&&norm(r.data.name)===norm(name)&&r.data.members?.includes(m?.id)));
- return {read:true,write,treasury:has('خزانه دار'),manager:has('مدیر مالی'),accountant:has('مدیر حسابداری'),ceo:has('مدیر عامل'),memberId:m?.id||'',membersSnapshot:JSON.stringify(members)};
+ const has=(role:FinancialWorkflowRole)=>u.isAdmin||!!p&&financialWorkflowRole(p,m.id,rows,role)&&financialWorkflowRole(u.permissions,m.id,rows,role);
+ return {read:true,write,treasury:has('treasury'),manager:has('manager'),accountant:has('accountant'),ceo:has('ceo'),memberId:m?.id||'',membersSnapshot:JSON.stringify(members)};
 }
 export function treasuryApprovalBasis(d:any){return JSON.stringify([d.direction,d.category,d.amount,d.currency,d.party,d.destination,d.beneficiaryMemberId||'',d.source||null,d.due,d.referenceDocument,d.approvedBy]);}
 export function treasuryPaymentAuthorized(d:any){return d.direction!=='out'||!!d.approvedBy&&!!d.ceoApproval?.actor&&d.ceoApproval.actor!==d.approvedBy&&d.ceoApproval.basis===treasuryApprovalBasis(d);}

@@ -110,5 +110,26 @@ assert.ok(sql.prepare('SELECT COUNT(*) n FROM duty_notices WHERE task_id LIKE ?'
 const policy={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(root,'lib/assistant-policy.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:policy,Set,require:()=>({costRead:load('lib/costing.ts').costRead})});
 assert.ok(policy.assistantReadNames.has('get_treasury')&&policy.assistantReadNames.has('get_treasury_guide'));
 assert.ok(policy.assistantWriteNames.has('treasury_apply'));assert.equal(policy.actionSection('treasury_apply',{}),'treasury');assert.equal(policy.actionSection('get_treasury',{}),'treasury');assert.equal(policy.canOpenSection(reader,'treasury'),true);assert.equal(policy.canOpenSection({permissions:{finance:'write',salesAgentId:'rep'}},'treasury'),false);
+// Explicit new workflow grants work without a second position assignment.
+const policyRoles=load('lib/permissions.ts');
+for(const [job,role] of [['treasurer','treasury'],['finance_director','manager'],['accounting_head','accountant'],['ceo_payment','ceo']]){
+ const p=policyRoles.validatePermissions({roleAssignment:{roles:[job]}}),id='assigned-'+job;
+ assert.equal(p.finance,'read');
+ sql.prepare("INSERT INTO app_members(id,email,name,unit,status,permissions,created,updated) VALUES(?,?,?,?, 'active',?,?,?)").run(id,id+'@test',id,'finance',JSON.stringify(p),'2026-10-01','2026-10-01');
+ const session={userId:id,isAdmin:false,permissions:p};
+ const granted=await domain.treasuryRoles(session,await domain.treasuryRows());
+ assert.equal(granted[role],true);assert.equal(granted.write,false);
+ for(const other of ['treasury','manager','accountant','ceo'].filter(x=>x!==role))assert.equal(granted[other],false);
+ if(role==='manager'){
+  entity('assigned-role-review','treasury_request',{...request(),state:'review'});
+  await load('lib/treasury-tasks.ts').syncTreasuryTasks();
+  assert.equal(sql.prepare('SELECT assignee FROM duty_runs WHERE id=?').get('treasury:assigned-role-review:review:'+id).assignee,id);
+ }
+ sql.prepare('UPDATE app_members SET permissions=? WHERE id=?').run(JSON.stringify({finance:'read'}),id);
+ assert.equal((await domain.treasuryRoles(session,await domain.treasuryRows()))[role],false,'DB revocation beats stale session');
+ if(role==='manager'){await load('lib/treasury-tasks.ts').syncTreasuryTasks();assert.equal(sql.prepare('SELECT state FROM duty_runs WHERE id=?').get('treasury:assigned-role-review:review:'+id).state,'cancelled');}
+}
+assert.equal(policyRoles.validatePermissions({roleAssignment:{roles:['ceo']}}).treasuryWorkflowRoles.length,0,'existing CEO assignment is not expanded');
+assert.throws(()=>policyRoles.validatePermissions({roleAssignment:{roles:['production_store_assistant'],warehouses:['raw']}}));
 console.log('PASS treasury: position+grant access, independent approval and reconciliation, partial payments, duplicate/reference/retry, balanced statement and suggestions, check reservation/settlement, petty cash ceilings, live purchase allowance and atomic integration, private evidence, stale permission, maintenance freeze and FK-safe reset rollback.');
 })().catch(e=>{console.error(e);process.exit(1)});
