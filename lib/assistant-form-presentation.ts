@@ -24,6 +24,7 @@ function contractSchema(fs:any[]):any {
  return {type:'object',properties:Object.fromEntries(fs.map(f=>[f.key,{
   title:f.label,type:f.type==='rows'?'array':f.type==='boolean'?'boolean':['number','integer'].includes(f.type)?'number':'string',
   ...(f.type==='date'?{format:'date'}:{}),...(f.type==='textarea'?{multiline:true}:{}),
+  ...(f.type==='money'?{format:'money'}:{}),
   ...(f.options?{enum:f.options.map((o:any)=>Array.isArray(o)?o[0]:o),enumLabels:Object.fromEntries(f.options.map((o:any)=>Array.isArray(o)?o:[o,o]))}:{}),
   ...(f.fields?{items:contractSchema(f.fields)}:{})
  }])),required:fs.filter(f=>!f.optional).map(f=>f.key)};
