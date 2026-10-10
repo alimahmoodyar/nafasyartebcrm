@@ -61,7 +61,16 @@ async function evidence(cid,user,id=crypto.randomUUID(),contents=new Uint8Array(
  const prev=await op('activation_preview',{source:'legacy',rows:[{serial:'S1',day:'2025-01-01',months:12}]});assert.equal(prev.preview[0].status,'conflict');await op('activation_import',{source:'legacy',rows:[{serial:'S1',day:'2025-01-01',months:12}]},400);
  const cid=(await op('create',{serial:'S1',customer:'Customer',phone:'0912',day:today,model:'NF5',complaint:'stopped'},200,agent)).id;
  await get('&case='+cid,other,404);await op('intake',{caseId:cid,day:today,hours:'100',deliverer:'Customer',accessories:'Cable',appearance:'Good'},200,agent);
- const quote={caseId:cid,lines:[{partCode:'01',quantity:'1',customerUnitRial:'0',coverage:'warranty',oldBatchId:'',unknownReason:'legacy serial',fault:'does not start',cause:'unknown',coverageReason:'no visible misuse'}],laborLines:[{tariffId:labor,covered:true,customerRial:'0'}],notes:'diagnosis'};
+ const diagnosisFields=load('lib/after-sales-contract.ts').serviceForms.diagnose.find(f=>f.key==='lines');
+ assert.ok(!JSON.stringify(diagnosisFields).includes('oldBatchId'));assert.ok(!JSON.stringify(diagnosisFields).includes('unknownReason'));
+ const installed=[{partCode:'01',batchId:'old-a',quantity:2000,warrantyStart:today,warrantyEnd:service.monthsAfter(today,6)},{partCode:'02',batchId:'wrong-part',quantity:5000}];
+ assert.equal(service.automaticRemovedPart(installed,'01',1000,today).oldBatchId,'old-a');
+ assert.equal(service.automaticRemovedPart(installed,'02',1000,today).partWarranty,false);
+ assert.equal(service.automaticRemovedPart(installed,'03',1000,today).traceStatus,'missing');
+ assert.equal(service.automaticRemovedPart([...installed,{partCode:'01',batchId:'old-b',quantity:1000}],'01',1000,today).traceStatus,'ambiguous');
+ assert.equal(service.automaticRemovedPart(installed,'01',1000,today,{'old-a':2000}).oldBatchId,'');
+ assert.equal(service.automaticRemovedPart(installed,'01',1000,service.monthsAfter(today,6)).partWarranty,false);
+ const quote={caseId:cid,lines:[{partCode:'01',quantity:'1',customerUnitRial:'0',coverage:'warranty',fault:'does not start',cause:'unknown',coverageReason:'no visible misuse'}],laborLines:[{tariffId:labor,covered:true,customerRial:'0'}],notes:'diagnosis'};
  await op('diagnose',quote,200,agent);await op('repair',{caseId:cid,notes:'skip authorization'},400,agent);await op('authorize',{caseId:cid,approved:true,notes:'review'},400,actor('coordinator'));
  await evidence(cid,other,crypto.randomUUID(),undefined,404);await evidence(cid,agent,crypto.randomUUID(),new Uint8Array([1,2]),400);const ev=await evidence(cid,agent);await evidence(cid,agent,ev.id,undefined,200);
  const foreignDownload=await context.run(other,()=>fileApi.GET(request('/api/after-sales/files?case='+cid+'&id='+ev.id)));assert.equal(foreignDownload.status,404);
@@ -73,7 +82,7 @@ async function evidence(cid,user,id=crypto.randomUUID(),contents=new Uint8Array(
  await op('deliver',{caseId:cid,day:today,person:'Customer',reference:'signed'},400,agent);
  await op('test',{caseId:cid,tests:[{name:'purity',value:'80',min:'90',max:'96',passed:true}],notes:'incorrect'},400,agent);
  await op('test',{caseId:cid,tests:[{name:'purity',value:'93',min:'90',max:'96',unit:'%',passed:true}],notes:'pass'},200,agent);
- await op('deliver',{caseId:cid,day:today,person:'Customer',reference:'signed'},200,agent);assert.equal(entity(cid).data.partWarrantyEnd,service.monthsAfter(today,6));
+ await op('deliver',{caseId:cid,day:today,person:'Customer',reference:'signed'},200,agent);assert.equal(entity(cid).data.partWarrantyEnd,service.monthsAfter(today,6));assert.equal(entity(cid).data.repairs[0].batchId,raw);assert.equal((await service.lineage('S1'))[0].partCode,'01');
  await op('labor',{caseId:cid,notes:'not confirmed'},400,actor('coordinator'));await op('confirm',{caseId:cid,result:'confirmed',person:'Customer',rating:5,paidRial:'0',notes:'works'},403,agent);
  await op('confirm',{caseId:cid,result:'confirmed',person:'Customer',rating:5,paidRial:'0',notes:'works'},200,actor('support'));
  await op('labor',{caseId:cid,notes:'approved'},200,actor('coordinator'));assert.equal((await service.ledger(a)).find(r=>r.kind==='labor_credit').credit,'50');assert.equal(entities('as_claim')[0].data.state,'awaiting_return');
@@ -85,9 +94,10 @@ async function evidence(cid,user,id=crypto.randomUUID(),contents=new Uint8Array(
  led=await service.ledger(a);assert.equal(led.find(r=>r.kind==='return_credit').remaining,'100');assert.equal(led.find(r=>r.kind==='invoice').remaining,'0');await op('credit',{claimId:claim,notes:'again'},400,actor('finance'));
  // Prior replacement warranty is traceable and date based, not inferred from main warranty.
  const next=(await op('create',{serial:'S1',customer:'Customer',phone:'0912',day:today,complaint:'again'},200,agent)).id;await op('intake',{caseId:next,day:today,hours:'101',deliverer:'Customer',accessories:'Cable',appearance:'Good'},200,agent);
- await op('diagnose',{...quote,caseId:next,lines:[{...quote.lines[0],coverage:'part_warranty',oldBatchId:raw,unknownReason:''}]},200,agent);
+ await op('diagnose',{...quote,caseId:next,lines:[{...quote.lines[0],coverage:'part_warranty',oldBatchId:'forged-client-batch',unknownReason:'ignored'}]},200,agent);
  // Paid repair requires consent even after company authorization.
  const paid=(await op('create',{serial:'PAID',customer:'Paid Customer',phone:'0914',day:today,complaint:'fault'},200,agent)).id;await op('intake',{caseId:paid,day:today,hours:'0',deliverer:'Customer',accessories:'none',appearance:'normal'},200,agent);
+ assert.equal(entity(next).data.lines[0].oldBatchId,raw,'old batch is derived, never trusted from caller');assert.equal(entity(next).data.lines[0].traceStatus,'automatic');
  const paidQuote={...quote,caseId:paid,lines:[{...quote.lines[0],coverage:'paid',customerUnitRial:'100'}],laborLines:[]};await op('diagnose',paidQuote,200,agent);await op('authorize',{caseId:paid,approved:true,notes:'review'},200,actor('coordinator'));assert.equal(entity(paid).data.state,'diagnosed');await op('reserve',{caseId:paid,allocations:[]},400,agent);
  await op('consent',{caseId:paid,approved:true,person:'Customer',method:'phone',notes:'approved 100 IRR'},200,agent);assert.equal(entity(paid).data.state,'approved');
  await op('diagnose',paidQuote,200,agent);assert.equal(entity(paid).data.consent,null);assert.equal(entity(paid).data.estimates.length,1);

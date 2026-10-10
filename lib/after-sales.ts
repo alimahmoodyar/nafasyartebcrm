@@ -42,7 +42,19 @@ export async function lineage(serial:string){
  if(d){const rows=(await storage().prepare("SELECT * FROM records WHERE json_extract(payload,'$.device')=? AND kind IN ('event','service') ORDER BY created,id").bind(d.id).all()).results as any[];for(const r of rows){const p=JSON.parse(r.payload);if(p.serviceCase)continue;if(p.stage==='مصرف قطعه'&&p.batch)events.push({at:r.created,batchId:p.batch,quantity:Number(p.quantity)*1000,source:r.id});if(p.replacement)events.push({at:r.created,batchId:p.replacement,oldBatchId:p.batch,quantity:Number(p.quantity||1)*1000,source:r.id});}}
  for(const c of cases)for(const a of c.data.repairs||[])events.push({...a,at:c.data.repairedAt,source:c.id,warrantyStart:c.data.deliveredDay||'',warrantyEnd:c.data.deliveredDay?monthsAfter(c.data.deliveredDay,6):''});
  for(const e of events.sort((a,b)=>a.at.localeCompare(b.at))){let left=e.quantity;if(e.oldBatchId)for(const p of installed.filter(p=>p.batchId===e.oldBatchId&&p.quantity>0)){const n=Math.min(p.quantity,left);p.quantity-=n;left-=n;if(!left)break;}installed.push({...e});}
- return installed.filter(p=>p.quantity>0);
+ const result=installed.filter(p=>p.quantity>0),parts=new Map<string,string>();
+ for(const row of result){if(!parts.has(row.batchId)){const batch:any=await storage().prepare("SELECT payload FROM records WHERE id=? AND kind='batch'").bind(row.batchId).first();parts.set(row.batchId,batch?JSON.parse(batch.payload).partCode||'':'');}row.partCode=parts.get(row.batchId)||row.partCode||'';}
+ return result;
+}
+// Historical identity comes only from the device's recorded consumption. A new
+// stock lot never proves which old component was physically removed.
+export function automaticRemovedPart(installed:any[],partCode:string,quantity:number,at:string,used:Record<string,number>={}){
+ const candidates=installed.filter(a=>a.partCode===partCode&&a.quantity>0),batches=[...new Set(candidates.map(a=>a.batchId))];
+ const available=(batch:string)=>candidates.filter(a=>a.batchId===batch).reduce((n,a)=>n+a.quantity,0)-(used[batch]||0);
+ const active=batches.filter(batch=>available(batch)>0);
+ if(active.length!==1||available(active[0])<quantity)return {oldBatchId:'',traceStatus:active.length>1?'ambiguous':'missing',unknownReason:active.length>1?'سابقه قطعه یکتا نیست؛ رهگیری قبلی نیازمند بررسی است.':'سابقه کافی برای قطعه قبلی ثبت نشده است.',partWarranty:false};
+ const batch=active[0],rows=candidates.filter(a=>a.batchId===batch);
+ return {oldBatchId:batch,traceStatus:'automatic',unknownReason:'',partWarranty:rows.every(a=>a.warrantyStart&&at>=a.warrantyStart&&at<a.warrantyEnd)};
 }
 export async function ledger(agent:string){const db=storage(),rows=(await db.prepare('SELECT * FROM service_ledger WHERE agent_id=? ORDER BY created,id').bind(agent).all()).results as any[],offsets=(await db.prepare('SELECT x.* FROM service_offsets x JOIN service_ledger l ON l.id=x.debit_id WHERE l.agent_id=?').bind(agent).all()).results as any[];return rows.map(r=>({...r,data:JSON.parse(r.data),remaining:(BigInt(r.debit||0)+BigInt(r.credit||0)-offsets.filter(x=>x.debit_id===r.id||x.credit_id===r.id).reduce((n,x)=>n+BigInt(x.amount),BigInt(0))).toString()}));}
 export async function serviceSteps(c:any){const d=c.data,steps:any[]=[],stageDay=(d.stageSince||c.created).slice(0,10);const add=(key:string,r:string,title:string,due=addDay(dayAt(),1))=>steps.push({key,role:r,title,due});const domain=d.domain;
