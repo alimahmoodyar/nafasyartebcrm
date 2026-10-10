@@ -46,3 +46,14 @@ Run `node tests/access-control.cjs`, `node tests/batch-number.cjs`, TypeScript c
 - تمام تغییرات با نسخه جاری و audit در یک تراکنش هستند. خطای نام کاربری تکراری، نسخه قدیمی یا شکست میانی هیچ تغییر جزئی به‌جا نمی‌گذارد؛ تکرار DELETE پس از موفقیت بی‌اثر است.
 - MCP: `update_user`، `update_password_user` و `delete_user` همان handler و مجوز را دارند. دستیار برای ویرایش غیرمحرمانه و حذف، شخص و نسخه را از `list_users` می‌خواند و کارت تأیید می‌سازد؛ رمز جدید فقط در فرم امن وارد می‌شود.
 - بدون مهاجرت دیتابیس. آزمون‌های `password-accounts.cjs`، `assistant.cjs` و `mcp-integration.cjs` مسیرهای مجوز، حفظ سابقه، ابطال ورود/توکن و تأیید دستیار را پوشش می‌دهند.
+
+
+## Role-based account provisioning — ۱۴۰۵/۰۷/۱۹
+
+The default form selects one or more named job responsibilities from `jobRoles` in `lib/permissions.ts`. These explicit policies map responsibilities to existing authenticated workflow capabilities; no LLM guesses or grants permissions from free text or an organizational unit. Necessary warehouse, service-domain and representative scope is collected separately. The form previews business actions; advanced manual grants remain available as an explicit alternative.
+
+`permissions.roleAssignment` stores selected stable role IDs and necessary scope inside the existing member permissions JSON. `validatePermissions` derives a fresh union of allowed grants from that selection and ignores extra caller-supplied grants. Shared dependencies survive role removal; obsolete grants and scopes do not. External representative and observer roles cannot be mixed with other responsibilities. Role selection never creates an administrator.
+
+UI, assistant and MCP create/update tools use the same validator and existing admin-only audited account handlers. `get_user_creation_guide` exposes the role catalog and policy version. Existing accounts without role assignments retain their exact manual grants on unrelated edits, and changing the unit never changes grants. Switching an old account to roles is an explicit replacement. Assigning a job role does not automatically reassign existing duties or position membership. Policy edits require review of these mappings and tests; they do not silently update stored account grants.
+
+No schema migration: the permissions JSON remains part of preserved app_members records and existing reset backup/freeze rules. Validation: password-accounts (all role policies, scope, conflicts, forged grants, role removal, HTTP/MCP parity and optimistic revision), MCP integration, assistant, TypeScript, production build and interactive browser role-picker checks.

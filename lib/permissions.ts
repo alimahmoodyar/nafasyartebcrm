@@ -4,7 +4,8 @@ import type {Kind} from "./model";
 export const modules: Kind[] = ["product", "batch", "device", "event", "service", "action", "distribution", "firmware"];
 const productionModules:Kind[]=["batch", "device", "event", "service", "action"];
 export const stages = ["مصرف قطعه", "مونتاژ", "آزمون نهایی", "بسته‌بندی", "تحویل"];
-export type Permissions = {assetRoles?:string[];qmsRoles?:string[];personnelRoles?:string[];hospitalCenterId?:string;salesRoles?:string[];salesAgentId?:string;transportRoles?:string[];serviceRoles?:string[];serviceDomains?:string[];serviceAgentId?:string;supplyRoles?: string[];warehouses?: string[];flowRoles?: string[];read: Kind[]; write: Kind[]; eventStages: string[]; finance?: "none"|"read"|"write"};
+export type RoleAssignment = {roles:string[]; warehouses?:string[]; serviceDomains?:string[]; salesAgentId?:string; serviceAgentId?:string};
+export type Permissions = {roleAssignment?:RoleAssignment;assetRoles?:string[];qmsRoles?:string[];personnelRoles?:string[];hospitalCenterId?:string;salesRoles?:string[];salesAgentId?:string;transportRoles?:string[];serviceRoles?:string[];serviceDomains?:string[];serviceAgentId?:string;supplyRoles?: string[];warehouses?: string[];flowRoles?: string[];read: Kind[]; write: Kind[]; eventStages: string[]; finance?: "none"|"read"|"write"};
 export type Session = {username?:string;authType?:"password"|"chatgpt";userId: string; email: string; name: string; isAdmin: boolean; permissions: Permissions};
 export type Member = {canDelete?:boolean;username?:string;id: string; email: string; name: string; unit: string; status: string; userId: string | null; permissions: Permissions; revision: number; created: string; updated: string};
 export const allPermissions: Permissions = {assetRoles:["custodian"],personnelRoles:["hr","payroll","approver","finance","treasury"],salesRoles:["manager","staff","finance","viewer"],transportRoles:['manager','driver'],serviceRoles:["manager","support","intake","technician","coordinator","inventory","logistics","finance"],serviceDomains:["home","hospital"],supplyRoles:["sales","production_planning","ceo","engineering","inventory","finance","domestic","foreign","commerce_manager"],warehouses:["raw","semi","line","quarantine","nonconforming","finished"],flowRoles:["inventory","qc","production","procurement","sales","logistics"],read: modules, write: modules, eventStages: stages, finance: "write"};
@@ -33,7 +34,9 @@ presets['تکنسین فنی بیمارستانی']={serviceRoles:['technician']
 presets['تکنسین فنی خانگی']={serviceRoles:['technician'],serviceDomains:['home'],read:[],write:[],eventStages:[]};
 presets["اموال‌دار"]={assetRoles:["custodian"],read:[],write:[],eventStages:[]};
 export function validatePermissions(value: unknown): Permissions {
-  const p = value as Permissions;
+  const raw = value as Permissions;
+  // Role selection is authoritative: never merge client-supplied extra grants.
+  const p = raw?.roleAssignment ? resolveRoleAssignment(raw.roleAssignment) : raw;
   if(p?.assetRoles!==undefined&&(!Array.isArray(p.assetRoles)||p.assetRoles.some(r=>r!=="custodian")))throw Error("نقش اموال معتبر نیست.");
   if(p?.assetRoles?.length&&(p.hospitalCenterId||p.salesAgentId||p.serviceAgentId||p.salesRoles?.includes("agent")||p.serviceRoles?.includes("agent")))throw Error("حساب بیرونی دسترسی اموال شرکت ندارد.");
   if(p?.qmsRoles!==undefined&&(!Array.isArray(p.qmsRoles)||p.qmsRoles.some(r=>!Object.hasOwn(qmsRoles,r))))throw Error("نقش کیفیت معتبر نیست.");
@@ -64,7 +67,7 @@ export function validatePermissions(value: unknown): Permissions {
   if(p.salesAgentId&&!p.salesRoles?.includes('agent'))throw new Error('ارتباط نماینده فروش فقط با نقش نماینده مجاز است.');
   if(p.hospitalCenterId!==undefined&&(typeof p.hospitalCenterId!=='string'||p.hospitalCenterId.length>200))throw Error('شناسه مرکز معتبر نیست.');
   if(p.hospitalCenterId&&(p.read.length||p.write.length||p.eventStages.length||p.salesRoles?.length||p.salesAgentId||p.serviceRoles?.length||p.serviceDomains?.length||p.serviceAgentId||p.flowRoles?.length||p.transportRoles?.length||p.supplyRoles?.length||p.finance&&p.finance!=='none'))throw Error('حساب مسئول مرکز فقط به مرکز خودش دسترسی دارد.');
-  return {assetRoles:[...new Set(p.assetRoles||[])],qmsRoles:[...new Set(p.qmsRoles||[])],personnelRoles:[...new Set(p.personnelRoles||[])],hospitalCenterId:p.hospitalCenterId||'',salesRoles:[...new Set(p.salesRoles||[])],salesAgentId:p.salesAgentId||'',transportRoles:[...new Set(p.transportRoles||[])],serviceRoles:[...new Set(p.serviceRoles||[])],serviceDomains:[...new Set(p.serviceDomains||[])],serviceAgentId:p.serviceAgentId||'',supplyRoles:[...new Set(p.supplyRoles||[])],...(p.warehouses!==undefined?{warehouses:[...new Set(p.warehouses)]}:{}),flowRoles:[...new Set(p.flowRoles||[])],finance:p.finance||"none",read: [...new Set(p.read)], write: [...new Set(p.write)], eventStages: p.write.includes("event") ? [...new Set(p.eventStages)] : []};
+  return {...(p.roleAssignment?{roleAssignment:p.roleAssignment}:{}),assetRoles:[...new Set(p.assetRoles||[])],qmsRoles:[...new Set(p.qmsRoles||[])],personnelRoles:[...new Set(p.personnelRoles||[])],hospitalCenterId:p.hospitalCenterId||'',salesRoles:[...new Set(p.salesRoles||[])],salesAgentId:p.salesAgentId||'',transportRoles:[...new Set(p.transportRoles||[])],serviceRoles:[...new Set(p.serviceRoles||[])],serviceDomains:[...new Set(p.serviceDomains||[])],serviceAgentId:p.serviceAgentId||'',supplyRoles:[...new Set(p.supplyRoles||[])],...(p.warehouses!==undefined?{warehouses:[...new Set(p.warehouses)]}:{}),flowRoles:[...new Set(p.flowRoles||[])],finance:p.finance||"none",read: [...new Set(p.read)], write: [...new Set(p.write)], eventStages: p.write.includes("event") ? [...new Set(p.eventStages)] : []};
 }
 
 for(const [role,label] of Object.entries({hr:"اداری و منابع انسانی",payroll:"تهیه حقوق‌ودستمزد",approver:"تأیید حقوق و احکام",finance:"تأیید پرداخت پرسنلی",treasury:"ثبت پرداخت پرسنلی"}))presets[label]={read:[],write:[],eventStages:[],personnelRoles:[role]};
@@ -76,3 +79,69 @@ presets["مدیرعامل"]={read:["product"],write:[],eventStages:[],supplyRole
 
 presets['مدیر بازرگانی']={read:[],write:[],eventStages:[],supplyRoles:['commerce_manager','foreign','domestic']};
 presets['بازرگانی خارجی']={read:[],write:[],eventStages:[],supplyRoles:['foreign']};
+
+// Versioned, explicit workflow dependencies. Assignments store both intent and the
+// validated effective snapshot; editing unrelated account fields never infers roles.
+export const rolePolicyVersion=1;
+export type JobRole={id:string;label:string;group:string;actions:string;grants:Permissions;scope?:'warehouses'|'services'|'salesAgent'|'serviceAgent'};
+const emptyGrants=():Permissions=>({read:[],write:[],eventStages:[]});
+const job=(id:string,label:string,group:string,actions:string,grants:Partial<Permissions>,scope?:JobRole['scope']):JobRole=>({id,label,group,actions,grants:{...emptyGrants(),...grants},scope});
+export const jobRoles:JobRole[]=[
+ job('inventory','انباردار','انبار و تولید','بررسی کسری، دریافت کالا، جانمایی، تحویل مواد و بستن سفارش پذیرفته‌شده',{...presets['انبار'],supplyRoles:['inventory']},'warehouses'),
+ job('production','مسئول تولید','انبار و تولید','برنامه روزانه، مونتاژ، ثبت مصرف مواد و بسته‌بندی',presets['تولید']),
+ job('planning','برنامه‌ریزی تولید','انبار و تولید','ثبت و پیگیری برنامه تولید و نیاز تأمین',presets['برنامه‌ریزی تولید']),
+ job('engineering','تحقیق و توسعه','انبار و تولید','مشخصات و BOM، مسیر تأمین، بررسی فنی پیشنهاد و تغییر طراحی',presets['تحقیق‌وتوسعه و مهندسی طراحی']),
+ job('qc','کنترل کیفیت','کیفیت','کنترل ورودی و نهایی، صلاحیت منبع و ثبت عدم انطباق',{...presets['کنترل کیفیت'],qmsRoles:['qc']}),
+ job('domestic','کارشناس خرید داخلی','خرید','استعلام داخلی، پرونده تأمین‌کننده و پیگیری سفارش و مدارک',{supplyRoles:['domestic'],flowRoles:['procurement'],read:['batch']}),
+ job('foreign','کارشناس خرید خارجی','خرید','منبع‌یابی، نمونه، اسناد واردات، پیگیری ارز، بار و ترخیص',{supplyRoles:['foreign'],flowRoles:['procurement'],read:['batch']}),
+ job('commerce','مدیر بازرگانی','خرید','مدیریت مسئول‌ها و پیگیری خرید داخلی و خارجی',presets['مدیر بازرگانی']),
+ job('purchase_finance','مسئول مالی خرید','مالی','بودجه و صدور خرید، بررسی بدهی، مجوز پرداخت و تأیید بهای خرید',{finance:'write',supplyRoles:['finance']}),
+ job('finance','کارشناس مالی','مالی','مشاهده و ثبت بررسی‌های مالی و هزینه‌ها',presets['مالی']),
+ job('ceo','مدیرعامل / تصمیم‌گیر خرید','مدیریت','تأیید برنامه و انتخاب پیشنهاد خرید؛ بدون مدیریت حساب‌های کاربری',presets['مدیرعامل']),
+ job('sales','کارشناس فروش','فروش','ثبت و پیگیری فروش و درخواست تولید',{...presets['کارشناس فروش'],read:['product'],supplyRoles:['sales']}),
+ job('sales_manager','مدیر فروش','فروش','مدیریت فروش، سفارش‌ها و درخواست تولید',{...presets['مدیر فروش'],read:['product'],supplyRoles:['sales']}),
+ job('sales_finance','مالی فروش','فروش','بررسی مالی سفارش‌های فروش',presets['مالی فروش']),
+ job('delivery','فروش و تحویل','فروش','ثبت تحویل دستگاه و اطلاعات توزیع',presets['فروش و تحویل']),
+ job('transport_manager','مسئول تدارکات','تدارکات','تخصیص و پیگیری مأموریت‌های حمل‌ونقل',presets['مسئول تدارکات']),
+ job('driver','راننده تدارکات','تدارکات','انجام مأموریت‌های تخصیص‌یافته خرید، فروش و خدمات',presets['کارشناس تدارکات و حمل‌ونقل']),
+ job('custodian','اموال‌دار','اداری','ثبت اموال، تحویل و بازپس‌گیری و پیگیری تأیید اموال امانی',presets['اموال‌دار']),
+ job('firmware','مهندسی نرم‌افزار','انبار و تولید','ثبت و نگهداری نسخه نرم‌افزار دستگاه',presets['مهندسی نرم‌افزار']),
+ job('viewer','مدیریت؛ مشاهده اطلاعات رهگیری','مدیریت','مشاهده اطلاعات رهگیری؛ بدون ثبت یا تأیید',presets['مدیریت — فقط مشاهده']),
+ job('sales_agent','نماینده فروش','حساب‌های بیرونی','فقط پرونده نمایندگی فروش انتخاب‌شده',{salesRoles:['agent']},'salesAgent'),
+ job('service_agent','نماینده خدمات','حساب‌های بیرونی','فقط پرونده، موجودی و حساب نمایندگی خدمات انتخاب‌شده',{serviceRoles:['agent']},'serviceAgent'),
+];
+for(const [id,label,actions] of [
+ ['manager','مدیر خدمات','مدیریت پرونده‌ها و عملیات حوزه خدمات انتخاب‌شده'],
+ ['support','پاسخ‌گوی خدمات','ثبت تماس، پیگیری و هماهنگی با مشتری'],
+ ['intake','پذیرش خدمات','پذیرش و ثبت اطلاعات دستگاه و پرونده'],
+ ['technician','تکنسین خدمات','عیب‌یابی، برآورد، تعمیر و ثبت نتیجه آزمون'],
+ ['coordinator','مسئول نمایندگان خدمات','هماهنگی و پیگیری امور نمایندگان'],
+ ['inventory','انباردار خدمات','آماده‌سازی، دریافت و تحویل قطعات خدمات'],
+ ['finance','مالی خدمات','ثبت و بررسی پرداخت و حساب خدمات'],
+])jobRoles.push(job('service_'+id,label,'خدمات پس از فروش',actions,{serviceRoles:[id]},'services'));
+for(const [id,label] of Object.entries({hr:'اداری و منابع انسانی',payroll:'تهیه حقوق‌ودستمزد',approver:'تأیید حقوق و احکام',finance:'تأیید پرداخت پرسنلی',treasury:'ثبت پرداخت پرسنلی'}))jobRoles.push(job('personnel_'+id,label,'پرسنلی',label,{personnelRoles:[id]}));
+for(const [id,label] of Object.entries(qmsRoles))if(id!=='qc')jobRoles.push(job('quality_'+id,label,'کیفیت',label,{qmsRoles:[id]}));
+
+export function resolveRoleAssignment(value:RoleAssignment):Permissions {
+ if(!value||typeof value!=='object'||Object.keys(value).some(k=>!['roles','warehouses','serviceDomains','salesAgentId','serviceAgentId'].includes(k))||!Array.isArray(value.roles)||!value.roles.length||value.roles.length>jobRoles.length||value.roles.some(id=>typeof id!=='string'||!jobRoles.some(r=>r.id===id)))throw Error('حداقل یک نقش شغلی معتبر انتخاب کنید.');
+ const roles=[...new Set(value.roles)].map(id=>jobRoles.find(r=>r.id===id)!);
+ if(roles.some(r=>r.scope==='salesAgent'||r.scope==='serviceAgent'||r.id==='quality_observer')&&roles.length>1)throw Error('نقش بیرونی را نمی‌توان با نقش‌های دیگر ترکیب کرد؛ حساب مستقل تعریف کنید.');
+ const scope=(key:'warehouses'|'serviceDomains',allowed:string[],required:boolean)=>{
+  const v=value[key];if(v!==undefined&&(!Array.isArray(v)||v.some(x=>typeof x!=='string'||!allowed.includes(x))))throw Error('محدوده کاری معتبر انتخاب کنید.');
+  if(required&&!v?.length)throw Error(key==='warehouses'?'انبارهای تحت مسئولیت را انتخاب کنید.':'حوزه خدمات را انتخاب کنید.');
+  return required?[...new Set(v!)]:undefined;
+ };
+ const assignment:RoleAssignment={roles:roles.map(r=>r.id)};
+ const result:Permissions=emptyGrants();
+ const arrays=['read','write','eventStages','assetRoles','qmsRoles','personnelRoles','salesRoles','transportRoles','serviceRoles','supplyRoles','flowRoles'] as const;
+ for(const role of roles){for(const key of arrays)(result as any)[key]=[...new Set([...(result[key]||[]),...(role.grants[key]||[])])];if(role.grants.finance==='write'||role.grants.finance==='read'&&result.finance!=='write')result.finance=role.grants.finance;}
+ const wh=scope('warehouses',['raw','semi','line','quarantine','nonconforming','finished'],roles.some(r=>r.scope==='warehouses'));
+ if(wh){result.warehouses=wh;assignment.warehouses=wh;}
+ const domains=scope('serviceDomains',['home','hospital'],roles.some(r=>r.scope==='services'||r.scope==='serviceAgent'));
+ if(domains){result.serviceDomains=domains;assignment.serviceDomains=domains;}
+ for(const [kind,key] of [['salesAgent','salesAgentId'],['serviceAgent','serviceAgentId']] as const)if(roles.some(r=>r.scope===kind)){
+  if(typeof value[key]!=='string'||!value[key]!.trim()||value[key]!.length>200)throw Error('نمایندگی مربوط را انتخاب کنید.');result[key]=value[key]!.trim();assignment[key]=result[key];
+ }
+ if(roles.some(r=>r.scope==='serviceAgent')&&domains?.length!==1)throw Error('نماینده خدمات باید فقط یک حوزه داشته باشد.');
+ return {...result,roleAssignment:assignment};
+}

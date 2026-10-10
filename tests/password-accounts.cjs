@@ -130,6 +130,24 @@ async function enter(pass='Test-password-123'){return login.POST(request('/api/a
  const updated=await catalog.executeTool('update_user',{id:other.id,revision:other.revision,email:'',name:'Via MCP',unit:other.unit,status:'active',permissions:other.permissions,confirmed:true},base,ownerPrincipal);assert.equal(updated.member.name,'Via MCP');
  assert.equal((await catalog.executeTool('delete_user',{id:other.id,revision:updated.member.revision,confirmed:true},base,ownerPrincipal)).deleted,true);
  assert.ok(!JSON.stringify(sql.prepare('SELECT * FROM access_audit').all()).includes(body.password));
+ // Role-based account creation must derive permissions on the same authenticated API/MCP path.
+ const policy=load('lib/permissions.ts');
+ const roleInput=roles=>({read:[],write:[],eventStages:[],roleAssignment:{roles}});
+ for(const role of policy.jobRoles){const assignment={roles:[role.id]};if(role.scope==='warehouses')assignment.warehouses=['raw','quarantine'];if(['services','serviceAgent'].includes(role.scope))assignment.serviceDomains=['home'];if(role.scope==='salesAgent')assignment.salesAgentId='test-sales';if(role.scope==='serviceAgent')assignment.serviceAgentId='test-service';assert.doesNotThrow(()=>policy.validatePermissions({roleAssignment:assignment}),role.id);}
+ assert.throws(()=>policy.validatePermissions(roleInput(['unknown'])));
+ assert.throws(()=>policy.validatePermissions(roleInput(['inventory'])));
+ assert.throws(()=>policy.validatePermissions(roleInput(['service_technician'])));
+ assert.throws(()=>policy.validatePermissions({...roleInput(['sales_agent','ceo']),roleAssignment:{roles:['sales_agent','ceo'],salesAgentId:'test'}}));
+ const combined=policy.validatePermissions(roleInput(['domestic','foreign']));assert.equal(combined.flowRoles.filter(x=>x==='procurement').length,1);
+ const removed=policy.validatePermissions({...combined,roleAssignment:{roles:['foreign']}});assert.equal(removed.supplyRoles.includes('domestic'),false);assert.equal(removed.flowRoles.includes('procurement'),true);
+ const responseRole=await userApi.POST(request('/api/users','POST',{email:'roles@example.com',name:'Roles',unit:'Office',status:'active',permissions:{...roleInput(['driver','custodian']),finance:'write',supplyRoles:['ceo'],write:['product']}}));assert.equal(responseRole.status,201);const roleMember=(await responseRole.json()).member;
+ assert.equal(roleMember.permissions.finance,'none');assert.equal(roleMember.permissions.write.length,0);assert.equal(roleMember.permissions.supplyRoles.length,0);assert.equal(roleMember.permissions.assetRoles[0],'custodian');
+ const changed=await catalog.executeTool('update_user',{id:roleMember.id,revision:roleMember.revision,email:roleMember.email,name:'Updated role',unit:'New unit',status:'active',permissions:{...roleMember.permissions,roleAssignment:{roles:['driver']}},confirmed:true},base,ownerPrincipal);
+ assert.equal(changed.member.permissions.assetRoles.length,0);assert.equal(changed.member.permissions.transportRoles[0],'driver');
+ assert.equal((await userApi.PATCH(request('/api/users','PATCH',{id:roleMember.id,revision:roleMember.revision,email:roleMember.email,name:'Stale',unit:'Office',status:'active',permissions:roleMember.permissions}))).status,409);
+ const persisted=JSON.parse(sql.prepare('SELECT permissions FROM app_members WHERE id=?').get(roleMember.id).permissions);assert.equal(persisted.roleAssignment.roles.length,1);assert.equal(persisted.roleAssignment.roles[0],'driver');
+ const guide=await catalog.executeTool('get_user_creation_guide',{},base,ownerPrincipal);assert.ok(guide.jobRoles.some(r=>r.id==='inventory'));
+ console.log('Job roles passed: all policies, required scope, incompatible external roles, shared grants, role removal, forged extra grants, HTTP/MCP parity, persistence and stale update.');
  console.log('Account lifecycle passed: editing, rename/revocation, duplicate rollback, stale revision, deletion confirmation/roles/origin, protected admin, legacy accounts, retained history, failed-delete rollback, MCP parity and retry.');
  console.log('Bootstrap admin passed: no seed on bad password, administrator session and MCP, changed password persists.');
  console.log('Password accounts passed: creation, unique usernames, hashing, no secrets in audit, login, CSRF, permission enforcement, reset/session revocation, logout, disabling and rate limiting.');
