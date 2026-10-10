@@ -1225,3 +1225,11 @@ toolFieldTitles.expense_register_apply={...toolFieldTitles.expense_register_appl
 toolFieldTitles.save_product_bom={lines:'قطعات و مقدار مصرف در محصول',quantity:'مقدار مصرف هر محصول'};
 toolFieldTitles.create_production_sheet={orderId:'برگ تولید',lines:'اقلام مصرف تولید'};
 toolFieldTitles.apply_qms_record={...toolFieldTitles.apply_qms_record,fields:'تعریف فیلدهای فرم محصول',values:'پاسخ‌ها و مدارک پرونده',private:'دسترسی محرمانه طراحی',kind:'نوع پرونده کیفیت',title:'نام پرونده یا فرم'};
+
+toolFieldTitles.generate_activation_code={deviceCode:'کد ۱۰رقمی نمایش‌داده‌شده روی دستگاه',reason:'علت تولید کد / شماره پیگیری مشتری'};
+
+Object.assign(fieldTitles,{activationCode:'کد پنج‌رقمی مشتری',deviceCode:'کد ۱۰رقمی دستگاه'});
+
+Object.assign(fieldTitles,{assetRoles:'نقش‌های مدیریت اموال',holderKind:'نوع تحویل‌گیرنده',holderId:'تحویل‌گیرنده',holderName:'نام پیمانکار',contractorCode:'کد پیمانکار',contractorContact:'اطلاعات تماس پیمانکار',actualConfirmation:'تأیید دریافت واقعی نامه',specifications:'مشخصات اموال',signer:'نام امضاکننده نامه'});
+
+toolFieldTitles.assets_apply={brand:'برند اموال',condition:'وضعیت سلامت اموال',code:'کد اموال',name:'نام اموال',category:'گروه اموال',serial:'شماره سریال',recordId:'پرونده اموال',reference:'شماره رسید یا نامه',purpose:'علت تحویل / کاربرد'};

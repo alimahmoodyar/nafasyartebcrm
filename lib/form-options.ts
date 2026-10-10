@@ -1,3 +1,4 @@
+import {trainingRoles} from './training-contract';
 // Enumerated wire values with display-only Persian captions. Keys include the full field path.
 export const toolOptions:Record<string,Record<string,Record<string,string>>>={
  "routine_production_apply": {
@@ -1530,3 +1531,8 @@ export const toolOptions:Record<string,Record<string,Record<string,string>>>={
 toolOptions.training_workspace_request.roleId={"role-0":"مدیر فروش","role-1":"کارشناس فروش","role-2":"مالی فروش","role-3":"نماینده فروش","role-4":"تأمین","role-5":"مسئول تدارکات","role-6":"کارشناس تدارکات و حمل‌ونقل","role-7":"مالی","role-8":"انبار","role-9":"تولید","role-10":"کنترل کیفیت","role-11":"فروش و تحویل","role-12":"خدمات خانگی","role-13":"خدمات بیمارستانی","role-14":"نماینده خدمات","role-15":"خدمات پس از فروش","role-16":"مدیریت — فقط مشاهده","role-17":"مهندسی نرم‌افزار","role-18":"اداری و منابع انسانی","role-19":"تهیه حقوق‌ودستمزد","role-20":"تأیید حقوق و احکام","role-21":"تأیید پرداخت پرسنلی","role-22":"ثبت پرداخت پرسنلی","role-23":"مدیر تضمین کیفیت","role-24":"کارشناس تضمین کیفیت و کنترل مدارک","role-25":"مسئول کنترل کیفیت","role-26":"کارشناس مجوزها","role-27":"مسئول فنی","role-28":"مسئول تجهیزات آزمون","role-29":"ممیز داخلی","role-30":"ممیز بیرونی — فقط مشاهده","role-31":"تحقیق‌وتوسعه و مهندسی طراحی","role-32":"مدیرعامل","role-33":"مدیر بازرگانی","role-34":"بازرگانی خارجی","role-35":"مدیر سامانه","role-36":"مدیر خدمات پس از فروش","role-37":"برنامه‌ریز فروش","role-38":"مدیرعامل تأمین","role-39":"مهندس محصول","role-40":"کنترل موجودی تأمین","role-41":"کنترل مالی تأمین","role-42":"کارشناس خرید داخلی","role-43":"کارشناس خرید خارجی","role-44":"پذیرش خدمات","role-45":"تکنسین خدمات","role-46":"هماهنگ‌کننده خدمات","role-47":"انبار خدمات","role-48":"ارسال خدمات","role-49":"مالی خدمات","role-50":"مسئول مرکز بیمارستانی ۱","role-51":"مسئول مرکز بیمارستانی ۲","role-52":"تکنسین فنی بیمارستانی","role-53":"تکنسین فنی خانگی"};
 
 toolOptions.get_service_warranty={domain:{home:'خانگی',hospital:'بیمارستانی'}};
+
+toolOptions.training_workspace_request.roleId=Object.fromEntries(trainingRoles.map(r=>[r.id,r.name]));
+
+for(const tool of ['create_user','update_user','create_password_user','update_password_user']){toolOptions[tool]={...toolOptions[tool],'permissions.assetRoles.*':{custodian:'اموال‌دار'}};}
+toolOptions.assets_apply={mode:{register:'ثبت اموال',edit:'ویرایش مشخصات',transfer:'تحویل یا برگشت اموال',confirm_annual:'ثبت تأیید سالیانه',request_clearance:'درخواست تسویه اموال',approve_clearance:'تأیید تسویه اموال',cancel_clearance:'لغو تسویه اموال',install_position:'تعریف سمت اموال‌دار'},condition:{good:'سالم',repair:'نیازمند تعمیر',damaged:'آسیب‌دیده'},holderKind:{stock:'انبار / محل شرکت',employee:'کارمند شرکت',contractor:'پیمانکار'}};
