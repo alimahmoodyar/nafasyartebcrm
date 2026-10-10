@@ -18,7 +18,7 @@ export const apHelp=[
 export const active=(a:any[])=>a.filter(x=>!x.voided);
 export function applied(c:any,kind:'invoiceId'|'paymentId',id:string){return active(c.allocations).filter((x:any)=>x[kind]===id).reduce((n:bigint,x:any)=>n+moneyMicro(x.amount),BigInt(0));}
 export function invoiceMatch(c:any,i:any,rows:any[]){
- const blockers:string[]=[],lines=i.lines.map((l:any)=>{const o=rows.find(x=>x.type==='purchase_order'&&x.id===l.orderId);const receipts=l.receiptIds.map((id:string)=>rows.find(x=>x.type==='receipt'&&x.id===id));
+ const blockers:string[]=[],lines=i.lines.map((l:any)=>{if(l.serviceId){const service=rows.find(r=>r.type==='purchase_service'&&r.id===l.serviceId);const accepted=service?.data.state==='accepted';if(!accepted)blockers.push('دریافت خدمت هنوز توسط مسئول تأیید نشده');return {serviceId:l.serviceId,orderId:'',partCode:service?.data.title||'خدمت',ordered:1000,invoice:1000,received:service?.data.delivery?1000:0,accepted:accepted?1000:0,rejected:0,receipts:[],serviceRevision:service?.revision};}const o=rows.find(x=>x.type==='purchase_order'&&x.id===l.orderId);const receipts=l.receiptIds.map((id:string)=>rows.find(x=>x.type==='receipt'&&x.id===id));
  if(!o||o.data.state==='cancelled')blockers.push('سفارش نامعتبر یا لغوشده');
  if(!receipts.length||receipts.some((r:any)=>!r||r.data.purchaseOrderId!==l.orderId))blockers.push('رسید کالا کامل نیست');
  const received=receipts.reduce((n:number,r:any)=>n+(r?.data.quantity||0),0),accepted=receipts.reduce((n:number,r:any)=>n+(r?.data.accepted||0),0),rejected=receipts.reduce((n:number,r:any)=>n+(r?.data.rejected||0),0);

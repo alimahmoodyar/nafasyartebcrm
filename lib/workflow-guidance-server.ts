@@ -6,6 +6,7 @@ import {guidanceOutline,guidanceProfiles,type GuideCheck} from './workflow-guida
 import type {Session} from './permissions';
 type Source={load:()=>Promise<any>;path:string;keys:string[];single?:string[]};
 const sources:Record<string,Source>={
+ purchaseService:{load:()=>import('@/app/api/purchase-services/route'),path:'purchase-services',keys:['services']},
  treasury:{load:()=>import('@/app/api/treasury/route'),path:'treasury',keys:['requests','accounts','checks','expenses','statements']},
  guarantees:{load:()=>import('@/app/api/guarantees/route'),path:'guarantees',keys:['records']},
  personnel:{load:()=>import('@/app/api/personnel/route'),path:'personnel',keys:['records']},
@@ -26,7 +27,7 @@ const sources:Record<string,Source>={
  projects:{load:()=>import('@/app/api/build-projects/route'),path:'build-projects',keys:['projects']},
  development:{load:()=>import('@/app/api/development/route'),path:'development',keys:['requests'],single:['request']}
 };
-export function guideSource(t:any,kind:string){const d=t.data;let id=d.recordId||d.caseId||d.guaranteeId||d.leadId||d.transportMissionId||d.sourcePlanId||d.salesAlertId||d.salesReportId||d.sourceId||d.salesAgentId||'';
+export function guideSource(t:any,kind:string){const d=t.data;let id=d.serviceId||d.recordId||d.payableId||d.caseId||d.guaranteeId||d.leadId||d.transportMissionId||d.sourcePlanId||d.salesAlertId||d.salesReportId||d.sourceId||d.salesAgentId||'';
  if(kind==='service'&&!id)id=t.id.startsWith('after-sales:')?t.id.split(':')[1]:'';
  if(kind==='supplierQuality'&&!id)id=t.id.startsWith('supplier-quality:')?t.id.split(':')[1]:'';
  return {id,kind:kind==='replenishment'?'sourcing':d.sourceSection==='build-projects'?'projects':kind};
@@ -56,6 +57,7 @@ export async function workflowGuide(u:Session,input:{taskId?:string;threadId?:st
    if(request&&request.data.direction==='out'){checks.push({key:'finance',label:'تأیید مالی ثبت‌شده',status:request.data.approvedBy?'passed':'attention',detail:request.data.approvedBy?'تأیید مالی در پرونده ثبت شده است.':'تأیید مالی ثبت نشده است.'},{key:'ceo',label:'مجوز نهایی مدیرعامل',status:request.paymentAuthorized?'passed':'attention',detail:request.paymentAuthorized?'مجوز ثبت‌شده با مشخصات فعلی درخواست منطبق است.':'پرداخت بدون مجوز معتبر مدیرعامل قابل اجرا نیست.'},{key:'balance',label:'مانده و رزرو چک',status:'passed',detail:'مانده درخواست: '+request.remaining+'؛ رزرو چک: '+request.reserved+'؛ ارز: '+request.data.currency+' . این مانده، موجودی بانک نیست.'});}
    const fileCase=r.id;checks.push({key:'evidence',label:'مدرک بارگذاری‌شده',status:(body.files||[]).some((f:any)=>f.caseId===fileCase)?'passed':'attention',detail:(body.files||[]).some((f:any)=>f.caseId===fileCase)?'فایل در این پرونده موجود است؛ اصالت و مناسب بودن آن تأیید نشده.':'هنوز فایل مدرکی در این پرونده دیده نشد؛ ضرورت آن به عملیات انتخابی بستگی دارد.'});
   }
+  if(g.kind==='purchaseService'&&r.summary){checks.push({key:'service',label:'تحویل و تخصیص خدمت',status:r.summary.complete?'passed':'attention',detail:r.summary.complete?'تحویل، تخصیص هزینه و تسویه تکمیل شده است.':r.summary.blockers.join(' / ')});}
   if(g.kind==='purchase'&&r.view){const blockers=[...new Set((r.view.invoices||[]).flatMap((i:any)=>i.blockers||[]))];checks.push({key:'purchase-blockers',label:'موانع فعلی فاکتورها',status:blockers.length?'attention':'passed',detail:blockers.length?blockers.slice(0,10).join('؛ '):'در محاسبه فعلی فاکتورها مانعی گزارش نشده؛ این نتیجه مجوز پرداخت خزانه نیست.'});}
   if(g.kind==='transport'&&(d.blocker?.state==='open'||d.missingDocuments))checks.push({key:'transport-blocker',label:'مانع یا نقص مدرک حمل',status:'attention',detail:'مانع باز یا نقص مدرک ثبت شده؛ از پرونده مأموریت پیگیری کنید.'});
   if(g.kind==='personnel'&&!g.closed){

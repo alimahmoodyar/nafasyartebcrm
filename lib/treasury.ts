@@ -20,7 +20,7 @@ export const tToday=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tehran',
 export function tMoney(v:unknown,zero=false){try{const n=moneyMicro(v);if(n<BigInt(0)||!zero&&n===BigInt(0))tFail('مبلغ مثبت لازم است.');return moneyText(n);}catch{return tFail('مبلغ عددی معتبر بدون جداکننده لازم است.');}}
 export const tUUID=(v:unknown)=>{if(typeof v!=='string'||!/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(v))tFail('UUID معتبر لازم است.');return v as string;};
 const norm=(v:string)=>v.replace(/[\s\u200c]/g,'').replace(/ي/g,'ی').replace(/ك/g,'ک');
-const types="'treasury_account','treasury_request','treasury_movement','treasury_statement','treasury_check','treasury_expense','treasury_file','position','purchase_payable','payable_file','purchase_order','receipt','hr_payroll','hr_request'";
+const types="'treasury_account','treasury_request','treasury_movement','treasury_statement','treasury_check','treasury_expense','treasury_file','position','purchase_payable','payable_file','purchase_order','receipt','hr_payroll','hr_request','purchase_service'";
 export async function treasuryRows(){return (await storage().prepare('SELECT * FROM flow_entities WHERE type IN ('+types+') ORDER BY id').all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}));}
 export async function treasuryRoles(u:Session,rows:any[]){
  if(trainingContext.getStore()||!costRead(u))tFail('دسترسی مالی داخلی شرکت لازم است.',403);
@@ -38,7 +38,7 @@ export function treasuryNeedsCeo(d:any){return d.direction==='out'&&['ceo_review
 const rowsOf=(rows:any[],type:string)=>rows.filter(r=>r.type===type);
 export const tPaid=(id:string,rows:any[])=>rowsOf(rows,'treasury_movement').filter(r=>r.data.requestId===id&&r.data.kind!=='advance_return').reduce((n,r)=>n+moneyMicro(r.data.amount),BigInt(0));
 export const tReserved=(id:string,rows:any[])=>rowsOf(rows,'treasury_check').filter(r=>r.data.requestId===id&&r.data.state==='issued').reduce((n,r)=>n+moneyMicro(r.data.amount),BigInt(0));
-export function treasurySources(rows:any[]){return rowsOf(rows,'purchase_payable').flatMap(c=>{const v=apView(c.data,rows);return [...v.invoices.flatMap((i:any)=>i.queue.filter((q:any)=>q.released&&moneyMicro(q.remaining)>BigInt(0)).map((q:any)=>({key:c.id+':'+i.id+':'+q.id,caseId:c.id,itemId:i.id,installmentId:q.id,kind:'invoice',title:c.data.supplier+' — '+i.reference,amount:q.remaining,due:q.due,party:c.data.supplier,currency:'IRR'}))),...v.advances.filter((a:any)=>a.released&&moneyMicro(a.remaining)>BigInt(0)).map((a:any)=>({key:c.id+':'+a.id,caseId:c.id,itemId:a.id,kind:'advance',title:c.data.supplier+' — پیش‌پرداخت',amount:a.remaining,due:a.due,party:c.data.supplier,currency:'IRR'}))];});}
+export function treasurySources(rows:any[]){return rowsOf(rows,'purchase_payable').filter(c=>!c.data.completion).flatMap(c=>{const v=apView(c.data,rows);return [...v.invoices.flatMap((i:any)=>i.queue.filter((q:any)=>q.released&&moneyMicro(q.remaining)>BigInt(0)).map((q:any)=>({key:c.id+':'+i.id+':'+q.id,caseId:c.id,itemId:i.id,installmentId:q.id,kind:'invoice',title:c.data.supplier+' — '+i.reference,amount:q.remaining,due:q.due,party:c.data.supplier,currency:'IRR'}))),...v.advances.filter((a:any)=>a.released&&moneyMicro(a.remaining)>BigInt(0)).map((a:any)=>({key:c.id+':'+a.id,caseId:c.id,itemId:a.id,kind:'advance',title:c.data.supplier+' — پیش‌پرداخت',amount:a.remaining,due:a.due,party:c.data.supplier,currency:'IRR'}))];});}
 export function treasuryView(rows:any[],today=tToday()){
  const movements=rowsOf(rows,'treasury_movement'),statements=rowsOf(rows,'treasury_statement');
  const accounts=rowsOf(rows,'treasury_account').map(r=>{const ledger=movements.filter(m=>m.data.accountId===r.id).reduce((n,m)=>n+(m.data.direction==='in'?BigInt(1):BigInt(-1))*moneyMicro(m.data.amount),moneyMicro(r.data.opening));const imports=statements.filter(s=>s.data.accountId===r.id).sort((a,b)=>b.data.to.localeCompare(a.data.to)||b.created.localeCompare(a.created));return {...r,ledger:moneyText(ledger),latestStatement:imports[0]?{from:imports[0].data.from,to:imports[0].data.to,closing:imports[0].data.closing}:null};});
@@ -72,10 +72,10 @@ export async function applyTreasury(u:Session,b:any){
  };
  const consumeSource=(request:any,amount:string,m:any)=>{
   const s=request.data.source;if(!s)return;
-  const c=get(s.caseId,'purchase_payable'),v=apView(c.data,rows),cd=structuredClone(c.data);
+  const c=get(s.caseId,'purchase_payable');if(c.data.completion)tFail('پرونده خرید بسته شده است.',409);const v=apView(c.data,rows),cd=structuredClone(c.data);
   if(s.kind==='invoice'){const i=v.invoices.find((i:any)=>i.id===s.itemId),q=i?.queue.find((q:any)=>q.id===s.installmentId);if(!q?.released||moneyMicro(q.remaining)<moneyMicro(amount))tFail('اجازه یا مانده قسط خرید تغییر کرده است.',409);cd.allocations.push({id:b.id+':allocation',invoiceId:i.id,paymentId:b.id+':movement',amount,...stamp});}
   else{const a=v.advances.find((a:any)=>a.id===s.itemId);if(!a?.released||moneyMicro(a.remaining)<moneyMicro(amount))tFail('اجازه یا مانده پیش‌پرداخت تغییر کرده است.',409);}
-  cd.payments.push({id:b.id+':movement',reference:m.reference,day:m.day,amount,evidence:'treasury_file:'+m.fileId,purpose:request.data.title,advanceId:s.kind==='advance'?s.itemId:'',orderId:s.kind==='advance'?cd.advances.find((a:any)=>a.id===s.itemId).orderId||'':'',treasuryRequestId:request.id,...stamp});
+  cd.payments.push({serviceId:s.kind==='advance'?cd.advances.find((a:any)=>a.id===s.itemId)?.serviceId||'':'',id:b.id+':movement',reference:m.reference,day:m.day,amount,evidence:'treasury_file:'+m.fileId,purpose:request.data.title,advanceId:s.kind==='advance'?s.itemId:'',orderId:s.kind==='advance'?cd.advances.find((a:any)=>a.id===s.itemId).orderId||'':'',treasuryRequestId:request.id,...stamp});
   // New payment/allocation must not silently invalidate the existing invoice approval.
   if(s.kind==='invoice'){const i=cd.invoices.find((i:any)=>i.id===s.itemId);i.release={...i.release,basis:releaseBasis(cd,i,rows)};}put(c,cd);
  };

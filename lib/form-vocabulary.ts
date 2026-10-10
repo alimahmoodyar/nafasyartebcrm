@@ -1248,3 +1248,11 @@ Object.assign(fieldTitles,{delegationKind:"نوع ارجاع",completionHours:"�
 toolFieldTitles.control_purchase_technical={targetId:'کالا یا منبع تأمین',scope:'محدوده کنترل فنی',authority:'واحد صاحب اختیار',decision:'تصمیم فنی',reason:'دلیل تصمیم',evidence:'شواهد واقعی',specs:'مشخصات جدید طراحی'};
 
 toolFieldTitles.get_workflow_guidance={taskId:'وظیفه کارتابل',threadId:'گفت‌وگوی کاری'};
+
+toolFieldTitles.purchase_service_apply={serviceId:'تعهد خدمت',caseId:'پرونده خرید',title:'عنوان خدمت',expected:'خروجی مورد انتظار و معیار پذیرش',amount:'مبلغ کل خدمت / سهم هزینه (ریال)',ownerId:'مسئول تأیید دریافت',due:'موعد تحویل',design:'خروجی محرمانه طراحی',fileId:'فایل واقعی تحویل',costs:'مقصدهای هزینه',kind:'نوع مقصد هزینه',targetId:'کالا یا پروژه مقصد',notes:'توضیح واقعی عملیات'};
+toolModeTitles.purchase_service_apply={create:'تعهد خدمت جدید',deliver:'ارائه خروجی',accept:'تأیید دریافت واقعی',return:'برگشت خروجی برای اصلاح',reassign:'تغییر مسئول و موعد',cost:'تأیید تخصیص هزینه',undo_cost:'برگشت تخصیص هزینه',reopen:'بازگشایی دریافت'};
+Object.assign(toolModeTitles.purchase_payables_apply,{close_case:'تأیید پایان خرید',reopen_case:'بازگشایی پرونده خرید'});
+Object.assign(toolFieldTitles.purchase_payables_apply,{serviceId:'تعهد خدمت مرتبط'});
+toolFieldTitles.upload_purchase_service_output={serviceId:'تعهد خدمت',filename:'نام فایل خروجی',base64:'محتوای واقعی فایل'};
+
+toolFieldTitles.download_purchase_service_output={id:'فایل خروجی خدمت',offset:'شروع بخش فایل',length:'اندازه بخش فایل'};

@@ -3,7 +3,7 @@ import {normalizeExpense} from './expense-register';
 import {invoiceTaxStates} from './purchase-invoice-contract';
 const active=(rows:any[]=[])=>rows.filter(r=>!r.voided);
 const plusWeek=(day:string)=>new Date(Date.parse(day+'T12:00:00Z')+7*86400000).toISOString().slice(0,10);
-export function invoiceDocument(i:any,caseId:string,rows:any[]){return rows.find(f=>f.type==='payable_file'&&f.id===i.documentId&&f.data.caseId===caseId)||null;}
+export function invoiceDocument(i:any,caseId:string,rows:any[]){return rows.find(f=>f.type==='payable_file'&&!f.data.serviceId&&f.id===i.documentId&&f.data.caseId===caseId)||null;}
 export function invoiceDocumentMissing(i:any,rows:any[],caseId?:string){
  const owner=caseId||rows.find(c=>c.type==='purchase_payable'&&c.data.invoices?.some((x:any)=>x.id===i.id))?.id;
  return !owner||!invoiceDocument(i,owner,rows);
