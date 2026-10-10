@@ -1233,3 +1233,6 @@ Object.assign(fieldTitles,{activationCode:'کد پنج‌رقمی مشتری',de
 Object.assign(fieldTitles,{assetRoles:'نقش‌های مدیریت اموال',holderKind:'نوع تحویل‌گیرنده',holderId:'تحویل‌گیرنده',holderName:'نام پیمانکار',contractorCode:'کد پیمانکار',contractorContact:'اطلاعات تماس پیمانکار',actualConfirmation:'تأیید دریافت واقعی نامه',specifications:'مشخصات اموال',signer:'نام امضاکننده نامه'});
 
 toolFieldTitles.assets_apply={brand:'برند اموال',condition:'وضعیت سلامت اموال',code:'کد اموال',name:'نام اموال',category:'گروه اموال',serial:'شماره سریال',recordId:'پرونده اموال',reference:'شماره رسید یا نامه',purpose:'علت تحویل / کاربرد'};
+
+Object.assign(toolFieldTitles.purchase_payables_apply,{invoiceType:'نوع فاکتور خرید',documentId:'سند بارگذاری‌شده فاکتور',taxState:'وضعیت مؤدیان',taxId:'شناسه مالیاتی فاکتور',taxDay:'تاریخ اقدام در سامانه مؤدیان'});
+toolFieldTitles.get_formal_purchase_invoices={supplier:'نام تأمین‌کننده',product:'نام یا کد کالا',reference:'شماره فاکتور / شناسه مالیاتی',from:'تاریخ فاکتور از',to:'تاریخ فاکتور تا',state:'وضعیت مؤدیان',offset:'شروع صفحه گزارش'};

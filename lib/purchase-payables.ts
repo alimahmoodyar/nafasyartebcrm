@@ -1,3 +1,4 @@
+import {invoiceDocumentMissing} from './purchase-invoice';
 import {moneyMicro,moneyText,costRead,costWrite} from './costing';
 export const apRead=(u:any)=>!u.permissions.salesAgentId&&!u.permissions.serviceAgentId&&!u.permissions.hospitalCenterId&&(costRead(u)||u.permissions.supplyRoles?.some((r:string)=>['domestic','foreign','finance','ceo'].includes(r)));
 export const apFinance=(u:any)=>apRead(u)&&costWrite(u);
@@ -31,7 +32,7 @@ export function apView(c:any,rows:any[]){
  const issues=active(c.issues).filter((x:any)=>x.state!=='resolved');
  const invoices=active(c.invoices).map((i:any)=>{const match=invoiceMatch(c,i,rows),paid=applied(c,'invoiceId',i.id),remaining=moneyMicro(i.amount)-paid;
  const pendingAdvance=active(c.advances).some((a:any)=>!a.closed&&(!a.orderId||i.lines.some((l:any)=>l.orderId===a.orderId))&&active(c.payments).filter((p:any)=>p.advanceId===a.id).reduce((n:bigint,p:any)=>n+moneyMicro(p.amount),BigInt(0))<moneyMicro(a.amount));
- const discrepancyReviewed=!!i.dispute&&i.dispute.match===JSON.stringify(match);const blockers=[...(pendingAdvance?['مانده برنامه پیش‌پرداخت این خرید را پیش از اجازه تسویه ببندید']:[]),...match.blockers.filter((b:string)=>!(discrepancyReviewed&&['مغایرت تعداد فاکتور و دریافت','کالای مردود نیازمند تعیین تکلیف'].includes(b))),...(issues.length?['مدرک یا پیگیری باز']:[]),...(!i.evidence?['مدرک فاکتور ناقص است']:[]),...(!i.recognition?['بدهی هنوز تأیید نشده']:[])];
+ const discrepancyReviewed=!!i.dispute&&i.dispute.match===JSON.stringify(match);const blockers=[...(pendingAdvance?['مانده برنامه پیش‌پرداخت این خرید را پیش از اجازه تسویه ببندید']:[]),...match.blockers.filter((b:string)=>!(discrepancyReviewed&&['مغایرت تعداد فاکتور و دریافت','کالای مردود نیازمند تعیین تکلیف'].includes(b))),...(issues.length?['مدرک یا پیگیری باز']:[]),...(i.invoiceType==='informal'?[]:i.invoiceType==='formal'&&invoiceDocumentMissing(i,rows)||!i.invoiceType&&!i.evidence?['مدرک فاکتور ناقص است']:[]),...(!i.recognition?['بدهی هنوز تأیید نشده']:[])];
  const released=!!i.release&&i.release.basis===releaseBasis(c,i,rows)&&!blockers.length;let credit=paid;const disputed=i.dispute?moneyMicro(i.dispute.amount):BigInt(0);let payable=remaining>disputed?remaining-disputed:BigInt(0);
  const queue=[...(i.schedule||[])].sort((a:any,b:any)=>a.due.localeCompare(b.due)||a.id.localeCompare(b.id)).map((s:any)=>{const amount=moneyMicro(s.amount),used=credit>amount?amount:credit;credit-=used;const rest=amount-used,available=rest>payable?payable:rest;payable-=available;return {...s,remaining:moneyText(available),held:moneyText(rest-available),released,blockers:!released?[...blockers,...(!i.release||i.release.basis!==releaseBasis(c,i,rows)?['نیازمند تأیید اجازه پرداخت']:[])]:[]};});
  return {...i,match,disputed:moneyText(disputed),paid:moneyText(paid),remaining:moneyText(remaining),blockers,released,queue};});
@@ -39,3 +40,5 @@ export function apView(c:any,rows:any[]){
  const advances=active(c.advances).map((a:any)=>{const paid=payments.filter((p:any)=>p.advanceId===a.id).reduce((n:bigint,p:any)=>n+moneyMicro(p.amount),BigInt(0));return {...a,remaining:moneyText(a.closed?BigInt(0):moneyMicro(a.amount)-paid),released:!!a.release&&!issues.length&&(!a.orderId||rows.some(o=>o.id===a.orderId&&o.type==='purchase_order'&&o.data.state!=='cancelled'&&o.revision===a.release.orderRevision))};});
  return {invoices,payments,advances,issues,liability:moneyText(invoices.filter((i:any)=>i.recognition).reduce((n:bigint,i:any)=>n+moneyMicro(i.remaining),BigInt(0))),unallocated:moneyText(payments.reduce((n:bigint,p:any)=>n+moneyMicro(p.available),BigInt(0)))};
 }
+
+apHelp.push('نوع فاکتور جدید را رسمی یا غیررسمی انتخاب کنید. برای رسمی، سند واقعی همین پرونده برای تأیید بدهی و اجازه پرداخت لازم است. غیررسمی بدون سند قابل پرداخت است؛ هفت روز پس از پرداخت، تدارکات و مالی خرید پیگیری سند دارند. نتیجه مؤدیان دستی ثبت می‌شود و اتصال مستقیم وجود ندارد.');

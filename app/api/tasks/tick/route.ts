@@ -1,3 +1,4 @@
+import {syncPurchaseInvoiceTasks} from '@/lib/purchase-invoice-tasks';
 import {syncAssetTasks} from '@/lib/assets-tasks';
 import {syncForeignTasks} from '@/lib/foreign-purchase-tasks';
 import {installForeignPosition} from '@/lib/foreign-purchase';
@@ -33,6 +34,7 @@ export async function POST(request:Request){try{
  await syncSupplierQuality();
  await syncSalesTasks();
  await syncLeadTasks();
+ await syncPurchaseInvoiceTasks();
  await syncAssetTasks();await syncPersonnelTasks();await syncForeignTasks();
  await syncQmsTasks();
  await scanSalesMonitor({source});

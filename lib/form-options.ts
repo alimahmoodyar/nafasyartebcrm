@@ -1536,3 +1536,9 @@ toolOptions.training_workspace_request.roleId=Object.fromEntries(trainingRoles.m
 
 for(const tool of ['create_user','update_user','create_password_user','update_password_user']){toolOptions[tool]={...toolOptions[tool],'permissions.assetRoles.*':{custodian:'اموال‌دار'}};}
 toolOptions.assets_apply={mode:{register:'ثبت اموال',edit:'ویرایش مشخصات',transfer:'تحویل یا برگشت اموال',confirm_annual:'ثبت تأیید سالیانه',request_clearance:'درخواست تسویه اموال',approve_clearance:'تأیید تسویه اموال',cancel_clearance:'لغو تسویه اموال',install_position:'تعریف سمت اموال‌دار'},condition:{good:'سالم',repair:'نیازمند تعمیر',damaged:'آسیب‌دیده'},holderKind:{stock:'انبار / محل شرکت',employee:'کارمند شرکت',contractor:'پیمانکار'}};
+
+Object.assign(toolOptions.purchase_payables_apply.mode,{invoice_document:'اتصال سند واقعی فاکتور',invoice_tax:'ثبت نتیجه مؤدیان'});
+Object.assign(toolOptions.purchase_payables_apply,{invoiceType:{formal:'رسمی',informal:'غیررسمی'},taxState:{awaiting_seller:'در انتظار ارسال فروشنده',awaiting_review:'در انتظار بررسی خرید',accepted:'تأیید در مؤدیان',rejected:'رد در مؤدیان'}});
+toolOptions.get_formal_purchase_invoices={state:toolOptions.purchase_payables_apply.taxState};
+
+toolOptions.purchase_payables_apply.mode.invoice_classify='تعیین نوع فاکتور قدیمی';

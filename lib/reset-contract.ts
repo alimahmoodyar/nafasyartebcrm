@@ -111,3 +111,6 @@ resetHelp.push('سوابق تولید دستی کد پنج‌رقمی همراه
 // Both reset scopes include them; existing 0016 freeze triggers and generic backups apply.
 // asset_file is included in private R2 backup manifests; duty children are removed first.
 // The asset-custodian position is preserved with other positions, with members/permissions unchanged.
+
+// Invoice type, uploaded-document links and manual taxpayer tracking live in purchase_payable; follow-ups use duty_runs/notices. Existing 0016 freezes and child-first reset order cover all changes.
+resetHelp.push('نوع رسمی یا غیررسمی، سند متصل و سابقه پیگیری مؤدیان همراه پرونده خرید در هر دو محدوده پشتیبان‌گیری و حذف می‌شوند؛ اعلان‌ها و وظایف هفت‌روزه قبل از پرونده حذف می‌شوند.');
