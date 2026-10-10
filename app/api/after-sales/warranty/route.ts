@@ -7,6 +7,6 @@ export async function GET(request:Request){try{
  need(u,domain,'support','intake','agent','coordinator');if(isAgent(u))await visible(u,{data:{domain,agentId:u.permissions.serviceAgentId}});
  const w=await warranty(req(q.get('serial'),160),past(q.get('day')||dayAt()));
  // Intake lookup reveals warranty only, never another customer's case or device history.
- const {serial,model,activatedAt,months,endsAt,state,checkedAt,remainingDays}=w;
- return Response.json({accountId:u.userId,warranty:{serial,model,activatedAt,months,endsAt,state,checkedAt,remainingDays},technicalCoverageApproved:false},{headers:{'Cache-Control':'private, no-store','Vary':'Cookie, Authorization'}});
+ const {serial,model,activatedAt,months,endsAt,state,checkedAt,remainingDays,salesDealer,explanation}=w;
+ return Response.json({accountId:u.userId,warranty:{serial,model,activatedAt,months,endsAt,state,checkedAt,remainingDays,salesDealer,explanation},technicalCoverageApproved:false},{headers:{'Cache-Control':'private, no-store','Vary':'Cookie, Authorization'}});
  }catch(e){return accessResponse(e)||Response.json({error:'استعلام گارانتی انجام نشد.'},{status:400,headers:{'Cache-Control':'no-store'}});}}

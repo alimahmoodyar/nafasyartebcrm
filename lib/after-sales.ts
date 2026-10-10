@@ -5,6 +5,7 @@ import type {Session} from './permissions';
 import {dayAt,taskRequired,taskText,validDay,addDay} from './duties';
 import {solarParts,solarToIso,solarMonthDays,localDay} from './device-analytics';
 import {firstWarrantyCodeIssuedAt} from './warranty';
+import {serviceSalesDealer} from './service-sales-dealer';
 import {normalizeSerial} from './distribution';
 import {scaled} from './production';
 import {serviceRoles,serviceDomains} from './after-sales-labels';
@@ -35,7 +36,8 @@ export async function warranty(serial:string,at:string){
  const validMonths=Number.isSafeInteger(months)&&months>0,end=activation&&validMonths?monthsAfter(activation,months):'';
  const state=end?(at<activation?'not_started':at<end?'active':'expired'):device&&!activation?'not_activated':'unknown';
  const remainingDays=state==='active'?Math.max(0,Math.round((Date.parse(end+'T00:00:00Z')-Date.parse(at+'T00:00:00Z'))/86400000)):null;
- return {serial:s,deviceId:device?.id||'',model:device?.data.model||'',productId:device?.data.product||'',activatedAt:activation,months:validMonths?months:0,endsAt:end,state,checkedAt:at,remainingDays,source:a?.source||'activation-history'};
+ const salesDealer=await serviceSalesDealer(device?.id||'',at);const explanation=state==='not_activated'?'دستگاه شناسایی شد، اما تاریخ فعال‌سازی گارانتی ثبت نشده است.':state==='unknown'?(activation&&!validMonths?'مدت معتبر گارانتی ثبت نشده است.':'اطلاعات کافی برای تعیین وضعیت گارانتی ثبت نشده است.'):state==='not_started'?'تاریخ تماس پیش از شروع گارانتی است.':'';
+ return {salesDealer,explanation,serial:s,deviceId:device?.id||'',model:device?.data.model||'',productId:device?.data.product||'',activatedAt:activation,months:validMonths?months:0,endsAt:end,state,checkedAt:at,remainingDays,source:a?.source||'activation-history'};
 }
 export async function lineage(serial:string){
  const cases=(await list('as_case')).filter(c=>c.data.serial===serial),d:any=await storage().prepare("SELECT id FROM records WHERE kind='device' AND json_extract(payload,'$.code')=?").bind(serial).first(),events:any[]=[],installed:any[]=[];

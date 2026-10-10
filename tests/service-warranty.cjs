@@ -3,7 +3,7 @@ const {DatabaseSync}=require('node:sqlite');const root=path.resolve(__dirname,'.
 const db={prepare(q){let args=[];return{bind(...a){args=a;return this},async first(){return sql.prepare(q).get(...args)||null},async all(){return {results:sql.prepare(q).all(...args)}},async run(){return {meta:{changes:sql.prepare(q).run(...args).changes}}}}},async batch(stmts){sql.exec('BEGIN');try{const r=[];for(const s of stmts)r.push(await s.run());sql.exec('COMMIT');return r;}catch(e){sql.exec('ROLLBACK');throw e;}}};
 const objects=new Map();const bucket={async put(k,b){objects.set(k,b.slice(0));return {key:k}},async get(k){const b=objects.get(k);return b?{arrayBuffer:async()=>b.slice(0)}:null},async delete(k){objects.delete(k)}};
 let identity=null;const env={TRACE_OWNER_EMAIL:'owner@example.com',LLM_CONFIG_ENCRYPTION_KEY:require('node:crypto').randomBytes(32).toString('base64'),DB:db,BUCKET:bucket};
-const cache={};function load(file){file=path.resolve(root,file);if(cache[file])return cache[file];const exports={};cache[file]=exports;const source=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+const cache={};function load(file){file=path.resolve(root,file);if(cache[file])return cache[file];const exports={};cache[file]=exports;const source=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
 vm.runInNewContext(source,{exports,require:n=>{if(n==='cloudflare:workers')return {env};if(n==='@/app/chatgpt-auth')return {getChatGPTUser:async()=>identity};if(n.startsWith('@/')||n.startsWith('.')){const p=n.startsWith('@/')?path.join(root,n.slice(2)):path.resolve(path.dirname(file),n);return load(p+(path.extname(p)?'':'.ts'));}return require(n)},Response,Request,URL,URLSearchParams,Error,crypto:globalThis.crypto,Date,Intl,Set,Map,FormData,Blob,File,TextEncoder,TextDecoder,Uint8Array,ArrayBuffer,AbortController,ReadableStream,btoa,atob,setTimeout:(f,n)=>setTimeout(f,Math.min(n,10)),clearTimeout,console},{filename:file});return exports;}
 const auth=load('lib/authorization.ts'),http=load('app/mcp/route.ts'),sse=load('lib/mcp/sse.ts'),tokens=load('app/api/mcp-tokens/route.ts'),configs=load('app/api/llm-config/route.ts'),secrets=load('lib/llm-secrets.ts'),catalog=load('lib/mcp/tools.ts');
 const base='https://test.local';const owner={userId:'owner',email:'owner@example.com',displayName:'Owner',fullName:null};
@@ -42,5 +42,26 @@ const lookup=load('app/api/after-sales/warranty/route.ts');
  const tool=catalog.tools.find(t=>t.name==='get_service_warranty');assert.ok(tool&&!tool.write);const r=await context.run(support,()=>tool.run({domain:'home',serial:'S1',day:today},base));assert.ok(JSON.stringify(r).includes('active'));assert.ok(load('lib/assistant-policy.ts').assistantReadNames.has(tool.name));
  // A preview makes no case or activation changes. Creation rechecks on the server.
  assert.equal(entities('as_case').length,0);const initial=await op('create',{serial:'S1',customer:'Customer',phone:'0912',day:today,complaint:'Check'},200,support);assert.equal(entity(initial.id).data.warranty.state,'active');
+ // Selling dealer is derived only from actual, completed serial-linked delivery.
+ seedEntity('dealer-one','sales_agent',{name:'Dealer One',phone:'PRIVATE_PHONE'});
+ seedEntity('sale-reserved','sale',{state:'reserved',deviceIds:['device:S1'],salesAgentId:'dealer-one',recipient:{name:'Wrong reservation'}});
+ assert.equal((await read(support,'S1')).d.warranty.salesDealer.state,'missing');
+ seedEntity('sale-one','sale',{state:'delivered',deliveredAt:earlier+'T12:00:00Z',deviceIds:['device:S1'],salesAgentId:'dealer-one',recipient:{name:'Dealer One',phone:'PRIVATE_PHONE'},amount:'PRIVATE_AMOUNT'});
+ let dealerResult=await read(support,'S1');assert.equal(dealerResult.d.warranty.salesDealer.name,'Dealer One');assert.equal(dealerResult.d.warranty.salesDealer.state,'recorded');assert.ok(!JSON.stringify(dealerResult.d).includes('PRIVATE'));
+ assert.equal((await read(support,'S1',load('lib/duties.ts').addDay(earlier,-1))).d.warranty.salesDealer.state,'missing');
+ seedEntity('sale-two','sale',{state:'delivered',deliveredAt:earlier+'T13:00:00Z',deviceIds:['device:S1'],salesAgentId:'dealer-two',recipient:{name:'Dealer Two'}});
+ dealerResult=await read(support,'S1');assert.equal(dealerResult.d.warranty.salesDealer.state,'conflict');assert.equal(dealerResult.d.warranty.salesDealer.name,'');
+ sql.prepare('DELETE FROM flow_entities WHERE id=?').run('sale-two');
+ seedEntity('sale-unrelated','sale',{state:'delivered',deliveredAt:earlier+'T12:00:00Z',deviceIds:['device:OTHER'],salesAgentId:'dealer-two',recipient:{name:'Unrelated'}});
+ assert.equal((await read(support,'S1')).d.warranty.salesDealer.name,'Dealer One');
+ assert.ok((await read(support,'NO-ACT')).d.warranty.explanation.includes('فعال‌سازی'));
+ assert.ok((await read(support,'MISSING')).d.warranty.explanation.includes('اطلاعات کافی'));
+ const mcpDealer=await context.run(support,()=>tool.run({domain:'home',serial:'S1',day:today},base));assert.equal(mcpDealer.warranty.salesDealer.name,'Dealer One');
+ assert.equal(entity(initial.id).data.warranty.salesDealer.state,'missing');
+ const React=require('react'),{renderToStaticMarkup}=require('react-dom/server'),{ServiceWarrantyDetails}=load('components/trace/service-warranty-preview.tsx');
+ const rendered=renderToStaticMarkup(React.createElement(ServiceWarrantyDetails,{w:(await read(support,'S1')).d.warranty}));
+ for(const title of ['وضعیت گارانتی','تاریخ شروع','تاریخ پایان','نمایندگی در سابقه فروش','Dealer One'])assert.ok(rendered.includes(title));
+ assert.ok(rendered.includes('<dl'));assert.ok(!rendered.includes('PRIVATE'));
+ const unknownMarkup=renderToStaticMarkup(React.createElement(ServiceWarrantyDetails,{w:(await read(support,'MISSING')).d.warranty}));assert.ok(unknownMarkup.includes('نمایندگی فروش ثبت نشده'));assert.ok(unknownMarkup.includes('اطلاعات کافی'));
  console.log('PASS warranty intake: active/exclusive expiry/remaining days, missing and unactivated records, pre-start contact, private data, agent/role/domain/account access, future/invalid dates, read-only MCP and server recheck on create.');
 })().catch(e=>{console.error(e);process.exit(1)});
