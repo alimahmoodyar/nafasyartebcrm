@@ -1,5 +1,5 @@
 import {storage} from './storage';
-import {treasuryRows,tToday} from './treasury';
+import {treasuryRows,tToday,treasuryNeedsCeo,treasuryPaymentAuthorized} from './treasury';
 import {trainingContext} from './training-context';
 export async function syncTreasuryTasks(date=new Date()){
  if(trainingContext.getStore())return {generated:0,missingOwners:[]};
@@ -7,15 +7,15 @@ export async function syncTreasuryTasks(date=new Date()){
  const eligible=members.filter(m=>{const p=JSON.parse(m.permissions);return m.status==='active'&&p.finance==='write'&&!p.salesAgentId&&!p.serviceAgentId&&!p.hospitalCenterId;});
  const norm=(s:string)=>s.replace(/[\s\u200c]/g,'').replace(/ي/g,'ی').replace(/ك/g,'ک');
  const owners=(name:string)=>eligible.filter(m=>rows.some(p=>p.type==='position'&&p.data.active&&norm(p.data.name)===norm(name)&&p.data.members?.includes(m.id))).map(m=>m.id);
- const roles={treasury:owners('خزانه دار'),manager:owners('مدیر مالی'),accountant:owners('مدیر حسابداری')},desired=new Set<string>(),missingOwners=new Set<string>(),existing=(await db.prepare("SELECT * FROM duty_runs WHERE id LIKE 'treasury:%'").all()).results as any[],statements:any[]=[];let generated=0;
+ const roles={treasury:owners('خزانه دار'),manager:owners('مدیر مالی'),accountant:owners('مدیر حسابداری'),ceo:owners('مدیر عامل')},desired=new Set<string>(),missingOwners=new Set<string>(),existing=(await db.prepare("SELECT * FROM duty_runs WHERE id LIKE 'treasury:%'").all()).results as any[],statements:any[]=[];let generated=0;
  const job=(r:any,key:string,role:keyof typeof roles,title:string,due:string)=>{if(!roles[role].length)missingOwners.add(role);for(const assignee of roles[role]){const id='treasury:'+r.id+':'+key+':'+assignee,old=existing.find(t=>t.id===id),data={treasuryWorkflow:true,recordId:r.id,workflowRole:role,sourceSection:'treasury',sourceId:r.id,title:title+' — '+(r.data.title||r.data.number||r.data.filename),instructions:'مرحله واقعی را در خزانه‌داری انجام دهید؛ پاسخ وظیفه جای تأیید یا اجرا نیست.',evidence:'مدرک واقعی و نتیجه بررسی مستقل',history:old?JSON.parse(old.data).history||[]:[],answer:old?JSON.parse(old.data).answer||'':''},deadline=(old&&key==='review'?old.due:due+'T09:00:00+03:30');desired.add(id);
   if(!old){statements.push(db.prepare("INSERT INTO duty_runs(id,template_id,period,assignee,supervisor,due,state,data,revision,created,updated) VALUES(?,?,?,?,?,?,'open',?,1,?,?)").bind(id,id,today,assignee,roles.manager[0]||'@admin',deadline,JSON.stringify(data),now,now));generated++;}
   else if(!['open','blocked'].includes(old.state)||old.due!==deadline||old.supervisor!==(roles.manager[0]||'@admin'))statements.push(db.prepare("UPDATE duty_runs SET state='open',due=?,data=?,supervisor=?,revision=revision+1,updated=? WHERE id=?").bind(deadline,JSON.stringify(data),roles.manager[0]||'@admin',now,id));
   if(due<=today){for(const recipient of new Set([assignee,...(due<today?roles.manager:[])]))statements.push(db.prepare('INSERT OR IGNORE INTO duty_notices(id,task_id,recipient,phase,message,created) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),id,recipient,'treasury:'+today,(due<today?'معوق: ':'موعد اقدام: ')+data.title,now));}
  }};
  for(const r of rows){if(r.type==='treasury_account'&&r.data.state==='review')job(r,'review','manager','تأیید حساب و مانده اولیه',today);
-  if(r.type==='treasury_request'){if(r.data.state==='review')job(r,'review','manager','بررسی درخواست و حساب مقصد',today);if(['approved','partial'].includes(r.data.state))job(r,'execute','treasury','پیگیری اجرای دریافت / پرداخت',r.data.due);}
-  if(r.type==='treasury_check'){if(r.data.state==='review')job(r,'review','manager','بررسی چک',today);if(r.data.state==='issued')job(r,'settle','treasury','پیگیری سررسید و نتیجه واقعی چک',r.data.due);}
+  if(r.type==='treasury_request'){if(r.data.state==='review')job(r,'review','manager','بررسی درخواست و حساب مقصد',today);if(treasuryNeedsCeo(r.data))job(r,'ceo','ceo','مجوز نهایی پرداخت به خزانه‌دار',r.data.due);if(['approved','partial'].includes(r.data.state)&&treasuryPaymentAuthorized(r.data))job(r,'execute','treasury','پیگیری اجرای دریافت / پرداخت',r.data.due);}
+  if(r.type==='treasury_check'){if(r.data.state==='review')job(r,'review','manager','بررسی چک',today);if(r.data.state==='issued'&&(r.data.direction==='in'||rows.some(q=>q.id===r.data.requestId&&treasuryPaymentAuthorized(q.data))))job(r,'settle','treasury','پیگیری سررسید و نتیجه واقعی چک',r.data.due);}
   if(r.type==='treasury_expense'&&r.data.state==='review')job(r,'review','manager','بررسی مدرک هزینه تنخواه',today);
   if(r.type==='treasury_statement'&&r.data.rows.some((b:any)=>!b.match))job(r,'reconcile','accountant','تطبیق مستقل صورتحساب',r.data.to);
  }

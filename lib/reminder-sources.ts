@@ -45,7 +45,7 @@ const catalogs:Record<string,Record<string,string>>={
  flow:{...common,assembled:'برگ تولید ثبت‌شده',awaiting_receipt:'منتظر رسید محصول',finished:'انبار محصول نهایی',reserved:'رزروشده',in_transit:'در حمل',pending_qc:'منتظر کنترل کیفیت ورودی',awaiting_warehouse:'منتظر جانمایی انبار',stored:'جانمایی‌شده',issued:'تحویل مواد',planned:'برنامه‌ریزی‌شده',assigned:'تخصیص‌یافته',prepared:'آماده',building:'در حال ساخت',testing:'در حال آزمون',passed:'تأیید آزمون',failed:'رد آزمون'},
  projects:{open:'باز',closed:'بسته'},routine:{open:'باز',closed:'بسته'},
  guarantees:{draft:'پیش‌نویس',review:'بررسی مالی',approved:'منتظر صدور یا دریافت',active:'فعال',terminated:'خاتمه؛ پیگیری استرداد',closed:'بسته'},
- treasury:{...common,partial:'پرداخت جزئی',paid:'پرداخت کامل',issued:'صادرشده',settled:'وصول‌شده',returned:'برگشت‌شده'},assets:{...common,cleared:'تسویه‌شده'},
+ treasury:{...common,ceo_review:'در انتظار مجوز مدیرعامل',partial:'پرداخت جزئی',paid:'پرداخت کامل',issued:'صادرشده',settled:'وصول‌شده',returned:'برگشت‌شده'},assets:{...common,cleared:'تسویه‌شده'},
  home_service:{...caseStates,requested:'درخواست جدید',rejected:'ردشده',prepared:'بسته آماده',shipped:'در راه',awaiting_return:'منتظر داغی',sent:'داغی ارسال‌شده',credited:'بستانکاری ثبت شد'},hospital_service:caseStates
 };
 export async function reminderSources(u:Session,kind:string,targetId?:string,query=''){

@@ -1560,3 +1560,5 @@ toolOptions.get_reminder_links={kind:reminderLinks};
 
 // Permission forms share the current domain role captions.
 for(const fields of Object.values(toolOptions))if(fields['permissions.supplyRoles.*'])Object.assign(fields['permissions.supplyRoles.*'],supplyRoles);
+
+toolOptions.control_purchase_technical={scope:{material:'کالا',supplier_material:'منبع تأمین کالا'},authority:{engineering:'تحقیق و توسعه',quality:'تضمین و کنترل کیفیت'},decision:{hold:'توقف خرید',release:'آزادسازی توقف',change:'تغییر مشخصات طراحی'}};
