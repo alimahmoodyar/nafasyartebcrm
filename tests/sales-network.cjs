@@ -25,7 +25,7 @@ const quote=(qty=3,u=rep)=>post(quoteApi,'/api/sales/quote',{agentId:a,items:[{p
 const version=id=>entity(id).revision;
 async function upload(u=rep,extra={},status=201){const meta={id:crypto.randomUUID(),agentId:a,confirmed:true,title:'Evidence',...extra},form=new FormData();form.set('metadata',JSON.stringify(meta));form.set('file',new File(['%PDF-test'],'receipt.pdf'));const r=await context.run(u,()=>files.POST(new Request(base+'/api/sales/files',{method:'POST',headers:{origin:base},body:form})));const d=await r.json();assert.equal(r.status,status,JSON.stringify(d));return {...d,meta};}
 const network=load('app/api/sales/network/route.ts'),contract=load('lib/sales-network-contract.ts');
-const nw=(mode,extra={},u=manager,status=200)=>post(network,'/api/sales/network',{id:crypto.randomUUID(),mode,...(mode==='agent'&&!extra.agentId?{nationalId:String(++representativeSequence),mobile:'09123456789'}:{}),confirmed:true,agentId:a,notes:'Actual recorded decision',...extra},u,status);
+const nw=(mode,extra={},u=manager,status=200)=>post(network,'/api/sales/network',{id:crypto.randomUUID(),mode,...(mode==='template'?{effectiveFrom:today}:{}),...(mode==='agent'&&!extra.agentId?{nationalId:String(++representativeSequence),mobile:'09123456789'}:{}),confirmed:true,agentId:a,notes:'Actual recorded decision',...extra},u,status);
 (async()=>{
  for(const u of [manager,staff,finance,viewer])member(u);
  const second=actor('second',['staff']);member(second);
@@ -37,7 +37,7 @@ const nw=(mode,extra={},u=manager,status=200)=>post(network,'/api/sales/network'
  const t=await nw('template',{kind:'representative',title:'Rep standard',cashBps:5000,minCashBps:3000,maxCashBps:7000,months:1,minMonths:1,maxMonths:3,notes:undefined});
  const template=entity(t.body.id);assert.equal(template.data.history[0].actor,manager.userId);assert.ok(template.data.history[0].at);assert.equal(template.data.version,1);assert.ok(!Object.hasOwn(template.data,'notes'));
  const presentation=load('lib/assistant-form-presentation.ts').generalPresentation('sales_network_apply',{mode:'template',data:{notes:'Legacy draft text'}},{type:'object',properties:{data:{type:'object',required:['notes']}}},'Template');assert.equal(presentation.schema.properties.data.properties.notes.uiHidden,true);assert.ok(!presentation.schema.properties.data.required.includes('notes'));
- const templateArgs={id:crypto.randomUUID(),confirmed:true,mode:'template',data:{kind:'reseller',title:'Reseller standard',cashBps:6000,months:2}};const principal={user:manager,scope:'write',tokenId:null};await catalog.executeTool('sales_network_apply',templateArgs,base,principal);assert.equal((await catalog.executeTool('sales_network_apply',templateArgs,base,principal)).repeated,true);
+ const templateArgs={id:crypto.randomUUID(),confirmed:true,mode:'template',data:{effectiveFrom:today,kind:'reseller',title:'Reseller standard',cashBps:6000,months:2}};const principal={user:manager,scope:'write',tokenId:null};await catalog.executeTool('sales_network_apply',templateArgs,base,principal);assert.equal((await catalog.executeTool('sales_network_apply',templateArgs,base,principal)).repeated,true);
  await nw('contact',{channel:'visit',day:today,nextDue:future,nextAction:'Still requires actual contact evidence',notes:undefined},staff,400);
  await nw('partner',{revision:version(a),kind:'representative',ownerId:'staff',contactDays:10,reorderDays:30});
  await nw('contact',{channel:'visit',day:today,nextDue:future,nextAction:'Confirm repeat purchase'},staff);
