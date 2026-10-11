@@ -1,6 +1,6 @@
 import {costRead,costWrite} from './costing';
-export function routineRoles(u:any){const p=u.permissions,read=!p.salesAgentId&&!p.serviceAgentId&&!p.hospitalCenterId,manager=read&&(u.isAdmin||p.supplyRoles?.includes('ceo')),foreman=read&&(manager||p.flowRoles?.includes('production')),engineering=read&&(manager||p.supplyRoles?.includes('engineering')),quality=read&&(manager||p.flowRoles?.includes('qc'));
- return {read,manager:!!manager,foreman:!!foreman,engineering:!!engineering,quality:!!quality,finance:costWrite(u),financial:costRead(u),staff:!!(foreman||engineering||quality||costRead(u))};}
+export function routineRoles(u:any){const p=u.permissions,internal=!p.salesAgentId&&!p.serviceAgentId&&!p.hospitalCenterId,manager=internal&&(u.isAdmin||p.supplyRoles?.includes('ceo')),foreman=internal&&(manager||p.flowRoles?.includes('production')),engineering=internal&&(manager||p.supplyRoles?.includes('engineering')),quality=internal&&(manager||p.flowRoles?.includes('qc')),section=internal&&(!!manager||!!foreman||!!engineering||!!quality),read=internal;
+ return {read,section,manager:!!manager,foreman:!!foreman,engineering:!!engineering,quality:!!quality,finance:costWrite(u),financial:costRead(u),staff:!!(section&&(foreman||engineering||quality||costRead(u)))};}
 export function targetFor(j:any){const p=j.policy,s=j.step,span=j.end-j.start,rest=s.allowancesIncluded?0:(j.restMinutes??p.restMinutes??0),setup=j.setupMinutes??p.setupMinutes??0;
  const useful=Math.max(0,span-j.leaveMinutes-j.downtimeMinutes-rest-setup)*(p.efficiencyPercent??100)/100;
  const standard=Math.floor(useful*60/s.seconds),lower=Math.floor(standard*(p.lowerPercent??100)/100),upper=Math.floor(standard*(p.upperPercent??100)/100);

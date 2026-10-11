@@ -10,7 +10,7 @@ const policy=load('lib/permissions.ts'),auth=load('lib/authorization.ts'),flow=l
 const ids=(...v)=>new Set(v),has=(set,id)=>set.has(id);
 const expected={
  salesManager:ids('sales_manager'),salesStaff:ids('sales','sales_manager','home_sales','hospital_sales','sales_manager_assistant','delivery'),
- salesFinance:ids('finance','purchase_finance','sales_finance'),
+ salesFinance:ids('sales_finance'),
  transportManager:ids('transport_manager'),transportDriver:ids('driver'),
  productWrite:ids('product_manager'),firmwareWrite:ids('firmware'),
  design:ids('engineering','ceo'),custodian:ids('custodian'),
@@ -64,6 +64,11 @@ if(qa&&!qa.design)assert.equal(qms.qvisible({type:'qms_record',data:{private:tru
  }
  const forged=policy.validatePermissions({roleAssignment:validAssignment(id),read:policy.modules,write:policy.modules,eventStages:policy.stages,finance:'write',salesRoles:['manager'],supplyRoles:['ceo'],treasuryWorkflowRoles:['ceo'],qmsRoles:['qa']});assert.deepEqual(JSON.parse(JSON.stringify(forged)),JSON.parse(JSON.stringify(u.permissions)),id+': extra grants merged');assertions++;
  check(nav.canOpenSection(u,'qms'),!!u.permissions.qmsRoles?.length||has(expected.design,id),'QMS navigation',id);
+ check(nav.canOpenSection(u,'sales'),has(expected.salesStaff,id)||has(expected.salesManager,id)||has(expected.salesFinance,id)||id==='sales_viewer'||id==='sales_agent','sales navigation',id);
+ check(nav.canOpenSection(u,'routine-production'),['production','engineering','qc','ceo'].includes(id),'routine production navigation',id);
+ check(nav.canOpenSection(u,'assets'),!['sales_agent','service_agent'].includes(id),'assets navigation',id);
+ check(nav.canOpenSection(u,'personnel'),!['sales_agent','service_agent'].includes(id),'personnel navigation',id);
+ check(nav.canOpenSection(u,'guarantees'),['treasurer','finance_director','accounting_head','ceo_payment','warehouse_finance','finance','purchase_finance'].includes(id),'guarantees navigation',id);
  check(nav.canOpenSection(u,'users'),false,'admin users',id);check(nav.canOpenSection(u,'llm'),false,'admin LLM',id);check(nav.canOpenSection(u,'system-reset'),false,'admin reset',id);
 }
 // Home/hospital service scopes are independent; combined roles preserve only explicitly selected scopes.
