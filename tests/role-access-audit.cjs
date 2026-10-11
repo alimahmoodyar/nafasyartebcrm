@@ -59,7 +59,7 @@ for(const [id,u] of users){
   check(qa&&qms.qwrite({kind,private:privateRecord},qa),privateRecord?has(expected.design,id):id==='ceo'||writers.includes(qualityRole),'qmsWrite:'+kind,id);
  }
 if(qa&&!qa.design)assert.equal(qms.qvisible({type:'qms_record',data:{private:true}},qa,[]),false,id+': design data leak');
- const actor=await hr.hrActor(u,members).catch(()=>null);for(const r of ['hr','payroll','approver','finance','treasury'])check(actor?.has(r),id==='personnel_'+r,'personnel:'+r,id);
+ const actor=await hr.hrActor(u,members).catch(()=>null);for(const r of ['hr','payroll','approver','finance','treasury','executive_viewer'])check(actor?.has(r),id==='personnel_'+r||r==='executive_viewer'&&id==='ceo','personnel:'+r,id);
  check(service.domainAccess(u,'home'),id.startsWith('service_'),'serviceHome',id);check(service.domainAccess(u,'hospital'),false,'serviceHospitalScope',id);
  if(id.startsWith('service_')&&id!=='service_agent')for(const r of ['support','intake','technician','coordinator','inventory','finance'])check(service.role(u,r),id==='service_'+r||id==='service_manager','service:'+r,id);
  check(flow.warehouseAccess(u,'raw'),['inventory','warehouse_supervisor'].includes(id),'warehouseRaw',id);check(flow.warehouseAccess(u,'finished'),false,'warehouseFinishedScope',id);check(flow.warehouseAccess(u,'line'),id==='production_store_assistant','warehouseLine',id);

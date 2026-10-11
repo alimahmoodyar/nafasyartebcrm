@@ -12,7 +12,7 @@ let tail=Promise.resolve();const batch=db.batch.bind(db);db.batch=stmts=>{const 
 const base='https://test.local',now=new Date().toISOString(),today=duties.dayAt(),day=duties.addDay(today,-10),next=duties.addDay(today,2);
 const req=(url,b,origin=base)=>new Request(base+url,{method:b?'POST':'GET',headers:{origin,'Content-Type':'application/json'},...(b?{body:JSON.stringify(b)}:{})});
 function actor(id,roles=[],extra={}){const u={userId:'local:'+id,email:id+'@test.local',name:id,isAdmin:false,permissions:{read:[],write:[],eventStages:[],personnelRoles:roles,...extra}};sql.prepare("INSERT INTO app_members(id,email,name,unit,status,subject,permissions,created,updated) VALUES(?,?,?,'company','active',?,?,?,?)").run(id,u.email,id,u.userId,JSON.stringify(u.permissions),now,now);return u;}
-const alice=actor('alice'),bob=actor('bob'),manager=actor('manager'),hr=actor('hr',['hr']),payroll=actor('payroll',['payroll']),approver=actor('approver',['approver']),finance=actor('finance',['finance']),treasury=actor('treasury',['treasury']),external=actor('external',[],{salesAgentId:'outside',salesRoles:['agent']});
+const alice=actor('alice'),bob=actor('bob'),manager=actor('manager'),hr=actor('hr',['hr']),payroll=actor('payroll',['payroll']),approver=actor('approver',['approver']),finance=actor('finance',['finance']),treasury=actor('treasury',['treasury']),ceo=actor('ceo',['executive_viewer']),external=actor('external',[],{salesAgentId:'outside',salesRoles:['agent']});
 const row=id=>{const r=sql.prepare('SELECT * FROM flow_entities WHERE id=?').get(id);return r?{...r,data:JSON.parse(r.data)}:null};
 async function get(u,q=''){const r=await ctx.run(u,()=>api.GET(req('/api/personnel'+q)));return {status:r.status,data:await r.json()}}
 async function post(u,b){const r=await ctx.run(u,()=>api.POST(req('/api/personnel',{id:crypto.randomUUID(),confirmed:true,revision:0,notes:'Actual evidence',...b})));return {status:r.status,data:await r.json()}}
@@ -32,6 +32,8 @@ const profile={mode:'employee',code:'A01',memberId:'alice',managerId:'manager',s
  assert.equal((await apply(alice,lid,'approve')).status,403);assert.equal((await post(bob,{...leave,start:today,end:today})).status,403);
  assert.equal((await get(alice)).data.balances[0].availableMinutes,480);assert.equal((await post(alice,leave)).status,400);
  const task=sql.prepare("SELECT * FROM duty_runs WHERE template_id='personnel' AND period=? AND assignee='manager'").get(lid);assert.ok(task);
+ const managerPortal=(await get(manager)).data;assert.equal(managerPortal.managementInbox.enabled,true);assert.ok(managerPortal.managementInbox.leaveReport.some(r=>r.id===lid));
+ const ceoPortal=(await get(ceo)).data;assert.equal(ceoPortal.managementInbox.leaveReportReadOnly,true);assert.ok(ceoPortal.managementInbox.leaveReport.some(r=>r.id===lid));assert.equal((await apply(ceo,lid,'approve')).status,403);
  const generic=await ctx.run(manager,()=>tasks.POST(req('/api/tasks',{id:crypto.randomUUID(),confirmed:true,mode:'submit',taskId:task.id,revision:task.revision,note:'Shortcut'})));assert.equal(generic.status,400);
  await success(manager,lid,'approve');await success(hr,lid,'approve');assert.equal(row(lid).data.state,'approved');
  const cancel=await ok(alice,{mode:'request',kind:'cancel',targetId:lid});await success(manager,cancel,'approve');await success(hr,cancel,'approve');assert.equal(row(lid).data.state,'cancelled');assert.equal((await get(alice)).data.balances[0].availableMinutes,960);
