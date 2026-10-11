@@ -14,7 +14,7 @@ const expected={
  transportManager:ids('transport_manager'),transportDriver:ids('driver'),
  productWrite:ids('product_manager'),firmwareWrite:ids('firmware'),
  design:ids('engineering','ceo'),custodian:ids('custodian'),
- financeWrite:ids('finance','purchase_finance'),
+ financeWrite:ids('finance'),
  treasury:ids('treasurer'),financialManager:ids('finance_director'),accountant:ids('accounting_head'),ceoPayment:ids('ceo_payment')
 };
 
@@ -44,8 +44,12 @@ for(const [id,u] of users){
 
  for(const [name,predicate] of Object.entries({salesManager:sales.salesManager,salesStaff:sales.salesStaff,salesFinance:sales.salesFinance,transportManager:transport.transportManager,transportDriver:transport.transportDriver,financeWrite:cost.costWrite}))check(predicate(u),has(expected[name],id),name,id);
  for(const predicate of ['hospitalManager','hospitalTech','hospitalInventory','hospitalLogistics'])check(hospital[predicate](u),false,predicate+':home isolation',id);
- check(hospital.hospitalFinance(u),has(expected.financeWrite,id),'hospitalFinance',id);
- check(nav.canOpenSection(u,'hospital'),has(expected.financeWrite,id),'hospital navigation',id);
+ check(hospital.hospitalFinance(u),false,'hospitalFinance',id);
+ check(nav.canOpenSection(u,'hospital'),false,'hospital navigation',id);
+ check(nav.canOpenSection(u,'costing'),['finance','finance_director','accounting_head','warehouse_finance'].includes(id),'costing exact role',id);
+ check(nav.canOpenSection(u,'finance-control'),['finance','finance_director','accounting_head'].includes(id),'control exact role',id);
+ check(nav.canOpenSection(u,'guarantees'),['treasurer','finance_director'].includes(id),'guarantees exact role',id);
+ check(nav.canOpenSection(u,'treasury'),['treasurer','finance_director','accounting_head','ceo_payment','purchase_finance'].includes(id),'treasury exact role',id);
  check(auth.can(u,'product','write'),has(expected.productWrite,id),'productWrite',id);check(auth.can(u,'firmware','write'),has(expected.firmwareWrite,id),'firmwareWrite',id);
  for(const [role,key] of [['treasury','treasury'],['manager','financialManager'],['accountant','accountant'],['ceo','ceoPayment']])check(finance.financialWorkflowRole(u.permissions,id,[],role),has(expected[key],id),'financial:'+role,id);
  check((await assets.assetActor(u,members).catch(()=>({custodian:false}))).custodian,has(expected.custodian,id),'custodian',id);
@@ -68,11 +72,16 @@ if(qa&&!qa.design)assert.equal(qms.qvisible({type:'qms_record',data:{private:tru
  check(nav.canOpenSection(u,'routine-production'),['production','engineering','qc','ceo'].includes(id),'routine production navigation',id);
  check(nav.canOpenSection(u,'assets'),!['sales_agent','service_agent'].includes(id),'assets navigation',id);
  check(nav.canOpenSection(u,'personnel'),!['sales_agent','service_agent'].includes(id),'personnel navigation',id);
- check(nav.canOpenSection(u,'guarantees'),['treasurer','finance_director','accounting_head','ceo_payment','warehouse_finance','finance','purchase_finance'].includes(id),'guarantees navigation',id);
+ check(nav.canOpenSection(u,'guarantees'),['treasurer','finance_director'].includes(id),'guarantees navigation',id);
  check(nav.canOpenSection(u,'users'),false,'admin users',id);check(nav.canOpenSection(u,'llm'),false,'admin LLM',id);check(nav.canOpenSection(u,'system-reset'),false,'admin reset',id);
 }
 // Home/hospital service scopes are independent; combined roles preserve only explicitly selected scopes.
 for(const role of policy.jobRoles.filter(r=>r.scope==='services')){const p=policy.validatePermissions({roleAssignment:{roles:[role.id],serviceDomains:['hospital']}}),u={isAdmin:false,permissions:p};check(service.domainAccess(u,'hospital'),true,'hospital',role.id);check(service.domainAccess(u,'home'),false,'home isolation',role.id);for(const [key,allowed] of Object.entries({hospitalManager:['service_manager','service_coordinator'],hospitalTech:['service_manager','service_coordinator','service_technician'],hospitalFinance:['service_finance'],hospitalInventory:['service_inventory'],hospitalLogistics:[]}))check(hospital[key](u),allowed.includes(role.id),key,role.id);check(nav.canOpenSection(u,'hospital'),true,'hospital navigation',role.id);}
 for(const [id] of users.filter(([id])=>!['sales_agent','service_agent','quality_observer'].includes(id))){const combined=policy.validatePermissions({roleAssignment:{...validAssignment(id),roles:[id,'finance']}});assert.equal(combined.finance,'write');const removed=policy.validatePermissions({roleAssignment:validAssignment(id)});assert.equal(removed.finance,users.find(([x])=>x===id)[1].permissions.finance);assertions+=2;}
+const scopes=load('lib/financial-access.ts'),treasuryDomain=load('lib/treasury.ts');
+for(const grant of ['read','write']){const legacy={isAdmin:false,permissions:{read:[],write:[],finance:grant}};for(const d of ['costing','control','purchase','treasury','guarantees','hospital','transport']){assert.equal(scopes.financialAccess(legacy,d),false,'Generic finance must not grant '+d);assert.equal(scopes.financialAccess(legacy,d,true),false);}}
+const tr=users.find(([id])=>id==='treasurer')[1];for(const d of ['costing','control','purchase','hospital','transport'])assert.equal(scopes.financialAccess(tr,d),false,'Treasurer leakage '+d);
+const scoped=treasuryDomain.scopedTreasuryRows([{id:'pending',type:'treasury_request',data:{state:'review',createdBy:'other'}},{id:'ready',type:'treasury_request',data:{state:'approved'}},{id:'file1',type:'treasury_file',data:{caseId:'pending'}},{id:'file2',type:'treasury_file',data:{caseId:'ready'}},{id:'cost',type:'cost_price',data:{unitCost:'secret'}}],{treasury:true},'me');
+assert.deepEqual(Array.from(scoped,r=>r.id),['ready','file2']);
 console.log('PASS complete role access matrix: '+users.length+' job roles, '+assertions+' positive/negative scope and separation checks, exact grant derivation, forbidden admin access and role removal.');
 })().catch(e=>{console.error(e);process.exit(1)});

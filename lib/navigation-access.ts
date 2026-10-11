@@ -1,3 +1,4 @@
+import {financialAccess} from './financial-access';
 import {canGenerateActivationCode} from './activation-code-access';
 import {routineRoles} from './routine-production';
 import {projectRoles} from './build-projects';
@@ -13,9 +14,9 @@ export function canOpenSection(u:Session,s:string){
  const p=u.permissions;
  const internal=!p.hospitalCenterId&&!p.salesAgentId&&!p.serviceAgentId;
  if(s==='qms')return internal&&(u.isAdmin||!!p.qmsRoles?.length||!!p.supplyRoles?.some(r=>['engineering','ceo'].includes(r)));
- if(s==='hospital')return !!p.hospitalCenterId||u.isAdmin||p.finance==='write'||!p.serviceAgentId&&!!p.serviceDomains?.includes('hospital');
+ if(s==='hospital')return !!p.hospitalCenterId||u.isAdmin||financialAccess(u,'hospital')||!p.serviceAgentId&&!!p.serviceDomains?.includes('hospital');
  if(s==='reminders')return true;
- if(s==='treasury')return internal&&(u.isAdmin||['read','write'].includes(p.finance||''));
+ if(s==='treasury')return internal&&(u.isAdmin||financialAccess(u,'treasury'));
  // Employees need this entry point to see their own entrusted assets; the API
  // still limits company-wide records and write operations to the custodian.
  if(s==='assets')return internal;
@@ -23,12 +24,13 @@ export function canOpenSection(u:Session,s:string){
  // Personnel is a self-service entry point for every internal employee; HR
  // scope and sensitive fields remain enforced by the personnel domain API.
  if(s==='personnel')return internal;
- if(s==='guarantees')return internal&&(u.isAdmin||['read','write'].includes(p.finance||''));
- if(s==='llm-usage')return true;
+ if(s==='guarantees')return internal&&(u.isAdmin||financialAccess(u,'guarantees'));
+ if(s==='llm-usage')return u.isAdmin;
  if(s==='routine-production')return routineRoles(u).section;
  if(s==='build-projects')return projectRoles(u).read;
  if(s==='costing')return costRead(u);
- if(u.isAdmin||s==='mobile-install'||s==='overview'||s==='tasks'||s==='development')return true;
+ if(s==='overview')return u.isAdmin||!!p.read.length;
+ if(u.isAdmin||s==='mobile-install'||s==='tasks'||s==='development')return true;
  if(s==='sales')return salesRead(u)||salesWarehouse(u);
  if(s==='transport')return !!p.salesAgentId||!!p.salesRoles?.some(r=>['manager','staff'].includes(r))||!!p.supplyRoles?.some(r=>['inventory','domestic','foreign'].includes(r))||!!p.transportRoles?.length||!!p.flowRoles?.some(r=>['inventory','sales','logistics'].includes(r))||!!p.serviceRoles?.length;
  if(s==='after-sales')return !!p.serviceRoles?.length;
@@ -36,6 +38,6 @@ export function canOpenSection(u:Session,s:string){
  if(['users','llm','finance','system-reset'].includes(s))return false;
  if(s==='fulfillment')return salesStaff(u)||!!p.flowRoles?.some(r=>['inventory','production','sales','logistics'].includes(r));
  if(s==='flow')return !!p.flowRoles?.some(r=>['inventory','qc','production','procurement'].includes(r));
- if(s==='finance-control')return ['read','write'].includes(p.finance||'');
+ if(s==='finance-control')return financialAccess(u,'control');
  return can(u,(s==='inventory'?'batch':['serials','analytics'].includes(s)?'device':s) as Kind,'read');
 }

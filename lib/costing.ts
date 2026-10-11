@@ -1,10 +1,11 @@
+import {financialAccess} from './financial-access';
 // Costing is a read model over posted stock movements. All money uses micro-rials.
 export const MICRO=BigInt(1000000);
 export function moneyMicro(v:unknown){if(typeof v!=='string'||!/^\d{1,15}(\.\d{1,6})?$/.test(v))throw Error('مبلغ ریالی معتبر با حداکثر شش رقم اعشار لازم است.');const [a,b='']=v.split('.');return BigInt(a)*MICRO+BigInt(b.padEnd(6,'0'));}
 export const moneyText=(n:bigint)=>{const sign=n<BigInt(0)?'-':'';n=n<BigInt(0)?-n:n;return sign+(n/MICRO).toString()+((n%MICRO)?'.'+(n%MICRO).toString().padStart(6,'0').replace(/0+$/,''):'');};
 export const rounded=(n:bigint)=>((n+MICRO/BigInt(2))/MICRO).toString();
-export const costRead=(u:any)=>!u.permissions.salesAgentId&&!u.permissions.serviceAgentId&&!u.permissions.hospitalCenterId&&(u.isAdmin||['read','write'].includes(u.permissions.finance));
-export const costWrite=(u:any)=>costRead(u)&&(u.isAdmin||u.permissions.finance==='write');
+export const costRead=(u:any)=>financialAccess(u,'costing');
+export const costWrite=(u:any)=>financialAccess(u,'costing',true);
 export const costingHelp=[
  'همه مبالغ ریال و قیمت واحد بر حسب واحد اصلی شناسنامه قطعه است. هزینه‌های مستقیم خرید را در قیمت تمام‌شده واحد لحاظ کنید؛ سند و توضیح الزامی است.',
  'بهای مواد با میانگین موزون متحرکِ موجودی قابل مصرف (مواد اولیه و خط) بر اساس ترتیب ثبت گردش محاسبه می‌شود. تأیید تطبیق این روش با سپیدار برای نهایی‌سازی لازم است؛ این سامانه به سپیدار متصل نشده است.',

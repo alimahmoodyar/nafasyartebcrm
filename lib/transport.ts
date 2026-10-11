@@ -1,3 +1,4 @@
+import {financialAccess} from './financial-access';
 import {salesRep,salesStaff} from './sales';
 import {storage} from './storage';
 import type {Session} from './permissions';
@@ -8,11 +9,11 @@ import {unifyTransportPositions} from './transport-positions';
 import {transportStates,transportRoles,transportBlockerReasons} from './transport-contract';
 export const transportManager=(u:Session)=>u.isAdmin||!!u.permissions.transportRoles?.includes('manager');
 export const transportDriver=(u:Session)=>!!u.permissions.transportRoles?.includes('driver')||!!u.permissions.flowRoles?.includes('logistics');
-export const transportFinance=(u:Session)=>u.isAdmin||!isAgent(u)&&u.permissions.finance==='write';
+export const transportFinance=(u:Session)=>u.isAdmin||!isAgent(u)&&financialAccess(u,'transport',true);
 export const purchaseTransportRequester=(u:Session,s?:any)=>!isAgent(u)&&(!!u.permissions.supplyRoles?.includes('inventory')||!!u.permissions.supplyRoles?.includes(s?.data.route)||!s&&!!u.permissions.supplyRoles?.some(r=>['domestic','foreign'].includes(r)));
 export const purchaseReceiver=(p:any)=>!p.serviceAgentId&&(p.supplyRoles?.includes('inventory')||p.flowRoles?.includes('inventory')&&(!p.warehouses||p.warehouses.includes('quarantine')));
 export function transportUnit(d:any){return d.kind==='sale'?'فروش':d.kind==='purchase_order'?(d.purchaseRoute==='foreign'?'بازرگانی خارجی':'بازرگانی داخلی'):d.domain==='hospital'?'خدمات بیمارستانی':'خدمات خانگی';}
-export const transportEntry=(u:Session)=>u.isAdmin||salesRep(u)||salesStaff(u)||!!u.permissions.transportRoles?.length||!!u.permissions.flowRoles?.some(r=>['inventory','sales','logistics'].includes(r))||!!u.permissions.serviceRoles?.length||u.permissions.finance==='write'||purchaseTransportRequester(u);
+export const transportEntry=(u:Session)=>u.isAdmin||salesRep(u)||salesStaff(u)||!!u.permissions.transportRoles?.length||!!u.permissions.flowRoles?.some(r=>['inventory','sales','logistics'].includes(r))||!!u.permissions.serviceRoles?.length||financialAccess(u,'transport',true)||purchaseTransportRequester(u);
 export async function transportCanSee(u:Session,m:any,mid?:string){
  if(u.isAdmin||transportManager(u))return true;const d=m.data;mid=mid??await memberId(u);
  if(salesRep(u)){const a:any=await storage().prepare("SELECT data FROM flow_entities WHERE type='sales_agent' AND id=?").bind(u.permissions.salesAgentId).first();return !!a&&JSON.parse(a.data).active&&d.kind==='sale'&&d.salesAgentId===u.permissions.salesAgentId;}

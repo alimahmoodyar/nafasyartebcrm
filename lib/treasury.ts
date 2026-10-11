@@ -1,3 +1,4 @@
+import {financialAccess} from './financial-access';
 import {financialWorkflowRole, type FinancialWorkflowRole} from './financial-workflow-roles';
 import {storage} from './storage';
 import {AccessError} from './authorization';
@@ -24,18 +25,26 @@ const norm=(v:string)=>v.replace(/[\s\u200c]/g,'').replace(/ي/g,'ی').replace(/
 const types="'treasury_account','treasury_request','treasury_movement','treasury_statement','treasury_check','treasury_expense','treasury_file','position','purchase_payable','payable_file','purchase_order','receipt','hr_payroll','hr_request','purchase_service'";
 export async function treasuryRows(){return (await storage().prepare('SELECT * FROM flow_entities WHERE type IN ('+types+') ORDER BY id').all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}));}
 export async function treasuryRoles(u:Session,rows:any[]){
- if(trainingContext.getStore()||!costRead(u))tFail('دسترسی مالی داخلی شرکت لازم است.',403);
+ if(trainingContext.getStore()||!financialAccess(u,'treasury'))tFail('دسترسی مالی داخلی شرکت لازم است.',403);
  const members=(await storage().prepare('SELECT id,subject,status,permissions FROM app_members ORDER BY id').all()).results as any[];
  const m=members.find(m=>m.status==='active'&&(m.subject===u.userId||m.id===(u.userId.startsWith('local:')?u.userId.slice(6):u.userId)));
  const p=m?JSON.parse(m.permissions):null;
- if(!u.isAdmin&&(!p||!costRead({isAdmin:false,permissions:p})))tFail('دسترسی فعال مالی لازم است.',403);
- const write=costWrite(u)&&(u.isAdmin||costWrite({isAdmin:false,permissions:p}));
+ if(!u.isAdmin&&(!p||!financialAccess({isAdmin:false,permissions:p},'treasury')))tFail('دسترسی فعال مالی لازم است.',403);
+ const write=financialAccess(u,'purchase',true)&&(u.isAdmin||financialAccess({isAdmin:false,permissions:p},'purchase',true));
  const has=(role:FinancialWorkflowRole)=>u.isAdmin||!!p&&financialWorkflowRole(p,m.id,rows,role)&&financialWorkflowRole(u.permissions,m.id,rows,role);
  return {read:true,write,treasury:has('treasury'),manager:has('manager'),accountant:has('accountant'),ceo:has('ceo'),memberId:m?.id||'',membersSnapshot:JSON.stringify(members)};
 }
 export function treasuryApprovalBasis(d:any){return JSON.stringify([d.direction,d.category,d.amount,d.currency,d.party,d.destination,d.beneficiaryMemberId||'',d.source||null,d.due,d.referenceDocument,d.approvedBy]);}
 export function treasuryPaymentAuthorized(d:any){return d.direction!=='out'||!!d.approvedBy&&!!d.ceoApproval?.actor&&d.ceoApproval.actor!==d.approvedBy&&d.ceoApproval.basis===treasuryApprovalBasis(d);}
 export function treasuryNeedsCeo(d:any){return d.direction==='out'&&['ceo_review','approved','partial'].includes(d.state)&&!treasuryPaymentAuthorized(d);}
+export function scopedTreasuryRows(rows:any[],roles:any,userId:string,admin=false){
+ if(admin||roles.manager||roles.accountant)return rows.filter(r=>r.type.startsWith('treasury_'));
+ const requests=rows.filter(r=>r.type==='treasury_request'&&(r.data.createdBy===userId||roles.treasury&&['approved','partial','paid','cancelled'].includes(r.data.state)||roles.ceo&&r.data.direction==='out'&&['ceo_review','approved','partial'].includes(r.data.state)));
+ const ids=new Set(requests.map(r=>r.id));
+ const selected=rows.filter(r=>ids.has(r.id)||r.type==='treasury_account'&&(roles.treasury||requests.some(q=>q.data.accountId===r.id))||['treasury_check','treasury_expense','treasury_movement'].includes(r.type)&&(ids.has(r.data.requestId)||roles.treasury)||r.type==='treasury_statement'&&roles.treasury&&r.data.actor===userId);
+ const selectedIds=new Set(selected.map(r=>r.id));
+ return [...selected,...rows.filter(r=>r.type==='treasury_file'&&selectedIds.has(r.data.caseId))];
+}
 const rowsOf=(rows:any[],type:string)=>rows.filter(r=>r.type===type);
 export const tPaid=(id:string,rows:any[])=>rowsOf(rows,'treasury_movement').filter(r=>r.data.requestId===id&&r.data.kind!=='advance_return').reduce((n,r)=>n+moneyMicro(r.data.amount),BigInt(0));
 export const tReserved=(id:string,rows:any[])=>rowsOf(rows,'treasury_check').filter(r=>r.data.requestId===id&&r.data.state==='issued').reduce((n,r)=>n+moneyMicro(r.data.amount),BigInt(0));

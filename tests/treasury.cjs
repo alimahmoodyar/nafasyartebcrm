@@ -7,7 +7,7 @@ const auth={AccessError,requireAccess:async()=>user,checkOrigin:r=>{if(r.headers
 const objects=new Map(),bucket={async put(k,v){objects.set(k,new Uint8Array(v))},async get(k){const v=objects.get(k);return v?{arrayBuffer:async()=>v.buffer.slice(v.byteOffset,v.byteOffset+v.byteLength)}:null},async delete(k){objects.delete(k)}};
 const cache={};function load(file){file=path.resolve(root,file);if(cache[file])return cache[file];const exports={};cache[file]=exports;vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports,require:n=>{const p=n.startsWith('@/')?path.resolve(root,n.slice(2)+'.ts'):n.startsWith('.')?path.resolve(path.dirname(file),n+'.ts'):'';if(p.replaceAll('\\','/').endsWith('/lib/storage.ts'))return {storage:()=>db};if(p.replaceAll('\\','/').endsWith('/lib/authorization.ts'))return auth;if(p.replaceAll('\\','/').endsWith('/lib/training-context.ts'))return {trainingContext:{getStore:()=>training?{}:undefined}};if(p.replaceAll('\\','/').endsWith('/lib/firmware-storage.ts'))return {firmwareBucket:()=>bucket,boundedBody:async(r,max)=>{const v=new Uint8Array(await r.arrayBuffer());if(v.length>max)throw new AccessError('large',413);return v}};if(p.replaceAll('\\','/').endsWith('/lib/firmware.ts'))return {sha256:async v=>require('node:crypto').createHash('sha256').update(new Uint8Array(v)).digest('hex')};if(p)return load(p);return require(n)},Response,Request,URL,Date,Intl,Set,Map,Error,TextDecoder,TextEncoder,Uint8Array,crypto:globalThis.crypto,structuredClone,console},{filename:file});return exports;}
 const api=load('app/api/treasury/route.ts'),files=load('app/api/treasury/files/route.ts'),domain=load('lib/treasury.ts');
-const person=(id,finance='write')=>({userId:id,name:id,isAdmin:false,permissions:{finance}}),clerk=person('clerk'),manager=person('manager'),treasurer=person('treasurer'),accountant=person('accountant'),ceo=person('ceo'),reader=person('reader','read');
+const person=(id,finance='write')=>({userId:id,name:id,isAdmin:false,permissions:{finance,treasuryWorkflowRoles:({manager:['manager'],treasurer:['treasury'],accountant:['accountant'],ceo:['ceo'],reader:['accountant']})[id]||[],supplyRoles:id==='clerk'?['finance']:[]}}),clerk=person('clerk'),manager=person('manager'),treasurer=person('treasurer'),accountant=person('accountant'),ceo=person('ceo'),reader=person('reader','read');
 const entity=(id,type,data)=>sql.prepare('INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?)').run(id,type,JSON.stringify(data),'2026-10-01','2026-10-01');
 const by=id=>{const r=sql.prepare('SELECT * FROM flow_entities WHERE id=?').get(id);return r?{...r,data:JSON.parse(r.data)}:null};
 const body=(mode,id,extra={})=>({id:crypto.randomUUID(),mode,entityId:id||undefined,revision:id?by(id).revision:0,confirmed:true,notes:'Reviewed actual source',...extra});
@@ -32,7 +32,9 @@ const statement={accountId:aid,from:'2026-10-01',to:'2026-10-01',opening:'1000',
 await action('statement',null,{...statement,closing:'901'},400);const sid=(await action('statement',null,statement)).id;await action('statement',null,statement,409);view=await get();assert.equal(view.bankRows[0].candidates.length,1);await action('match',sid,{rowId:sid+':0',movementId:mid},403);
 user=accountant;await action('match',sid,{rowId:sid+':0',movementId:view.movements.find(m=>m.data.reference==='PAY2').id},400);await action('match',sid,{rowId:sid+':0',movementId:mid});await action('match',sid,{rowId:sid+':1',movementId:mid},400);await action('unmatch',sid,{rowId:sid+':0'});assert.equal((await get()).bankRows[0].candidates.length,1);
 // Same person with every role still cannot self approve or self reconcile.
+const previousTreasurerPermissions=treasurer.permissions;treasurer.permissions={...previousTreasurerPermissions,supplyRoles:['finance'],treasuryWorkflowRoles:['treasury','manager','accountant']};sql.prepare('UPDATE app_members SET permissions=? WHERE id=?').run(JSON.stringify(treasurer.permissions),'treasurer');
 sql.prepare("UPDATE flow_entities SET data=json_set(data,'$.members',json('[\"manager\",\"treasurer\"]')) WHERE id IN ('fm','tm','ac')").run();user=treasurer;const own=(await action('request',null,request({title:'self review'}))).id;await action('approve',own,{},403);await action('match',sid,{rowId:sid+':0',movementId:mid},403);
+treasurer.permissions=previousTreasurerPermissions;sql.prepare('UPDATE app_members SET permissions=? WHERE id=?').run(JSON.stringify(treasurer.permissions),'treasurer');
 // Outgoing checks reserve the request, do not change bank until settlement.
 user=clerk;const crid=(await action('request',null,request({amount:'200'}))).id;user=manager;await action('approve',crid);await authorize(crid);user=treasurer;const cid=(await action('check',null,{number:'CK1',bank:'Bank',accountId:aid,direction:'out',amount:'150',requestId:crid,due:'2026-10-01',location:'safe'})).id,cf=await proof(cid);user=manager;await action('check_issue',cid,{fileId:cf});user=treasurer;const rf=await proof(crid);await action('execute',crid,{accountId:aid,amount:'51',day:'2026-10-01',reference:'TOO-MUCH',fileId:rf},400);assert.equal((await get()).accounts[0].ledger,'900');await action('check_settle',cid,{fileId:cf,reference:'CKPAY',day:'2026-10-01'});assert.equal(by(cid).data.state,'settled');assert.equal(by(crid).data.state,'partial');assert.equal((await get()).accounts[0].ledger,'750');
 // Petty cash approvals, duplicate receipt, expense and return ceilings.
@@ -54,13 +56,13 @@ user=clerk;const gated=(await action('request',null,request())).id;user=manager;
 assert.equal(by(gated).data.state,'ceo_review');assert.equal((await get()).requests.find(r=>r.id===gated).authorizationPending,true);
 assert.ok(sql.prepare("SELECT id FROM duty_runs WHERE id=? AND state='open'").get('treasury:'+gated+':ceo:ceo'));
 assert.equal(sql.prepare("SELECT COUNT(*) n FROM duty_runs WHERE id LIKE ? AND state='open'").get('treasury:'+gated+':execute:%').n,0);
-await action('ceo_approve',gated,{},403);user=treasurer;const gf=await proof(gated);
+await action('ceo_approve',gated,{},403);user=clerk;const gf=await proof(gated);user=treasurer;
 await action('execute',gated,{accountId:aid,amount:'1',day:'2026-10-01',reference:'NO-CEO',fileId:gf},409);
 await action('check',null,{number:'NO-CEO-CK',bank:'Bank',accountId:aid,direction:'out',amount:'10',requestId:gated,due:'2026-10-01',location:'safe'},403);
 // Even an administrator may not combine finance and CEO approval.
 user={...manager,isAdmin:true};await action('ceo_approve',gated,{},403);
-user=ceo;sql.prepare("UPDATE flow_entities SET data=json_set(data,'$.active',0),revision=revision+1 WHERE id='ceo-position'").run();await action('ceo_approve',gated,{},403);
-sql.prepare("UPDATE flow_entities SET data=json_set(data,'$.active',1),revision=revision+1 WHERE id='ceo-position'").run();
+user=ceo;sql.prepare("UPDATE app_members SET permissions='{}' WHERE id='ceo'").run();await action('ceo_approve',gated,{},403);
+sql.prepare('UPDATE app_members SET permissions=? WHERE id=?').run(JSON.stringify(ceo.permissions),'ceo');
 const permit=body('ceo_approve',gated);await post(permit);await post(permit);assert.equal(by(gated).data.ceoApproval.actor,'ceo');
 assert.equal(sql.prepare("SELECT COUNT(*) n FROM access_audit WHERE target=? AND action='treasury_ceo_approve'").get(gated).n,1);
 user={...ceo,isAdmin:true};await action('execute',gated,{accountId:aid,amount:'1',day:'2026-10-01',reference:'SELF-CEO',fileId:gf},403);
@@ -90,7 +92,7 @@ beforeBatch=()=>sql.prepare("UPDATE app_members SET permissions='{}' WHERE id='c
 assert.equal(by(race).data.state,'ceo_review');assert.equal(by(race).data.ceoApproval,undefined);
 assert.equal(sql.prepare("SELECT COUNT(*) n FROM access_audit WHERE target=? AND action='treasury_ceo_approve'").get(race).n,0);
 sql.prepare('UPDATE app_members SET permissions=? WHERE id=?').run(JSON.stringify(ceo.permissions),'ceo');
-sql.exec("UPDATE reset_control SET phase='maintenance'");await action('ceo_approve',race,{},409);assert.equal(by(race).data.ceoApproval,undefined);sql.exec("UPDATE reset_control SET phase='testing'");await action('ceo_approve',race);
+user=ceo;sql.exec("UPDATE reset_control SET phase='maintenance'");await action('ceo_approve',race,{},409);assert.equal(by(race).data.ceoApproval,undefined);sql.exec("UPDATE reset_control SET phase='testing'");await action('ceo_approve',race);
 // Live guide uses the same authenticated source and cannot approve or mutate anything.
 const guideApi=load('app/api/tasks/guide/route.ts');user=treasurer;const guideId='treasury:'+gated+':execute:treasurer';
 const auditBefore=sql.prepare('SELECT COUNT(*) n FROM access_audit').get().n,opsBefore=sql.prepare('SELECT COUNT(*) n FROM inventory_operations').get().n;
@@ -103,11 +105,11 @@ assert.equal((await guideApi.GET(new Request('https://test.local/api/tasks/guide
 user=manager;
 // Both resets remove all treasury operational data, preserve roles, roll back safely.
 const reset=load('lib/reset-contract.ts');for(const scope of ['operations','full']){sql.exec('BEGIN');for(const t of Object.keys(reset.resetTables))sql.exec('DELETE FROM '+t+' WHERE '+reset.resetWhere(t,scope));assert.equal(sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type LIKE 'treasury_%'").get().n,0);assert.equal(sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type='position'").get().n,4);sql.exec('ROLLBACK');}assert.ok(by(aid));
-sql.exec("UPDATE reset_control SET phase='maintenance'");await action('request',null,request(),409);sql.exec("UPDATE reset_control SET phase='testing'");
+user=clerk;sql.exec("UPDATE reset_control SET phase='maintenance'");await action('request',null,request(),409);sql.exec("UPDATE reset_control SET phase='testing'");
 assert.ok(sql.prepare("SELECT COUNT(*) n FROM access_audit WHERE action LIKE 'treasury_%'").get().n>10);
 assert.equal(sql.prepare('SELECT state FROM duty_runs WHERE id LIKE ?').get('treasury:'+rid+':execute:%').state,'completed');
 assert.ok(sql.prepare('SELECT COUNT(*) n FROM duty_notices WHERE task_id LIKE ?').get('treasury:'+rid+':%').n>0);
-const policy={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(root,'lib/assistant-policy.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:policy,Set,require:()=>({costRead:load('lib/costing.ts').costRead})});
+const policy=load('lib/assistant-policy.ts');
 assert.ok(policy.assistantReadNames.has('get_treasury')&&policy.assistantReadNames.has('get_treasury_guide'));
 assert.ok(policy.assistantWriteNames.has('treasury_apply'));assert.equal(policy.actionSection('treasury_apply',{}),'treasury');assert.equal(policy.actionSection('get_treasury',{}),'treasury');assert.equal(policy.canOpenSection(reader,'treasury'),true);assert.equal(policy.canOpenSection({permissions:{finance:'write',salesAgentId:'rep'}},'treasury'),false);
 // Explicit new workflow grants work without a second position assignment.
@@ -126,7 +128,7 @@ for(const [job,role] of [['treasurer','treasury'],['finance_director','manager']
   assert.equal(sql.prepare('SELECT assignee FROM duty_runs WHERE id=?').get('treasury:assigned-role-review:review:'+id).assignee,id);
  }
  sql.prepare('UPDATE app_members SET permissions=? WHERE id=?').run(JSON.stringify({finance:'read'}),id);
- assert.equal((await domain.treasuryRoles(session,await domain.treasuryRows()))[role],false,'DB revocation beats stale session');
+ await assert.rejects(()=>domain.treasuryRoles(session,[]),e=>e.status===403,'DB revocation beats stale session');
  if(role==='manager'){await load('lib/treasury-tasks.ts').syncTreasuryTasks();assert.equal(sql.prepare('SELECT state FROM duty_runs WHERE id=?').get('treasury:assigned-role-review:review:'+id).state,'cancelled');}
 }
 assert.equal(policyRoles.validatePermissions({roleAssignment:{roles:['ceo']}}).treasuryWorkflowRoles.length,0,'existing CEO assignment is not expanded');

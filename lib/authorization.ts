@@ -1,3 +1,4 @@
+import {financialAccess} from './financial-access';
 import {localSession} from "@/lib/password-auth";
 import {mcpActor} from "@/lib/mcp/context";
 import {env} from "cloudflare:workers";
@@ -67,4 +68,4 @@ export function accessResponse(error: unknown): Response | null {
   return error instanceof AccessError ? Response.json({error: error.message}, {status: error.status, headers: {"Cache-Control": "no-store"}}) : null;
 }
 
-export async function requireFinance(write=false){const user=await session();if(!user.isAdmin&&!(write?user.permissions.finance==='write':['read','write'].includes(user.permissions.finance||'')))throw new AccessError('دسترسی کنترل مالی برای شما فعال نیست.',403);return user;}
+export async function requireFinance(write=false){const user=await session();if(!user.isAdmin&&!financialAccess(user,'control',write))throw new AccessError('دسترسی کنترل مالی برای شما فعال نیست.',403);return user;}

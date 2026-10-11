@@ -1,8 +1,9 @@
+import {financialAccess} from './financial-access';
 import {session,AccessError} from './authorization';
 import {storage} from './storage';
 import type {Session} from './permissions';
 export const hospitalManager=(u:Session)=>!u.permissions.hospitalCenterId&&(u.isAdmin||!u.permissions.serviceAgentId&&u.permissions.serviceDomains?.includes('hospital')&&u.permissions.serviceRoles?.some(r=>['manager','coordinator'].includes(r)));
-export const hospitalFinance=(u:Session)=>!u.permissions.hospitalCenterId&&(u.isAdmin||u.permissions.finance==='write'||!u.permissions.serviceAgentId&&u.permissions.serviceDomains?.includes('hospital')&&u.permissions.serviceRoles?.includes('finance'));
+export const hospitalFinance=(u:Session)=>!u.permissions.hospitalCenterId&&(u.isAdmin||financialAccess(u,'hospital',true)||!u.permissions.serviceAgentId&&u.permissions.serviceDomains?.includes('hospital')&&u.permissions.serviceRoles?.includes('finance'));
 export const hospitalTech=(u:Session)=>hospitalManager(u)||!u.permissions.hospitalCenterId&&!u.permissions.serviceAgentId&&u.permissions.serviceDomains?.includes('hospital')&&u.permissions.serviceRoles?.includes('technician');
 export const hospitalInventory=(u:Session)=>!u.permissions.hospitalCenterId&&!u.permissions.serviceAgentId&&(u.isAdmin||u.permissions.serviceDomains?.includes('hospital')&&u.permissions.serviceRoles?.includes('inventory'));
 export const hospitalLogistics=(u:Session)=>!u.permissions.hospitalCenterId&&!u.permissions.serviceAgentId&&(u.isAdmin||u.permissions.serviceDomains?.includes('hospital')&&u.permissions.serviceRoles?.includes('logistics'));

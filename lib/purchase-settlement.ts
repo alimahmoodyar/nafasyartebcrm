@@ -1,3 +1,4 @@
+import {financialAccess} from './financial-access';
 import {serviceCosts} from './purchase-fulfillment';
 import {storage} from './storage';
 import {requireAccess,AccessError} from './authorization';
@@ -6,10 +7,10 @@ import {costRead,costWrite,moneyMicro,moneyText,MICRO} from './costing';
 export const settleFail=(m:string,s=400):never=>{throw new AccessError(m,s)};
 export const settleText=(v:any,max=500)=>{if(typeof v!=='string'||!v.trim()||v.length>max)settleFail('متن الزامی یا نامعتبر است.');return v.trim();};
 export const settleAmount=(v:any):bigint=>{try{return moneyMicro(v);}catch{return settleFail('مبلغ نامنفی معتبر لازم است.');}};
-export const settleFinance=(u:any)=>costWrite(u);
-export const settleRead=(u:any)=>!u.permissions.salesAgentId&&!u.permissions.serviceAgentId&&!u.permissions.hospitalCenterId&&(costRead(u)||hasSupply(u,'finance')||hasSupply(u,'ceo')||hasSupply(u,'domestic')||hasSupply(u,'foreign'));
+export const settleFinance=(u:any)=>financialAccess(u,'purchase',true);
+export const settleRead=(u:any)=>!u.permissions.salesAgentId&&!u.permissions.serviceAgentId&&!u.permissions.hospitalCenterId&&(financialAccess(u,'purchase')||hasSupply(u,'finance')||hasSupply(u,'ceo')||hasSupply(u,'domestic')||hasSupply(u,'foreign'));
 export const settleBuyer=(u:any,route:string)=>settleRead(u)&&['domestic','foreign'].includes(route)&&hasSupply(u,route);
-export const settleVisible=(u:any,s:any)=>settleRead(u)&&(costRead(u)||hasSupply(u,'finance')||hasSupply(u,'ceo')||settleBuyer(u,s.data.route));
+export const settleVisible=(u:any,s:any)=>settleRead(u)&&(financialAccess(u,'purchase')||hasSupply(u,'finance')||hasSupply(u,'ceo')||settleBuyer(u,s.data.route));
 export async function settlementUser(){const u=await requireAccess();if(!settleRead(u))settleFail('دسترسی بازرگانی یا مالی لازم است.',403);return u;}
 export async function settlementRows(){return (await storage().prepare("SELECT * FROM flow_entities WHERE type IN ('purchase_settlement','settlement_file','purchase_order','receipt','cost_price','purchase_service','purchase_payable') ORDER BY id").all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}));}
 export function settlementBy(rows:any[],id:string,u:any){const s=rows.find(r=>r.type==='purchase_settlement'&&r.id===id);if(!s||!settleVisible(u,s))settleFail('پرونده تسویه در دسترس نیست.',404);return s;}

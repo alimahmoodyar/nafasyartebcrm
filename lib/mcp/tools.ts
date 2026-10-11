@@ -1,3 +1,4 @@
+import {financialAccess} from '../financial-access';
 import * as ownCredentialsApi from '@/app/api/auth/credentials/route';
 import * as purchaseServicesApi from '@/app/api/purchase-services/route';
 import * as purchaseServiceFiles from '@/app/api/purchase-services/files/route';
@@ -266,7 +267,7 @@ export async function executeTool(name:string,args:unknown,origin:string,p:McpPr
  if(t.write&&p.scope==='read')throw new AccessError('This reference token is read-only.',403);
  if(t.admin&&!p.user.isAdmin)throw new AccessError('Administrator access required.',403);
  if(t.kind&&!can(p.user,t.kind,t.write?'write':'read'))throw new AccessError('Module permission denied.',403);
- if(t.finance&&!p.user.isAdmin&&!(t.write?p.user.permissions.finance==='write':['read','write'].includes(p.user.permissions.finance||'')))throw new AccessError('Finance permission denied.',403);
+ if(t.finance&&!p.user.isAdmin&&!financialAccess(p.user,'control',t.write))throw new AccessError('Finance permission denied.',403);
  let outcome='failed';try{const data=await mcpActor.run(p.user,()=>t.run(args,origin,p));outcome='succeeded';return data;}finally{
  // Domain mutations already write their atomic audit rows. Never log arguments or secrets here.
  try{await storage().prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),p.user.userId,name,'mcp_call',JSON.stringify({outcome,tokenId:p.tokenId}),new Date().toISOString()).run();}catch{console.error('MCP audit write failed');}

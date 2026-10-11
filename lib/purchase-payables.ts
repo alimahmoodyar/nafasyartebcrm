@@ -1,9 +1,10 @@
+import {financialAccess} from './financial-access';
 import {invoiceDocumentMissing} from './purchase-invoice';
 import {moneyMicro,moneyText,costRead,costWrite} from './costing';
-export const apRead=(u:any)=>!u.permissions.salesAgentId&&!u.permissions.serviceAgentId&&!u.permissions.hospitalCenterId&&(costRead(u)||u.permissions.supplyRoles?.some((r:string)=>['domestic','foreign','finance','ceo'].includes(r)));
-export const apFinance=(u:any)=>apRead(u)&&costWrite(u);
+export const apRead=(u:any)=>!u.permissions.salesAgentId&&!u.permissions.serviceAgentId&&!u.permissions.hospitalCenterId&&(financialAccess(u,'purchase')||u.permissions.supplyRoles?.some((r:string)=>['domestic','foreign','finance','ceo'].includes(r)));
+export const apFinance=(u:any)=>apRead(u)&&financialAccess(u,'purchase',true);
 export const apBuyer=(u:any,route:string)=>apRead(u)&&(u.isAdmin||u.permissions.supplyRoles?.includes(route));
-export const apVisible=(u:any,c:any)=>apRead(u)&&(costRead(u)||u.permissions.supplyRoles?.some((r:string)=>['finance','ceo'].includes(r))||apBuyer(u,c.data.route));
+export const apVisible=(u:any,c:any)=>apRead(u)&&(financialAccess(u,'purchase')||u.permissions.supplyRoles?.some((r:string)=>['finance','ceo'].includes(r))||apBuyer(u,c.data.route));
 export const apHelp=[
  'شروع از پرداخت یا فاکتور: پرونده مشترک با هویت تأمین‌کننده و مسیر خرید بسازید. پرداخت واقعی با مرجع بانکی ثبت می‌شود؛ تخصیص آن به فاکتور، اقدام مستقل مالی است. گزارش پرداخت قدیمی سفارش خودکار پرداخت جدید محسوب نمی‌شود.',
  'مبالغ دفتر بدهی و پرداخت ریال است. برای خرید ارزی مبلغ ارز، نرخ و مرجع تبدیل در مدرک ثبت شود؛ مبلغ ریالی نهایی را مالی تأیید می‌کند. این دفتر جای ثبت تفاوت تسعیر در حسابداری نیست.',

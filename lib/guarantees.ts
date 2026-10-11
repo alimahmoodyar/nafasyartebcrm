@@ -1,3 +1,4 @@
+import {financialAccess} from './financial-access';
 import {financialWorkflowRole} from './financial-workflow-roles';
 import {storage} from './storage';
 import {AccessError} from './authorization';
@@ -18,7 +19,7 @@ export async function guaranteeRoles(u:Session,rows?:any[]){
  const all=rows||await guaranteeRows(),mid:any=await storage().prepare("SELECT id,permissions FROM app_members WHERE status='active' AND (subject=? OR id=?)").bind(u.userId,u.userId.startsWith('local:')?u.userId.slice(6):u.userId).first();
  const normalized=(v:string)=>v.replace(/[\s\u200c]/g,'').replace(/ي/g,'ی').replace(/ك/g,'ک');
  const positions=all.filter(r=>r.type==='position'&&r.data.active),treasury=positions.filter(r=>normalized(r.data.name)==='خزانه دار'.replace(/ /g,'')),manager=positions.filter(r=>normalized(r.data.name)==='مدیرمالی');
- const principal=mid?{...u,permissions:JSON.parse(mid.permissions)}:u;if(principal.permissions.salesAgentId||principal.permissions.serviceAgentId||principal.permissions.hospitalCenterId)gFail('این بخش برای کاربران داخلی است.',403);const canRead=u.isAdmin||!!mid&&costRead(principal),canWrite=u.isAdmin||!!mid&&costWrite(principal);
+ const principal=mid?{...u,permissions:JSON.parse(mid.permissions)}:u;if(principal.permissions.salesAgentId||principal.permissions.serviceAgentId||principal.permissions.hospitalCenterId)gFail('این بخش برای کاربران داخلی است.',403);const canRead=u.isAdmin||!!mid&&financialAccess(principal,'guarantees'),canWrite=u.isAdmin||!!mid&&costWrite(principal);
  const has=(list:any[])=>list.some(r=>r.data.members?.includes(mid?.id));
  return {memberId:mid?.id||'',read:canRead,treasury:u.isAdmin||!!mid&&financialWorkflowRole(principal.permissions,mid.id,all,'treasury'),manager:u.isAdmin||!!mid&&financialWorkflowRole(principal.permissions,mid.id,all,'manager'),positions,treasuryPositions:treasury,managers:manager};
 }
