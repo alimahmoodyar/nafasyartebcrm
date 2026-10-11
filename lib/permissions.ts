@@ -113,6 +113,7 @@ export const jobRoles:JobRole[]=[
  job('service_agent','نماینده خدمات','حساب‌های بیرونی','فقط پرونده، موجودی و حساب نمایندگی خدمات انتخاب‌شده',{serviceRoles:['agent']},'serviceAgent'),
 ];
 jobRoles.push(
+ job('product_manager','مسئول تعریف محصول و BOM پایه','انبار و تولید','تعریف و ویرایش شناسنامه محصول، BOM پایه و فرم آزمون محصول؛ بدون عملیات انبار یا تأیید طراحی',{read:['product'],write:['product']}),
  job('treasurer','خزانه‌دار','مالی','اجرای پرداخت دارای مجوز مدیرعامل، چک، تنخواه و پیگیری ضمانت‌نامه',{finance:'read',treasuryWorkflowRoles:['treasury']}),
  job('finance_director','مدیر مالی','مالی','بررسی مستقل درخواست، حساب و ضمانت‌نامه؛ بدون اجرای پرداخت',{finance:'read',treasuryWorkflowRoles:['manager']}),
  job('accounting_head','رئیس حسابداری','مالی','تطبیق مستقل صورتحساب و کنترل حسابداری',{finance:'read',treasuryWorkflowRoles:['accountant']}),
