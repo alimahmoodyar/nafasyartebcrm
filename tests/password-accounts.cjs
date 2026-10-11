@@ -54,7 +54,7 @@ async function enter(pass='Test-password-123'){return login.POST(request('/api/a
  const body={username:'Worker01',password:'Test-password-123',name:'Worker',unit:'انبار',status:'active',permissions};
  let r=await userApi.POST(request('/api/users','POST',body));assert.equal(r.status,201);let m=(await r.json()).member;assert.equal(m.username,'worker01');assert.equal(m.email,'');assert.ok(!JSON.stringify(m).includes(body.password));
  assert.ok(!JSON.stringify(sql.prepare('SELECT * FROM access_audit').all()).includes(body.password));assert.ok(sql.prepare('SELECT password_hash FROM password_accounts').get().password_hash.startsWith('pbkdf2-sha256'));
- assert.equal((await userApi.POST(request('/api/users','POST',body))).status,409);
+ const duplicateUser=await userApi.POST(request('/api/users','POST',body));assert.equal(duplicateUser.status,409);assert.equal((await duplicateUser.json()).error,'این نام کاربری قبلاً تعریف شده است.');
  r=await userApi.PATCH(request('/api/users','PATCH',{...m,unit:'بازرگانی'}));assert.equal(r.status,400);
  for(const unit of ['بازرگانی — داخلی','بازرگانی — خارجی']) {
   r=await userApi.PATCH(request('/api/users','PATCH',{...m,unit}));assert.equal(r.status,200);m=(await r.json()).member;

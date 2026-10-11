@@ -9,7 +9,7 @@ async function scope(domain:string) {
   if(!actor.isAdmin&&(!actor.permissions.serviceRoles?.includes('manager')||actor.permissions.serviceAgentId||!actor.permissions.serviceDomains?.includes(domain)))throw new AccessError('فقط مدیر خدمات همین حوزه می‌تواند حساب نماینده بسازد.',403);
   return actor;
 }
-function failure(e:unknown){return accessResponse(e)||Response.json({error:/UNIQUE/.test(String(e))?'این نام کاربری یا شناسه درخواست قبلاً استفاده شده است.':'ثبت حساب انجام نشد؛ ورودی‌ها را بررسی و دوباره تلاش کنید.'},{status:/UNIQUE/.test(String(e))?409:400});}
+function failure(e:unknown){return accessResponse(e)||Response.json({error:/UNIQUE/.test(String(e))?'این نام کاربری قبلاً استفاده شده است.':'ثبت حساب انجام نشد؛ ورودی‌ها را بررسی و دوباره تلاش کنید.'},{status:/UNIQUE/.test(String(e))?409:400});}
 export async function GET(request:Request){try{
   const domain=new URL(request.url).searchParams.get('domain')||'';await scope(domain);
   const rows=await storage().prepare("SELECT m.id,m.name,m.status,a.username,a.must_change AS mustChangePassword,EXISTS(SELECT 1 FROM access_audit x WHERE x.target=m.id AND x.action='automatic_representative_account') AS automaticAccount,json_extract(m.permissions,'$.serviceAgentId') AS agentId FROM app_members m JOIN password_accounts a ON a.member_id=m.id JOIN flow_entities f ON f.id=json_extract(m.permissions,'$.serviceAgentId') AND f.type='as_agent' WHERE m.status!='deleted' AND json_extract(f.data,'$.domain')=? AND json_extract(m.permissions,'$.serviceRoles')='[\"agent\"]' AND json_extract(m.permissions,'$.serviceDomains')=? ORDER BY m.created DESC").bind(domain,JSON.stringify([domain])).all();

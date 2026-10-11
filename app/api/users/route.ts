@@ -17,11 +17,14 @@ function payload(value: any) {
   return {email, name, unit, status: value.status, permissions: JSON.stringify(validatePermissions(value.permissions))};
 }
 async function checkServiceAgent(permissions:string){const p=JSON.parse(permissions);if(p.salesAgentId){const row:any=await storage().prepare("SELECT data FROM flow_entities WHERE id=? AND type='sales_agent'").bind(p.salesAgentId).first();if(!row||!JSON.parse(row.data).active)throw new Error('نماینده فروش فعال انتخاب کنید.');}if(p.serviceAgentId){const row:any=await storage().prepare("SELECT data FROM flow_entities WHERE id=? AND type='as_agent'").bind(p.serviceAgentId).first();if(!row||!JSON.parse(row.data).active||p.serviceDomains.length!==1||p.serviceDomains[0]!==JSON.parse(row.data).domain)throw new Error('نماینده فعال و حوزه منطبق را انتخاب کنید.');}}
-function failure(error: unknown) {
+function failure(error: unknown, identity: 'username' | 'email' | 'both' = 'both') {
   console.error(error);
   const denied = accessResponse(error); if (denied) return denied;
   const message = error instanceof Error ? error.message : "";
-  if (/UNIQUE/.test(message)) return Response.json({error: "این ایمیل یا نام کاربری قبلاً تعریف شده است."}, {status: 409});
+  if (/UNIQUE/.test(message)) {
+    const errorText = identity === 'username' ? 'این نام کاربری قبلاً تعریف شده است.' : identity === 'email' ? 'این ایمیل قبلاً تعریف شده است.' : 'این ایمیل یا نام کاربری قبلاً تعریف شده است.';
+    return Response.json({error: errorText}, {status: 409});
+  }
   return Response.json({error: /D1|SQLITE|Database/.test(message) ? "ذخیره حساب انجام نشد؛ دوباره تلاش کنید." : message || "درخواست معتبر نیست."}, {status: /D1|SQLITE|Database/.test(message) ? 503 : 400});
 }
 function checkAccount(request:Request,actor:{userId:string}) {
@@ -42,8 +45,9 @@ export async function GET() {
   } catch(error) {return failure(error);}
 }
 export async function POST(request: Request) {
+  let localAccount = false;
   try {
-    checkOrigin(request); const actor = await requireAdmin(); checkAccount(request,actor); const body=await request.json() as any;const local=!!body.username;const login=local?username(body.username):null;const passwordHash=local?await hashPassword(password(body.password)):null;const data = payload({...body,email:local?crypto.randomUUID()+"@local.invalid":body.email});
+    checkOrigin(request); const actor = await requireAdmin(); checkAccount(request,actor); const body=await request.json() as any;localAccount=!!body.username;const login=localAccount?username(body.username):null;const passwordHash=localAccount?await hashPassword(password(body.password)):null;const data = payload({...body,email:localAccount?crypto.randomUUID()+"@local.invalid":body.email});
     await checkServiceAgent(data.permissions);
     const id = crypto.randomUUID(), now = new Date().toISOString();
     const row = {id, ...data, subject: null, username:login||undefined, revision: 1, created: now, updated: now};
@@ -54,9 +58,10 @@ export async function POST(request: Request) {
       db.prepare("INSERT INTO access_audit (id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)").bind(crypto.randomUUID(), actor.userId, id, "create_member", JSON.stringify(row), now),
     ]);
     return Response.json({member: present(row)}, {status: 201});
-  } catch (error) {return failure(error);}
+  } catch (error) {return failure(error, localAccount ? 'username' : 'email');}
 }
 export async function PATCH(request: Request) {
+  let localAccount = false;
   try {
     checkOrigin(request); const actor=await requireAdmin(); checkAccount(request,actor);
     const body=await request.json() as any;
@@ -65,7 +70,7 @@ export async function PATCH(request: Request) {
     if(!old||old.status==='deleted')return Response.json({error:'حساب یافت نشد یا حذف شده است.'},{status:404});
     const protectedUser=await protectedAccount(old,actor);
     if(protectedUser&&body.status!=='active')throw new AccessError('حساب مدیر اصلی یا حساب جاری را نمی‌توان غیرفعال کرد.',403);
-    const credential:any=await db.prepare('SELECT username FROM password_accounts WHERE member_id=?').bind(old.id).first();
+    const credential:any=await db.prepare('SELECT username FROM password_accounts WHERE member_id=?').bind(old.id).first(); localAccount=!!credential;
     const login=credential?username(body.username===undefined?credential.username:body.username):null;
     const data=payload({...body,email:credential?old.email:body.email});
     const newHash=credential&&body.password?await hashPassword(password(body.password)):null;
@@ -89,7 +94,7 @@ export async function PATCH(request: Request) {
     ]);
     if(!results[0].meta.changes)return conflict();
     return Response.json({member:present({...next,protected:protectedUser}),reauthenticate:revoke&&actor.userId==='local:'+old.id});
-  }catch(error){return failure(error);}
+  }catch(error){return failure(error, localAccount ? 'username' : 'email');}
 }
 export async function DELETE(request:Request) {
   try {
