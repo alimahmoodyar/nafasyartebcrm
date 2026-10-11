@@ -36,7 +36,7 @@ const quantity=nodes=>nodes.find(n=>n.type==='input'&&n.props.fieldKey==='quanti
  // Invalid negotiated input stays editable after its preview is rejected.
  defer=false;button(nodes,'واردکردن شرایط پیشنهادی').props.onClick();nodes=render();await settle();nodes=render();
  const monthInput=nodes.find(n=>n.type==='input'&&n.props.fieldKey==='months');assert.equal(monthInput.props.min,0,'Legacy template minimum must not block an earlier payment term');assert.equal(monthInput.props.max,3);
- let cash=nodes.find(n=>n.type==='input'&&n.props.fieldKey==='cashBps');cash.props.onChange({target:{value:'20'}});render();await settle();nodes=render();
+ let cash=nodes.find(n=>n.type==='input'&&n.props.fieldKey==='cashBps');assert.equal(cash.props.max,100,'Legacy cash maximum must not block a larger cash share');assert.equal(cash.props.min,30);cash.props.onChange({target:{value:'20'}});render();await settle();nodes=render();
  cash=nodes.find(n=>n.type==='input'&&n.props.fieldKey==='cashBps');assert.ok(cash,'Invalid override remains visible for correction');assert.equal(cash.props.value,20);assert.equal(button(nodes,'بررسی و آماده‌سازی سفارش').props.disabled,true);
  cash.props.onChange({target:{value:'50'}});render();await settle();nodes=render();assert.equal(button(nodes,'بررسی و آماده‌سازی سفارش').props.disabled,false);
  form={...form,actionId:'pending',args:{...form.args,quoteHash:'stale-quote'}};render();assert.equal(reviewReady,false,'Stale pending quote cannot be confirmed');

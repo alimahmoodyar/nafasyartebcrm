@@ -31,12 +31,12 @@ export async function applyNetwork(actor:Session,b:any){const {u,members}=await 
    const overlap=overlappingSalesPromotion(rows,b.kind,effectiveFrom,effectiveTo!);if(overlap)fail('بازه پروموشن با پروموشن قبلی این نوع خریدار همپوشانی دارد؛ روز شروع و پایان هر دو جزو بازه هستند.');
    period={durationDays,effectiveTo:effectiveTo!};
   }
-  // Early settlement has no lower time bound; retain a zero legacy field for older clients.
-  const cashBps=integer(b.cashBps,0,10000),minCashBps=integer(b.minCashBps??0,0,10000),maxCashBps=integer(b.maxCashBps??10000,0,10000),months=integer(b.months,0,12),maxMonths=integer(b.maxMonths??12,0,12);
-  if(minCashBps>cashBps||cashBps>maxCashBps||minCashBps>maxCashBps||months>maxMonths)fail('مقدار پیش‌فرض باید داخل دامنه مجاز باشد.');
+  // Earlier settlement and higher cash share are allowed; canonical legacy limits preserve client compatibility.
+  const cashBps=integer(b.cashBps,0,10000),minCashBps=integer(b.minCashBps??0,0,10000),months=integer(b.months,0,12),maxMonths=integer(b.maxMonths??12,0,12);
+  if(minCashBps>cashBps||months>maxMonths)fail('مقدار پیش‌فرض باید داخل دامنه مجاز باشد.');
   const previous=latestSalesTemplate(rows,b.kind);if((previous?.id||'')!==(b.previousId||''))fail('الگو تغییر کرده؛ تازه‌سازی کنید.',409);
   const baseline=selectFixedSalesTemplate(rows,b.kind,effectiveFrom),discountBps=integer(b.discountBps??baseline?.data.discountBps??0,0,9000);
-  put(b.id,'sales_template',{kind:b.kind,title:sreq(b.title),templateType,effectiveFrom,...period,discountBps,cashBps,minCashBps,maxCashBps,months,minMonths:0,maxMonths,version:(previous?.data.version||0)+1,previousId:previous?.id||''});
+  put(b.id,'sales_template',{kind:b.kind,title:sreq(b.title),templateType,effectiveFrom,...period,discountBps,cashBps,minCashBps,maxCashBps:10000,months,minMonths:0,maxMonths,version:(previous?.data.version||0)+1,previousId:previous?.id||''});
  }
  else if(b.mode==='partner'){if(a!.revision!==b.revision)fail('نسخه تغییر کرده است.',409);if(!Object.hasOwn(partnerKinds,b.kind)||!leadEligible(members.find(m=>m.id===b.ownerId)))fail('نوع همکاری و مسئول فروش فعال لازم است.');if((a!.data.kind==='referrer')!==(b.kind==='referrer')&&rows.some(r=>r.data.agentId===a!.id&&['sales_order','sales_invoice','sales_contract','sales_payment'].includes(r.type)))fail('نوع حساب دارای سابقه مالی قابل تبدیل نیست؛ پرونده جدا ایجاد کنید.');put(a!.id,'sales_agent',{...a!.data,kind:b.kind,ownerId:b.ownerId,contactDays:integer(b.contactDays,1,365),reorderDays:integer(b.reorderDays,1,365)},a);}
  else if(b.mode==='check_link'){const r=current('sales_payment');if(r.data.method!=='check'||!['received','bounced'].includes(r.data.state)||rows.some(v=>v.type==='sales_allocation'&&v.data.creditId===r.id))fail('فقط چک بدون تخصیص قبلی قابل اتصال است.');const invoice=rows.find(v=>v.type==='sales_invoice'&&v.id===b.invoiceId&&v.data.agentId===a!.id);if(!invoice)fail('فاکتور همین شریک لازم است.');put(r.id,r.type,{...r.data,checkInvoiceId:invoice.id},r);}

@@ -5,9 +5,10 @@ const {AssistantWorkspace}=load('components/trace/assistant-workspace.tsx'),{Act
 function render(tool,args,schema){return renderToStaticMarkup(React.createElement(AssistantWorkspace,{form:{tool,args,schema,title:'فرم عملیات',section:'test'},accountId:'test',onChange(){},onSaved(){},onClose(){}}));}
 // Template schedules share their visible controls and derived dates with the manual form.
 const templateInput={type:'object',properties:{mode:{type:'string'},data:{type:'object',additionalProperties:true}}};
-const fixedTemplateArgs={mode:'template',data:{effectiveFrom:'2026-10-11',durationDays:5,effectiveTo:'2027-01-01',minMonths:3,notes:'Old draft explanation'}};
+const fixedTemplateArgs={mode:'template',data:{effectiveFrom:'2026-10-11',durationDays:5,effectiveTo:'2027-01-01',minMonths:3,maxCashBps:7000,notes:'Old draft explanation'}};
 const fixedPresentation=formPresentation('sales_network_apply',fixedTemplateArgs,templateInput,'فروش');
 assert.equal(fixedPresentation.schema.properties.data.properties.minMonths.uiHidden,true);assert.ok(!fixedPresentation.schema.properties.data.required.includes('minMonths'));
+assert.equal(fixedPresentation.schema.properties.data.properties.maxCashBps.uiHidden,true);assert.ok(!fixedPresentation.schema.properties.data.required.includes('maxCashBps'));
 const fixedFields=fixedPresentation.schema.properties.data;
 assert.equal(fixedFields.properties.effectiveFrom.format,'date');assert.ok(fixedFields.required.includes('effectiveFrom'));assert.ok(!fixedFields.required.includes('durationDays'));for(const key of ['durationDays','effectiveTo','notes'])assert.ok(fixedFields.properties[key].uiHidden);
 const fixedTemplateHtml=render('sales_network_apply',fixedTemplateArgs,templateInput);assert.ok(fixedTemplateHtml.includes('<option value="fixed" selected="">الگوی ثابت</option>'));assert.ok(!fixedTemplateHtml.includes('Old draft explanation'));assert.ok(!fixedTemplateHtml.includes('مدت پروموشن (روز)'));
