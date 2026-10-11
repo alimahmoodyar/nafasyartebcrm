@@ -3,6 +3,7 @@ import {env} from "cloudflare:workers";
 import {storage} from "@/lib/storage";
 import {requireAdmin, checkOrigin, accessResponse, AccessError} from "@/lib/authorization";
 import {validatePermissions} from "@/lib/permissions";
+import {personnelProfileStatements} from "@/lib/personnel-profile";
 
 function present(row: any) {return {...row,canDelete:!row.protected,email:row.username?"":row.email, userId: row.subject, permissions: JSON.parse(row.permissions)};}
 function payload(value: any) {
@@ -56,6 +57,7 @@ export async function POST(request: Request) {
       db.prepare("INSERT INTO app_members (id,email,name,unit,status,permissions,revision,created,updated) VALUES(?,?,?,?,?,?,1,?,?)").bind(id, data.email, data.name, data.unit, data.status, data.permissions, now, now),
       ...(login?[db.prepare("INSERT INTO password_accounts(member_id,username,password_hash,version) VALUES(?,?,?,1)").bind(id,login,passwordHash)]:[]),
       db.prepare("INSERT INTO access_audit (id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)").bind(crypto.randomUUID(), actor.userId, id, "create_member", JSON.stringify(row), now),
+      ...personnelProfileStatements(db,row,actor,now),
     ]);
     return Response.json({member: present(row)}, {status: 201});
   } catch (error) {return failure(error, localAccount ? 'username' : 'email');}

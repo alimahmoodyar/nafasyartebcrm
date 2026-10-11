@@ -1381,6 +1381,7 @@ export const toolOptions:Record<string,Record<string,Record<string,string>>>={
  },
  "personnel_apply": {
   "mode": {
+   "profile_setup": "ایجاد پرونده پایه پرسنلی",
    "employee": "پرونده پرسنلی",
    "shift": "تعریف شیفت",
    "assignment": "برنامه کاری",
