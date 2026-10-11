@@ -126,6 +126,15 @@ const nw=(mode,extra={},u=manager,status=200)=>post(network,'/api/sales/network'
  const currentTemplate=all('sales_template').filter(t=>t.data.kind==='representative').sort((a,b)=>b.data.version-a.data.version)[0];
  await nw('template',{kind:'representative',title:'Invalid discount',discountBps:9001,cashBps:5000,months:1,previousId:currentTemplate.id},manager,400);
  await nw('template',{kind:'representative',title:'Preserve approved discount',cashBps:5000,months:1,previousId:currentTemplate.id});assert.equal((await draftDomain.salesOrderDraft(manager,args)).baseDiscountBps,1200);
+ const activeTemplate=all('sales_template').filter(t=>t.data.kind==='representative').sort((a,b)=>b.data.version-a.data.version)[0];
+ await nw('template',{kind:'representative',title:'Scheduled',effectiveFrom:'2099-01-01',discountBps:2500,cashBps:5000,months:1,previousId:activeTemplate.id});
+ assert.equal((await draftDomain.salesOrderDraft(manager,args)).baseDiscountBps,1200,'Future template must not override current pricing');
+ const scheduled=all('sales_template').find(t=>t.data.title==='Scheduled');assert.equal(scheduled.data.effectiveFrom,'2099-01-01');
+ await nw('template',{kind:'representative',title:'Invalid date',effectiveFrom:'2099-02-30',cashBps:5000,months:1,previousId:scheduled.id},manager,400);
+ await nw('template',{kind:'representative',title:'Effective today',effectiveFrom:now.slice(0,10),discountBps:2500,cashBps:5000,months:1,previousId:scheduled.id});
+ assert.equal((await draftDomain.salesOrderDraft(manager,args)).baseDiscountBps,2500,'Template applies on its start day');
+ const started=all('sales_template').find(t=>t.data.title==='Effective today');
+ await nw('template',{kind:'representative',title:'Restore category',discountBps:1200,cashBps:5000,months:1,previousId:started.id});
  seed('simple-target','sales_target',{agentId:args.agentId,state:'active',start:past,end:future,basis:'net',productIds:['product'],tiers:[{threshold:'0',discountBps:1500}]});
  const earned=await draftDomain.salesOrderDraft(manager,args);assert.equal(earned.lines[0].discountBps,1500,'Category and earned discounts use higher rate, never stack');
  seed('simple-overdue','sales_invoice',{agentId:args.agentId,day:past,amount:'100',installments:[{id:'old',due:past,amount:'100'}]});
