@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { XIcon } from "lucide-react"
+import { XIcon, ArrowRight } from "lucide-react"
 import { Dialog as DialogPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
@@ -66,6 +66,7 @@ function DialogContent({
         )}
         {...props}
       >
+        {showCloseButton && <DialogPrimitive.Close asChild><button type="button" className="btn justify-self-start" aria-label="بازگشت به صفحه قبل"><ArrowRight size={18}/>بازگشت</button></DialogPrimitive.Close>}
         {children}
         {showCloseButton && (
           <DialogPrimitive.Close

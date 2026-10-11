@@ -4,7 +4,9 @@ import {ArrowRight,Boxes,ClipboardList,FileText,Users,Settings2,ChartNoAxesCombi
 import {PersonalHome} from './personal-home';
 
 const AccountContext=createContext<string|null>(null);
-export function LayoutAccountProvider({accountId,children}:{accountId:string;children:ReactNode}){return <AccountContext.Provider value={accountId}>{children}</AccountContext.Provider>}
+const RootBackContext=createContext<(()=>void)|null>(null);
+export function LayoutAccountProvider({accountId,children,onBack}:{accountId:string;children:ReactNode;onBack?:()=>void}){return <RootBackContext.Provider value={onBack||null}><AccountContext.Provider value={accountId}>{children}</AccountContext.Provider></RootBackContext.Provider>}
+export function WorkspaceBackButton(){const back=useContext(RootBackContext);return back?<button type="button" className="btn" onClick={()=>{const buttons=Array.from(document.querySelectorAll<HTMLButtonElement>('[data-workspace-back="step"]')).filter(b=>b.getClientRects().length&&!b.closest('[hidden]'));const deepest=buttons.at(-1);if(deepest)deepest.click();else back()}}><ArrowRight size={18}/>بازگشت</button>:null;}
 type Menu={items:[string,string][];value:string;onChange:(key:string)=>void|boolean};
 const ProgramPathContext=createContext('');
 type WorkspaceContext={register:(menu:Menu|null)=>void;showHome:boolean;open:()=>void;reveal:()=>void;select:(key:string)=>void};
@@ -27,6 +29,7 @@ export function subprogramIcon(key:string,title:string):LucideIcon{
  return ClipboardList;
 }
 export function ProgramWorkspace({programId,title,direct=false,children}:{programId:string;title:string;direct?:boolean;children:ReactNode}){
+ const parentNavigation=useContext(NavigationContext),rootBack=useContext(RootBackContext);
  const accountId=useContext(AccountContext),[menu,setMenu]=useState<Menu|null>(null),[showHome,setShowHome]=useState(!direct);
  const parentPath=useContext(ProgramPathContext),path=parentPath?parentPath+'/'+programId:programId;
  const register=useCallback((next:Menu|null)=>setMenu(next),[]);
@@ -37,6 +40,7 @@ export function ProgramWorkspace({programId,title,direct=false,children}:{progra
  const navigation=useMemo(()=>accountId?({register,showHome,open,reveal,select}):null,[accountId,register,showHome,open,reveal,select]);
  const canLaunch=!!accountId&&!!menu?.items.length;
  return <NavigationContext.Provider value={navigation}><div className="program-workspace">
+ {accountId&&<nav className="tools" aria-label="بازگشت به مرحله قبل"><button type="button" className="btn" data-workspace-back={canLaunch&&!showHome||parentNavigation?"step":undefined} onClick={()=>{if(canLaunch&&!showHome)setShowHome(true);else if(parentNavigation)parentNavigation.open();else rootBack?.()}}><ArrowRight size={18}/>بازگشت</button></nav>}
  {canLaunch&&showHome&&<PersonalHome key={accountId+path} accountId={accountId} name="" scope={path} title={title} greeting={false} shortTitles={false} apps={menu!.items.map(([key,label])=>({key,title:label,icon:subprogramIcon(key,label)}))} onNavigate={select}/>}
  <ProgramPathContext.Provider value={path+(menu?.value?'/'+menu.value:'')}><div className="program-workspace-content" hidden={canLaunch&&showHome}>{children}</div></ProgramPathContext.Provider>
  </div></NavigationContext.Provider>;
