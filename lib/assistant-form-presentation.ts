@@ -75,6 +75,7 @@ export function generalPresentation(tool:string,args:any,input:any,title:string)
   schema.required=(schema.required||[]).filter((k:string)=>!['province','city','contractRef','ownerId','financeId','managerId','creditLimit','termDays','agentId','mode'].includes(k));
   return {schema,title:'ایجاد پرونده نماینده فروش'};
  }
+ if(tool==='guarantee_apply'){if(schema.properties?.kind){schema.properties.kind.enum=[...(schema.properties.kind.enum||[]).filter((v:string)=>v!=='customs'),'customs'];schema.properties.kind.enumLabels={...schema.properties.kind.enumLabels,customs:'ضمانت‌نامه گمرکی'};}if(schema.properties?.contract)schema.properties.contract.title=args.kind==='customs'?'شماره ثبت سفارش':'شماره قرارداد یا شماره مناقصه';for(const key of ['applicant','collateral','actionDeadline']){if(schema.properties?.[key])schema.properties[key].uiHidden=true;}schema.required=(schema.required||[]).filter((key:string)=>!['applicant','collateral','actionDeadline','originalLocation'].includes(key));}
  if(tool==='personnel_apply'){
   const visible=visiblePersonnelFields(args);
   if(visible.length)for(const [k,f] of Object.entries(schema.properties||{}) as [string,any][])f.uiHidden=!visible.includes(k)||technical.has(k);

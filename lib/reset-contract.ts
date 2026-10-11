@@ -1,3 +1,4 @@
+// business_contract: operational flow entity, backed up and deleted in both reset scopes; migration 0016 freeze protects writes.
 // New shipments reference sales_agent profiles directly; historical party rows remain covered by the existing reset scopes.
 // Automatic representative identities use preserved app_members/password_accounts and as_agent/sales_agent; existing flow/inventory operation freeze triggers protect the atomic mutation. No new tables. Credential changes clear ciphertext and revoke sessions/tokens.
 // Intake contact fields are embedded in as_case; existing backup, both reset scopes and flow freeze cover them.

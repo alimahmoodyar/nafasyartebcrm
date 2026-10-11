@@ -17,14 +17,26 @@ const request=(path,body,origin=base)=>new Request(base+path,{method:body?'POST'
 const row=id=>{const r=sql.prepare('SELECT * FROM flow_entities WHERE id=?').get(id);return r?{...r,data:JSON.parse(r.data)}:null};
 async function post(u,body){const r=await ctx.run(u,()=>api.POST(request('/api/guarantees',{id:crypto.randomUUID(),confirmed:true,...body})));return {status:r.status,data:await r.json()}}
 async function get(u){const r=await ctx.run(u,()=>api.GET());return {status:r.status,data:await r.json()}}
-const fields={mode:'save',revision:0,notes:'Actual contract',direction:'outgoing',kind:'performance',number:'G-1',bank:'Bank',applicant:'Company',beneficiary:'Customer',amount:'1000',currency:'IRR',deposit:'200',fees:'10',issueDate:'2026-01-01',expiry:'2026-10-31',actionDeadline:'2026-10-25',originalLocation:'Safe 1',collateral:'Property deed',viewerIds:['viewer']};
+const fields={mode:'save',revision:0,notes:'Actual contract',contract:'CON-1',direction:'outgoing',kind:'performance',number:'G-1',bank:'Bank',applicant:'Company',beneficiary:'Customer',amount:'1000',currency:'IRR',deposit:'200',fees:'10',issueDate:'2026-01-01',expiry:'2026-10-31',actionDeadline:'2026-10-25',originalLocation:'Safe 1',collateral:'Property deed',viewerIds:['viewer']};
 async function apply(u,id,mode,extra={}){return post(u,{guaranteeId:id,revision:row(id).revision,mode,notes:'Actual evidence',...extra})}
 function evidence(id){const fid=crypto.randomUUID();entity(fid,'guarantee_file',{caseId:id,filename:'evidence.pdf',actor:'treasury'});return fid}
 (async()=>{
  assert.equal((await post(unrelated,fields)).status,403);assert.equal((await get(external)).status,403);
  assert.equal((await post(treasury,{...fields,confirmed:false})).status,400);
  assert.equal((await post(treasury,{...fields,expiry:'2026-02-30'})).status,400);
- const body={...fields,id:crypto.randomUUID()},created=await post(treasury,body);assert.equal(created.status,200,JSON.stringify(created));const id=created.data.id;
+ const body={...fields,id:crypto.randomUUID()};delete body.applicant;delete body.actionDeadline;delete body.originalLocation;delete body.collateral;const created=await post(treasury,body);assert.equal(created.status,200,JSON.stringify(created));const id=created.data.id;assert.equal(row(id).data.applicant,body.beneficiary);assert.equal(row(id).data.actionDeadline,body.expiry);assert.equal(row(id).data.originalLocation,'زونکن اسناد مالی');
+ const contractsApi=load('app/api/business-contracts/route.ts'),contractBody={id:crypto.randomUUID(),confirmed:true,number:'CON-1',title:'Contract One',party:'Customer',notes:'Original reference'};
+ const saveContract=async(u,b)=>{const r=await ctx.run(u,()=>contractsApi.POST(request('/api/business-contracts',b)));return {status:r.status,data:await r.json()}};
+ assert.equal((await saveContract(unrelated,contractBody)).status,403);
+ const contractSaved=await saveContract(treasury,contractBody);assert.equal(contractSaved.status,200,JSON.stringify(contractSaved));
+ assert.equal((await saveContract(treasury,contractBody)).data.repeated,true);
+ assert.equal((await saveContract(treasury,{...contractBody,id:crypto.randomUUID()})).status,409);
+ const linkedView=(await get(treasury)).data.records.find(r=>r.id===id);assert.equal(linkedView.data.contractMatch.state,'matched');assert.equal(linkedView.data.contractMatch.record.id,contractSaved.data.id);
+ const linkedDraft=await post(treasury,{...fields,number:'AUTO-2'});assert.equal(linkedDraft.status,200);assert.equal(row(linkedDraft.data.id).data.linkId,contractSaved.data.id);
+ const customs=await post(treasury,{...fields,number:'CUSTOMS-1',kind:'customs',contract:'REG-123'});assert.equal(customs.status,200);assert.equal(row(customs.data.id).data.linkId,'');assert.equal(row(customs.data.id).data.contract,'REG-123');
+ const viaMcp=await catalog.executeTool('save_business_contract',{...contractBody,id:crypto.randomUUID(),number:'CON-MCP'},base,{user:treasury,scope:'read_write',tokenId:null});assert.equal(viaMcp.saved,true);
+ const resetContract=load('lib/reset-contract.ts');for(const scope of ['operations','full']){sql.exec('BEGIN');sql.exec('DELETE FROM flow_entities WHERE '+resetContract.resetWhere('flow_entities',scope));assert.equal(sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type='business_contract'").get().n,0);sql.exec('ROLLBACK');}assert.ok(row(contractSaved.data.id));
+
  assert.equal((await post(treasury,body)).data.repeated,true);assert.equal((await post(treasury,{...body,number:'changed'})).status,409);
  assert.equal((await get(viewer)).data.records[0].data.deposit,undefined);assert.equal((await get(viewer)).data.files.length,0);
  assert.equal((await post(viewer,{...fields,guaranteeId:id,revision:1})).status,403);
