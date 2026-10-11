@@ -22,6 +22,12 @@ export function salesSubmission(u:Session,agentId:string,source:any,at:string){
  const day=sday(source.day);if(day>dayAt())salesFail('تاریخ دریافت درخواست در آینده نباشد.');
  return {actor:u.userId,actorName:u.name,agentId,onBehalf:true,channel:source.channel,contactName:sreq(source.contactName,200),day,reference:stxt(source.reference??'',1000),at};
 }
+// Staff payment entry is based on a receipt, not a fabricated customer request.
+// Explicit legacy request metadata is still validated when supplied.
+export function salesPaymentSubmission(u:Session,agentId:string,source:any,at:string){
+ if(salesRep(u)||source!=null)return salesSubmission(u,agentId,source,at);
+ return {actor:u.userId,actorName:u.name,agentId,onBehalf:false,channel:'staff_entry',at};
+}
 export function integer(v:unknown,min=1,max=10000){if(typeof v!=='number'||!Number.isSafeInteger(v)||v<min||v>max)salesFail('عدد صحیح در محدوده مجاز وارد کنید.');return v as number;}
 export function arr(v:unknown,max=100){if(!Array.isArray(v)||!v.length||v.length>max)salesFail('فهرست غیرخالی معتبر لازم است.');return v as any[];}
 export const salesDecode=(r:any)=>({...r,data:JSON.parse(r.data)});

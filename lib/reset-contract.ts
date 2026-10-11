@@ -137,3 +137,6 @@ resetHelp.push('نوع رسمی یا غیررسمی، سند متصل و ساب�
 
 // Job-role assignments are embedded in preserved app_members.permissions; no new table or reset deletion is introduced.
 // Service diagnosis traceStatus is embedded in as_case data; existing full-JSON backup, reset scope and freeze rules cover it without a new table.
+
+// sales_payment staff_entry attribution is embedded in the existing operational entity;
+// both reset scopes, backup and generic 0016 freeze apply. No new table, FK or file type.

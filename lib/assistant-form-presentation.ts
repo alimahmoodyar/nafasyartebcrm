@@ -75,6 +75,14 @@ export function generalPresentation(tool:string,args:any,input:any,title:string)
   }
   const data=schema.properties?.data;if(data){data.required=[...new Set([...(data.required||[]),'effectiveFrom',...(promotion?['durationDays']:[])])];}
  }
+ if(tool==='sales_apply'&&args.mode==='payment'){
+  const visible=new Set(['agentId','method','amount','day','reference','fileId','notes',...(args.method!=='cash'?['bank']:[]),...(args.method==='check'?['checkDue']:[]),...(args.cashOrderId?['cashOrderId']:[]),...(args.checkInvoiceId?['checkInvoiceId']:[])]);
+  for(const [key,f] of Object.entries(schema.properties||{}) as [string,any][])f.uiHidden=!visible.has(key);
+  if(schema.properties.agentId)schema.properties.agentId.title='خریدار';
+  if(schema.properties.reference)schema.properties.reference.title=args.method==='check'?'شناسهٔ چک':'شماره پیگیری / رسید';
+  schema.required=['agentId','method','amount','day','reference',...(args.method!=='cash'?['bank','fileId']:[]),...(args.method==='check'?['checkDue']:[])];
+  return {schema,title:'اعلام پرداخت خریدار'};
+ }
  if(tool==='sales_apply'&&args.mode==='order'){
   const visible=new Set(['agentId','items','requestSource','customerReference','notes']);
   for(const [key,f] of Object.entries(schema.properties||{}) as [string,any][])f.uiHidden=!visible.has(key);

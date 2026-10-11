@@ -367,6 +367,17 @@ async function expectQuote(templateId, rate, cashBps, months, agentId = 'buyer-r
   assert.equal(leapPromo.record.data.effectiveTo, '2028-03-01', 'Inclusive duration crosses leap February correctly');
   assert.equal(leapBaseline.record.data.templateType, 'fixed');
 
+  // An omitted rate inherits the fixed terms eligible on its start, never a promotion
+  // or a newer fixed version whose start lies after the new template's start.
+  await saveTemplate('branch', {templateType: 'promotion', effectiveFrom: '2026-10-21', durationDays: 1, discountBps: 2500});
+  const inheritedFixed = await saveTemplate('branch', {effectiveFrom: '2026-10-18', discountBps: undefined});
+  assert.equal(inheritedFixed.record.data.discountBps, 800, 'Fixed inheritance skips the latest promotion and the later scheduled fixed');
+  await saveTemplate('branch', {effectiveFrom: '2026-10-25', discountBps: 3200});
+  const inheritedPromotion = await saveTemplate('branch', {templateType: 'promotion', effectiveFrom: '2026-10-19', durationDays: 1, discountBps: undefined});
+  assert.equal(inheritedPromotion.record.data.discountBps, 800, 'Promotion inheritance uses the fixed terms eligible on its own start');
+  at('2026-10-19T08:00:00Z');
+  await expectQuote(inheritedPromotion.body.id, 800, 5000, 1, 'buyer-branch');
+
   sql.prepare("UPDATE app_members SET status='inactive' WHERE id='manager'").run();
   const revoked = templateBody();
   await post(network, '/api/sales/network', revoked, manager, 403);

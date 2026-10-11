@@ -3,7 +3,8 @@ import {useEffect,useRef,useState} from 'react';
 import type {OperationForm} from '@/lib/assistant-workspace';
 import {partnerKinds} from '@/lib/sales-network-contract';
 import {salesRequestChannels} from '@/lib/sales-contract';
-import {formatDate} from '@/lib/persian-date';
+import {formatDate,localDay} from '@/lib/persian-date';
+import {selectSalesTemplate} from '@/lib/sales-template';
 import {NumberInput} from './number-input';
 import {SolarDate} from './solar-date';
 
@@ -55,7 +56,7 @@ export function SalesOrderWorkspace({form,accountId,locked,onChange,onPrepare,on
  },[key,accountId]);
  const currentCatalog=catalog?.me===accountId?catalog:null;
  const args=form.args,quote=preview.accountId===accountId&&preview.key===key?preview.quote:null,agent=currentCatalog?.agents.find((a:any)=>a.id===args.agentId),items=args.items?.length?args.items:[{productId:'',quantity:1}];
- const terms=quote?.salesTerms||form.preview?.salesTerms||currentCatalog?.templates.filter((t:any)=>t.data.kind===(agent?.data.kind||'representative')).sort((a:any,b:any)=>(b.data.version||0)-(a.data.version||0)||b.created.localeCompare(a.created)||b.id.localeCompare(a.id))[0]?.data;
+ const terms=quote?.salesTerms||form.preview?.salesTerms||selectSalesTemplate(currentCatalog?.templates||[],agent?.data.kind||'representative',quote?.day||currentCatalog?.today||localDay())?.data;
  const quoteChanged=!!form.actionId&&!!quote&&args.quoteHash!==quote.quoteHash;
  useEffect(()=>{onReviewReady(!form.actionId||!!quote&&!loading&&!quoteChanged);},[form.actionId,quote,loading,quoteChanged,onReviewReady]);
  function change(patch:any){const next={...latest.current,args:{...latest.current.args,...patch,quoteHash:undefined},preview:undefined,previewError:undefined};onChange(next);}
