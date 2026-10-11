@@ -34,8 +34,12 @@ const nw=(mode,extra={},u=manager,status=200)=>post(network,'/api/sales/network'
  rep=actor('rep',['agent'],{salesAgentId:a});member(rep);
  assert.equal((await get(staff)).agents.length,1);await get(staff,b,404);assert.equal((await get(manager)).agents.length,2);
  await nw('template',{kind:'representative',title:'Rep standard',cashBps:5000,months:1},staff,403);
- const t=await nw('template',{kind:'representative',title:'Rep standard',cashBps:5000,minCashBps:3000,maxCashBps:7000,months:1,minMonths:1,maxMonths:3,notes:undefined});
+ const t=await nw('template',{kind:'representative',title:'Rep standard',cashBps:5000,minCashBps:3000,maxCashBps:7000,months:1,minMonths:2,maxMonths:3,notes:undefined});
  const template=entity(t.body.id);assert.equal(template.data.history[0].actor,manager.userId);assert.ok(template.data.history[0].at);assert.equal(template.data.version,1);assert.ok(!Object.hasOwn(template.data,'notes'));
+ assert.equal(template.data.minMonths,0,'A legacy minimum may not impose or reject earlier default terms');
+ await nw('template',{kind:'representative',title:'Default above maximum',cashBps:5000,months:4,maxMonths:3,previousId:t.body.id},manager,400);
+ // An existing stored minimum must not obstruct a new shorter-term quote.
+ sql.prepare('UPDATE flow_entities SET data=? WHERE id=?').run(JSON.stringify({...template.data,minMonths:1}),t.body.id);
  const presentation=load('lib/assistant-form-presentation.ts').generalPresentation('sales_network_apply',{mode:'template',data:{notes:'Legacy draft text'}},{type:'object',properties:{data:{type:'object',required:['notes']}}},'Template');assert.equal(presentation.schema.properties.data.properties.notes.uiHidden,true);assert.ok(!presentation.schema.properties.data.required.includes('notes'));
  const templateArgs={id:crypto.randomUUID(),confirmed:true,mode:'template',data:{effectiveFrom:today,kind:'reseller',title:'Reseller standard',cashBps:6000,months:2}};const principal={user:manager,scope:'write',tokenId:null};await catalog.executeTool('sales_network_apply',templateArgs,base,principal);assert.equal((await catalog.executeTool('sales_network_apply',templateArgs,base,principal)).repeated,true);
  await nw('contact',{channel:'visit',day:today,nextDue:future,nextAction:'Still requires actual contact evidence',notes:undefined},staff,400);
@@ -53,6 +57,9 @@ const nw=(mode,extra={},u=manager,status=200)=>post(network,'/api/sales/network'
  await op('price',{agentId:'',productId:'product',unitPrice:'1000',active:true,reference:'PRICE'},manager);
  await op('terms',{revision:version(a),creditLimit:'100000',termDays:30});
  const items=[{productId:'product',quantity:1}],terms={cashBps:4000,months:2},source={channel:'phone',contactName:'Buyer',day:today,reference:'Actual negotiation'};
+ for(const months of [0,1,3]){const args={agentId:a,items,salesTerms:{cashBps:4000,months}},early=await post(quoteApi,'/api/sales/quote',args,staff),mcpEarly=await catalog.executeTool('preview_sales_order',args,base,{user:staff,scope:'read',tokenId:null});assert.equal(early.salesTerms.months,months);assert.equal(early.salesTerms.minMonths,0);assert.equal(mcpEarly.quoteHash,early.quoteHash);if(!months)assert.ok(early.installments.every(p=>p.due===today),'zero-month settlement is due today');}
+ for(const months of [-1,0.5,4])await post(quoteApi,'/api/sales/quote',{agentId:a,items,salesTerms:{cashBps:4000,months}},staff,400);
+ const earlyTerms={cashBps:4000,months:0},earlyQuote=await post(quoteApi,'/api/sales/quote',{agentId:a,items,salesTerms:earlyTerms},staff),earlyOrder=await op('order',{items,salesTerms:earlyTerms,quoteHash:earlyQuote.quoteHash,requestSource:source},staff);assert.equal(entity(earlyOrder.id).data.salesTerms.months,0);await op('order_cancel',{orderId:earlyOrder.id,revision:version(earlyOrder.id),requestSource:source},staff);
  const q=await post(quoteApi,'/api/sales/quote',{agentId:a,items,salesTerms:terms,referrerId:ref},staff);assert.equal(q.salesTerms.cashBps,4000);assert.equal(q.salesTerms.standardCashBps,5000);assert.equal(q.salesTerms.minCashBps,3000);assert.equal(q.installments[0].amount,'400');await post(quoteApi,'/api/sales/quote',{agentId:a,items,salesTerms:{cashBps:2000,months:1}},staff,400);
  const o=await op('order',{items,salesTerms:terms,referrerId:ref,quoteHash:q.quoteHash,requestSource:source},staff);
  await op('order_review',{orderId:o.id,revision:1,approved:true},staff,403);await op('order_review',{orderId:o.id,revision:1,approved:true},manager);
