@@ -36,7 +36,7 @@ export function canOpenSection(u:Session,s:string){
  if(s==='after-sales')return !!p.serviceRoles?.length;
  if(s==='sourcing')return !!p.qmsRoles?.some(r=>['qa','qc'].includes(r))||!!p.flowRoles?.includes('qc')||!!p.supplyRoles?.length||!!p.flowRoles?.some(r=>['inventory','logistics'].includes(r))||!!p.transportRoles?.includes('manager');
  if(['users','llm','finance','system-reset'].includes(s))return false;
- if(s==='fulfillment')return salesStaff(u)||!!p.flowRoles?.some(r=>['inventory','production','sales','logistics'].includes(r));
+ if(s==='fulfillment')return salesStaff(u)||!!p.salesAgentId||!!p.flowRoles?.some(r=>['inventory','production','sales','logistics'].includes(r));
  if(s==='flow')return !!p.flowRoles?.some(r=>['inventory','qc','production','procurement'].includes(r));
  if(s==='finance-control')return financialAccess(u,'control');
  return can(u,(s==='inventory'?'batch':['serials','analytics'].includes(s)?'device':s) as Kind,'read');
