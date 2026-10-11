@@ -10,7 +10,8 @@ import {normalizeSerial} from './distribution';
 import {scaled} from './production';
 import {serviceRoles,serviceDomains} from './after-sales-labels';
 export function fail(s:string,status=400):never{throw new AccessError(s,status)}
-export const req=taskRequired,txt=(v:unknown,max=4000)=>taskText(v??'',max);
+export function req(v:unknown,max=200){return taskRequired(v,max)}
+export const txt=(v:unknown,max=4000)=>taskText(v??'',max);
 export const decode=(r:any)=>({...r,data:JSON.parse(r.data)});
 export const isAgent=(u:Session)=>!u.isAdmin&&!!u.permissions.serviceAgentId;
 export const role=(u:Session,r:string)=>u.isAdmin||!!u.permissions.serviceRoles?.includes(r)||!isAgent(u)&&!!u.permissions.serviceRoles?.includes('manager');

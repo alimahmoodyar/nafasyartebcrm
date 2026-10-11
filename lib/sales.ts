@@ -10,7 +10,9 @@ export {salesRep,salesManager,salesStaff,salesFinance,salesRead,salesWarehouse} 
 import {salesRep,salesRead,salesWarehouse,salesStaff,salesManager,salesFinance} from './sales-access';
 import {memberId} from './duties';
 import {termsPlan} from './sales-network-contract';
-export const sreq=taskRequired,stxt=taskText;
+// Defer imported validators until call time: duties and sales have circular imports.
+export function sreq(v:unknown,max=200){return taskRequired(v,max)}
+export function stxt(v:unknown,max=4000){return taskText(v,max)}
 export function money(v:unknown,positive=false){const s=sreq(v,18);if(!/^\d{1,18}$/.test(s)||positive&&BigInt(s)<=BigInt(0))salesFail('مبلغ باید ریال صحیح '+(positive?'مثبت':'نامنفی')+' باشد.');return BigInt(s).toString();}
 export function sday(v:unknown){const s=sreq(v,10);if(!validDay(s))salesFail('تاریخ معتبر لازم است.');return s;}
 export function salesSubmission(u:Session,agentId:string,source:any,at:string){
