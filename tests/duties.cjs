@@ -30,6 +30,8 @@ function latest(id){const r=sql.prepare('SELECT * FROM duty_runs WHERE id=?').ge
  await Promise.all([engine.tickDuties(new Date(day+'T20:00:00Z')),engine.tickDuties(new Date(day+'T20:00:00Z'))]);assert.equal(sql.prepare('SELECT count(*) AS n FROM duty_runs').get().n,1);
  const run=sql.prepare('SELECT id FROM duty_runs').get().id;const noticeCount=sql.prepare('SELECT count(*) AS n FROM duty_notices').get().n;await engine.tickDuties(new Date(day+'T20:00:00Z'));assert.equal(sql.prepare('SELECT count(*) AS n FROM duty_notices').get().n,noticeCount);
  let d=await (await as(outsider,()=>tasks.GET())).json();assert.equal(d.tasks.length,0);assert.equal(d.notifications.length,0);assert.equal(d.definitions.length,0);
+ sql.prepare("INSERT INTO duty_notices(id,task_id,recipient,phase,message,created) VALUES('admin-notice',?,'@admin','escalate','Manager-only escalation',?)").run(run,now);
+ d=await (await as(admin,()=>tasks.GET())).json();assert.equal(d.notifications.some(n=>n.id==='admin-notice'),false);assert.equal(d.managementNotifications.some(n=>n.id==='admin-notice'),true);
  await op(outsider,'answer',{taskId:run,revision:1,note:'private'},404);
  await op(worker,'submit',{taskId:run,revision:1,note:'report ready'},400);
  let form=new FormData();form.set('file',new File(['a,b\n1,2'],'report.csv',{type:'text/csv'}));const upload=()=>files.POST(new Request(base+'/api/tasks/files?task='+encodeURIComponent(run)+'&requestId='+crypto.randomUUID(),{method:'POST',headers:{origin:base},body:form}));assert.equal((await as(outsider,upload)).status,404);let r=await as(worker,upload);assert.equal(r.status,201,await r.clone().text());const file=(await r.json()).file;assert.ok(!file.object_key);
