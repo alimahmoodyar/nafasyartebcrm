@@ -1,9 +1,10 @@
+import {financialWorkflowRole} from './financial-workflow-roles';
 import {financialAccess} from './financial-access';
 import {canGenerateActivationCode} from './activation-code-access';
 import {routineRoles} from './routine-production';
 import {projectRoles} from './build-projects';
 import {costRead} from './costing';
-import {salesRead,salesWarehouse,salesStaff} from './sales-access';
+import {salesRead,salesWarehouse,salesStaff,salesManager,salesFinance} from './sales-access';
 import type {Kind} from './model';
 import type {Session} from './permissions';
 
@@ -16,6 +17,7 @@ export function canOpenSection(u:Session,s:string){
  if(s==='qms')return internal&&(u.isAdmin||!!p.qmsRoles?.length||!!p.supplyRoles?.some(r=>['engineering','ceo'].includes(r)));
  if(s==='hospital')return !!p.hospitalCenterId||u.isAdmin||financialAccess(u,'hospital')||!p.serviceAgentId&&!!p.serviceDomains?.includes('hospital');
  if(s==='reminders')return true;
+ if(s==='sales-bank')return internal&&(salesManager(u)||salesFinance(u)||financialWorkflowRole(p,'',[],'treasury'));
  if(s==='treasury')return internal&&(u.isAdmin||financialAccess(u,'treasury'));
  // Employees need this entry point to see their own entrusted assets; the API
  // still limits company-wide records and write operations to the custodian.

@@ -1586,3 +1586,5 @@ toolOptions.purchase_service_apply={'costs.*.kind':{receipt:'بچ کالای خ�
 for(const name of ['create_user','create_password_user','update_user','update_password_user']){toolOptions[name] ||= {};toolOptions[name]['permissions.treasuryWorkflowRoles.*']={treasury:'خزانه‌دار',manager:'مدیر مالی',accountant:'رئیس حسابداری',ceo:'مجوز نهایی مدیرعامل'};}
 
 for(const name of ['create_user','create_password_user','update_user','update_password_user']){toolOptions[name]['permissions.roleAssignment.roles.*']=Object.fromEntries(jobRoles.map(r=>[r.id,r.label]));toolOptions[name]['permissions.roleAssignment.warehouses.*']=toolOptions[name]['permissions.warehouses.*'];toolOptions[name]['permissions.roleAssignment.serviceDomains.*']=toolOptions[name]['permissions.serviceDomains.*'];}
+
+toolOptions.sales_bank_apply={mode:{terminal:'اتصال پوز به خریدار',import:'ورود اکسل بانک',reconcile:'تطبیق وصول و تخصیص بدهی',reverse:'برگشت وصول متصل به بانک'}};
