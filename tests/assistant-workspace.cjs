@@ -27,6 +27,14 @@ let chain=Promise.resolve();const batch=db.batch.bind(db);db.batch=s=>{const p=c
 const forms=load('app/api/assistant/forms/route.ts'),workspace=load('lib/assistant-workspace.ts');
 (async()=>{
  const clean=workspace.cleanFormArgs({name:'A',data:{password:'SECRET',apiKey:'SECRET',token:'SECRET',qty:2},confirmed:true});assert.deepEqual(JSON.parse(JSON.stringify(clean)),{name:'A',data:{qty:2}});
+ const salesTool=catalog.tools.find(t=>t.name==='sales_apply'),saleIntent=workspace.requestedOperationForm('میخوام پنج دستگاه سوشیا به نماینده باران سلامت بفروشم',null,catalog.tools);
+ assert.equal(saleIntent.args.mode,'order','Selling to a representative must not create a representative profile');
+ assert.equal(workspace.requestedOperationForm('سفارش خرید مواد اولیه ثبت کن',null,catalog.tools),undefined,'Purchase intent must not open a sales order');
+ const simpleSale=workspace.operationForm(salesTool,{mode:'order',agentId:'actual-buyer',items:[{productId:'actual-product',quantity:5}]},'sales','Old generic form');
+ assert.equal(simpleSale.title,'ثبت سفارش فروش');assert.equal(simpleSale.schema.properties.salesTerms.uiHidden,true);
+ for(const key of ['cashOrderId','checkInvoiceId','referrerId','tiers','installments','creditLimit','deviceIds','openingId','mode'])assert.equal(simpleSale.schema.properties[key].uiHidden,true,'Unrelated sale field '+key);
+ assert.deepEqual(Object.keys(simpleSale.schema.properties.items.items.properties).sort(),['productId','quantity']);
+ assert.equal(simpleSale.args.salesTerms,undefined,'A draft must never invent zero payment conditions');
  const leadTool=catalog.tools.find(t=>t.name==='sales_lead_apply'),leadArgs={mode:'save',revision:0,company:'Example hospital'},schemaBefore=JSON.stringify(leadTool.inputSchema);
  const lead=workspace.operationForm(leadTool,leadArgs,'sales','Generic title');assert.equal(lead.title,'ایجاد سرنخ فروش');assert.equal(lead.schema.properties.title.title,'نام سرنخ فروش');assert.equal(lead.schema.properties.company.title,'نام شرکت / بیمارستان / مرکز');assert.equal(lead.schema.properties.contactName.title,'نام فرد رابط');assert.equal(lead.schema.properties.ownerId.title,'مسئول پیگیری');assert.equal(lead.schema.properties.segment.enumLabels.hospital,'بیمارستانی');assert.equal(lead.schema.properties.nextDue.format,'date');assert.equal(lead.schema.properties.items.items.properties.productId.title,'محصول');assert.equal(lead.args.revision,0);assert.equal(lead.schema.properties.revision.uiHidden,true);assert.equal(lead.schema.properties.mode.uiHidden,true);assert.equal(lead.schema.properties.lossReason.uiHidden,true);assert.ok(lead.schema.required.includes('contactName'));assert.equal(JSON.stringify(leadTool.inputSchema),schemaBefore);assert.equal(JSON.stringify(leadArgs),JSON.stringify({mode:'save',revision:0,company:'Example hospital'}));
  for(const [key,field] of Object.entries(lead.schema.properties).filter(([,f])=>!f.uiHidden))assert.ok(field.title,'Missing visible field title: '+key);
@@ -108,6 +116,20 @@ const forms=load('app/api/assistant/forms/route.ts'),workspace=load('lib/assista
  assert.equal(workspace.matchedOperationForm('فرم ایجاد سرنخ فروش را بیار',allChoices,eligible).tool,'sales_lead_apply');
  for(const [tool,section] of [['generate_serials','serials'],['create_quality_template','product'],['move_batch_stock','inventory'],['create_production_sheet','event']])assert.equal(policy.actionSection(tool,{}),section);
  assert.equal(sql.prepare('SELECT COUNT(*) n FROM app_members').get().n,memberCount);
+ // The model must not turn unspecified payment defaults into a zero-cash/zero-month override.
+ sql.prepare("DELETE FROM login_attempts WHERE key='assistant:owner'").run();
+ const seed=(id,type,data)=>sql.prepare('INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?)').run(id,type,JSON.stringify(data),now,now);
+ seed('assistant-buyer','sales_agent',{name:'باران سلامت',kind:'representative',active:true,termDays:30,creditLimit:'100000',phone:'02111111111',address:'Actual address'});
+ seed('assistant-price','sales_price',{agentId:'',productId:'assistant-soshia',unitPrice:'1000',active:true});
+ seed('assistant-template','sales_template',{kind:'representative',discountBps:1000,cashBps:5000,months:1,version:1});
+ sql.prepare("INSERT INTO records(id,kind,payload,created) VALUES('assistant-soshia','product',?,?)").run(JSON.stringify({name:'سوشیا',model:'Soshia',status:'فعال'}),now);
+ round=0;cache[providerFile].providerRequest=async()=>({choices:[{message:round++===0?{tool_calls:[{id:'sale',type:'function',function:{name:'show_operation_form',arguments:JSON.stringify({tool:'sales_apply',args:{mode:'order',agentId:'assistant-buyer',items:[{productId:'assistant-soshia',quantity:5}],salesTerms:{cashBps:0,months:0}}})}}]}:{content:'خلاصه فروش آماده بررسی است.'}}]});
+ response=await run(admin,()=>chat.POST(request('/api/assistant','POST',{requestId:crypto.randomUUID(),profileId,message:'میخوام پنج دستگاه سوشیا به نماینده باران سلامت بفروشم'})));
+ assert.equal(response.status,200,await response.clone().text());const saleDraft=await response.json();
+ assert.equal(saleDraft.workspace.args.mode,'order');assert.equal(saleDraft.workspace.args.salesTerms,undefined);assert.equal(saleDraft.workspace.preview.salesTerms.cashBps,5000);assert.equal(saleDraft.workspace.preview.salesTerms.months,1);
+ assert.equal(saleDraft.workspace.preview.amount,'4500');assert.equal(saleDraft.workspace.preview.buyer.name,'باران سلامت');assert.equal(saleDraft.actions.filter(a=>a.state==='pending').length,0);
+ assert.equal(sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type='sales_order'").get().n,0,'Showing a sales draft must not sell devices');
+ console.log('PASS assistant sale intent: compact named preview, configured discount/payment defaults, model-invented zero override removed, no business writes.');
  console.log('PASS universal operation forms: catalog coverage, cross-section opening, continuation, ambiguous-request chooser, permission denial and no writes.');
  console.log('PASS assistant workspace: secret-free partial form, authorized navigation, manual preparation without model, confirmation-only execution, origin/account/owner checks and idempotent preparation.');
 })().catch(e=>{console.error(e);process.exit(1)});

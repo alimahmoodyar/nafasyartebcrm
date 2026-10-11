@@ -1,3 +1,4 @@
+// Buyer-category discount is embedded in versioned sales_template; quote/order/invoice snapshots remain in existing sales_* flow_entities. Existing backup, reset predicates and migration 0016 flow freeze cover these JSON fields; no new tables or entity types.
 // business_contract: operational flow entity, backed up and deleted in both reset scopes; migration 0016 freeze protects writes.
 // New shipments reference sales_agent profiles directly; historical party rows remain covered by the existing reset scopes.
 // Automatic representative identities use preserved app_members/password_accounts and as_agent/sales_agent; existing flow/inventory operation freeze triggers protect the atomic mutation. No new tables. Credential changes clear ciphertext and revoke sessions/tokens.

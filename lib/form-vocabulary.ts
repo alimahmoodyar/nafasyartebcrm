@@ -1,5 +1,15 @@
 // Shared presentation vocabulary. Values/identifiers sent to domain APIs remain unchanged.
 export const fieldTitles:Record<string,string>={
+  "customerName": "نام مشتری نهایی",
+  "customerMobile": "موبایل مشتری نهایی",
+  "customerNationalId": "کد ملی مشتری نهایی",
+  "customerCity": "شهر مشتری نهایی",
+  "customerAddress": "نشانی تحویل مشتری نهایی",
+  "leaveMonth": "ماه تقویم مرخصی",
+  "minCashBps": "حداقل سهم نقد مجاز",
+  "maxCashBps": "حداکثر سهم نقد مجاز",
+  "minMonths": "حداقل مهلت مجاز، ماه",
+  "maxMonths": "حداکثر مهلت مجاز، ماه",
   "notes": "توضیحات",
   "day": "تاریخ",
   "quantity": "تعداد / مقدار",
@@ -1270,3 +1280,5 @@ Object.assign(fieldTitles,{roles:'نقش‌های شغلی'});
 
 Object.assign(toolFieldTitles.sales_apply,{nationalId:'کد ملی مسئول نمایندگی',mobile:'موبایل مسئول نمایندگی (رمز اولیه)'});
 Object.assign(fieldTitles,{newPassword:'رمز عبور تازه'});
+
+Object.assign(toolModeTitles.sales_apply,{branch_release:'تأیید ارسال امانی شعبه'});

@@ -2,7 +2,7 @@ import {formPresentation} from './assistant-form-presentation';
 import {fields,names,type Kind} from './model';
 // Shared UI draft contract. Drafts never execute a business operation.
 export type OperationChoice={key:string;tool:string;title:string;section:string;args:Record<string,string>};
-export type OperationForm={choices?:OperationChoice[];tool:string;section:string;title:string;args:Record<string,any>;schema:any;actionId?:string;state?:string;result?:any};
+export type OperationForm={choices?:OperationChoice[];tool:string;section:string;title:string;args:Record<string,any>;schema:any;actionId?:string;state?:string;result?:any;preview?:any;previewError?:string};
 const secret=/password|token|secret|cipher|api.?key/i;
 export function cleanFormArgs(value:any,depth=0):any{
  if(depth>12)throw new Error('اطلاعات فرم بیش از حد پیچیده است.');
@@ -22,6 +22,8 @@ export function operationForm(tool:any,args:any,section:string,title:string):Ope
 // Opening a requested draft must not depend on the model calling a display tool.
 export function requestedOperationForm(message:string,previous:any,available:any[]):OperationForm|undefined{
  const text=message.replace(/[ي]/g,'ی').replace(/[ك]/g,'ک').replace(/\u200c/g,' ');
+ const sale=/(بفروش|فروخت|سفارش\s+(?:فروش|مشتری|نماینده)|فروش\s+(?:دستگاه|محصول|کالا))/.test(text)&&!/(حذف|لغو|ثبت نکن|منصرف)/.test(text);
+ if(sale){const tool=available.find(t=>t.name==='sales_apply'&&t.write);if(tool){const args=previous?.tool===tool.name&&previous.args?.mode==='order'?previous.args:{mode:'order',items:[]};return operationForm(tool,args,'sales','ثبت سفارش فروش');}}
  const representative=/(نماینده|نمایندگی|عامل فروش)/.test(text)&&/(جدید|ایجاد|بساز|ساخت|تعریف|ثبت)/.test(text)&&!/(حذف|پاک|نساز|ایجاد نکن|ثبت نکن)/.test(text)&&!/(گیرنده|مقصد|ارسال کالا)/.test(text);
  if(representative&&!/خدمات/.test(text)){const tool=available.find(t=>t.name==='sales_apply'&&t.write);if(!tool)return;const args=previous?.tool===tool.name&&previous.args?.mode==='agent'&&!previous.args.agentId?previous.args:{mode:'agent',agentId:'',kind:'representative'};return operationForm(tool,args,'sales','ثبت پرونده نماینده فروش');}
  const createUser=/(کاربر|حساب کاربری|اکانت)/.test(text)&&/(جدید|ایجاد|بساز|ساخت|تعریف)/.test(text)&&!/(حذف|پاک|نساز|ایجاد نکن)/.test(text);
@@ -36,7 +38,7 @@ export function requestedOperationForm(message:string,previous:any,available:any
 
 export function requestsOperation(message:string){
  const text=message.replace(/ي/g,'ی').replace(/ك/g,'ک');
- return /فرم|ثبت|ایجاد|بساز|تعریف|ویرایش|اصلاح|حذف|تنظیم|ارجاع|تحویل|درخواست|تأیید|تایید|تمدید|بستن|تخصیص|رزرو|انتقال|تولید|صدور|پرداخت|مرخصی|مساعده|یادآور|یاداوری|یادآوری|ریمایندر|مأموریت|ماموریت|پذیرش/.test(text)&&!/(ثبت نکن|ایجاد نکن|نساز|حذف نکن|لغو کن|منصرف شدم)/.test(text);
+ return /فرم|ثبت|ایجاد|بساز|تعریف|ویرایش|اصلاح|حذف|تنظیم|ارجاع|تحویل|درخواست|تأیید|تایید|تمدید|بستن|تخصیص|رزرو|انتقال|تولید|صدور|پرداخت|مرخصی|مساعده|یادآور|یاداوری|یادآوری|ریمایندر|مأموریت|ماموریت|پذیرش|بفروش|سفارش/.test(text)&&!/(ثبت نکن|ایجاد نکن|نساز|حذف نکن|لغو کن|منصرف شدم)/.test(text);
 }
 export function operationChoices(available:any[],sectionFor:(tool:string,args:any)=>string,canOpen:(section:string)=>boolean,titles:Record<string,string>):OperationChoice[]{
  const choices:OperationChoice[]=[];

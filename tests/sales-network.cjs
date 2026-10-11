@@ -87,4 +87,48 @@ const nw=(mode,extra={},u=manager,status=200)=>post(network,'/api/sales/network'
  const before=sql.prepare('SELECT count(*) n FROM flow_entities').get().n;sql.exec('BEGIN');for(const table of Object.keys(reset.resetTables))sql.exec('DELETE FROM '+table+' WHERE '+reset.resetWhere(table,'operations'));assert.equal(sql.prepare('PRAGMA foreign_key_check').all().length,0);sql.exec('ROLLBACK');assert.equal(sql.prepare('SELECT count(*) n FROM flow_entities').get().n,before);
  sql.prepare("UPDATE reset_control SET phase='maintenance',internal=0 WHERE id=1").run();const frozen=await nw('template',{kind:'representative',previousId:all('sales_template').filter(r=>r.data.kind==='representative').sort((a,b)=>b.data.version-a.data.version)[0].id,title:'Frozen',cashBps:5000,months:1},manager,423);assert.equal(all('sales_template').length,3);
  console.log('PASS sales network: templates, negotiated approval, immutable invoice, automatic allocation, commissions/reversals, ownership, MCP, concurrency and reset rollback');
+ // Compact assistant orders derive every monetary field from actual scoped configuration.
+ sql.prepare("UPDATE reset_control SET phase='idle',internal=0 WHERE id=1").run();
+ const draftDomain=load('lib/sales-order-draft.ts'),formApi=load('app/api/assistant/forms/route.ts'),actionApi=load('app/api/assistant/actions/route.ts');
+ const simpleItems=[{productId:'product',quantity:5}],drafts={};
+ for(const [kind,rate,cashBps,months] of [['representative',1000,5000,1],['reseller',500,6000,2],['end_customer',0,10000,0]]){
+  const agentId='simple-'+kind;seed(agentId,'sales_agent',{name:'Buyer '+kind,kind,active:true,ownerId:'manager',termDays:30,creditLimit:'100000',phone:'02112345678',address:'Actual address'});
+  const previous=all('sales_template').filter(t=>t.data.kind===kind).sort((a,b)=>b.data.version-a.data.version)[0];
+  await nw('template',{kind,title:'Approved '+kind,discountBps:rate,cashBps,months,previousId:previous?.id||''});
+  const recordCount=sql.prepare('SELECT COUNT(*) n FROM flow_entities').get().n;
+  const q=await post(quoteApi,'/api/sales/quote',{agentId,items:simpleItems},manager);
+  assert.equal(q.lines[0].unitPrice,'1000');assert.equal(q.lines[0].discountBps,rate);assert.equal(q.amount,String(5*(1000-rate/10)));
+  assert.equal(q.salesTerms.cashBps,cashBps);assert.equal(q.salesTerms.months,months);assert.equal(q.baseDiscountBps,rate);
+  assert.equal(q.installments.reduce((n,p)=>n+BigInt(p.amount),0n),BigInt(q.amount));
+  assert.equal(sql.prepare('SELECT COUNT(*) n FROM flow_entities').get().n,recordCount,'Read-only preview must not reserve or write');
+  const mcpQuote=await catalog.executeTool('preview_sales_order',{agentId,items:simpleItems},base,{user:manager,scope:'read',tokenId:null});assert.equal(mcpQuote.quoteHash,q.quoteHash);
+  drafts[kind]=q;
+ }
+ const repDraft=drafts.representative,args={mode:'order',agentId:repDraft.agentId,items:simpleItems,requestSource:source};
+ const hydrated=await draftDomain.hydrateSalesOrderForm(manager,{tool:'sales_apply',args,section:'sales',title:'Order',schema:{}});
+ assert.equal(hydrated.preview.buyer.name,'Buyer representative');assert.equal(hydrated.preview.amount,'4500');assert.equal(hydrated.args.salesTerms,undefined);
+ const prepared=await draftDomain.prepareSalesOrderArgs(manager,args);assert.equal(prepared.quoteHash,repDraft.quoteHash);
+ const bad=await draftDomain.hydrateSalesOrderForm(manager,{...hydrated,args:{...args,items:[{productId:'missing',quantity:5}]}});assert.ok(bad.previewError);assert.equal(bad.preview,undefined);
+ sql.prepare("UPDATE app_members SET status='active' WHERE id='staff'").run();await assert.rejects(()=>draftDomain.salesOrderDraft(staff,{...args,agentId:b}),/دسترسی/);
+ const orderCount=all('sales_order').length,formId=crypto.randomUUID();
+ const formRequest=body=>new Request(base+'/api/assistant/forms',{method:'POST',headers:{origin:base,'Content-Type':'application/json','x-assistant-account':manager.userId},body:JSON.stringify(body)});
+ const formBody={id:formId,tool:'sales_apply',args:prepared};
+ const preparedResponse=await context.run(manager,()=>formApi.POST(formRequest(formBody)));assert.equal(preparedResponse.status,200,await preparedResponse.clone().text());
+ const preparedAction=(await preparedResponse.json()).action;assert.equal(preparedAction.state,'pending');assert.equal(all('sales_order').length,orderCount,'Preparing a form must not sell devices');
+ assert.equal((await context.run(manager,()=>formApi.POST(formRequest(formBody)))).status,200,'Preparation retry is idempotent');
+ const confirmRequest=new Request(base+'/api/assistant/actions',{method:'POST',headers:{origin:base,'Content-Type':'application/json','x-assistant-account':manager.userId},body:JSON.stringify({id:formId,decision:'confirm',confirmed:true})});
+ const confirmedResponse=await context.run(manager,()=>actionApi.POST(confirmRequest)),confirmed=await confirmedResponse.json();assert.equal(confirmed.action.state,'succeeded',JSON.stringify(confirmed));
+ const savedOrder=entity(preparedAction.args.id);assert.equal(savedOrder.data.amount,'4500');assert.equal(savedOrder.data.lines[0].discountBps,1000);assert.equal(savedOrder.data.salesTerms.cashBps,5000);
+ const oldTemplate=all('sales_template').filter(t=>t.data.kind==='representative').sort((a,b)=>b.data.version-a.data.version)[0];
+ await nw('template',{kind:'representative',title:'Updated approved rate',discountBps:1200,cashBps:5000,months:1,previousId:oldTemplate.id});
+ await assert.rejects(()=>draftDomain.prepareSalesOrderArgs(manager,prepared),/تغییر/);assert.equal(savedOrder.data.amount,'4500','Existing orders retain their approved snapshot');
+ const staleForm=await context.run(manager,()=>formApi.POST(formRequest({...formBody,id:crypto.randomUUID()})));assert.equal(staleForm.status,409);
+ const currentTemplate=all('sales_template').filter(t=>t.data.kind==='representative').sort((a,b)=>b.data.version-a.data.version)[0];
+ await nw('template',{kind:'representative',title:'Invalid discount',discountBps:9001,cashBps:5000,months:1,previousId:currentTemplate.id},manager,400);
+ await nw('template',{kind:'representative',title:'Preserve approved discount',cashBps:5000,months:1,previousId:currentTemplate.id});assert.equal((await draftDomain.salesOrderDraft(manager,args)).baseDiscountBps,1200);
+ seed('simple-target','sales_target',{agentId:args.agentId,state:'active',start:past,end:future,basis:'net',productIds:['product'],tiers:[{threshold:'0',discountBps:1500}]});
+ const earned=await draftDomain.salesOrderDraft(manager,args);assert.equal(earned.lines[0].discountBps,1500,'Category and earned discounts use higher rate, never stack');
+ seed('simple-overdue','sales_invoice',{agentId:args.agentId,day:past,amount:'100',installments:[{id:'old',due:past,amount:'100'}]});
+ const blocked=await draftDomain.salesOrderDraft(manager,args);assert.equal(blocked.discountBlocked,true);assert.equal(blocked.lines[0].discountBps,0);assert.equal(blocked.amount,'5000');
+ console.log('PASS simple sales: category defaults, exact prices, tier/overdue rules, HTTP/MCP parity, scoped previews, no draft writes, explicit confirmation, idempotency, stale quote rejection and immutable snapshots.');
 })().catch(e=>{console.error(e);process.exitCode=1});
