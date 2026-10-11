@@ -1,0 +1,3 @@
+export type BuyerChoice={id:string;name:string;detail?:string};
+export function buyerSearchText(v:string){return v.normalize('NFKC').replace(/ي/g,'ی').replace(/ك/g,'ک').replace(/[\u064B-\u065F\u0670]/g,'').replace(/[\u200c\u200d]/g,' ').replace(/[۰-۹]/g,c=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(c))).replace(/[٠-٩]/g,c=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(c))).replace(/\s+/g,' ').trim().toLocaleLowerCase();}
+export function searchBuyers(choices:BuyerChoice[],query:string){const words=buyerSearchText(query).split(' ').filter(Boolean);return choices.filter(c=>{const text=buyerSearchText(c.name+' '+(c.detail||''));return words.every(w=>text.includes(w));});}
