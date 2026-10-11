@@ -17,7 +17,8 @@ const entity=id=>{const r=sql.prepare('SELECT * FROM flow_entities WHERE id=?').
 const all=type=>sql.prepare('SELECT * FROM flow_entities WHERE type=?').all(type).map(r=>({...r,data:JSON.parse(r.data)}));
 async function post(api,path,body,u=admin,status=200){const r=await context.run(u,()=>api.POST(request(path,body)));const d=await r.json();assert.equal(r.status,status,body.mode+': '+JSON.stringify(d));return {...d,body};}
 let a,b,rep,other;
-const op=(mode,extra={},u=finance,status=200)=>post(sales,'/api/sales',{id:crypto.randomUUID(),mode,agentId:a,confirmed:true,notes:'Verified source',...extra},u,status);
+let representativeSequence=1234500000;
+const op=(mode,extra={},u=finance,status=200)=>post(sales,'/api/sales',{id:crypto.randomUUID(),mode,...(mode==='agent'&&!extra.agentId?{nationalId:String(++representativeSequence),mobile:'09123456789'}:{}),agentId:a,confirmed:true,notes:'Verified source',...extra},u,status);
 const get=async(u=rep,agent='',status=200)=>{const r=await context.run(u,()=>sales.GET(request('/api/sales'+(agent?'?agent='+agent:''))));assert.equal(r.status,status);return r.json();};
 const balance=async()=>((await get()).accounts[0]);
 const quote=(qty=3,u=rep)=>post(quoteApi,'/api/sales/quote',{agentId:a,items:[{productId:'product',quantity:qty}]},u);
@@ -75,10 +76,10 @@ async function upload(u=rep,extra={},status=201){const meta={id:crypto.randomUUI
  const mcpView=await catalog.executeTool('get_sales',{},base,{user:rep,scope:'read',tokenId:null});assert.equal(mcpView.agents.length,1);assert.equal(catalog.tools.find(t=>t.name==='preview_sales_order').write,false);await assert.rejects(()=>catalog.executeTool('sales_apply',{id:crypto.randomUUID(),mode:'payment',agentId:a,confirmed:true,method:'cash',amount:'1',day:today,reference:'MCP'},base,{user:rep,scope:'read',tokenId:null}),/read-only/);
  const mcpPay=await catalog.executeTool('sales_apply',{id:crypto.randomUUID(),mode:'payment',agentId:a,confirmed:true,method:'cash',amount:'1',day:today,reference:'MCP'},base,{user:rep,scope:'read_write',tokenId:null});assert.ok(mcpPay.saved);const mcpQuote=await catalog.executeTool('preview_sales_order',{agentId:a,items:[{productId:'product',quantity:1}]},base,{user:rep,scope:'read',tokenId:null});assert.equal(mcpQuote.amount,'1000');
 
- // Delegated workflow: a representative needs no login account for sales staff to operate their profile.
+ // Delegated workflow: automatic account creation does not prevent staff from recording an actual offline request.
  const source={channel:'phone',contactName:'Actual rep contact',day:today,reference:'Call log 104: agreed price, quantity and terms'};
  const c=(await op('agent',{...create,agentId:'',name:'Offline rep',managerId:'manager'},manager)).id;
- assert.equal(sql.prepare("SELECT count(*) n FROM app_members WHERE json_extract(permissions,'$.salesAgentId')=?").get(c).n,0);
+ assert.equal(sql.prepare("SELECT count(*) n FROM app_members WHERE json_extract(permissions,'$.salesAgentId')=?").get(c).n,1);
  await op('terms',{agentId:c,revision:version(c),creditLimit:'100000',termDays:0});
  const cq=await post(quoteApi,'/api/sales/quote',{agentId:c,items:[{productId:'product',quantity:1}]},staff);
  const cb={agentId:c,items:cq.body.items,quoteHash:cq.quoteHash};await op('order',cb,staff,400);await op('order',{...cb,requestSource:{...source,day:future}},staff,400);

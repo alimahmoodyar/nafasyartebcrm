@@ -1262,3 +1262,6 @@ toolFieldTitles.get_development_requests={...toolFieldTitles.get_development_req
 Object.assign(fieldTitles,{roleAssignment:'انتخاب نقش شغلی',treasuryWorkflowRoles:'نقش‌های فرایند خزانه‌داری'});
 
 Object.assign(fieldTitles,{roles:'نقش‌های شغلی'});
+
+Object.assign(toolFieldTitles.sales_apply,{nationalId:'کد ملی مسئول نمایندگی',mobile:'موبایل مسئول نمایندگی (رمز اولیه)'});
+Object.assign(fieldTitles,{newPassword:'رمز عبور تازه'});

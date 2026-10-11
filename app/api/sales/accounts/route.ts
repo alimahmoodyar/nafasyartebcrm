@@ -9,7 +9,7 @@ async function scope(){const actor=await requireAccess();if(!salesManager(actor)
 function failure(e:unknown){return accessResponse(e)||Response.json({error:/UNIQUE/.test(String(e))?'این نام کاربری یا شناسه درخواست قبلاً استفاده شده است.':'ثبت حساب انجام نشد؛ ورودی‌ها را بررسی و دوباره تلاش کنید.'},{status:/UNIQUE/.test(String(e))?409:400});}
 export async function GET(request:Request){try{
   await scope();
-  const rows=await storage().prepare("SELECT m.id,m.name,m.status,a.username,json_extract(m.permissions,'$.salesAgentId') AS agentId FROM app_members m JOIN password_accounts a ON a.member_id=m.id WHERE m.status!='deleted' AND json_extract(m.permissions,'$.salesRoles')='[\"agent\"]' ORDER BY m.created DESC").all();
+  const rows=await storage().prepare("SELECT m.id,m.name,m.status,a.username,a.must_change AS mustChangePassword,EXISTS(SELECT 1 FROM access_audit x WHERE x.target=m.id AND x.action='automatic_representative_account') AS automaticAccount,json_extract(m.permissions,'$.salesAgentId') AS agentId FROM app_members m JOIN password_accounts a ON a.member_id=m.id WHERE m.status!='deleted' AND json_extract(m.permissions,'$.salesRoles')='[\"agent\"]' ORDER BY m.created DESC").all();
   return Response.json({accounts:rows.results},{headers:{'Cache-Control':'no-store'}});
 }catch(e){return failure(e)}}
 export async function POST(request:Request){try{

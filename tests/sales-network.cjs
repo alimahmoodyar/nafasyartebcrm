@@ -17,14 +17,15 @@ const entity=id=>{const r=sql.prepare('SELECT * FROM flow_entities WHERE id=?').
 const all=type=>sql.prepare('SELECT * FROM flow_entities WHERE type=?').all(type).map(r=>({...r,data:JSON.parse(r.data)}));
 async function post(api,path,body,u=admin,status=200){const r=await context.run(u,()=>api.POST(request(path,body)));const d=await r.json();assert.equal(r.status,status,body.mode+': '+JSON.stringify(d));return {...d,body};}
 let a,b,rep,other;
-const op=(mode,extra={},u=finance,status=200)=>post(sales,'/api/sales',{id:crypto.randomUUID(),mode,agentId:a,confirmed:true,notes:'Verified source',...extra},u,status);
+let representativeSequence=1234500000;
+const op=(mode,extra={},u=finance,status=200)=>post(sales,'/api/sales',{id:crypto.randomUUID(),mode,...(mode==='agent'&&!extra.agentId?{nationalId:String(++representativeSequence),mobile:'09123456789'}:{}),agentId:a,confirmed:true,notes:'Verified source',...extra},u,status);
 const get=async(u=rep,agent='',status=200)=>{const r=await context.run(u,()=>sales.GET(request('/api/sales'+(agent?'?agent='+agent:''))));assert.equal(r.status,status);return r.json();};
 const balance=async()=>((await get()).accounts[0]);
 const quote=(qty=3,u=rep)=>post(quoteApi,'/api/sales/quote',{agentId:a,items:[{productId:'product',quantity:qty}]},u);
 const version=id=>entity(id).revision;
 async function upload(u=rep,extra={},status=201){const meta={id:crypto.randomUUID(),agentId:a,confirmed:true,title:'Evidence',...extra},form=new FormData();form.set('metadata',JSON.stringify(meta));form.set('file',new File(['%PDF-test'],'receipt.pdf'));const r=await context.run(u,()=>files.POST(new Request(base+'/api/sales/files',{method:'POST',headers:{origin:base},body:form})));const d=await r.json();assert.equal(r.status,status,JSON.stringify(d));return {...d,meta};}
 const network=load('app/api/sales/network/route.ts'),contract=load('lib/sales-network-contract.ts');
-const nw=(mode,extra={},u=manager,status=200)=>post(network,'/api/sales/network',{id:crypto.randomUUID(),mode,confirmed:true,agentId:a,notes:'Actual recorded decision',...extra},u,status);
+const nw=(mode,extra={},u=manager,status=200)=>post(network,'/api/sales/network',{id:crypto.randomUUID(),mode,...(mode==='agent'&&!extra.agentId?{nationalId:String(++representativeSequence),mobile:'09123456789'}:{}),confirmed:true,agentId:a,notes:'Actual recorded decision',...extra},u,status);
 (async()=>{
  for(const u of [manager,staff,finance,viewer])member(u);
  const second=actor('second',['staff']);member(second);

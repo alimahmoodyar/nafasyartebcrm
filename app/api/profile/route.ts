@@ -5,7 +5,7 @@ const headers={'Cache-Control':'private, no-store','Vary':'Cookie, Authorization
 async function own(request:Request){const u=await requireAccess(),expected=request.headers.get('x-profile-account')||new URL(request.url).searchParams.get('account');if(expected&&expected!==u.userId)throw new AccessError('حساب تغییر کرده است؛ صفحه را تازه‌سازی کنید.',409);return u;}
 export async function GET(request:Request){try{const u=await own(request),r:any=await storage().prepare("SELECT data,revision FROM flow_entities WHERE id=? AND type='account_profile'").bind('profile:'+u.userId).first(),d=r?JSON.parse(r.data):{};
  if(new URL(request.url).searchParams.has('image')){if(!d.image)throw new AccessError('عکس پروفایل ثبت نشده است.',404);const raw=atob(d.image);return new Response(Uint8Array.from(raw,c=>c.charCodeAt(0)),{headers:{...headers,'Content-Type':'image/jpeg','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; sandbox"}})}
- return Response.json({accountId:u.userId,name:u.name,revision:r?.revision||0,hasPhoto:!!d.image},{headers});
+ return Response.json({accountId:u.userId,name:u.name,username:u.username,authType:u.authType,revision:r?.revision||0,hasPhoto:!!d.image},{headers});
  }catch(e){return accessResponse(e)||Response.json({error:'پروفایل در دسترس نیست.'},{status:503,headers})}}
 export async function POST(request:Request){try{checkOrigin(request);const u=await own(request),b=JSON.parse(new TextDecoder().decode(await boundedBody(request,95000))),db=storage(),id='profile:'+u.userId;
  if(b.confirmed!==true||!Number.isInteger(b.revision)||b.revision<0||!['upload','remove'].includes(b.mode))throw new AccessError('اطلاعات پروفایل معتبر نیست.',400);

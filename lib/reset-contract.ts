@@ -1,3 +1,4 @@
+// Automatic representative identities use preserved app_members/password_accounts and as_agent/sales_agent; existing flow/inventory operation freeze triggers protect the atomic mutation. No new tables. Credential changes clear ciphertext and revoke sessions/tokens.
 // Intake contact fields are embedded in as_case; existing backup, both reset scopes and flow freeze cover them.
 // purchase_service is operational flow_entities data: both resets delete it; 0016 freezes it. Output files reuse payable_file backup/object cleanup; private design remains in qms_file under existing rules.
 // Development test results, closure identity and attention flags remain embedded in preserved development_request; existing backup and 0016 freeze apply.

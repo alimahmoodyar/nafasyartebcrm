@@ -7,7 +7,7 @@ import {allPermissions, validatePermissions, type Session} from "@/lib/permissio
 import type {Kind} from "@/lib/model";
 
 export class AccessError extends Error { constructor(message: string, public status: number) {super(message);} }
-export async function session(): Promise<Session> {
+async function currentSession(): Promise<Session> {
   const actor = mcpActor.getStore();
   if (actor) return actor;
   const local=await localSession();
@@ -34,6 +34,11 @@ export async function resolveIdentity(identity: Awaited<ReturnType<typeof getCha
   const current = await db.prepare("SELECT subject, status, permissions FROM app_members WHERE id = ?").bind(member.id).first<{subject: string; status: string; permissions: string}>();
   if (!current || current.status !== "active" || current.subject !== identity.userId) throw new AccessError("حساب غیرفعال است یا هویت ورود تطابق ندارد.", 403);
   return {userId: identity.userId, email, name: member.name, isAdmin: false, permissions: validatePermissions(JSON.parse(current.permissions))};
+}
+export async function session(allowPasswordChange=false):Promise<Session>{
+ const user=await currentSession();
+ if(user.mustChangePassword&&!allowPasswordChange)throw new AccessError('ابتدا رمز اولیه حساب را در صفحه ورود تغییر دهید.',403);
+ return user;
 }
 export function can(user: Session, kind: Kind, operation: "read" | "write") {return user.isAdmin || user.permissions[operation].includes(kind);}
 export async function requireAccess(kind?: Kind, operation: "read" | "write" = "read") {
