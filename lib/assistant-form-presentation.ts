@@ -1,3 +1,4 @@
+import {partRepairForms,partRepairActions,visiblePartRepairFields} from './part-repair-contract';
 import {personnelKinds} from './personnel-contract';
 import {operationDataSchema,visiblePersonnelFields} from './operation-form-fields';
 import {fieldTitles,toolFieldTitles,toolModeTitles,baseModeTitles} from './form-vocabulary';
@@ -34,9 +35,10 @@ export function generalPresentation(tool:string,args:any,input:any,title:string)
  const dataSchema=operationDataSchema(tool,args.mode);
  if(dataSchema){schema.properties??={};schema.properties.data={...schema.properties.data,...dataSchema};}
  if(tool==='apply_qms_record'&&schema.properties?.data?.properties?.kind){schema.properties.data.properties.kind={type:'string',enum:Object.keys(qmsKinds),enumLabels:Object.fromEntries(Object.entries(qmsKinds).map(([k,v])=>[k,v.title]))};}
- const forms=tool==='after_sales_apply'?serviceForms:tool==='transport_apply'?transportForms:null;
+ const forms=tool==='part_repair_apply'?partRepairForms:tool==='after_sales_apply'?serviceForms:tool==='transport_apply'?transportForms:null;
  if(forms?.[args.mode]){
-  const target=contractSchema(forms[args.mode]);
+  const target=contractSchema(tool==='part_repair_apply'?visiblePartRepairFields(args.mode,args.data||{}):forms[args.mode]);
+  if(tool==='part_repair_apply'){for(const key of Object.keys(args.data||{}))if(!target.properties[key])target.properties[key]={uiHidden:true};if(target.properties.repairId&&args.data?.repairId)target.properties.repairId.uiHidden=true;}
   schema.properties??={};schema.properties.data={...schema.properties.data,...target};
  }
  if(tool==='apply_qms_record'&&qmsKinds[args.data?.kind]&&args.mode==='save'){
@@ -104,6 +106,7 @@ export function generalPresentation(tool:string,args:any,input:any,title:string)
  }
  if(tool==='setup_personnel_profile')return {schema,title:'ایجاد پرونده پایه پرسنلی'};
  if(tool==='save_sales_recipient'){if(schema.properties?.partyId&&!args.partyId)schema.properties.partyId.uiHidden=true;schema.required=(schema.required||[]).filter((k:string)=>k!=='partyId');return {schema,title:args.partyId?'ویرایش مقصد تحویل کالا':'ثبت مقصد تحویل کالا'};}
+ if(tool==='part_repair_apply')return {schema,title:partRepairActions[args.mode]||'قطعات تعمیری نمایندگان'};
  const mode=args.mode,modeTitle=toolModeTitles[tool]?.[mode]||optionTitles(tool,['mode'])[mode];
  return {schema,title:modeTitle?title.endsWith(' — '+modeTitle)?title:`${title} — ${modeTitle}`:title};
 }
