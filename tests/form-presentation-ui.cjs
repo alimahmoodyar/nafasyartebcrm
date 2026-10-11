@@ -5,7 +5,14 @@ const {AssistantWorkspace}=load('components/trace/assistant-workspace.tsx'),{Act
 function render(tool,args,schema){return renderToStaticMarkup(React.createElement(AssistantWorkspace,{form:{tool,args,schema,title:'فرم عملیات',section:'test'},accountId:'test',onChange(){},onSaved(){},onClose(){}}));}
 const raw={type:'object',properties:{mode:{type:'string'},revision:{type:'number'},company:{type:'string'},contactName:{type:'string'},title:{type:'string'},phone:{type:'string'},segment:{type:'string',enum:['home','hospital']}}};
 const empty=render('sales_lead_apply',{mode:'save'},raw);for(const name of ['ایجاد سرنخ فروش','نام سرنخ فروش','نام شرکت / بیمارستان / مرکز','نام فرد رابط','شماره تماس','بیمارستانی'])assert.ok(empty.includes(name),name);assert.ok(!empty.includes('اطلاعات تکمیلی'));assert.ok(!empty.includes('نسخه رکورد'));
-const service=render('after_sales_apply',{mode:'diagnose',data:{lines:[{partCode:'P-1',coverage:'warranty',quantity:'2'}]}},{type:'object',properties:{data:{type:'object'}}});for(const name of ['قطعات موردنیاز','پوشش','گارانتی دستگاه','علت نامشخص بودن بچ'])assert.ok(service.includes(name),name);
+const service=render('after_sales_apply',{mode:'diagnose',data:{lines:[{partCode:'P-1',coverage:'warranty',quantity:'2'}]}},{type:'object',properties:{data:{type:'object'}}});for(const name of ['قطعات موردنیاز','پوشش','گارانتی دستگاه','دلیل شمول یا عدم شمول گارانتی'])assert.ok(service.includes(name),name);
+// Installed batch history is resolved by the server; diagnosis must not ask the
+// service user to supply a batch number or explain missing trace history.
+assert.ok(!service.includes('علت نامشخص بودن بچ'));
+assert.ok(!service.includes('بچ قطعه قبلی'));
+const diagnose=formPresentation('after_sales_apply',{mode:'diagnose'},{type:'object',properties:{data:{type:'object'}}},'خدمات');
+assert.equal(diagnose.schema.properties.data.properties.lines.items.properties.oldBatchId,undefined);
+assert.equal(diagnose.schema.properties.data.properties.lines.items.properties.unknownReason,undefined);
 const groupedService=render('after_sales_apply',{mode:'diagnose',data:{lines:[{customerUnitRial:'12500000',quantity:'1250'}],laborLines:[{customerRial:'450000'}]}},{type:'object',properties:{data:{type:'object'}}});assert.ok(groupedService.includes('value="12,500,000"'));assert.ok(groupedService.includes('value="450,000"'));assert.ok(groupedService.includes('value="1250"'),'Quantities keep their existing format');assert.ok(groupedService.includes('inputMode="numeric"'));
 const args={mode:'request',kind:'advance',amount:'1200000',notes:'bank',memberId:'employee-17',revision:2,id:'op-123'};const before=JSON.stringify(args);
 const action={id:'pending',tool:'personnel_apply',title:'درخواست پرسنلی',args,state:'pending',section:'personnel'};
@@ -16,6 +23,8 @@ const metadata=formPresentation('apply_qms_record',{mode:'save',data:{kind:'chan
 const advance=formPresentation('personnel_apply',{mode:'request',kind:'advance'},{type:'object',properties:{kind:{},amount:{},installments:{},repaymentStart:{},start:{},end:{},leaveType:{},monthlyBase:{}}},'پرسنلی');
 assert.ok(advance.schema.properties.monthlyBase.uiHidden);assert.ok(advance.schema.required.includes('repaymentStart'));
 const leave=formPresentation('personnel_apply',{mode:'request',kind:'leave'},advance.schema,advance.title);assert.equal(leave.schema.properties.start.uiHidden,false);assert.equal(leave.schema.properties.amount.uiHidden,true);
+const setup=formPresentation('personnel_apply',{mode:'profile_setup'},{type:'object',properties:{memberId:{},managerId:{},start:{},monthlyBase:{},notes:{}}},'پرسنلی');assert.ok(setup.title.includes('ایجاد پرونده پایه پرسنلی'));assert.equal(setup.schema.properties.memberId.uiHidden,false);for(const key of ['managerId','start','monthlyBase'])assert.equal(setup.schema.properties[key].uiHidden,true);
+const setupHtml=render('setup_personnel_profile',{}, {type:'object',properties:{memberId:{type:'string'},notes:{type:'string'}}});assert.ok(setupHtml.includes('ایجاد پرونده پایه پرسنلی'));assert.ok(setupHtml.includes('علت اتصال پرونده پرسنلی'));assert.ok(!setupHtml.includes('فیلد تعریف‌نشده'));
 const {ActivationCodePanel}=load('components/trace/activation-code-panel.tsx');
 const activation=renderToStaticMarkup(React.createElement(ActivationCodePanel,{accountId:'test',demo:false}));
 for(const label of ['تولید کد پنج‌رقمی','کد ۱۰رقمی دستگاه','علت تولید کد / شماره پیگیری مشتری','تأیید و تولید کد پنج‌رقمی'])assert.ok(activation.includes(label),label);

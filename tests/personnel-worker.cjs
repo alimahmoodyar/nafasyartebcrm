@@ -7,7 +7,7 @@ const root=path.resolve(__dirname,'..');
 const built=path.join(root,'dist','server');
 assert.ok(fs.existsSync(path.join(built,'index.js')),'Run pnpm build before this worker regression test.');
 const {Miniflare}=require(require.resolve('miniflare',{paths:[require.resolve('wrangler/package.json')]}));
-const permissions={read:[],write:[],eventStages:[],personnelRoles:['treasury']};
+const permissions={read:[],write:[],eventStages:[],personnelRoles:['treasury'],roleAssignment:{roles:['treasurer']}};
 const wrapper=`
 import app from './index.js';
 let initialized;
@@ -22,7 +22,7 @@ async function initialize(db){
 async function linkedFixtures(db){
  const now=new Date().toISOString();
  const rows=[
-  ['audit-employee','hr_employee',{memberId:'audit-treasurer',managerId:'manager',name:'Audit treasurer',code:'T01',state:'active',start:'2026-01-01',end:'',leaveMinutes:480,unit:'Finance',title:'Treasurer'}],
+  ['audit-employee','hr_employee',{memberId:'audit-treasurer',managerId:'manager',name:'Audit treasurer',code:'T01',state:'active',start:'2026-01-01',end:'',leaveMinutes:480,unit:'Finance',title:'Treasurer',location:'Office',employment:'Contract'}],
   ['audit-ruling','hr_ruling',{memberId:'audit-treasurer',title:'My published ruling',state:'published',monthlyBase:'100000'}],
   ['audit-private-ruling','hr_ruling',{memberId:'another-employee',title:'Another employee private ruling',state:'draft',text:'PRIVATE-OTHER-EMPLOYEE'}],
   ['audit-payroll','hr_payroll',{memberId:'audit-treasurer',title:'My payslip',state:'paid',published:true,net:'90000',payments:[]}],
@@ -99,7 +99,7 @@ async function checkPreviousAliasFails(){
  try{
   assert.equal((await get()).status,401,'An anonymous request must remain unauthorized');
   const admin=await get('admin');checkPortal(admin);assert.equal(admin.data.admin,true);assert.equal(admin.data.records.length,0);
-  const treasury=await get('treasury');checkPortal(treasury);assert.equal(treasury.data.me,'audit-treasurer');assert.equal(treasury.data.admin,false);assert.deepEqual(treasury.data.roles,['treasury']);assert.equal(treasury.data.records.length,0);
+  const treasury=await get('treasury');checkPortal(treasury);assert.equal(treasury.data.me,'audit-treasurer');assert.equal(treasury.data.admin,false);assert.deepEqual(treasury.data.roles,['treasury']);assert.equal(treasury.data.records.length,0);assert.equal(treasury.data.profileStatus.state,'missing');assert.equal(treasury.data.profileStatus.ready,false);assert.equal(treasury.data.jobResponsibilities[0].name,'خزانه‌دار');assert.ok(!JSON.stringify(treasury.data.jobResponsibilities).includes('grants'));assert.equal(treasury.data.documentStatus.ruling.state,'missing');
   assert.equal((await get('external')).status,403,'A representative must not receive personnel data');
   assert.equal((await get('treasury','?from=invalid')).status,400,'Date validation must still reject an invalid date');
   const linked=await get('treasury','',{'x-audit-linked':'yes'});checkPortal(linked);
@@ -107,7 +107,7 @@ async function checkPreviousAliasFails(){
   assert.ok(!JSON.stringify(linked.data).includes('PRIVATE-OTHER-EMPLOYEE'),'Another employee private ruling must remain hidden');
   assert.equal(linked.data.positions[0].name,'Treasurer duties');assert.equal(linked.data.positions[0].tasks[0].title,'Review payment documents');
   assert.equal(linked.data.balances.find(b=>b.memberId==='audit-treasurer').availableMinutes,480);
-  assert.equal(linked.data.advances.find(a=>a.memberId==='audit-treasurer').pending,'1000');
+  assert.equal(linked.data.advances.find(a=>a.memberId==='audit-treasurer').pending,'1000');assert.equal(linked.data.profileStatus.ready,true);assert.equal(linked.data.profileStatus.services.finance.ready,true);assert.equal(linked.data.profileStatus.services.leave.ready,false);assert.equal(linked.data.documentStatus.ruling.state,'published');assert.equal(linked.data.documentStatus.payroll.state,'published');assert.ok(linked.data.personalWork.summary.error);
   checkPortal(await get('admin'));
   console.log('Personnel bundled workerd regression passed: admin, empty treasurer, linked personnel records, duties, leave/advance/loan kinds, privacy and date validation.');
  }finally{await mf.dispose();}

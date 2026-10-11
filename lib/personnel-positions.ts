@@ -1,4 +1,23 @@
 import {storage} from './storage';
+import {jobRoles} from './permissions';
+
+export type OwnJobResponsibility={id:string;name:string;group:string;responsibilities:string};
+
+// Use only explicit assignments, never infer a job from effective permissions.
+// The catalogue contains grants and scopes that do not belong in a self-service view.
+export function ownJobResponsibilities(permissions:unknown):OwnJobResponsibility[]{
+ let parsed:unknown=permissions;
+ if(typeof parsed==='string'){try{parsed=JSON.parse(parsed);}catch{return [];}}
+ if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))return [];
+ const assignment=(parsed as {roleAssignment?:unknown}).roleAssignment;
+ if(!assignment||typeof assignment!=='object'||Array.isArray(assignment))return [];
+ const roles=(assignment as {roles?:unknown}).roles;
+ if(!Array.isArray(roles)||roles.some(id=>typeof id!=='string'))return [];
+ return [...new Set<string>(roles)].flatMap(id=>{
+  const role=jobRoles.find(r=>r.id===id);
+  return role?[{id:role.id,name:role.label,group:role.group,responsibilities:role.actions}]:[];
+ });
+}
 
 // Only the authenticated employee's assignments; no membership or supervisor data.
 export function ownPositionProfiles(rows:any[], memberId:string){

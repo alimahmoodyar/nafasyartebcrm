@@ -9,7 +9,7 @@ function load(name){
  vm.runInNewContext(source,{exports,require:n=>{
   if(n==='./storage')return {storage:()=>db};
   if(n==='./authorization')return {AccessError};
-  if(n==='./personnel-contract'||n==='./persian-date')return load('lib/'+n.slice(2)+'.ts');
+  if(n==='./personnel-contract'||n==='./persian-date'||n==='./personnel-profile')return load('lib/'+n.slice(2)+'.ts');
   return {};
  },Error,Date,Intl,BigInt,Array,Object,Set,Map,console},{filename});return exports;
 }

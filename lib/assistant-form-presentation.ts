@@ -95,6 +95,7 @@ export function generalPresentation(tool:string,args:any,input:any,title:string)
   if(props.day)props.day.title=args.mode==='pay'?'تاریخ پرداخت':'روز کاری';
   if(args.mode==='request'&&personnelKinds[args.kind])return {schema,title:'ثبت درخواست '+personnelKinds[args.kind]};
  }
+ if(tool==='setup_personnel_profile')return {schema,title:'ایجاد پرونده پایه پرسنلی'};
  if(tool==='save_sales_recipient'){if(schema.properties?.partyId&&!args.partyId)schema.properties.partyId.uiHidden=true;schema.required=(schema.required||[]).filter((k:string)=>k!=='partyId');return {schema,title:args.partyId?'ویرایش مقصد تحویل کالا':'ثبت مقصد تحویل کالا'};}
  const mode=args.mode,modeTitle=toolModeTitles[tool]?.[mode]||optionTitles(tool,['mode'])[mode];
  return {schema,title:modeTitle?title.endsWith(' — '+modeTitle)?title:`${title} — ${modeTitle}`:title};

@@ -30,7 +30,9 @@ const profile={mode:'employee',code:'A01',memberId:'alice',managerId:'manager',s
  assert.equal((await apply(alice,aid,'approve')).status,403);assert.equal((await post(bob,{...input,id:crypto.randomUUID(),memberId:'alice'})).status,403);
  await success(hr,aid,'approve');await success(finance,aid,'approve');assert.equal((await summary(alice))[0].pending,'0');assert.equal((await summary(alice))[0].approved,'2000');
  await success(treasury,aid,'pay',{amount:'500',day:today,reference:'ADV-PART'});assert.equal((await summary(alice))[0].paid,'500');assert.equal(row(aid).data.state,'partial');
+ const partial=(await get(alice)).data.records.find(r=>r.id===aid);assert.ok(partial.reviewers.includes('treasury'),'treasury remains responsible after a partial advance payment');const paymentTask=()=>sql.prepare('SELECT state,data FROM duty_runs WHERE id=?').get('personnel:'+aid+':treasury');assert.equal(paymentTask().state,'open');assert.equal(JSON.parse(paymentTask().data).stage,'partial');
  await success(treasury,aid,'pay',{amount:'1500',day:today,reference:'ADV-FINAL'});assert.equal(row(aid).data.state,'paid');assert.equal((await summary(alice))[0].paid,'2000');
+ assert.equal((await get(alice)).data.records.find(r=>r.id===aid).reviewers.includes('treasury'),false);assert.equal(paymentTask().state,'completed','payment task retires only after the request is fully paid');
  const denied=await ok(alice,{...input,id:crypto.randomUUID(),amount:'10'});await success(hr,denied,'reject');assert.equal((await summary(alice))[0].pending,'0');
  const mcpInput={id:crypto.randomUUID(),confirmed:true,amount:'300',installments:1,repaymentStart:today,notes:'Actual advance reason'};
  await assert.rejects(()=>catalog.executeTool('request_personnel_advance',mcpInput,base,{user:alice,scope:'read',tokenId:null}),/read-only/);

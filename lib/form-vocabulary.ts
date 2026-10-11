@@ -646,6 +646,7 @@ export const fieldTitles:Record<string,string>={
   "error": "پیام خطا"
 };
 export const toolFieldTitles:Record<string,Record<string,string>>={
+ setup_personnel_profile:{memberId:'کارمند (برای پرونده خودتان خالی بگذارید)',notes:'علت اتصال پرونده پرسنلی'},
  save_sales_recipient:{kind:"نوع گیرنده کالا",partyId:"گیرنده موجود برای ویرایش",name:"نام گیرنده کالا",phone:"شماره تماس گیرنده",address:"نشانی تحویل کالا",active:"مقصد تحویل فعال"},
   "personnel_apply": {
     "memberId": "درخواست برای",
@@ -892,6 +893,7 @@ export const toolFieldTitles:Record<string,Record<string,string>>={
 };
 export const toolModeTitles:Record<string,Record<string,string>>={
   "personnel_apply": {
+    "profile_setup": "ایجاد پرونده پایه پرسنلی",
     "employee": "پرونده پرسنلی",
     "shift": "تعریف شیفت",
     "assignment": "برنامه کاری",
