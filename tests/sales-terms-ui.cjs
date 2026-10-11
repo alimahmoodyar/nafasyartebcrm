@@ -1,0 +1,10 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript');
+let slots=[],cursor=0;
+const state=init=>{const i=cursor++;if(!(i in slots))slots[i]=init;return [slots[i],v=>slots[i]=typeof v==='function'?v(slots[i]):v]};
+const jsx=(type,props)=>({type,props}),out={};
+vm.runInNewContext(ts.transpileModule(fs.readFileSync('components/trace/sales-network-panel.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText,{exports:out,crypto:require('node:crypto').webcrypto,require:n=>n==='react'?{useState:state,useEffect:()=>{}}:n==='react/jsx-runtime'?{jsx,jsxs:jsx}:n.includes('sales-network-contract')?{partnerKinds:{representative:'نماینده'}}:n.includes('persian-date')?{localDay:()=> '2026-10-11'}:new Proxy({},{get:(_,k)=>k})});
+const flatten=x=>Array.isArray(x)?x.flatMap(flatten):x&&typeof x==='object'?[x,...flatten(x.props?.children)]:[];
+const render=()=>{cursor=0;return flatten(out.SalesNetworkPanel({templatesOnly:true,selected:'',members:[],onChange:()=>{}}))};
+slots=[{roles:{manager:true},agents:[],portfolio:[],templates:[]}];let nodes=render();const button=nodes.find(n=>n.type==='button'&&n.props.children==='تعریف نسخه جدید الگوی فروش');assert.ok(button);button.props.onClick();nodes=render();assert.ok(nodes.some(n=>n.type==='form'));assert.equal(slots[2].mode,'template');assert.equal(slots[2].kind,'representative');assert.ok(!nodes.some(n=>n.type==='IconActions'));
+slots=[{roles:{manager:false},agents:[],portfolio:[],templates:[]}];nodes=render();assert.ok(nodes.some(n=>n.props.role==='alert'));assert.ok(!nodes.some(n=>n.type==='button'));
+console.log('PASS sales terms: direct manager action opens template form; other roles denied.');
