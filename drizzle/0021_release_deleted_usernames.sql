@@ -5,6 +5,11 @@ SET username='@deleted:'||member_id, password_hash='deleted', password_ciphertex
 WHERE member_id IN (SELECT id FROM app_members WHERE status='deleted')
   AND username!='@deleted:'||member_id;
 --> statement-breakpoint
+UPDATE app_members
+SET email='deleted+'||id||'@deleted.invalid', subject=NULL
+WHERE status='deleted'
+  AND (email!='deleted+'||id||'@deleted.invalid' OR subject IS NOT NULL);
+--> statement-breakpoint
 DELETE FROM password_sessions WHERE member_id IN (SELECT id FROM app_members WHERE status='deleted');
 --> statement-breakpoint
 UPDATE mcp_tokens SET revoked=1 WHERE subject IN (

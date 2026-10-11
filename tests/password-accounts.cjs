@@ -128,14 +128,19 @@ async function enter(pass='Test-password-123'){return login.POST(request('/api/a
  assert.equal((await userApi.POST(request('/api/users','POST',{...body,username:'renamed-user'}))).status,409,'active name remains reserved');
  // Repair previously deleted accounts without releasing disabled or active names.
  const archived=await createLocal('old-deleted'),disabled=await createLocal('still-disabled');
+ const archivedEmail=sql.prepare('SELECT email FROM app_members WHERE id=?').get(archived.id).email;
  sql.prepare("UPDATE app_members SET status='deleted' WHERE id=?").run(archived.id);
+ sql.prepare("UPDATE app_members SET subject='archived-subject' WHERE id=?").run(archived.id);
  sql.prepare("UPDATE app_members SET status='disabled' WHERE id=?").run(disabled.id);
  sql.prepare('UPDATE password_accounts SET password_ciphertext=? WHERE member_id=?').run('old-encrypted-secret',archived.id);
  const migration=fs.readFileSync(path.join(root,'drizzle/0021_release_deleted_usernames.sql'),'utf8');sql.exec(migration);
  assert.equal(sql.prepare('SELECT password_ciphertext FROM password_accounts WHERE member_id=?').get(archived.id).password_ciphertext,null);
+ assert.equal(sql.prepare('SELECT email FROM app_members WHERE id=?').get(archived.id).email,'deleted+'+archived.id+'@deleted.invalid');
+ assert.equal(sql.prepare('SELECT subject FROM app_members WHERE id=?').get(archived.id).subject,null);
  const version=sql.prepare('SELECT version FROM password_accounts WHERE member_id=?').get(archived.id).version;sql.exec(migration);
  assert.equal(sql.prepare('SELECT version FROM password_accounts WHERE member_id=?').get(archived.id).version,version,'migration retry is stable');
  assert.notEqual((await createLocal('old-deleted')).id,archived.id);
+ const emailReplacement=await (await userApi.POST(request('/api/users','POST',{...body,username:undefined,email:archivedEmail}))).json();assert.ok(emailReplacement.member?.id);
  assert.equal((await userApi.POST(request('/api/users','POST',{...body,username:'still-disabled'}))).status,409,'disabled name remains reserved');
  assert.equal(sql.prepare('SELECT username FROM password_accounts WHERE member_id=?').get(replacement.id).username,'renamed-user');
  const legacy=(await (await userApi.POST(request('/api/users','POST',{email:'legacy@example.com',name:'Legacy',unit:'انبار',status:'active',permissions}))).json()).member;

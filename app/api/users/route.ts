@@ -107,7 +107,9 @@ export async function DELETE(request:Request) {
     const gate='EXISTS(SELECT 1 FROM access_audit WHERE id=?)';
     const results=await db.batch([
       db.prepare("INSERT INTO access_audit(id,actor,target,action,before,after,at) SELECT ?,?,?,?,?,?,? FROM app_members WHERE id=? AND revision=? AND status!='deleted'").bind(auditId,actor.userId,old.id,'delete_member',JSON.stringify(old),JSON.stringify(next),now,old.id,old.revision),
-      db.prepare("UPDATE app_members SET status='deleted',updated=?,revision=revision+1 WHERE id=? AND "+gate).bind(now,old.id,auditId),
+      // Keep the member row for historical references, but release all login identity keys.
+      // The audit snapshot retains the original email/subject for traceability.
+      db.prepare("UPDATE app_members SET status='deleted',email='deleted+'||id||'@deleted.invalid',subject=NULL,updated=?,revision=revision+1 WHERE id=? AND "+gate).bind(now,old.id,auditId),
       db.prepare("UPDATE password_accounts SET username='@deleted:'||member_id,password_hash='deleted',password_ciphertext=NULL,version=version+1 WHERE member_id=? AND "+gate).bind(old.id,auditId),
       db.prepare('DELETE FROM password_sessions WHERE member_id=? AND '+gate).bind(old.id,auditId),
       db.prepare('UPDATE mcp_tokens SET revoked=1 WHERE (subject=? OR subject=?) AND '+gate).bind('local:'+old.id,old.subject||'local:'+old.id,auditId),
