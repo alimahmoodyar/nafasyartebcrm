@@ -66,10 +66,10 @@ export function generalPresentation(tool:string,args:any,input:any,title:string)
  }
  decorate(schema,args);
  if(tool==='sales_network_apply'&&args.mode==='template'){
-  // Legacy drafts may still carry notes; keep them out of the visible template form.
+  // Hide retired fields even when a legacy template draft still carries them.
   const promotion=args.data?.templateType==='promotion';
   for(const node of [schema,schema.properties?.data])if(node){
-   const hidden=['notes','effectiveTo',...(!promotion?['durationDays']:[])];
+   const hidden=['notes','minMonths','effectiveTo',...(!promotion?['durationDays']:[])];
    for(const key of hidden)if(node.properties?.[key])node.properties[key].uiHidden=true;
    if(Array.isArray(node.required))node.required=node.required.filter((key:string)=>!hidden.includes(key));
   }
