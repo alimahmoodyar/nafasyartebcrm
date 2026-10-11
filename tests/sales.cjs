@@ -83,7 +83,8 @@ async function upload(u=rep,extra={},status=201){const meta={id:crypto.randomUUI
  await op('terms',{agentId:c,revision:version(c),creditLimit:'100000',termDays:0});
  const cq=await post(quoteApi,'/api/sales/quote',{agentId:c,items:[{productId:'product',quantity:1}]},staff);
  const cb={agentId:c,items:cq.body.items,quoteHash:cq.quoteHash};await op('order',cb,staff,400);await op('order',{...cb,requestSource:{...source,day:future}},staff,400);
- const co=await op('order',{...cb,requestSource:{...source,actor:'forged-rep'}},staff);
+ const co=await op('order',{...cb,requestSource:{...source,reference:undefined,actor:'forged-rep'}},staff);
+assert.equal(entity(co.id).data.submission.reference,'','No message reference is required for a real phone request');
  assert.equal(entity(co.id).data.submission.actor,'local:staff');assert.equal(entity(co.id).data.submission.onBehalf,true);assert.equal(entity(co.id).data.createdBy,'local:staff');
  await op('payment',{agentId:c,method:'cash',amount:'30',day:today,reference:'OFFLINE',requestSource:source},viewer,403);
  const cp=await op('payment',{agentId:c,method:'cash',amount:'30',day:today,reference:'OFFLINE',requestSource:source},staff);
@@ -95,7 +96,7 @@ async function upload(u=rep,extra={},status=201){const meta={id:crypto.randomUUI
  sql.prepare("UPDATE app_members SET status='inactive' WHERE id='staff'").run();await load('lib/sales-tasks.ts').syncSalesTasks();assert.ok(sql.prepare("SELECT id FROM duty_runs WHERE assignee='manager' AND json_extract(data,'$.salesAgentId')=? AND state='open'").get(c));sql.prepare("UPDATE app_members SET status='active' WHERE id='staff'").run();await load('lib/sales-tasks.ts').syncSalesTasks();
  const cqb=await post(quoteApi,'/api/sales/quote',{agentId:c,items:[{productId:'product',quantity:1}]},manager),cancelOrder=await op('order',{agentId:c,items:cqb.body.items,quoteHash:cqb.quoteHash,requestSource:source},manager);await op('order_cancel',{agentId:c,orderId:cancelOrder.id,revision:version(cancelOrder.id),requestSource:source},staff);assert.equal(entity(cancelOrder.id).data.state,'cancelled');
  await op('payment',{method:'cash',amount:'1',day:today,reference:'SPOOF',requestSource:source},rep,400);
- const mcpProxy=await catalog.executeTool('sales_apply',{id:crypto.randomUUID(),mode:'payment',agentId:c,confirmed:true,method:'cash',amount:'2',day:today,reference:'MCP-OFFLINE',requestSource:source},base,{user:staff,scope:'read_write',tokenId:null});assert.equal(entity(mcpProxy.id).data.submission.actor,'local:staff');
+ const mcpProxy=await catalog.executeTool('sales_apply',{id:crypto.randomUUID(),mode:'payment',agentId:c,confirmed:true,method:'cash',amount:'2',day:today,reference:'MCP-OFFLINE',requestSource:{channel:source.channel,contactName:source.contactName,day:source.day}},base,{user:staff,scope:'read_write',tokenId:null});assert.equal(entity(mcpProxy.id).data.submission.actor,'local:staff');
  // Finish the remaining two real serials through delegated receipt, with proof and revision-safe retries.
  assert.equal((await get(manager)).pipeline.find(p=>p.orderId===order.id).stage,'partial');
  const shipment2=all('sale').find(s=>s.id!==shipmentId);await post(fulfillment,'/api/fulfillment',{id:crypto.randomUUID(),mode:'dispatch',saleId:shipment2.id,deviceIds:['device2','device3'],carrierId:'driver',handedOver:true},warehouse);

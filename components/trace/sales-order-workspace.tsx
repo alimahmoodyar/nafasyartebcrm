@@ -61,7 +61,7 @@ export function SalesOrderWorkspace({form,accountId,locked,onChange,onPrepare,on
  function change(patch:any){const next={...latest.current,args:{...latest.current.args,...patch,quoteHash:undefined},preview:undefined,previewError:undefined};onChange(next);}
  const source=args.requestSource||{},needsSource=currentCatalog&&!currentCatalog.roles.agent;
  function sourceChange(patch:any){change({requestSource:{...source,...patch}});}
- const sourceComplete=!needsSource||source.channel&&source.contactName?.trim()&&source.day&&source.reference?.trim();
+ const sourceComplete=!needsSource||source.channel&&source.contactName?.trim()&&source.day;
  function prepare(){
   if(!quote||loading)return;
   const allowed=['mode','agentId','items','salesTerms','referrerId','customerReference','requestSource','notes','leadId','leadRevision'];
@@ -90,7 +90,7 @@ export function SalesOrderWorkspace({form,accountId,locked,onChange,onPrepare,on
     <label className="field">روش دریافت<select value={source.channel||''} onChange={e=>sourceChange({channel:e.target.value})}><option value="">انتخاب کنید</option>{Object.entries(salesRequestChannels).map(([v,label])=><option key={v} value={v}>{label}</option>)}</select></label>
     <label className="field">نام درخواست‌دهنده<NumberInput fieldKey="contactName" value={source.contactName||''} onChange={e=>sourceChange({contactName:e.target.value})}/></label>
     <SolarDate label="تاریخ دریافت درخواست" value={source.day||''} onChange={day=>sourceChange({day})}/>
-    <label className="field">خلاصه تماس یا مرجع پیام<NumberInput fieldKey="reference" value={source.reference||''} onChange={e=>sourceChange({reference:e.target.value})}/></label>
+    <label className="field">خلاصه تماس یا مرجع پیام (اختیاری)<NumberInput maxLength={1000} fieldKey="reference" value={source.reference||''} onChange={e=>sourceChange({reference:e.target.value})}/></label>
    </div></details>}
    {terms&&agent?.data.kind!=='branch'&&<details style={{marginBlock:12}}><summary>شرایط متفاوت از مصوب، در صورت توافق</summary>{!args.salesTerms?<button type="button" className="link" onClick={()=>change({salesTerms:{cashBps:terms.cashBps,months:terms.months}})}>واردکردن شرایط پیشنهادی</button>:<><p>شرایط پیشنهادی به تأیید مدیر فروش نیاز دارد.</p><div className="formgrid"><label className="field">سهم نقد، درصد<NumberInput fieldKey="cashBps" type="number" min={(terms.minCashBps??0)/100} max={(terms.maxCashBps??10000)/100} step="0.01" value={args.salesTerms.cashBps/100} onChange={e=>change({salesTerms:{...args.salesTerms,cashBps:Math.round(Number(e.target.value)*100)}})}/></label><label className="field">مهلت، ماه<NumberInput fieldKey="months" type="number" min={terms.minMonths??0} max={terms.maxMonths??12} value={args.salesTerms.months} onChange={e=>change({salesTerms:{...args.salesTerms,months:Number(e.target.value)}})}/></label></div><button type="button" className="link" onClick={()=>change({salesTerms:undefined})}>برگشت به شرایط مصوب</button></>}</details>}
    <details style={{marginBlock:12}}><summary>توضیح سفارش، در صورت نیاز</summary><label className="field">توضیح<NumberInput fieldKey="notes" value={args.notes||''} onChange={e=>change({notes:e.target.value})}/></label></details>

@@ -19,7 +19,7 @@ export function salesSubmission(u:Session,agentId:string,source:any,at:string){
  if(salesRep(u)){if(source!=null)salesFail('نماینده درخواست را مستقیماً از حساب خودش ثبت می‌کند.');return {actor:u.userId,actorName:u.name,agentId,onBehalf:false,channel:'portal',at};}
  if(!source||typeof source!=='object'||Array.isArray(source)||!Object.hasOwn(salesRequestChannels,source.channel))salesFail('روش دریافت درخواست نماینده را مشخص کنید.');
  const day=sday(source.day);if(day>dayAt())salesFail('تاریخ دریافت درخواست در آینده نباشد.');
- return {actor:u.userId,actorName:u.name,agentId,onBehalf:true,channel:source.channel,contactName:sreq(source.contactName,200),day,reference:sreq(source.reference,1000),at};
+ return {actor:u.userId,actorName:u.name,agentId,onBehalf:true,channel:source.channel,contactName:sreq(source.contactName,200),day,reference:stxt(source.reference??'',1000),at};
 }
 export function integer(v:unknown,min=1,max=10000){if(typeof v!=='number'||!Number.isSafeInteger(v)||v<min||v>max)salesFail('عدد صحیح در محدوده مجاز وارد کنید.');return v as number;}
 export function arr(v:unknown,max=100){if(!Array.isArray(v)||!v.length||v.length>max)salesFail('فهرست غیرخالی معتبر لازم است.');return v as any[];}
