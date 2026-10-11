@@ -9,9 +9,9 @@ function payload(value: any) {
   if (!value || typeof value !== "object") throw new Error("اطلاعات حساب معتبر نیست.");
   const email = typeof value.email === "string" ? value.email.trim().toLowerCase() : "";
   const name = typeof value.name === "string" ? value.name.trim() : "";
-  const unit = typeof value.unit === "string" ? value.unit.trim() : "";
+  const unit = typeof value.unit === "string" && value.unit.trim() ? value.unit.trim() : "کارکنان";
   if (unit === "بازرگانی") throw new Error("زیرمجموعه بازرگانی را انتخاب کنید: داخلی یا خارجی.");
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254 || !name || name.length > 100 || !unit || unit.length > 100) throw new Error("نام، واحد و ایمیل معتبر را وارد کنید.");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254 || !name || name.length > 100 || unit.length > 100) throw new Error("نام و ایمیل معتبر را وارد کنید.");
   if (email === env.TRACE_OWNER_EMAIL?.trim().toLowerCase()) throw new Error("حساب مدیر اصلی از این بخش قابل تغییر نیست.");
   if (!["active", "disabled"].includes(value.status)) throw new Error("وضعیت حساب معتبر نیست.");
   return {email, name, unit, status: value.status, permissions: JSON.stringify(validatePermissions(value.permissions))};
@@ -47,7 +47,7 @@ export async function GET() {
 export async function POST(request: Request) {
   let localAccount = false;
   try {
-    checkOrigin(request); const actor = await requireAdmin(); checkAccount(request,actor); const body=await request.json() as any;localAccount=!!body.username;const login=localAccount?username(body.username):null;const passwordHash=localAccount?await hashPassword(password(body.password)):null;const data = payload({...body,email:localAccount?crypto.randomUUID()+"@local.invalid":body.email});
+    checkOrigin(request); const actor = await requireAdmin(); checkAccount(request,actor); const body=await request.json() as any;localAccount=!!body.username;const login=localAccount?username(body.username):null;const passwordHash=localAccount?await hashPassword(password(body.password)):null;const data = payload({...body,unit:localAccount?'کارکنان':body.unit,email:localAccount?crypto.randomUUID()+"@local.invalid":body.email});
     await checkServiceAgent(data.permissions);
     const id = crypto.randomUUID(), now = new Date().toISOString();
     const row = {id, ...data, subject: null, username:login||undefined, revision: 1, created: now, updated: now};
@@ -72,7 +72,7 @@ export async function PATCH(request: Request) {
     if(protectedUser&&body.status!=='active')throw new AccessError('حساب مدیر اصلی یا حساب جاری را نمی‌توان غیرفعال کرد.',403);
     const credential:any=await db.prepare('SELECT username FROM password_accounts WHERE member_id=?').bind(old.id).first(); localAccount=!!credential;
     const login=credential?username(body.username===undefined?credential.username:body.username):null;
-    const data=payload({...body,email:credential?old.email:body.email});
+    const data=payload({...body,unit:body.unit===undefined?old.unit:body.unit,email:credential?old.email:body.email});
     const newHash=credential&&body.password?await hashPassword(password(body.password)):null;
     await checkServiceAgent(data.permissions);
     if(old.email!==data.email)throw new Error('ایمیل ورود قبلی ثابت است؛ برای ایمیل دیگر حساب جدا تعریف کنید.');

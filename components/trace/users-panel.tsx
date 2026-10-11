@@ -20,11 +20,10 @@ import {supplyRoles} from '@/lib/sourcing-labels';
 import {warehouses} from "@/lib/production";
 import {names, type Kind} from "@/lib/model";
 
-const commerceUnits = ["بازرگانی — داخلی", "بازرگانی — خارجی"];
 export function UsersPanel({owner}: {owner: Session}) {
   const [members, setMembers] = useState<Member[]>([]), [loading, setLoading] = useState(true), [error, setError] = useState("");
   const [open, setOpen] = useState(false), [editing, setEditing] = useState<Member | null>(null), [busy, setBusy] = useState(false), [formError, setFormError] = useState("");
-  const [email, setEmail] = useState(""), [name, setName] = useState(""), [unit, setUnit] = useState("تولید"), [status, setStatus] = useState("active");
+  const [email, setEmail] = useState(""), [name, setName] = useState(""), [status, setStatus] = useState("active");
   const [permissions, setPermissions] = useState<Permissions>({read:[],write:[],eventStages:[],roleAssignment:{roles:[]}});
   const [username,setUsername]=useState(""),[password,setPassword]=useState("");
   const [roleMode,setRoleMode]=useState(true);
@@ -39,7 +38,7 @@ export function UsersPanel({owner}: {owner: Session}) {
     catch (err) {setError(err instanceof Error ? err.message : "دریافت کاربران انجام نشد.");} finally {setLoading(false);}
   }
   useEffect(() => {void load();void fetch('/api/sales').then(r=>r.json()).then((d:any)=>setSalesAgents(d.agents||[])).catch(()=>{});void Promise.all(['home','hospital'].map(async domain=>{const r=await fetch('/api/after-sales?domain='+domain);if(!r.ok)return [];return ((await r.json()) as any).agents||[]})).then(r=>setServiceAgents(r.flat())).catch(()=>{});}, []);
-  function start(member?: Member) {setEditing(member || null);setUsername(member?.username||"");setPassword("");setShowPassword(false); setEmail(member?.email || ""); setName(member?.name || ""); setUnit(member?.unit || "تولید"); setStatus(member?.status || "active"); setPermissions(member?.permissions || {read:[],write:[],eventStages:[],roleAssignment:{roles:[]}}); setRoleMode(!member||!!member.permissions.roleAssignment); setFormError(""); setOpen(true);}
+  function start(member?: Member) {setEditing(member || null);setUsername(member?.username||"");setPassword("");setShowPassword(false); setEmail(member?.email || ""); setName(member?.name || ""); setStatus(member?.status || "active"); setPermissions(member?.permissions || {read:[],write:[],eventStages:[],roleAssignment:{roles:[]}}); setRoleMode(!member||!!member.permissions.roleAssignment); setFormError(""); setOpen(true);}
   function toggle(kind: Kind, operation: "read" | "write", enabled: boolean) {
     setPermissions(previous => {
       const next = {...previous,read: [...previous.read], write: [...previous.write], eventStages: [...previous.eventStages]};
@@ -59,7 +58,7 @@ export function UsersPanel({owner}: {owner: Session}) {
     event.preventDefault(); if (busy) return; setBusy(true); setFormError("");
     try {
       const effectivePermissions=validatePermissions(permissions);
-      const response = await fetch("/api/users", {method: editing ? "PATCH" : "POST", headers: {"Content-Type": "application/json","x-assistant-account":owner.userId}, body: JSON.stringify({id: editing?.id, revision: editing?.revision, email, name, unit, status, permissions:effectivePermissions,username,password})});
+      const response = await fetch("/api/users", {method: editing ? "PATCH" : "POST", headers: {"Content-Type": "application/json","x-assistant-account":owner.userId}, body: JSON.stringify({id: editing?.id, revision: editing?.revision, email, name, unit: editing?.unit || "کارکنان", status, permissions:effectivePermissions,username,password})});
       const result = await response.json() as {member: Member; error?: string;reauthenticate?:boolean};
       if (!response.ok) throw new Error(result.error);
       setMembers(previous => [result.member, ...previous.filter(m => m.id !== result.member.id)]); setOpen(false);setPassword("");setShowPassword(false); setMessage("اطلاعات حساب ذخیره شد.");if(result.reauthenticate){notifyAccountChange();window.location.reload();}
@@ -95,8 +94,6 @@ export function UsersPanel({owner}: {owner: Session}) {
           </div>
         </div>
       </>:<label className="field">ایمیل ورود قبلی<input disabled value={email} dir="ltr"/></label>}
-      <label className="field">واحد سازمانی<input required maxLength={100} value={unit} onChange={e=>setUnit(e.target.value)} placeholder="مثلاً تولید، مالی یا بازرگانی — داخلی"/><span className="subtle">واحد برای دسته‌بندی است؛ مسئولیت‌ها را در پایین انتخاب کنید.</span></label>
-      {(unit === "بازرگانی" || commerceUnits.includes(unit)) && <label className="field">زیرمجموعه بازرگانی<Select dir="rtl" value={commerceUnits.includes(unit) ? unit : ""} onValueChange={setUnit}><SelectTrigger className="full"><SelectValue placeholder="داخلی یا خارجی را انتخاب کنید"/></SelectTrigger><SelectContent>{commerceUnits.map(value => <SelectItem key={value} value={value}>{value.endsWith("داخلی") ? "داخلی" : "خارجی"}</SelectItem>)}</SelectContent></Select><span className="subtle">انتخاب نقش‌های شغلی، دسترسی‌های مرتبط را تعیین می‌کند.</span></label>}
       <label className="field">وضعیت حساب<Select dir="rtl" value={status} onValueChange={setStatus}><SelectTrigger className="full"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="active">فعال</SelectItem><SelectItem value="disabled" disabled={editing?.canDelete===false}>غیرفعال</SelectItem></SelectContent></Select></label>
     </div>
     {roleMode?<JobRolePicker permissions={permissions} onChange={setPermissions} salesAgents={salesAgents} serviceAgents={serviceAgents}/>:<p className="notice">دسترسی‌های فعلی این حساب حفظ می‌شود. برای تنظیم خودکار، مسئولیت‌های فرد را انتخاب کنید.</p>}
