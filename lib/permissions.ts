@@ -8,7 +8,7 @@ export type RoleAssignment = {roles:string[]; warehouses?:string[]; serviceDomai
 export type Permissions = {roleAssignment?:RoleAssignment;treasuryWorkflowRoles?:string[];assetRoles?:string[];qmsRoles?:string[];personnelRoles?:string[];hospitalCenterId?:string;salesRoles?:string[];salesAgentId?:string;transportRoles?:string[];serviceRoles?:string[];serviceDomains?:string[];serviceAgentId?:string;supplyRoles?: string[];warehouses?: string[];flowRoles?: string[];read: Kind[]; write: Kind[]; eventStages: string[]; finance?: "none"|"read"|"write"};
 export type Session = {username?:string;authType?:"password"|"chatgpt";mustChangePassword?:boolean;userId: string; email: string; name: string; isAdmin: boolean; permissions: Permissions};
 export type Member = {canDelete?:boolean;username?:string;id: string; email: string; name: string; unit: string; status: string; userId: string | null; permissions: Permissions; revision: number; created: string; updated: string};
-export const allPermissions: Permissions = {assetRoles:["custodian"],personnelRoles:["hr","payroll","approver","finance","treasury","executive_viewer"],salesRoles:["manager","staff","finance","viewer"],transportRoles:['manager','driver'],serviceRoles:["manager","support","intake","technician","coordinator","inventory","logistics","finance"],serviceDomains:["home","hospital"],supplyRoles:["sales","production_planning","ceo","engineering","inventory","finance","domestic","foreign","commerce_manager"],warehouses:["raw","semi","line","quarantine","nonconforming","finished"],flowRoles:["inventory","qc","production","procurement","sales","logistics"],read: modules, write: modules, eventStages: stages, finance: "write"};
+export const allPermissions: Permissions = {assetRoles:["custodian"],personnelRoles:["hr","payroll","approver","finance","treasury","executive_viewer","reporter"],salesRoles:["manager","staff","finance","viewer"],transportRoles:['manager','driver'],serviceRoles:["manager","support","intake","technician","coordinator","inventory","logistics","finance"],serviceDomains:["home","hospital"],supplyRoles:["sales","production_planning","ceo","engineering","inventory","finance","domestic","foreign","commerce_manager"],warehouses:["raw","semi","line","quarantine","nonconforming","finished"],flowRoles:["inventory","qc","production","procurement","sales","logistics"],read: modules, write: modules, eventStages: stages, finance: "write"};
 export const presets: Record<string, Permissions> = {
  "مدیر فروش": {salesRoles:["manager","staff"],flowRoles:["sales"],read:[],write:[],eventStages:[]},
  "کارشناس فروش": {salesRoles:["staff"],flowRoles:["sales"],read:[],write:[],eventStages:[]},
@@ -43,7 +43,7 @@ export function validatePermissions(value: unknown): Permissions {
   if(p?.assetRoles?.length&&(p.hospitalCenterId||p.salesAgentId||p.serviceAgentId||p.salesRoles?.includes("agent")||p.serviceRoles?.includes("agent")))throw Error("حساب بیرونی دسترسی اموال شرکت ندارد.");
   if(p?.qmsRoles!==undefined&&(!Array.isArray(p.qmsRoles)||p.qmsRoles.some(r=>!Object.hasOwn(qmsRoles,r))))throw Error("نقش کیفیت معتبر نیست.");
   if(p?.qmsRoles?.length&&(p.hospitalCenterId||p.salesAgentId||p.serviceAgentId||p.salesRoles?.includes("agent")||p.serviceRoles?.includes("agent")))throw Error("حساب بیرونی مجوز کیفیت ندارد.");
-  if(p?.personnelRoles!==undefined&&(!Array.isArray(p.personnelRoles)||p.personnelRoles.some(r=>!["hr","payroll","approver","finance","treasury","executive_viewer"].includes(r))))throw Error("دسترسی پرسنلی معتبر نیست.");
+  if(p?.personnelRoles!==undefined&&(!Array.isArray(p.personnelRoles)||p.personnelRoles.some(r=>!["hr","payroll","approver","finance","treasury","executive_viewer","reporter"].includes(r))))throw Error("دسترسی پرسنلی معتبر نیست.");
   if(p?.personnelRoles?.length&&(p.hospitalCenterId||p.salesAgentId||p.serviceAgentId||p.salesRoles?.includes("agent")||p.serviceRoles?.includes("agent")))throw Error("حساب بیرونی مجوز پرسنلی ندارد.");
   if (!p || !Array.isArray(p.read) || !Array.isArray(p.write) || !Array.isArray(p.eventStages)) throw new Error("دسترسی‌ها معتبر نیستند.");
   if (p.read.some(k => !modules.includes(k)) || p.write.some(k => !modules.includes(k)) || p.eventStages.some(s => !stages.includes(s))) throw new Error("دسترسی ناشناخته است.");
@@ -72,7 +72,7 @@ export function validatePermissions(value: unknown): Permissions {
   return {treasuryWorkflowRoles:[...new Set(p.treasuryWorkflowRoles||[])],...(p.roleAssignment?{roleAssignment:p.roleAssignment}:{}),assetRoles:[...new Set(p.assetRoles||[])],qmsRoles:[...new Set(p.qmsRoles||[])],personnelRoles:[...new Set(p.personnelRoles||[])],hospitalCenterId:p.hospitalCenterId||'',salesRoles:[...new Set(p.salesRoles||[])],salesAgentId:p.salesAgentId||'',transportRoles:[...new Set(p.transportRoles||[])],serviceRoles:[...new Set(p.serviceRoles||[])],serviceDomains:[...new Set(p.serviceDomains||[])],serviceAgentId:p.serviceAgentId||'',supplyRoles:[...new Set(p.supplyRoles||[])],...(p.warehouses!==undefined?{warehouses:[...new Set(p.warehouses)]}:{}),flowRoles:[...new Set(p.flowRoles||[])],finance:p.finance||"none",read: [...new Set(p.read)], write: [...new Set(p.write)], eventStages: p.write.includes("event") ? [...new Set(p.eventStages)] : []};
 }
 
-for(const [role,label] of Object.entries({hr:"اداری و منابع انسانی",payroll:"تهیه حقوق‌ودستمزد",approver:"تأیید حقوق و احکام",finance:"تأیید پرداخت پرسنلی",treasury:"ثبت پرداخت پرسنلی",executive_viewer:"گزارش‌خوان مرخصی مدیرعامل"}))presets[label]={read:[],write:[],eventStages:[],personnelRoles:[role]};
+for(const [role,label] of Object.entries({hr:"اداری و منابع انسانی",payroll:"تهیه حقوق‌ودستمزد",approver:"تأیید حقوق و احکام",finance:"تأیید پرداخت پرسنلی",treasury:"ثبت پرداخت پرسنلی",executive_viewer:"گزارش‌خوان مرخصی مدیرعامل",reporter:"گزارش‌خوان اداری مرخصی"}))presets[label]={read:[],write:[],eventStages:[],personnelRoles:[role]};
 
 for(const [role,label] of Object.entries(qmsRoles))presets[label]={read:[],write:[],eventStages:[],qmsRoles:[role]};
 presets["تحقیق‌وتوسعه و مهندسی طراحی"]={read:["product"],write:[],eventStages:[],supplyRoles:["engineering"]};
@@ -84,7 +84,7 @@ presets['بازرگانی خارجی']={read:[],write:[],eventStages:[],supplyRo
 
 // Versioned, explicit workflow dependencies. Assignments store both intent and the
 // validated effective snapshot; editing unrelated account fields never infers roles.
-export const rolePolicyVersion=3;
+export const rolePolicyVersion=4;
 export type JobRole={id:string;label:string;group:string;actions:string;grants:Permissions;scope?:'warehouses'|'services'|'salesAgent'|'serviceAgent'};
 const emptyGrants=():Permissions=>({read:[],write:[],eventStages:[]});
 const job=(id:string,label:string,group:string,actions:string,grants:Partial<Permissions>,scope?:JobRole['scope']):JobRole=>({id,label,group,actions,grants:{...emptyGrants(),...grants},scope});
@@ -137,7 +137,7 @@ for(const [id,label,actions] of [
  ['inventory','انباردار خدمات','آماده‌سازی، دریافت و تحویل قطعات خدمات'],
  ['finance','مالی خدمات','ثبت و بررسی پرداخت و حساب خدمات'],
 ])jobRoles.push(job('service_'+id,label,'خدمات پس از فروش',actions,{serviceRoles:[id]},'services'));
-for(const [id,label] of Object.entries({hr:'اداری و منابع انسانی',payroll:'تهیه حقوق‌ودستمزد',approver:'تأیید حقوق و احکام',finance:'تأیید پرداخت پرسنلی',treasury:'ثبت پرداخت پرسنلی',executive_viewer:'گزارش‌خوان مرخصی مدیرعامل'}))jobRoles.push(job('personnel_'+id,label,'پرسنلی',label,{personnelRoles:[id]}));
+for(const [id,label] of Object.entries({hr:'اداری و منابع انسانی',payroll:'تهیه حقوق‌ودستمزد',approver:'تأیید حقوق و احکام',finance:'تأیید پرداخت پرسنلی',treasury:'ثبت پرداخت پرسنلی',executive_viewer:'گزارش‌خوان مرخصی مدیرعامل',reporter:'گزارش‌خوان اداری مرخصی'}))jobRoles.push(job('personnel_'+id,label,'پرسنلی',label,{personnelRoles:[id]}));
 for(const [id,label] of Object.entries(qmsRoles))if(id!=='qc')jobRoles.push(job('quality_'+id,label,'کیفیت',label,{qmsRoles:[id]}));
 
 export function resolveRoleAssignment(value:RoleAssignment):Permissions {

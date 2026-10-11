@@ -238,7 +238,8 @@ export const toolOptions:Record<string,Record<string,Record<string,string>>>={
    "approver": "تأیید حقوق و احکام",
    "finance": "تأیید پرداخت پرسنلی",
    "treasury": "ثبت پرداخت پرسنلی",
-   "executive_viewer": "گزارش‌خوان مرخصی مدیرعامل"
+   "executive_viewer": "گزارش‌خوان مرخصی مدیرعامل",
+   "reporter": "گزارش‌خوان اداری مرخصی"
   },
   "permissions.salesRoles.*": {
    "manager": "مدیر فروش",
@@ -344,7 +345,8 @@ export const toolOptions:Record<string,Record<string,Record<string,string>>>={
    "approver": "تأیید حقوق و احکام",
    "finance": "تأیید پرداخت پرسنلی",
    "treasury": "ثبت پرداخت پرسنلی",
-   "executive_viewer": "گزارش‌خوان مرخصی مدیرعامل"
+   "executive_viewer": "گزارش‌خوان مرخصی مدیرعامل",
+   "reporter": "گزارش‌خوان اداری مرخصی"
   },
   "permissions.salesRoles.*": {
    "manager": "مدیر فروش",
@@ -690,7 +692,8 @@ export const toolOptions:Record<string,Record<string,Record<string,string>>>={
    "approver": "تأیید حقوق و احکام",
    "finance": "تأیید پرداخت پرسنلی",
    "treasury": "ثبت پرداخت پرسنلی",
-   "executive_viewer": "گزارش‌خوان مرخصی مدیرعامل"
+   "executive_viewer": "گزارش‌خوان مرخصی مدیرعامل",
+   "reporter": "گزارش‌خوان اداری مرخصی"
   },
   "permissions.salesRoles.*": {
    "manager": "مدیر فروش",
@@ -796,7 +799,8 @@ export const toolOptions:Record<string,Record<string,Record<string,string>>>={
    "approver": "تأیید حقوق و احکام",
    "finance": "تأیید پرداخت پرسنلی",
    "treasury": "ثبت پرداخت پرسنلی",
-   "executive_viewer": "گزارش‌خوان مرخصی مدیرعامل"
+   "executive_viewer": "گزارش‌خوان مرخصی مدیرعامل",
+   "reporter": "گزارش‌خوان اداری مرخصی"
   },
   "permissions.salesRoles.*": {
    "manager": "مدیر فروش",
