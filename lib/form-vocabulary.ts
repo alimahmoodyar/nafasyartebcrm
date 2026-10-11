@@ -646,6 +646,7 @@ export const fieldTitles:Record<string,string>={
   "error": "پیام خطا"
 };
 export const toolFieldTitles:Record<string,Record<string,string>>={
+ save_sales_recipient:{kind:"نوع گیرنده کالا",partyId:"گیرنده موجود برای ویرایش",name:"نام گیرنده کالا",phone:"شماره تماس گیرنده",address:"نشانی تحویل کالا",active:"مقصد تحویل فعال"},
   "personnel_apply": {
     "memberId": "درخواست برای",
     "code": "کد پرسنلی",

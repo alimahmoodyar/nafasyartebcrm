@@ -916,9 +916,9 @@ export const toolOptions:Record<string,Record<string,Record<string,string>>>={
  },
  "save_sales_recipient": {
   "kind": {
-   "agent": "نماینده",
-   "representative": "نمایندگی",
-   "branch": "شعبه"
+   "agent": "عامل فروش",
+   "representative": "نماینده فروش",
+   "branch": "شعبه شرکت"
   }
  },
  "save_duty_template": {
