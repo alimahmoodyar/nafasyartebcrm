@@ -15,7 +15,7 @@ const json=(v:unknown)=>Response.json(v,{headers:{'Cache-Control':'no-store'}});
 export async function GET(){try{
  const u=await requireAccess(),production=flowRole(u,'production'),inventory=warehouseAccess(u,'finished'),sales=salesStaff(u),logistics=flowRole(u,'logistics');
  if(!production&&!inventory&&!sales&&!logistics)fail('دسترسی محصول نهایی ندارید.',403);
- const db=storage(),all=(await db.prepare("SELECT * FROM flow_entities WHERE type IN ('build','handoff','sale','party','print','finaltest') ORDER BY created DESC,id DESC").all()).results.map(entity);
+ const db=storage(),all=(await db.prepare("SELECT * FROM flow_entities WHERE type IN ('build','handoff','sale','sales_order','print','finaltest') ORDER BY created DESC,id DESC").all()).results.map(entity);
  const records=(await db.prepare("SELECT id,kind,payload FROM records WHERE kind IN ('device','product')").all()).results.map((r:any)=>({id:r.id,kind:r.kind,data:JSON.parse(r.payload)}));
  const rows=records.filter((r:any)=>r.kind==='product'||production||inventory||sales||all.some(e=>e.type==='sale'&&e.data.deviceIds?.includes(r.id)&&['local:'+e.data.carrierId,e.data.carrierSubject].includes(u.userId)));
  const prints=new Set(all.filter(e=>e.type==='print').map(e=>e.data.planId));
@@ -23,12 +23,12 @@ export async function GET(){try{
  const legacy=all.find(t=>t.type==='finaltest'&&t.data.deviceId===e.id&&t.data.buildRevision===e.revision);
  return {id:e.id,revision:e.revision,created:e.created,data:{...e.data,latestQc:e.data.latestQc===undefined&&legacy?{verdict:legacy.data.verdict,by:legacy.data.by,reportId:legacy.data.reportId}:e.data.latestQc},printRecorded:prints.has(e.data.planId)};});
  const members=(await db.prepare("SELECT id,name,subject,permissions FROM app_members WHERE status='active'").all()).results.map((m:any)=>({id:m.id,name:m.name,subject:m.subject,permissions:JSON.parse(m.permissions)}));
- return json({builds,rows,handoffs:production||inventory?all.filter(e=>e.type==='handoff'):[],sales:all.filter(e=>e.type==='sale'&&(inventory||sales||logistics&&['local:'+e.data.carrierId,e.data.carrierSubject].includes(u.userId))),parties:inventory||sales?all.filter(e=>e.type==='party'):[],carriers:inventory?members.filter(m=>(m.permissions.flowRoles?.includes('logistics')||m.permissions.transportRoles?.includes('driver'))).map(m=>({id:m.id,name:m.name})):[],roles:{production,inventory,sales,logistics}});
+ return json({builds,rows,handoffs:production||inventory?all.filter(e=>e.type==='handoff'):[],sales:all.filter(e=>e.type==='sale'&&(inventory||sales||logistics&&['local:'+e.data.carrierId,e.data.carrierSubject].includes(u.userId))),orders:inventory||sales?all.filter(e=>e.type==='sales_order'&&e.data.state==='approved').map(e=>({id:e.id,data:{agentId:e.data.agentId,recipient:e.data.recipient,lines:e.data.lines}})):[],carriers:inventory?members.filter(m=>(m.permissions.flowRoles?.includes('logistics')||m.permissions.transportRoles?.includes('driver'))).map(m=>({id:m.id,name:m.name})):[],roles:{production,inventory,sales,logistics}});
  }catch(e){return accessResponse(e)||Response.json({error:'دریافت کارتابل محصول نهایی انجام نشد.'},{status:503})}}
 export async function POST(request:Request){try{
  checkOrigin(request);const u=await requireAccess(),b=JSON.parse(new TextDecoder().decode(await boundedBody(request,128000))),id=needed(b.id),mode=needed(b.mode),db=storage(),now=new Date().toISOString();
  if(!/^[a-f0-9-]{36}$/i.test(id))fail('شناسه عملیات معتبر نیست.');
- const allowed=mode==='handoff'||mode==='cancel_handoff'?flowRole(u,'production'):['receive','dispatch'].includes(mode)?warehouseAccess(u,'finished'):['party','reserve','cancel_sale'].includes(mode)?salesStaff(u):mode==='acknowledge'?flowRole(u,'logistics'):false;
+ const allowed=mode==='handoff'||mode==='cancel_handoff'?flowRole(u,'production'):['receive','dispatch'].includes(mode)?warehouseAccess(u,'finished'):['reserve','cancel_sale'].includes(mode)?salesStaff(u):mode==='acknowledge'?flowRole(u,'logistics'):false;
  if(!allowed)fail('مجوز این عملیات یا انبار را ندارید.',403);
  const signature=JSON.stringify(b),prior:any=await db.prepare('SELECT payload,actor FROM inventory_operations WHERE id=?').bind(id).first();if(prior){if(prior.payload!==signature||prior.actor!==u.userId)fail('شناسه تکراری با درخواست متفاوت.',409);return json({saved:true,repeated:true});}
  const statements:D1PreparedStatement[]=[],checks:D1PreparedStatement[]=await salesLock(db,id);
@@ -40,11 +40,7 @@ export async function POST(request:Request){try{
  async function device(did:string){const r:any=await db.prepare("SELECT payload FROM records WHERE id=? AND kind='device'").bind(did).first();if(!r)fail('دستگاه یافت نشد.');return JSON.parse(r.payload)}
  async function passed(build:any){if(build.data.latestQc!==undefined){if(build.data.latestQc?.verdict!=='pass')fail('کنترل کیفیت معتبر و قبول‌شده لازم است.');return build.data.latestQc;}
  const tests=(await db.prepare("SELECT * FROM flow_entities WHERE type='finaltest' AND json_extract(data,'$.deviceId')=? ORDER BY created DESC,id DESC").bind(build.id).all()).results.map(entity),test=tests[0];if(!test||test.data.buildRevision!==build.revision||test.data.verdict!=='pass')fail('کنترل کیفیت معتبر و قبول‌شده لازم است.');return {reportId:test.data.reportId,verdict:'pass',by:test.data.by};}
- if(mode==='party'){
- const partyId=b.partyId?needed(b.partyId):id,old=b.partyId?await get(partyId,'party'):undefined;if(old&&old.revision!==b.revision)fail('مشخصات گیرنده تغییر کرده است.',409);
- if(!['agent','representative','branch'].includes(b.kind))fail('نوع گیرنده معتبر نیست.');
- put(partyId,'party',{...(old?.data||{}),name:needed(b.name),kind:b.kind,phone:text(b.phone||'',50),address:needed(b.address,2000),active:b.active!==false},old);
- }else if(mode==='handoff'){
+ if(mode==='handoff'){
  const deviceIds=ids(b.deviceIds);if(b.packaged!==true)fail('بسته‌بندی و نصب برچسب دستگاه‌ها را تأیید کنید.');
  for(const did of deviceIds){const build=await get(did,'build');if(build.data.state!=='assembled')fail('سریال آماده تحویل نیست یا قبلاً ارجاع شده است.');const qc=await passed(build);
  if(!await db.prepare("SELECT id FROM flow_entities WHERE type='print' AND json_extract(data,'$.planId')=? LIMIT 1").bind(build.data.planId).first())fail('ابتدا چاپ برچسب این برنامه را ثبت کنید.');
@@ -58,18 +54,12 @@ export async function POST(request:Request){try{
  if(mode==='receive')entry(did,'finished',1000);event(did,mode==='receive'?'دریافت انبار محصول نهایی':'بازگشت درخواست تحویل به خط',{notes});}
  const pending=h.data.pending.filter((d:string)=>!selected.includes(d));put(h.id,'handoff',{...h.data,pending,received:mode==='receive'?[...h.data.received,...selected]:h.data.received,state:pending.length?'pending':'closed',history:[...h.data.history,{mode,deviceIds:selected,by:u.name,actor:u.userId,at:now,notes}]},h);
  }else if(mode==='reserve'){
- const order=b.salesOrderId?await get(needed(b.salesOrderId),'sales_order'):null;
- let p:any;
- if(order){
-  if(order.data.state!=='approved')fail('سفارش باید تأیید مالی و فاکتور شده باشد.');
-  const agent=await get(order.data.agentId,'sales_agent');if(!agent.data.active)fail('نمایندگی غیرفعال است.');
-  const partyId='sales-party:'+agent.id,old:any=await db.prepare("SELECT * FROM flow_entities WHERE id=? AND type='party'").bind(partyId).first();
-  p=old?entity(old):{id:partyId,data:{...order.data.recipient,kind:'representative',active:true,salesAgentId:agent.id}};
-  if(!old)put(p.id,'party',p.data);else {guard('EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)',p.id,p.revision);if(p.data.salesAgentId!==agent.id)fail('ارتباط گیرنده تغییر کرده است.');}
-  // Shipping address is frozen with the accepted order, regardless of later profile edits.
-  p={...p,data:{...p.data,...order.data.recipient}};
- }else {p=await get(needed(b.partyId),'party');if(p.data.salesAgentId)fail('برای این نماینده سفارش تأییدشده انتخاب کنید.');}
- if(!p.data.active)fail('گیرنده غیرفعال است.');const productId=needed(b.productId),count=Number(b.count);if(!Number.isInteger(count)||count<1||count>100)fail('تعداد بین ۱ تا ۱۰۰ باشد.');
+ const order=await get(needed(b.salesOrderId),'sales_order');
+ if(order.data.state!=='approved')fail('سفارش باید تأیید مالی و فاکتور شده باشد.');
+ const agent=await get(order.data.agentId,'sales_agent');if(!agent.data.active)fail('نمایندگی یا عامل غیرفعال است.');
+ // Use the registered profile directly; keep only a shipment snapshot, never a separate party master.
+ const p={id:agent.id,data:{name:needed(agent.data.name),phone:text(agent.data.phone||agent.data.mobile||'',50),address:needed(agent.data.address,2000),kind:agent.data.kind||'representative',salesAgentId:agent.id}};
+ const productId=needed(b.productId),count=Number(b.count);if(!Number.isInteger(count)||count<1||count>100)fail('تعداد بین ۱ تا ۱۰۰ باشد.');
  if(order){const line=order.data.lines.find((l:any)=>l.productId===productId);if(!line)fail('محصول در سفارش نیست.');const used:any=await db.prepare("SELECT COALESCE(SUM(json_extract(data,'$.count')),0) AS n FROM flow_entities WHERE type='sale' AND json_extract(data,'$.salesOrderId')=? AND json_extract(data,'$.productId')=? AND json_extract(data,'$.state')!='cancelled'").bind(order.id,productId).first();if(used.n+count>line.quantity)fail('تعداد حواله‌ها از تعداد سفارش بیشتر می‌شود.');}
  let selected:string[];
  if(Array.isArray(b.deviceIds)&&b.deviceIds.length)selected=ids(b.deviceIds);else selected=(await db.prepare("SELECT f.id FROM flow_entities f JOIN records r ON r.id=f.id WHERE f.type='build' AND json_extract(f.data,'$.state')='finished' AND json_extract(r.payload,'$.product')=? ORDER BY json_extract(f.data,'$.receivedAt'),f.id LIMIT ?").bind(productId,count).all()).results.map((r:any)=>r.id);

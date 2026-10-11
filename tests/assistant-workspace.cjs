@@ -83,9 +83,9 @@ const forms=load('app/api/assistant/forms/route.ts'),workspace=load('lib/assista
  assert.equal(response.status,200,await response.clone().text());userForm=await response.json();assert.equal(userForm.workspace.args.name,'Known person');assert.equal(userForm.navigation,'users');assert.ok(!JSON.stringify(userForm.workspace).includes('PRIVATE'));
  assert.equal(workspace.requestedOperationForm('کاربر جدید ایجاد کن',null,catalog.tools.filter(t=>!t.admin)),undefined);
  assert.equal(workspace.requestedOperationForm('کاربر جدید ایجاد نکن',null,catalog.tools),undefined);
+ assert.ok(!catalog.tools.some(t=>t.name==='save_sales_recipient'),'Separate recipient creation must not be available through MCP or assistant');
  // Representative intent must never become a shipping destination, even with a wrong model call.
  for(const message of ['نماینده فروش تعریف کنیم','یک نمایندگی جدید بساز','عامل فروش ثبت کن']){const draft=workspace.requestedOperationForm(message,null,catalog.tools);assert.equal(draft.tool,'sales_apply');assert.equal(draft.args.mode,'agent');assert.equal(draft.section,'sales');}
- const destination=workspace.operationForm(catalog.tools.find(t=>t.name==='save_sales_recipient'),{},'fulfillment','Old title');assert.equal(destination.title,'ثبت مقصد تحویل کالا');assert.equal(destination.schema.properties.kind.title,'نوع گیرنده کالا');assert.equal(destination.schema.properties.kind.enumLabels.agent,'عامل فروش');assert.equal(destination.schema.properties.kind.enumLabels.representative,'نماینده فروش');assert.equal(destination.schema.properties.partyId.uiHidden,true);
  assert.equal(workspace.requestedOperationForm('نماینده فروش تعریف کنیم',null,catalog.tools.filter(t=>t.name!=='sales_apply')),undefined);
  round=0;cache[providerFile].providerRequest=async()=>({choices:[{message:round++===0?{tool_calls:[{id:'wrong',type:'function',function:{name:'show_operation_form',arguments:JSON.stringify({tool:'save_sales_recipient',args:{kind:'representative'}})}}]}:{content:'نام نماینده فروش چیست؟'}}]});
  response=await run(admin,()=>chat.POST(request('/api/assistant','POST',{requestId:crypto.randomUUID(),profileId,message:'نماینده فروش تعریف کنیم'})));
