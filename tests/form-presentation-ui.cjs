@@ -14,6 +14,13 @@ const diagnose=formPresentation('after_sales_apply',{mode:'diagnose'},{type:'obj
 assert.equal(diagnose.schema.properties.data.properties.lines.items.properties.oldBatchId,undefined);
 assert.equal(diagnose.schema.properties.data.properties.lines.items.properties.unknownReason,undefined);
 const groupedService=render('after_sales_apply',{mode:'diagnose',data:{lines:[{customerUnitRial:'12500000',quantity:'1250'}],laborLines:[{customerRial:'450000'}]}},{type:'object',properties:{data:{type:'object'}}});assert.ok(groupedService.includes('value="12,500,000"'));assert.ok(groupedService.includes('value="450,000"'));assert.ok(groupedService.includes('value="1,250"'),'Quantities use the shared grouping format');assert.ok(groupedService.includes('inputMode="numeric"'));
+// National identity numbers are user-entered text, not internal record IDs.
+const representativeSchema={type:'object',properties:{mode:{type:'string'},agentId:{type:'string',title:'شناسه پرونده نماینده'},nationalId:{type:'string',title:'کد ملی مسئول نمایندگی'},name:{type:'string'}}};
+for(const nationalId of ['', '0012345678']){
+ const html=render('sales_apply',{mode:'agent',nationalId},representativeSchema);
+ const input=html.match(/<input[^>]*aria-label="کد ملی مسئول نمایندگی"[^>]*>/)?.[0];assert.ok(input);assert.ok(!input.includes('readOnly'));assert.ok(!input.includes('پس از انتخاب پرونده'));assert.ok(input.includes('inputMode="numeric"'));assert.ok(input.includes('value="'+nationalId+'"'));
+}
+const linkedRepresentative=render('sales_apply',{mode:'agent',agentId:'agent-1',nationalId:'0012345678'},representativeSchema);assert.ok(linkedRepresentative.match(/<input[^>]*aria-label="شناسه پرونده نماینده"[^>]*>/)?.[0].includes('readOnly'),'Internal target identifiers stay locked');
 const args={mode:'request',kind:'advance',amount:'1200000',notes:'bank',memberId:'employee-17',revision:2,id:'op-123'};const before=JSON.stringify(args);
 const action={id:'pending',tool:'personnel_apply',title:'درخواست پرسنلی',args,state:'pending',section:'personnel'};
 const confirm=renderToStaticMarkup(React.createElement(ActionCards,{actions:[action],busy:false,onDecide:async()=>true}));
