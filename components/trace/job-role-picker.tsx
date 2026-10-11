@@ -1,4 +1,5 @@
 "use client";
+import {NumberInput} from '@/components/trace/number-input';
 import {useState} from 'react';
 import {jobRoles,validatePermissions,type Permissions,type RoleAssignment} from '@/lib/permissions';
 import {warehouses} from '@/lib/production';
@@ -19,7 +20,7 @@ export function JobRolePicker({permissions,onChange,salesAgents,serviceAgents}:{
  return <section aria-label="انتخاب مسئولیت‌های فرد" style={{marginTop:18}}>
   <h3>این فرد چه مسئولیت‌هایی دارد؟</h3><p className="subtle">یک یا چند نقش انتخاب کنید. دسترسی کارهای مرتبط به‌صورت خودکار تنظیم می‌شود.</p>
   {a.roles.includes('ceo')&&<p className="subtle">برای اختیار صدور مجوز نهایی پرداخت به خزانه‌دار، نقش «مجوز نهایی پرداخت مدیرعامل» را نیز انتخاب کنید.</p>}
-  <label className="field">جست‌وجوی نقش<input value={search} onChange={e=>setSearch(e.target.value)} placeholder="مثلاً انباردار، خرید، تکنسین یا اموال‌دار"/></label>
+  <label className="field">جست‌وجوی نقش<NumberInput fieldKey={"search"} value={search} onChange={e=>setSearch(e.target.value)} placeholder="مثلاً انباردار، خرید، تکنسین یا اموال‌دار"/></label>
   <div style={{maxHeight:300,overflowY:'auto',padding:8,border:'1px solid var(--border)',borderRadius:12}}>
    {groups.map(group=>{const roles=jobRoles.filter(r=>r.group===group&&(!search||`${r.label} ${r.actions}`.includes(search)));return roles.length?<fieldset key={group} className="stage-permissions"><legend>{group}</legend>{roles.map(r=><label key={r.id} style={{display:'block',padding:6}}><input type="checkbox" checked={a.roles.includes(r.id)} onChange={e=>toggle(r.id,e.target.checked)}/> {r.label}</label>)}</fieldset>:null;})}
   </div>

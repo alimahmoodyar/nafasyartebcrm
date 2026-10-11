@@ -1,11 +1,12 @@
 'use client';
+import {NumberInput} from '@/components/trace/number-input';
 import {useState} from 'react';
 import {notifyAccountChange} from '@/lib/account-change';
 export function AccountCredentials({accountId,username='',required=false}:{accountId:string;username?:string;required?:boolean}){
  const [login,setLogin]=useState(username),[current,setCurrent]=useState(''),[next,setNext]=useState(''),[repeat,setRepeat]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
  return <form onSubmit={async e=>{e.preventDefault();if(busy)return;setError('');if(next!==repeat){setError('تکرار رمز مطابقت ندارد.');return;}setBusy(true);try{const r=await fetch('/api/auth/credentials',{method:'POST',headers:{'Content-Type':'application/json','x-profile-account':accountId},body:JSON.stringify({username:login,currentPassword:current,newPassword:next,confirmed:true})}),d=await r.json() as any;if(!r.ok)throw Error(d.error);setCurrent('');setNext('');setRepeat('');notifyAccountChange();window.location.assign('/');}catch(e){setError((e as Error).message)}finally{setBusy(false)}}}>
  <h3>{required?'تغییر رمز اولیه برای ادامه ورود':'تغییر نام کاربری و رمز من'}</h3><p>پس از ذخیره، با اطلاعات تازه دوباره وارد شوید. نام کاربری را می‌توانید حفظ یا تغییر دهید.</p>
- <label className="field">نام کاربری<input dir="ltr" autoComplete="username" required minLength={3} maxLength={40} value={login} onChange={e=>setLogin(e.target.value)}/></label>
+ <label className="field">نام کاربری<NumberInput fieldKey={"login"} dir="ltr" autoComplete="username" required minLength={3} maxLength={40} value={login} onChange={e=>setLogin(e.target.value)}/></label>
  <label className="field">رمز فعلی<input type="password" autoComplete="current-password" required maxLength={128} value={current} onChange={e=>setCurrent(e.target.value)}/></label>
  <label className="field">رمز تازه (حداقل ۱۰ نویسه)<input type="password" autoComplete="new-password" required={required} minLength={10} maxLength={128} value={next} onChange={e=>setNext(e.target.value)}/></label>
  <label className="field">تکرار رمز تازه<input type="password" autoComplete="new-password" required={required} minLength={10} maxLength={128} value={repeat} onChange={e=>setRepeat(e.target.value)}/></label>

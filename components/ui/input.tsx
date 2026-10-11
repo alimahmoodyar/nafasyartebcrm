@@ -1,10 +1,12 @@
+'use client';
+import {NumberInput} from '@/components/trace/number-input';
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
 function Input({ className, type, ...props }: React.ComponentProps<"input">) {
   return (
-    <input
+    <NumberInput
       type={type}
       data-slot="input"
       className={cn(

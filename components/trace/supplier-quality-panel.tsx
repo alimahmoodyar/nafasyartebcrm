@@ -1,4 +1,5 @@
 'use client';
+import {NumberInput} from '@/components/trace/number-input';
 import {IconSections,IconActions,IconDisclosure} from "./program-workspace";
 import {useEffect,useState} from 'react';
 import {Dialog,DialogContent,DialogTitle,DialogDescription} from '@/components/ui/dialog';
@@ -16,7 +17,7 @@ export function SupplierQualityPanel({supplierId,linkId='',onChanged}:{supplierI
  useEffect(()=>{void load().catch(e=>setError(e.message))},[supplierId,linkId]);
  const begin=(mode:string,extra:any={})=>{setError('');setMessage('');setFile(null);setDraft({id:crypto.randomUUID(),confirmed:true,mode,supplierId,linkId,kind:'certificate',visibility:'quality',issuedOn:tehranDay(),expiresOn:'',noExpiryReason:'',ownerId:'',reviewerId:'',previousId:'',previousRevision:0,capaId:'',severity:'major',detectedOn:tehranDay(),responseDue:tehranDay(),implementedOn:tehranDay(),verificationDue:tehranDay(),receiptIds:[],evidenceIds:[],holdPurchase:false,result:mode==='capa_verify'?'effective':'approved',requiredForPurchase:false,...extra});};
  const change=(k:string,v:any)=>setDraft((d:any)=>({...d,[k]:v}));
- const field=(k:string,label:string,required=true,multi=false)=><label className={'field '+(multi?'wide':'')} key={k}>{label}{multi?<textarea required={required} rows={3} value={draft[k]||''} onChange={e=>change(k,e.target.value)}/>:<input required={required} value={draft[k]||''} onChange={e=>change(k,e.target.value)}/>}</label>;
+ const field=(k:string,label:string,required=true,multi=false)=><label className={'field '+(multi?'wide':'')} key={k}>{label}{multi?<textarea required={required} rows={3} value={draft[k]||''} onChange={e=>change(k,e.target.value)}/>:<NumberInput fieldKey={k} required={required} value={draft[k]||''} onChange={e=>change(k,e.target.value)}/>}</label>;
  const pick=(k:string,label:string,items:Record<string,string>)=><label className="field" key={k}>{label}<Select dir="rtl" value={draft[k]||'none'} onValueChange={v=>change(k,v==='none'?'':v)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="none">انتخاب کنید</SelectItem>{Object.entries(items).map(([id,t])=><SelectItem key={id} value={id}>{t}</SelectItem>)}</SelectContent></Select></label>;
  const date=(k:string,label:string)=><SolarDate key={k} label={label} value={draft[k]||''} onChange={v=>change(k,v)}/>;
  const chooseMany=(k:string,label:string,items:any[])=><fieldset className="field wide" style={{border:'1px solid var(--border)',padding:12}}><legend>{label}</legend>{items.length?items.map(e=><label className="flow-check" key={e.id}><Checkbox checked={draft[k].includes(e.id)} onCheckedChange={v=>change(k,v?[...draft[k],e.id]:draft[k].filter((x:string)=>x!==e.id))}/>{e.label}</label>):<p>موردی ثبت نشده است؛ ابتدا مدرک بارگذاری کنید یا دامنه اثر را توضیح دهید.</p>}</fieldset>;

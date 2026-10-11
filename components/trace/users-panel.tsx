@@ -1,4 +1,5 @@
 "use client";
+import {NumberInput} from '@/components/trace/number-input';
 import {JobRolePicker} from "./job-role-picker";
 import {IconActions} from "./program-workspace";
 import {useEffect, useState} from "react";
@@ -82,18 +83,18 @@ export function UsersPanel({owner}: {owner: Session}) {
       {loading ? <div className="empty">در حال دریافت کاربران…</div> : members.length ? <Table><TableHeader><TableRow>{["نام و شناسه ورود", "واحد", "دسترسی", "وضعیت", ""].map((h, i) => <TableHead className="tablehead" key={i}>{h}</TableHead>)}</TableRow></TableHeader><TableBody>{members.map(member => <TableRow key={member.id}><TableCell className="tablecell"><strong>{member.name}</strong><p className="subtle" dir="ltr">{member.username||member.email}</p></TableCell><TableCell className="tablecell">{member.unit}</TableCell><TableCell className="tablecell">{member.permissions.roleAssignment?<><strong>{member.permissions.roleAssignment.roles.map(id=>jobRoles.find(r=>r.id===id)?.label||id).join("، ")}</strong><p className="subtle">دسترسی خودکار بر اساس مسئولیت‌ها</p></>:<><span>دسترسی اختصاصی / قبلی</span><p className="subtle">جزئیات در ویرایش حساب</p></>}</TableCell><TableCell className="tablecell"><span className={"badge " + (member.status === "active" ? "good" : "bad")}>{member.status === "active" ? "فعال" : "غیرفعال"}</span><p className="subtle">{member.username?"ورود با نام کاربری":member.userId ? "هویت ورود متصل است" : "در انتظار اولین ورود"}</p></TableCell><TableCell className="tablecell"><IconActions scope="users-panel-actions-7facb254a5"><button type="button" className="btn" onClick={() => start(member)} aria-label={"ویرایش حساب " + member.name}><Pencil size={16}/>ویرایش</button><button type="button" className="btn account-delete-btn" disabled={member.canDelete===false} title={member.canDelete===false?"حساب مدیر اصلی یا حساب جاری قابل حذف نیست":"حذف حساب"} onClick={() => {setDeleteError("");setDeleteTarget(member);}} aria-label={"حذف حساب " + member.name}><Trash2 size={16}/>حذف</button></IconActions></TableCell></TableRow>)}</TableBody></Table> : <div className="empty">هنوز حسابی برای کارکنان تعریف نشده است.</div>}
     </div>
     <Dialog open={open} onOpenChange={v => {if (!busy) {setOpen(v);if (!v) {setPassword("");setShowPassword(false);}}}}><DialogContent className="modal sm:max-w-2xl"><DialogTitle style={{paddingRight: 24}}>{editing ? "ویرایش حساب" : "تعریف حساب کارکنان"}</DialogTitle><DialogDescription>مشخصات فرد و مسئولیت‌های او را انتخاب کنید؛ دسترسی‌های لازم خودکار تنظیم می‌شوند.</DialogDescription><form onSubmit={save}><div className="formgrid">
-      <label className="field">نام و نام خانوادگی<input required maxLength={100} value={name} onChange={e => setName(e.target.value)}/></label>
-      {(!editing||editing.username)?<><label className="field">نام کاربری<input autoComplete="off" required dir="ltr" maxLength={40} value={username} onChange={e=>setUsername(e.target.value)}/></label>
+      <label className="field">نام و نام خانوادگی<NumberInput fieldKey={"name"} required maxLength={100} value={name} onChange={e => setName(e.target.value)}/></label>
+      {(!editing||editing.username)?<><label className="field">نام کاربری<NumberInput fieldKey={"username"} autoComplete="off" required dir="ltr" maxLength={40} value={username} onChange={e=>setUsername(e.target.value)}/></label>
         <div className="field">
           <label htmlFor="user-account-password">{editing?"رمز جدید (خالی بماند = بدون تغییر)":"رمز عبور"}</label>
           <div className="account-password-input">
-            <input id="user-account-password" type={showPassword ? "text" : "password"} dir="ltr" autoComplete="new-password" spellCheck={false} autoCapitalize="none" required={!editing} minLength={10} maxLength={128} value={password} onChange={e=>setPassword(e.target.value)}/>
+            <NumberInput fieldKey={"password"} id="user-account-password" type={showPassword ? "text" : "password"} dir="ltr" autoComplete="new-password" spellCheck={false} autoCapitalize="none" required={!editing} minLength={10} maxLength={128} value={password} onChange={e=>setPassword(e.target.value)}/>
             <button type="button" className="account-password-toggle" disabled={busy} onClick={() => setShowPassword(value => !value)} aria-label={showPassword ? "پنهان کردن رمز عبور" : "نمایش رمز عبور"} title={showPassword ? "پنهان کردن رمز عبور" : "نمایش رمز عبور"} aria-controls="user-account-password" aria-pressed={showPassword}>
               {showPassword ? <EyeOff size={20} aria-hidden="true"/> : <Eye size={20} aria-hidden="true"/>}
             </button>
           </div>
         </div>
-      </>:<label className="field">ایمیل ورود قبلی<input disabled value={email} dir="ltr"/></label>}
+      </>:<label className="field">ایمیل ورود قبلی<NumberInput fieldKey={"email"} disabled value={email} dir="ltr"/></label>}
       <label className="field">وضعیت حساب<Select dir="rtl" value={status} onValueChange={setStatus}><SelectTrigger className="full"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="active">فعال</SelectItem><SelectItem value="disabled" disabled={editing?.canDelete===false}>غیرفعال</SelectItem></SelectContent></Select></label>
     </div>
     {roleMode?<JobRolePicker permissions={permissions} onChange={setPermissions} salesAgents={salesAgents} serviceAgents={serviceAgents}/>:<p className="notice">دسترسی‌های فعلی این حساب حفظ می‌شود. برای تنظیم خودکار، مسئولیت‌های فرد را انتخاب کنید.</p>}

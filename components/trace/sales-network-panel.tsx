@@ -1,4 +1,5 @@
 'use client';
+import {NumberInput} from '@/components/trace/number-input';
 import {IconDisclosure,IconActions} from "./program-workspace";
 import {useEffect,useState} from 'react';
 import {Dialog,DialogContent,DialogTitle,DialogDescription} from '@/components/ui/dialog';
@@ -13,9 +14,9 @@ export function SalesNetworkPanel({selected,members,onChange}:{selected:string;m
  useEffect(()=>{void load().catch(e=>setError(e.message))},[]);
  const begin=(mode:string,a:any=null,r:any=null)=>{setError('');setDraft({id:crypto.randomUUID(),confirmed:true,mode,agentId:a?.id||'',recordId:r?.id,revision:r?.revision||a?.revision||0,kind:a?.data.kind||'representative',ownerId:a?.data.ownerId||'',contactDays:a?.data.contactDays||30,reorderDays:a?.data.reorderDays||60,day:localDay(),start:localDay(),end:'',nextDue:localDay(),nextAction:'',channel:'call',state:'open',cashBps:5000,minCashBps:0,maxCashBps:10000,months:1,minMonths:0,maxMonths:12,bps:0,approved:true,notes:'',...(['case_update'].includes(mode)?{state:r.data.state}:{}),...(mode==='template'?{previousId:data.templates.filter((r:any)=>r.data.kind==='representative').sort((a:any,b:any)=>(b.data.version||0)-(a.data.version||0)||b.created.localeCompare(a.created)||b.id.localeCompare(a.id))[0]?.id||''}:{})});};
  const update=(k:string,v:any)=>setDraft((d:any)=>({...d,[k]:v,...(d.mode==='template'&&k==='kind'?{previousId:data.templates.filter((r:any)=>r.data.kind===v).sort((a:any,b:any)=>(b.data.version||0)-(a.data.version||0)||b.created.localeCompare(a.created)||b.id.localeCompare(a.id))[0]?.id||''}:{})}));
- const field=(k:string,label:string,type='text',max=10000)=><label className="field">{label}<input required type={type} min="0" max={max} value={draft[k]??''} onChange={e=>update(k,type==='number'?Number(e.target.value):e.target.value)}/></label>;
+ const field=(k:string,label:string,type='text',max=10000)=><label className="field">{label}<NumberInput fieldKey={k} required type={type} min="0" max={max} value={draft[k]??''} onChange={e=>update(k,type==='number'?Number(e.target.value):e.target.value)}/></label>;
  const pick=(k:string,label:string,values:Record<string,string>)=><label className="field">{label}<select required value={draft[k]||''} onChange={e=>update(k,e.target.value)}><option value="">انتخاب کنید</option>{Object.entries(values).map(([v,t])=><option value={v} key={v}>{t}</option>)}</select></label>;
- const percent=(k:string,label:string)=><label className="field">{label}<input required type="number" min="0" max="100" step="0.01" value={(draft[k]||0)/100} onChange={e=>update(k,Math.round(Number(e.target.value)*100))}/></label>;
+ const percent=(k:string,label:string)=><label className="field">{label}<NumberInput fieldKey={k} required type="number" min="0" max="100" step="0.01" value={(draft[k]||0)/100} onChange={e=>update(k,Math.round(Number(e.target.value)*100))}/></label>;
  const date=(k:string,label:string)=><SolarDate label={label} value={draft[k]||''} onChange={v=>update(k,v)}/>;
  async function save(e:React.FormEvent){e.preventDefault();if(busy)return;setBusy(true);setError('');try{const r=await fetch('/api/sales/network',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(draft)}),d:any=await r.json();if(!r.ok)throw Error(d.error);setDraft(null);setMessage(d.followupPending?'ثبت شد؛ کارتابل در اجرای بعدی زمان‌بند همگام می‌شود.':'ثبت شد.');await load();onChange();}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
  if(!data)return <p role="status">{error||'در حال دریافت شبکه فروش…'}</p>;

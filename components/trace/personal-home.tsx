@@ -1,4 +1,5 @@
 "use client";
+import {NumberInput} from '@/components/trace/number-input';
 import {cloneElement,useEffect,useState,type ReactElement} from 'react';
 import {ArrowUp,ArrowDown,GripVertical,Search,Settings2,RotateCcw,type LucideIcon} from 'lucide-react';
 import './personal-home.css';
@@ -21,7 +22,7 @@ export function PersonalHome({accountId,name,apps,onNavigate,scope='',title='خ�
  {editing&&<div className="personal-app-controls"><button disabled={index===0||!!search} aria-label={'بالا بردن '+app.title} onClick={()=>move(app.key,keys[index-1])}><ArrowUp size={17}/></button><GripVertical size={17} aria-hidden="true"/><button disabled={index===keys.length-1||!!search} aria-label={'پایین بردن '+app.title} onClick={()=>move(app.key,keys[index+1])}><ArrowDown size={17}/></button></div>}
  </article>})}</div>}
  return <section className={"personal-home"+(compact?" personal-home-compact":"")} aria-label={title}><div className="personal-home-header"><div>{greeting&&<p className="subtle">{name}، خوش آمدید</p>}<h2>{title}</h2></div><button className={'btn '+(editing?'primary':'')} aria-pressed={editing} onClick={()=>{setEditing(!editing);setSearch('');setNotice('')}}><Settings2 size={18}/>{editing?'پایان چیدمان':'چیدمان صفحه'}</button></div>
- {!compact&&<label className="personal-home-search"><Search size={19}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="پیدا کردن برنامه…" aria-label="جست‌وجوی برنامه‌ها"/></label>}
+ {!compact&&<label className="personal-home-search"><Search size={19}/><NumberInput fieldKey={"search"} value={search} onChange={e=>setSearch(e.target.value)} placeholder="پیدا کردن برنامه…" aria-label="جست‌وجوی برنامه‌ها"/></label>}
  {editing&&<div className="personal-home-help"><p>آیکون‌ها را بکشید یا با فلش‌ها جابه‌جا کنید. شش برنامهٔ اول، کارهای اصلی شما هستند.</p><button className="link" onClick={()=>save(defaults.map(a=>a.key))}><RotateCcw size={16}/>چیدمان اولیه</button></div>}
  {notice&&<p className="subtle" role="status">{notice}</p>}
  {search?grid(filtered):<>{!compact&&<h3>کارهای اصلی</h3>}{grid(ordered.slice(0,6))}{ordered.length>6&&<><h3 className="personal-other-title">سایر برنامه‌ها</h3>{grid(ordered.slice(6))}</>}</>}

@@ -1,4 +1,5 @@
 'use client';
+import {NumberInput} from '@/components/trace/number-input';
 import {IconDisclosure,IconActions} from "./program-workspace";
 import {IconSections} from "./program-workspace";
 import {ProgramWorkspace,SubprogramNavigation} from "./program-workspace";
@@ -23,8 +24,8 @@ export function CostingPanel({demo=false}:{demo?:boolean}){
  if(!data)return <div className="panel"><p role="status">{error||'در حال محاسبه بهای تمام‌شده…'}</p><button className="btn" onClick={()=>void load().catch(e=>setError(e.message))}>تلاش دوباره</button></div>;
  const product=(id:string)=>data.products.find((p:any)=>p.id===id)?.name||id;
  const bomName=(b:any)=>product(b.product_id)+' — نسخه '+b.version;
- const input=(key:string,label:string,numeric=false)=> <label className="field">{label}<input required value={draft[key]??''} inputMode={numeric?'decimal':undefined} onChange={e=>field(key,numeric?latinDigits(e.target.value):e.target.value)}/></label>;
- const intInput=(key:string,label:string)=> <label className="field">{label}<input required type="number" min="1" step="1" value={draft[key]??''} onChange={e=>field(key,Number(e.target.value))}/></label>;
+ const input=(key:string,label:string,numeric=false)=> <label className="field">{label}<NumberInput fieldKey={key} required value={draft[key]??''} inputMode={numeric?'decimal':undefined} onChange={e=>field(key,numeric?latinDigits(e.target.value):e.target.value)}/></label>;
+ const intInput=(key:string,label:string)=> <label className="field">{label}<NumberInput fieldKey={key} required type="number" min="1" step="1" value={draft[key]??''} onChange={e=>field(key,Number(e.target.value))}/></label>;
  const table=(heads:string[],rows:any[][])=><div style={{overflowX:'auto'}}><table><thead><tr>{heads.map(h=><th key={h}>{h}</th>)}</tr></thead><tbody>{rows.map((r,i)=><tr key={i}>{r.map((v,j)=><td key={j}>{v}</td>)}</tr>)}</tbody></table>{!rows.length&&<p className="empty">هنوز رکوردی ثبت نشده است.</p>}</div>;
  return <ProgramWorkspace programId="costing-panel" title="هزینه و مالی"><div className="panel"><div className="panelhead"><div><h2>بهای تمام‌شده</h2><p>مواد، دستمزد و سربار تولید · همه مبالغ ریال</p></div><button className="btn" disabled={busy} onClick={()=>void load().catch(e=>setError(e.message))}>تازه‌سازی</button></div>
  <SubprogramNavigation items={(Object.entries({payables:'بدهی و پرداخت خرید',expenses:'ثبت و تشخیص هزینه',settlements:'تسویه خرید',devices:'هزینه دستگاه‌ها',prices:'قیمت خرید و موجودی',standards:'استاندارد تولید',periods:'دوره مالی',guide:'راهنما'})).map(([key,title])=>[String(key),String(title)] as [string,string])} value={tab} onChange={setTab}/>
