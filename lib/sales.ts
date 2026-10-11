@@ -10,6 +10,7 @@ export {salesRep,salesManager,salesStaff,salesFinance,salesRead,salesWarehouse} 
 import {salesRep,salesRead,salesWarehouse,salesStaff,salesManager,salesFinance} from './sales-access';
 import {memberId} from './duties';
 import {termsPlan} from './sales-network-contract';
+import {selectSalesTemplate} from './sales-template';
 // Defer imported validators until call time: duties and sales have circular imports.
 export function sreq(v:unknown,max=200){return taskRequired(v,max)}
 export function stxt(v:unknown,max=4000){return taskText(v,max)}
@@ -20,6 +21,12 @@ export function salesSubmission(u:Session,agentId:string,source:any,at:string){
  if(!source||typeof source!=='object'||Array.isArray(source)||!Object.hasOwn(salesRequestChannels,source.channel))salesFail('روش دریافت درخواست نماینده را مشخص کنید.');
  const day=sday(source.day);if(day>dayAt())salesFail('تاریخ دریافت درخواست در آینده نباشد.');
  return {actor:u.userId,actorName:u.name,agentId,onBehalf:true,channel:source.channel,contactName:sreq(source.contactName,200),day,reference:stxt(source.reference??'',1000),at};
+}
+// Staff payment entry is based on a receipt, not a fabricated customer request.
+// Explicit legacy request metadata is still validated when supplied.
+export function salesPaymentSubmission(u:Session,agentId:string,source:any,at:string){
+ if(salesRep(u)||source!=null)return salesSubmission(u,agentId,source,at);
+ return {actor:u.userId,actorName:u.name,agentId,onBehalf:false,channel:'staff_entry',at};
 }
 export function integer(v:unknown,min=1,max=10000){if(typeof v!=='number'||!Number.isSafeInteger(v)||v<min||v>max)salesFail('عدد صحیح در محدوده مجاز وارد کنید.');return v as number;}
 export function arr(v:unknown,max=100){if(!Array.isArray(v)||!v.length||v.length>max)salesFail('فهرست غیرخالی معتبر لازم است.');return v as any[];}
@@ -32,7 +39,7 @@ export async function salesScope(u:Session,id:string){u=await liveSalesUser(u);i
 export async function salesLock(db:D1Database,id:string){const r:any=await db.prepare("SELECT revision FROM flow_entities WHERE id='sales-lock'").first();const now=new Date().toISOString();return [db.prepare("UPDATE inventory_operations SET guard=CASE WHEN COALESCE((SELECT revision FROM flow_entities WHERE id='sales-lock'),0)=? THEN guard ELSE 0 END WHERE id=?").bind(r?.revision||0,id),db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES('sales-lock','sales_lock','{}',1,?,?) ON CONFLICT(id) DO UPDATE SET revision=flow_entities.revision+1,updated=excluded.updated").bind(now,now)];}
 export async function salesQuote(agent:any,items:any[],rows:any[],options:any={}){
  if(agent.data.kind==='referrer')salesFail('عامل معرف طرف حساب خرید نیست.');if(!agent.data.active)salesFail('نمایندگی غیرفعال است.');const today=dayAt();const targets=rows.filter(r=>r.type==='sales_target'&&r.data.agentId===agent.id&&r.data.state==='active'&&r.data.start<=today&&r.data.end>=today);if(targets.length>1)salesFail('بازه قوانین تخفیف تداخل دارد.',409);
- const template=rows.filter(r=>r.type==='sales_template'&&(!r.data.effectiveFrom||r.data.effectiveFrom<=today)&&r.data.kind===(agent.data.kind||'representative')).sort((a,b)=>(b.data.version||0)-(a.data.version||0)||b.created.localeCompare(a.created)||b.id.localeCompare(a.id))[0];
+ const template=selectSalesTemplate(rows,agent.data.kind||'representative',today);
  const target=targets[0],progress=target?salesTargetProgress(target,rows,today):null,baseDiscountBps=integer(template?.data.discountBps??0,0,9000),discountBps=Math.max(baseDiscountBps,progress?.discountBps||0);
  const discountBlocked=rial(salesAccounts(rows,agent.id,today).overdue)>BigInt(0);
  const lines:any[]=[];for(const i of arr(items,30)){const productId=sreq(i.productId),quantity=integer(i.quantity,1,10000);if(lines.some(l=>l.productId===productId))salesFail('کالای تکراری را در یک ردیف ثبت کنید.');
@@ -43,8 +50,9 @@ export async function salesQuote(agent:any,items:any[],rows:any[],options:any={}
 
  if(!template&&options.salesTerms)salesFail('ابتدا مدیر الگوی عمومی را تعریف کند.');
  const requestedCash=options.salesTerms?.cashBps??template?.data.cashBps,requestedMonths=options.salesTerms?.months??template?.data.months;
- if(template&&options.salesTerms){const minCash=template.data.minCashBps??0,maxCash=template.data.maxCashBps??10000,minMonths=template.data.minMonths??0,maxMonths=template.data.maxMonths??12;if(Number(requestedCash)<minCash||Number(requestedCash)>maxCash||Number(requestedMonths)<minMonths||Number(requestedMonths)>maxMonths)salesFail('شرایط پیشنهادی خارج از دامنه مجاز این نوع خریدار است؛ مدیر فروش باید آن را تأیید یا اصلاح کند.');}
- const terms=template?{templateId:template.id,templateRevision:template.revision,cashBps:integer(requestedCash,0,10000),months:integer(requestedMonths,0,12),standardCashBps:template.data.cashBps,standardMonths:template.data.months,minCashBps:template.data.minCashBps??0,maxCashBps:template.data.maxCashBps??10000,minMonths:template.data.minMonths??0,maxMonths:template.data.maxMonths??12}:null;
+ // Ignore legacy maxCashBps/minMonths: higher cash and earlier settlement are allowed.
+ if(template&&options.salesTerms){const minCash=template.data.minCashBps??0,maxMonths=template.data.maxMonths??12;if(Number(requestedCash)<minCash||Number(requestedMonths)>maxMonths)salesFail('شرایط پیشنهادی خارج از دامنه مجاز این نوع خریدار است؛ مدیر فروش باید آن را تأیید یا اصلاح کند.');}
+ const terms=template?{templateId:template.id,templateRevision:template.revision,cashBps:integer(requestedCash,0,10000),months:integer(requestedMonths,0,12),standardCashBps:template.data.cashBps,standardMonths:template.data.months,minCashBps:template.data.minCashBps??0,maxCashBps:10000,minMonths:0,maxMonths:template.data.maxMonths??12}:null;
  let referral:any=null;if(options.referrerId){const ref=rows.find(r=>r.type==='sales_agent'&&r.id===options.referrerId&&r.data.active&&r.data.kind==='referrer'),contracts=rows.filter(r=>r.type==='sales_contract'&&r.data.agentId===ref?.id&&r.data.state==='approved'&&r.data.start<=today&&r.data.end>=today);if(!ref||contracts.length!==1)salesFail('عامل معرف با قرارداد مصوب معتبر انتخاب کنید.');const c=contracts[0];referral={agentId:ref.id,contractId:c.id,bps:c.data.bps,basis:'net-collected-v1'};}
  const deliveryMode=agent.data.kind==='branch'?'consignment':'sale';
  const quote={...(terms?{salesTerms:terms,installments:termsPlan(String(total(lines,l=>l.net)),terms,today)}:{}),...(referral?{referral}:{}),agentId:agent.id,agentRevision:agent.revision,deliveryMode,day:today,lines,amount:String(total(lines,l=>l.net)),discount:String(total(lines,l=>l.discount)),discountBps:discountBlocked?0:discountBps,baseDiscountBps,discountBlocked,targetId:target?.id||'',targetRevision:target?.revision||0,targetProgress:progress?.progress||'0',discountPolicy:'max-category-and-earned-tier-v1',termDays:agent.data.termDays,due:addDay(today,agent.data.termDays),recipient:{name:agent.data.name,phone:agent.data.phone,address:agent.data.address,province:agent.data.province,city:agent.data.city}};

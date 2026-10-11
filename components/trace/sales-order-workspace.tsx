@@ -4,6 +4,7 @@ import type {OperationForm} from '@/lib/assistant-workspace';
 import {partnerKinds} from '@/lib/sales-network-contract';
 import {salesRequestChannels} from '@/lib/sales-contract';
 import {formatDate,localDay} from '@/lib/persian-date';
+import {selectSalesTemplate} from '@/lib/sales-template';
 import {NumberInput} from './number-input';
 import {SolarDate} from './solar-date';
 
@@ -55,7 +56,7 @@ export function SalesOrderWorkspace({form,accountId,locked,onChange,onPrepare,on
  },[key,accountId]);
  const currentCatalog=catalog?.me===accountId?catalog:null;
  const args=form.args,quote=preview.accountId===accountId&&preview.key===key?preview.quote:null,agent=currentCatalog?.agents.find((a:any)=>a.id===args.agentId),items=args.items?.length?args.items:[{productId:'',quantity:1}];
- const terms=quote?.salesTerms||form.preview?.salesTerms||currentCatalog?.templates.filter((t:any)=>(!t.data.effectiveFrom||t.data.effectiveFrom<=localDay())&&t.data.kind===(agent?.data.kind||'representative')).sort((a:any,b:any)=>(b.data.version||0)-(a.data.version||0)||b.created.localeCompare(a.created)||b.id.localeCompare(a.id))[0]?.data;
+ const terms=quote?.salesTerms||form.preview?.salesTerms||selectSalesTemplate(currentCatalog?.templates||[],agent?.data.kind||'representative',quote?.day||currentCatalog?.today||localDay())?.data;
  const quoteChanged=!!form.actionId&&!!quote&&args.quoteHash!==quote.quoteHash;
  useEffect(()=>{onReviewReady(!form.actionId||!!quote&&!loading&&!quoteChanged);},[form.actionId,quote,loading,quoteChanged,onReviewReady]);
  function change(patch:any){const next={...latest.current,args:{...latest.current.args,...patch,quoteHash:undefined},preview:undefined,previewError:undefined};onChange(next);}
@@ -92,7 +93,7 @@ export function SalesOrderWorkspace({form,accountId,locked,onChange,onPrepare,on
     <SolarDate label="تاریخ دریافت درخواست" value={source.day||''} onChange={day=>sourceChange({day})}/>
     <label className="field">خلاصه تماس یا مرجع پیام (اختیاری)<NumberInput maxLength={1000} fieldKey="reference" value={source.reference||''} onChange={e=>sourceChange({reference:e.target.value})}/></label>
    </div></details>}
-   {terms&&agent?.data.kind!=='branch'&&<details style={{marginBlock:12}}><summary>شرایط متفاوت از مصوب، در صورت توافق</summary>{!args.salesTerms?<button type="button" className="link" onClick={()=>change({salesTerms:{cashBps:terms.cashBps,months:terms.months}})}>واردکردن شرایط پیشنهادی</button>:<><p>شرایط پیشنهادی به تأیید مدیر فروش نیاز دارد.</p><div className="formgrid"><label className="field">سهم نقد، درصد<NumberInput fieldKey="cashBps" type="number" min={(terms.minCashBps??0)/100} max={(terms.maxCashBps??10000)/100} step="0.01" value={args.salesTerms.cashBps/100} onChange={e=>change({salesTerms:{...args.salesTerms,cashBps:Math.round(Number(e.target.value)*100)}})}/></label><label className="field">مهلت، ماه<NumberInput fieldKey="months" type="number" min={terms.minMonths??0} max={terms.maxMonths??12} value={args.salesTerms.months} onChange={e=>change({salesTerms:{...args.salesTerms,months:Number(e.target.value)}})}/></label></div><button type="button" className="link" onClick={()=>change({salesTerms:undefined})}>برگشت به شرایط مصوب</button></>}</details>}
+   {terms&&agent?.data.kind!=='branch'&&<details style={{marginBlock:12}}><summary>شرایط متفاوت از مصوب، در صورت توافق</summary>{!args.salesTerms?<button type="button" className="link" onClick={()=>change({salesTerms:{cashBps:terms.cashBps,months:terms.months}})}>واردکردن شرایط پیشنهادی</button>:<><p>شرایط پیشنهادی به تأیید مدیر فروش نیاز دارد.</p><div className="formgrid"><label className="field">سهم نقد، درصد<NumberInput fieldKey="cashBps" type="number" min={(terms.minCashBps??0)/100} max={100} step="0.01" value={args.salesTerms.cashBps/100} onChange={e=>change({salesTerms:{...args.salesTerms,cashBps:Math.round(Number(e.target.value)*100)}})}/></label><label className="field">مهلت، ماه<NumberInput fieldKey="months" type="number" min={0} max={terms.maxMonths??12} value={args.salesTerms.months} onChange={e=>change({salesTerms:{...args.salesTerms,months:Number(e.target.value)}})}/></label></div><button type="button" className="link" onClick={()=>change({salesTerms:undefined})}>برگشت به شرایط مصوب</button></>}</details>}
    <details style={{marginBlock:12}}><summary>توضیح سفارش، در صورت نیاز</summary><label className="field">توضیح<NumberInput fieldKey="notes" value={args.notes||''} onChange={e=>change({notes:e.target.value})}/></label></details>
   </fieldset>
   {!form.actionId&&<button type="button" className="btn primary" disabled={locked||!currentCatalog||!quote||loading||!sourceComplete} onClick={prepare}>بررسی و آماده‌سازی سفارش</button>}

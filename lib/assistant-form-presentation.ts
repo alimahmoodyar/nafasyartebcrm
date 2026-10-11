@@ -66,8 +66,22 @@ export function generalPresentation(tool:string,args:any,input:any,title:string)
  }
  decorate(schema,args);
  if(tool==='sales_network_apply'&&args.mode==='template'){
-  // Legacy drafts may still carry notes; keep them out of the visible template form.
-  for(const node of [schema,schema.properties?.data])if(node){if(node.properties?.notes)node.properties.notes.uiHidden=true;if(Array.isArray(node.required))node.required=node.required.filter((key:string)=>key!=='notes');}
+  // Hide retired fields even when a legacy template draft still carries them.
+  const promotion=args.data?.templateType==='promotion';
+  for(const node of [schema,schema.properties?.data])if(node){
+   const hidden=['notes','minMonths','maxCashBps','effectiveTo',...(!promotion?['durationDays']:[])];
+   for(const key of hidden)if(node.properties?.[key])node.properties[key].uiHidden=true;
+   if(Array.isArray(node.required))node.required=node.required.filter((key:string)=>!hidden.includes(key));
+  }
+  const data=schema.properties?.data;if(data){data.required=[...new Set([...(data.required||[]),'effectiveFrom',...(promotion?['durationDays']:[])])];}
+ }
+ if(tool==='sales_apply'&&args.mode==='payment'){
+  const visible=new Set(['agentId','method','amount','day','reference','fileId','notes',...(args.method!=='cash'?['bank']:[]),...(args.method==='check'?['checkDue']:[]),...(args.cashOrderId?['cashOrderId']:[]),...(args.checkInvoiceId?['checkInvoiceId']:[])]);
+  for(const [key,f] of Object.entries(schema.properties||{}) as [string,any][])f.uiHidden=!visible.has(key);
+  if(schema.properties.agentId)schema.properties.agentId.title='خریدار';
+  if(schema.properties.reference)schema.properties.reference.title=args.method==='check'?'شناسهٔ چک':'شماره پیگیری / رسید';
+  schema.required=['agentId','method','amount','day','reference',...(args.method!=='cash'?['bank','fileId']:[]),...(args.method==='check'?['checkDue']:[])];
+  return {schema,title:'اعلام پرداخت خریدار'};
  }
  if(tool==='sales_apply'&&args.mode==='order'){
   const visible=new Set(['agentId','items','requestSource','customerReference','notes']);

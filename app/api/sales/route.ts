@@ -14,7 +14,7 @@ import {storage} from '@/lib/storage';
 import {boundedBody} from '@/lib/firmware-storage';
 import {dayAt,addDay,memberId} from '@/lib/duties';
 import {salesRoles,salesActions,salesHelp,salesAccounts,salesTargetProgress,salesMilestones,salesProxyModes,salesOrderProgress,rial,total} from '@/lib/sales-contract';
-import {salesFail as fail,salesRep,salesManager,salesStaff,salesFinance,salesRead,salesWarehouse,salesScope,salesLock,salesRows,salesEntity,salesQuote,salesSubmission,salesDelivery,publicSalesFile,sreq as req,stxt as txt,money,integer,arr,sday} from '@/lib/sales';
+import {salesFail as fail,salesRep,salesManager,salesStaff,salesFinance,salesRead,salesWarehouse,salesScope,salesLock,salesRows,salesEntity,salesQuote,salesSubmission,salesPaymentSubmission,salesDelivery,publicSalesFile,sreq as req,stxt as txt,money,integer,arr,sday} from '@/lib/sales';
 import {syncSalesTasks} from '@/lib/sales-tasks';
 const json=(d:any,status=200)=>Response.json(d,{status,headers:{'Cache-Control':'private, no-store','Vary':'Cookie, Authorization'}});
 async function dbReceivingAccounts(){return (await storage().prepare("SELECT id,revision,data FROM flow_entities WHERE type='treasury_account' AND json_extract(data,'$.state')='active' AND json_extract(data,'$.kind')='bank' AND json_extract(data,'$.currency')='IRR'").all()).results.map((a:any)=>{const d=JSON.parse(a.data);return {id:a.id,revision:a.revision,title:d.title,number:d.number,currency:d.currency};});}
@@ -46,7 +46,7 @@ export async function POST(request:Request){try{
  if(agent)guard("EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)",agent.id,agent.revision);
  const get=async(eid:string,type:string)=>{const e=await salesEntity(eid,type);if(agent&&e.data.agentId!==agent.id)fail('رکورد متعلق به این نماینده نیست.',404);guard('EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)',e.id,e.revision);return e;};
  const revision=(e:any)=>{if(e.revision!==b.revision)fail('نسخه پرونده تغییر کرده است؛ تازه‌سازی کنید.',409);};
- const submission=salesProxyModes.includes(mode)?salesSubmission(u,agent!.id,b.requestSource,now):null;
+ const submission=mode==='payment'?salesPaymentSubmission(u,agent!.id,b.requestSource,now):salesProxyModes.includes(mode)?salesSubmission(u,agent!.id,b.requestSource,now):null;
  const put=(eid:string,type:string,data:any,old?:any)=>{const updated={...data,...(submission?{submission:old?.data.submission||submission,lastSubmission:submission}:{}),history:[...(old?.data.history||[]),{mode,actor:u.userId,actorName:u.name,at:now,notes:txt(b.notes||'',4000),...(submission?{submission}:{})}]};stmts.push(old?db.prepare('UPDATE flow_entities SET data=?,revision=revision+1,updated=? WHERE id=? AND revision=?').bind(JSON.stringify(updated),now,eid,old.revision):db.prepare('INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?)').bind(eid,type,JSON.stringify(updated),now,now));const at=rows.findIndex(r=>r.id===eid),virtual={id:eid,type,data:updated,revision:(old?.revision||0)+1,created:old?.created||now,updated:now};if(at<0)rows.push(virtual);else rows[at]=virtual;return updated;};
  const state=(e:any,states:string[])=>{if(!states.includes(e.data.state))fail('وضعیت این پرونده برای اقدام انتخابی معتبر نیست.',409);};
  const notes=()=>req(b.notes,4000);const own=()=>{if(!agent)fail('نماینده لازم است.');return agent!;};const account=()=>salesAccounts(rows,own().id,today);
