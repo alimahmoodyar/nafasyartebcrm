@@ -1,6 +1,6 @@
 import {salesAccounts,rial,total} from './sales-contract';
 import {solarParts,solarToIso,solarMonthDays} from './persian-date';
-export const partnerKinds:Record<string,string>={representative:'نماینده خریدار',reseller:'عامل خریدار',referrer:'عامل معرف / پورسانتی'};
+export const partnerKinds:Record<string,string>={representative:'نماینده خریدار',reseller:'عامل فروش',branch:'شعبه',end_customer:'مصرف‌کننده نهایی',referrer:'عامل معرف / پورسانتی'};
 export const networkModes=['template','partner','contact','case','case_update','contract','contract_review','commission_settlement','commission_review','commission_pay','commission_cancel','check_link'] as const;
 export const networkHelp='سبد هر کارشناس فقط نمایندگان و عاملین مسئول خودش است. الگوی عمومی نماینده و عامل خریدار نسخه‌دار است؛ شرایط مذاکره‌شده پیش از صدور فاکتور باید به تأیید مدیر فروش برسد. پرداخت وصول‌شده ابتدا خرید قدیمی را تسویه می‌کند. برای وجه نقد خرید جدید، کسری خریدهای قبلی سررسیدشده یا مرتبط با چک برگشتی اولویت دارد؛ این اولویت بدهی جدید ایجاد نمی‌کند. چک برگشتی بدون ارتباط معتبر به خرید، استثنای خرید جدید را متوقف می‌کند. عامل معرف بدهکار خرید نیست؛ پورسانت قرارداد مصوب بر وصول خالص فروش معرفی‌شده محاسبه می‌شود، با اثر برگشت کالا و وصول. اعلان‌ها داخل سامانه و اجرای پس‌زمینه وابسته به زمان‌بند است.';
 export function addSolarMonths(day:string,months:number){const p=solarParts(day),n=p.month-1+months,y=p.year+Math.floor(n/12),m=n%12+1;return solarToIso(y,m,Math.min(p.day,solarMonthDays(y,m)));}

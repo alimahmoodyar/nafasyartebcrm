@@ -986,6 +986,13 @@ export const toolOptions:Record<string,Record<string,Record<string,string>>>={
    "in_person": "مراجعه حضوری",
    "letter": "نامه"
   },
+  "kind": {
+   "representative": "نماینده",
+   "reseller": "عامل فروش",
+   "branch": "شعبه",
+   "end_customer": "مصرف‌کننده نهایی",
+   "referrer": "عامل معرف"
+  },
   "mode": {
    "terms": "شرایط اعتباری نماینده",
    "agent": "پرونده نماینده",

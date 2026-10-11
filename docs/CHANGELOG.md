@@ -939,3 +939,7 @@
 - Annual Persian-calendar contractor tasks require actual private letter, signer and date; only domain confirmation completes a task. New confirmations require unused letter files.
 - UI, HTTP, MCP and assistant reuse authenticated roles, revision/idempotency guards and audit. Generic freeze/reset backups include assets and file manifests.
 - Validated asset privacy, race/rollback, exit/HR gate, file access, MCP, personnel and reset regressions; browser checked registry and annual letter form with sample data.
+# تفکیک پرونده نماینده از شرایط فروش
+
+- فرم ایجاد نماینده کوتاه شد و نوع خریدار، کد ملی، موبایل، نشانی، شماره ثابت اختیاری و پروانه کسب اختیاری را می‌گیرد؛ شرایط قیمت و پرداخت داخل پرونده ثبت نمی‌شود.
+- الگوی عمومی فروش مدیر فروش برای نماینده، عامل، شعبه و مصرف‌کننده نهایی مقدار پیش‌فرض و دامنه مجاز تغییر کارشناس را نگه می‌دارد و سفارش خارج از دامنه را نمی‌پذیرد.

@@ -63,6 +63,17 @@ export function generalPresentation(tool:string,args:any,input:any,title:string)
   }
  }
  decorate(schema,args);
+ if(tool==='sales_apply'&&args.mode==='agent'){
+  const visible=new Set(['mode','agentId','kind','name','contact','nationalId','mobile','phone','address','active']);
+  for(const [key,f] of Object.entries(schema.properties||{}) as [string,any][])f.uiHidden=!visible.has(key)||f.uiHidden;
+  if(schema.properties?.mode)schema.properties.mode.uiHidden=true;
+  if(!args.agentId&&schema.properties?.agentId)schema.properties.agentId.uiHidden=true;
+  if(schema.properties?.kind)schema.properties.kind.title='نوع خریدار';
+  if(schema.properties?.phone)schema.properties.phone.title='شماره ثابت (اختیاری)';
+  if(schema.properties?.contact)schema.properties.contact.title='نام مسئول تماس (اختیاری)';
+  schema.required=(schema.required||[]).filter((k:string)=>!['province','city','contractRef','ownerId','financeId','managerId','creditLimit','termDays','agentId','mode'].includes(k));
+  return {schema,title:'ایجاد پرونده نماینده فروش'};
+ }
  if(tool==='personnel_apply'){
   const visible=visiblePersonnelFields(args);
   if(visible.length)for(const [k,f] of Object.entries(schema.properties||{}) as [string,any][])f.uiHidden=!visible.includes(k)||technical.has(k);

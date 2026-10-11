@@ -21,7 +21,7 @@ export function operationForm(tool:any,args:any,section:string,title:string):Ope
 export function requestedOperationForm(message:string,previous:any,available:any[]):OperationForm|undefined{
  const text=message.replace(/[ي]/g,'ی').replace(/[ك]/g,'ک').replace(/\u200c/g,' ');
  const representative=/(نماینده|نمایندگی|عامل فروش)/.test(text)&&/(جدید|ایجاد|بساز|ساخت|تعریف|ثبت)/.test(text)&&!/(حذف|پاک|نساز|ایجاد نکن|ثبت نکن)/.test(text)&&!/(گیرنده|مقصد|ارسال کالا)/.test(text);
- if(representative&&!/خدمات/.test(text)){const tool=available.find(t=>t.name==='sales_apply'&&t.write);if(!tool)return;const args=previous?.tool===tool.name&&previous.args?.mode==='agent'&&!previous.args.agentId?previous.args:{mode:'agent',agentId:''};return operationForm(tool,args,'sales','ثبت پرونده نماینده فروش');}
+ if(representative&&!/خدمات/.test(text)){const tool=available.find(t=>t.name==='sales_apply'&&t.write);if(!tool)return;const args=previous?.tool===tool.name&&previous.args?.mode==='agent'&&!previous.args.agentId?previous.args:{mode:'agent',agentId:'',kind:'representative'};return operationForm(tool,args,'sales','ثبت پرونده نماینده فروش');}
  const createUser=/(کاربر|حساب کاربری|اکانت)/.test(text)&&/(جدید|ایجاد|بساز|ساخت|تعریف)/.test(text)&&!/(حذف|پاک|نساز|ایجاد نکن)/.test(text);
  const reopen=/(فرم)/.test(text)&&/(باز|بیار|بیاور|نمایش|نشان)/.test(text);
  const continuing=!!previous?.tool&&!previous.actionId&&!previous.state&&(!/(جدید|ایجاد|بساز|تعریف|عملیات دیگر|فرم دیگر)/.test(text)||reopen)&&!/(لغو|بیخیال|بی خیال|ببند|منصرف|تمام شد)/.test(text);

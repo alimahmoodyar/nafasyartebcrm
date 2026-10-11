@@ -34,7 +34,7 @@ const nw=(mode,extra={},u=manager,status=200)=>post(network,'/api/sales/network'
  rep=actor('rep',['agent'],{salesAgentId:a});member(rep);
  assert.equal((await get(staff)).agents.length,1);await get(staff,b,404);assert.equal((await get(manager)).agents.length,2);
  await nw('template',{kind:'representative',title:'Rep standard',cashBps:5000,months:1},staff,403);
- const t=await nw('template',{kind:'representative',title:'Rep standard',cashBps:5000,months:1});
+ const t=await nw('template',{kind:'representative',title:'Rep standard',cashBps:5000,minCashBps:3000,maxCashBps:7000,months:1,minMonths:1,maxMonths:3});
  await nw('template',{kind:'reseller',title:'Reseller standard',cashBps:6000,months:2});
  await nw('partner',{revision:version(a),kind:'representative',ownerId:'staff',contactDays:10,reorderDays:30});
  await nw('contact',{channel:'visit',day:today,nextDue:future,nextAction:'Confirm repeat purchase'},staff);
@@ -50,7 +50,7 @@ const nw=(mode,extra={},u=manager,status=200)=>post(network,'/api/sales/network'
  await op('price',{agentId:'',productId:'product',unitPrice:'1000',active:true,reference:'PRICE'},manager);
  await op('terms',{revision:version(a),creditLimit:'100000',termDays:30});
  const items=[{productId:'product',quantity:1}],terms={cashBps:4000,months:2},source={channel:'phone',contactName:'Buyer',day:today,reference:'Actual negotiation'};
- const q=await post(quoteApi,'/api/sales/quote',{agentId:a,items,salesTerms:terms,referrerId:ref},staff);assert.equal(q.salesTerms.cashBps,4000);assert.equal(q.salesTerms.standardCashBps,5000);assert.equal(q.installments[0].amount,'400');
+ const q=await post(quoteApi,'/api/sales/quote',{agentId:a,items,salesTerms:terms,referrerId:ref},staff);assert.equal(q.salesTerms.cashBps,4000);assert.equal(q.salesTerms.standardCashBps,5000);assert.equal(q.salesTerms.minCashBps,3000);assert.equal(q.installments[0].amount,'400');await post(quoteApi,'/api/sales/quote',{agentId:a,items,salesTerms:{cashBps:2000,months:1}},staff,400);
  const o=await op('order',{items,salesTerms:terms,referrerId:ref,quoteHash:q.quoteHash,requestSource:source},staff);
  await op('order_review',{orderId:o.id,revision:1,approved:true},staff,403);await op('order_review',{orderId:o.id,revision:1,approved:true},manager);
  await op('invoice',{orderId:o.id,revision:version(o.id),reference:'I1',installments:[{due:today,amount:'1000'}]},finance,400);

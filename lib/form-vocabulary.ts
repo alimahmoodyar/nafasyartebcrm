@@ -1212,7 +1212,7 @@ Object.assign(fieldTitles,{
 });
 Object.assign(toolFieldTitles.routine_production_apply,{stage:'شماره مرحله ساخت (از صفر)',start:'ساعت شروع',end:'ساعت پایان',hourly:'نرخ ساعتی (ریال)',basis:'مبنای محاسبه سربار'});
 Object.assign(toolFieldTitles.personnel_apply,{kind:'نوع درخواست یا سند',amount:'مبلغ درخواست (ریال)',installments:'تعداد اقساط بازپرداخت',notes:'شرح درخواست / علت اقدام'});
-Object.assign(toolFieldTitles.sales_apply,{orderId:'سفارش فروش',lines:'اقلام سفارش',amount:'مبلغ (ریال)'});
+Object.assign(toolFieldTitles.sales_apply,{orderId:'سفارش فروش',lines:'اقلام سفارش',amount:'مبلغ (ریال)',kind:'نوع خریدار',phone:'شماره ثابت (اختیاری)',nationalId:'کد ملی',mobile:'شماره موبایل',address:'نشانی'});
 Object.assign(toolModeTitles,{
  purchase_settlement_apply:{save:'ثبت / ویرایش تسویه خرید',submit:'ارسال برای بررسی مالی',review:'بررسی و تخصیص هزینه',approve:'تأیید و قیمت‌گذاری',return:'برگشت برای اصلاح',reopen:'بازگشایی تسویه'},
  expense_register_apply:{save:'ثبت هزینه',approve:'تأیید هزینه',reopen:'بازگشایی هزینه',rule:'تعریف قاعده تشخیص هزینه',retire_rule:'غیرفعال‌کردن قاعده'},
