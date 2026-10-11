@@ -65,6 +65,10 @@ export function generalPresentation(tool:string,args:any,input:any,title:string)
   }
  }
  decorate(schema,args);
+ if(tool==='sales_network_apply'&&args.mode==='template'){
+  // Legacy drafts may still carry notes; keep them out of the visible template form.
+  for(const node of [schema,schema.properties?.data])if(node){if(node.properties?.notes)node.properties.notes.uiHidden=true;if(Array.isArray(node.required))node.required=node.required.filter((key:string)=>key!=='notes');}
+ }
  if(tool==='sales_apply'&&args.mode==='order'){
   const visible=new Set(['agentId','items','requestSource','customerReference','notes']);
   for(const [key,f] of Object.entries(schema.properties||{}) as [string,any][])f.uiHidden=!visible.has(key);
