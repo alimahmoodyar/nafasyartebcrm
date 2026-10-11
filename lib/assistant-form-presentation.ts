@@ -69,6 +69,7 @@ export function generalPresentation(tool:string,args:any,input:any,title:string)
   if(schema.properties?.mode)schema.properties.mode.uiHidden=true;
   if(!args.agentId&&schema.properties?.agentId)schema.properties.agentId.uiHidden=true;
   if(schema.properties?.kind)schema.properties.kind.title='نوع خریدار';
+  if(schema.properties?.active)schema.properties.active.title='پرونده نماینده فعال است';
   if(schema.properties?.phone)schema.properties.phone.title='شماره ثابت (اختیاری)';
   if(schema.properties?.contact)schema.properties.contact.title='نام مسئول تماس (اختیاری)';
   schema.required=(schema.required||[]).filter((k:string)=>!['province','city','contractRef','ownerId','financeId','managerId','creditLimit','termDays','agentId','mode'].includes(k));
