@@ -1,3 +1,4 @@
+import {storedAccessPermissions} from './permissions';
 import {storage} from './storage';
 import {AccessError} from './authorization';
 import {supplyEntities,stockCandidates,supplyLock,coverage} from './sourcing';
@@ -7,7 +8,7 @@ import {defaultCalendar,addWorkingMinutes,workingMinutes,workingNow,localParts,w
 export const replenishmentRoles:Record<string,string>={inventory:'مسئول انبار',engineering:'مسئول بررسی فنی',domestic:'بازرگانی داخلی',foreign:'بازرگانی خارجی',finance:'مسئول مالی',ceo:'تصمیم‌گیر خرید',qc:'کنترل کیفیت ورودی'};
 export const defaultPolicy={enabled:false,calendar:defaultCalendar,owners:{} as Record<string,string>,supervisor:'',slaMinutes:480,reminderMinutes:120,escalationMinutes:120,criticalSlaMinutes:60,leadDays:7};
 export async function replenishmentPolicy(){const r:any=await storage().prepare("SELECT * FROM flow_entities WHERE id='replenishment-policy' AND type='replenishment_policy'").first();return {revision:r?.revision||0,data:r?JSON.parse(r.data):defaultPolicy};}
-export function eligibleRole(member:any,role:string){const p=typeof member.permissions==='string'?JSON.parse(member.permissions):member.permissions;if(member.status!=='active')return false;if(role==='qc')return p.flowRoles?.includes('qc');if(role==='inventory')return p.supplyRoles?.includes(role)&&p.flowRoles?.includes('inventory')&&(p.warehouses??['raw','quarantine']).includes('raw')&&(p.warehouses??['raw','quarantine']).includes('quarantine');return p.supplyRoles?.includes(role);}
+export function eligibleRole(member:any,role:string){const p=typeof member.permissions==='string'?storedAccessPermissions(member.permissions):member.permissions;if(member.status!=='active')return false;if(role==='qc')return p.flowRoles?.includes('qc');if(role==='inventory')return p.supplyRoles?.includes(role)&&p.flowRoles?.includes('inventory')&&(p.warehouses??['raw','quarantine']).includes('raw')&&(p.warehouses??['raw','quarantine']).includes('quarantine');return p.supplyRoles?.includes(role);}
 export async function shortageSnapshot(m:any,leadDays=7){
  const db=storage(),candidates=await stockCandidates(m.data.code,m.data.unit),builds=await supplyEntities('build'),boms=(await db.prepare('SELECT * FROM bom_versions').all()).results as any[];
  const legacy=(await db.prepare("SELECT m.quantity FROM production_materials m JOIN inventory_batches b ON b.batch_id=m.batch_id WHERE b.part_code=? AND b.unit=? AND NOT EXISTS(SELECT 1 FROM production_receipts r WHERE r.order_id=m.order_id)").bind(m.data.code,m.data.unit).all()).results as any[];

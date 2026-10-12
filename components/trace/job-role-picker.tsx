@@ -1,3 +1,5 @@
+import {canOpenSection,workflowSectionTitle} from '@/lib/navigation-access';
+import {sectionTitles} from '@/lib/assistant-policy';
 "use client";
 import {NumberInput} from '@/components/trace/number-input';
 import {useState} from 'react';
@@ -17,6 +19,8 @@ export function JobRolePicker({permissions,onChange,salesAgents,serviceAgents}:{
  };
  const toggle=(id:string,enabled:boolean)=>change({...a,roles:enabled?[...a.roles,id]:a.roles.filter(r=>r!==id)});
  const groups=[...new Set(jobRoles.map(r=>r.group))];
+ const principal=preview?{userId:'preview',email:'',name:'',isAdmin:false,permissions:preview}:null;
+ const apps=principal?Object.keys(sectionTitles).filter(key=>canOpenSection(principal,key)).map(key=>workflowSectionTitle(principal,key,sectionTitles[key])):[];
  return <section aria-label="انتخاب مسئولیت‌های فرد" style={{marginTop:18}}>
   <h3>این فرد چه مسئولیت‌هایی دارد؟</h3><p className="subtle">یک یا چند نقش انتخاب کنید. دسترسی کارهای مرتبط به‌صورت خودکار تنظیم می‌شود.</p>
   {a.roles.includes('ceo')&&<p className="subtle">برای اختیار صدور مجوز نهایی پرداخت به خزانه‌دار، نقش «مجوز نهایی پرداخت مدیرعامل» را نیز انتخاب کنید.</p>}
@@ -28,7 +32,7 @@ export function JobRolePicker({permissions,onChange,salesAgents,serviceAgents}:{
   {selected.some(r=>r.scope==='services')&&<fieldset className="stage-permissions"><legend>در کدام حوزه خدمات فعالیت می‌کند؟</legend>{Object.entries(serviceDomains).map(([key,label])=><label key={key}><input type="checkbox" checked={(a.serviceDomains||[]).includes(key)} onChange={e=>change({...a,serviceDomains:e.target.checked?[...(a.serviceDomains||[]),key]:(a.serviceDomains||[]).filter(x=>x!==key)})}/>{label}</label>)}</fieldset>}
   {selected.some(r=>r.scope==='salesAgent')&&<label className="field">نمایندگی فروش<select value={a.salesAgentId||''} onChange={e=>change({...a,salesAgentId:e.target.value})}><option value="">انتخاب نمایندگی</option>{salesAgents.filter(x=>x.data.active).map(x=><option key={x.id} value={x.id}>{x.data.name}</option>)}</select></label>}
   {selected.some(r=>r.scope==='serviceAgent')&&<label className="field">نمایندگی خدمات<select value={a.serviceAgentId||''} onChange={e=>{const agent=serviceAgents.find(x=>x.id===e.target.value);change({...a,serviceAgentId:e.target.value,serviceDomains:agent?[agent.data.domain]:[]});}}><option value="">انتخاب نمایندگی</option>{serviceAgents.filter(x=>x.data.active).map(x=><option key={x.id} value={x.id}>{x.data.name} · {serviceDomains[x.data.domain]}</option>)}</select></label>}
-  <div className="notice" style={{marginTop:12}}><div><strong>خلاصه کارهای مجاز پس از ذخیره</strong>{selected.length?<ul>{selected.map(r=><li key={r.id}><strong>{r.label}:</strong> {r.actions}</li>)}</ul>:<p>هنوز نقشی انتخاب نشده است.</p>}{preview?.warehouses?.length?<p>انبارها: {warehouses.filter(w=>preview!.warehouses!.includes(w.id)).map(w=>w.name).join('، ')}</p>:null}{preview?.serviceDomains?.length?<p>حوزه خدمات: {preview.serviceDomains.map(d=>serviceDomains[d]).join('، ')}</p>:null}<p className="subtle">حذف نقش، مجوزهای مخصوص همان نقش را حذف می‌کند؛ دسترسی مشترک نقش‌های باقی‌مانده حفظ می‌شود.</p></div></div>
+  <div className="notice" style={{marginTop:12}}><div><strong>خلاصه کارهای مجاز پس از ذخیره</strong>{selected.length?<ul>{selected.map(r=><li key={r.id}><strong>{r.label}:</strong> {r.actions}</li>)}</ul>:<p>هنوز نقشی انتخاب نشده است.</p>}{preview?.warehouses?.length?<p>انبارها: {warehouses.filter(w=>preview!.warehouses!.includes(w.id)).map(w=>w.name).join('، ')}</p>:null}{preview?.serviceDomains?.length?<p>حوزه خدمات: {preview.serviceDomains.map(d=>serviceDomains[d]).join('، ')}</p>:null}<p><strong>برنامه‌های این فرد:</strong> {apps.join("، ")||"پس از انتخاب نقش و محدوده نمایش داده می‌شوند."}</p><p className="subtle">حذف نقش، مجوزهای مخصوص همان نقش را حذف می‌کند؛ دسترسی مشترک نقش‌های باقی‌مانده حفظ می‌شود.</p></div></div>
   {error&&<p role="status" className="notice error">{error}</p>}
  </section>;
 }

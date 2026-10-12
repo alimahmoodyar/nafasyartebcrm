@@ -6,7 +6,7 @@ let identity=null;const env={TRACE_OWNER_EMAIL:'owner@example.com',LLM_CONFIG_EN
 let cookie="";const cache={};function load(file){file=path.resolve(root,file);if(cache[file])return cache[file];const exports={};cache[file]=exports;const source=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
 vm.runInNewContext(source,{exports,require:n=>{if(n==='next/headers')return {cookies:async()=>({get:()=>cookie?{value:cookie}:undefined})};if(n==='cloudflare:workers')return {env};if(n==='@/app/chatgpt-auth')return {getChatGPTUser:async()=>identity};if(n.startsWith('@/')||n.startsWith('.')){const p=n.startsWith('@/')?path.join(root,n.slice(2)):path.resolve(path.dirname(file),n);return load(p+(path.extname(p)?'':'.ts'));}return require(n)},Response,Request,URL,URLSearchParams,Error,crypto:globalThis.crypto,Date,Intl,Set,Map,FormData,Blob,File,TextEncoder,TextDecoder,Uint8Array,ArrayBuffer,AbortController,ReadableStream,btoa,atob,setTimeout:(f,n)=>setTimeout(f,Math.min(n,10)),clearTimeout,console},{filename:file});return exports;}
 
-const policy=load('lib/permissions.ts'),auth=load('lib/authorization.ts'),flow=load('lib/material-flow.ts'),supply=load('lib/sourcing.ts'),sales=load('lib/sales-access.ts'),service=load('lib/after-sales.ts'),serviceAccess=load('lib/service-access.ts'),hospital=load('lib/hospital.ts'),qms=load('lib/qms.ts'),hr=load('lib/personnel.ts'),assets=load('lib/assets.ts'),transport=load('lib/transport.ts'),cost=load('lib/costing.ts'),finance=load('lib/financial-workflow-roles.ts'),nav=load('lib/assistant-policy.ts');
+const policy=load('lib/permissions.ts'),auth=load('lib/authorization.ts'),flow=load('lib/material-flow.ts'),supply=load('lib/sourcing.ts'),sales=load('lib/sales-access.ts'),service=load('lib/after-sales.ts'),serviceAccess=load('lib/service-access.ts'),hospital=load('lib/hospital.ts'),qms=load('lib/qms.ts'),hr=load('lib/personnel.ts'),assets=load('lib/assets.ts'),transport=load('lib/transport.ts'),cost=load('lib/costing.ts'),finance=load('lib/financial-workflow-roles.ts'),nav=load('lib/navigation-access.ts');
 const ids=(...v)=>new Set(v),has=(set,id)=>set.has(id);
 const expected={
  salesManager:ids('sales_manager'),salesStaff:ids('sales','sales_manager','home_sales','hospital_sales','sales_manager_assistant','delivery'),
@@ -23,11 +23,11 @@ const legacy={
  inventory:{read:['batch'],write:['batch']},warehouse_supervisor:{read:['batch'],write:['batch']},production_store_assistant:{read:['batch'],write:['batch']},
  production:{read:['product','batch','device','event'],write:['device','event'],stages:['مصرف قطعه','مونتاژ','بسته‌بندی']},
  qc:{read:['batch','device','event','service','action'],write:['batch','event','action'],stages:['آزمون نهایی']},
- delivery:{read:['batch','device','event','distribution'],write:['event','distribution'],stages:['تحویل']},
+ delivery:{},
  product_manager:{read:['product'],write:['product']},firmware:{read:['device','firmware'],write:['firmware']},
  viewer:{read:['product','batch','device','event','service','action','distribution','firmware']},warehouse_finance:{read:['batch']}
 };
-for(const id of ['planning','engineering','ceo','sales','sales_manager','home_sales','hospital_sales','sales_manager_assistant'])legacy[id]={read:['product']};
+for(const id of ['planning','engineering','ceo'])legacy[id]={read:['product']};
 for(const id of ['domestic','foreign'])legacy[id]={read:['batch']};
 const qualityWriters={document:['qa','documents'],permit:['qa','regulatory','technical'],audit:['qa','auditor'],capa:['qa','qc','technical'],design:[],change:[],risk:[],calibration:['qa','calibration'],release:['qa','qc'],complaint:['qa','technical','regulatory'],training:['qa','documents','technical'],management:['qa'],software:['qa','technical'],form:['qa','documents'],response:['qa','documents','qc','technical']};
 
@@ -72,7 +72,7 @@ if(qa&&!qa.design)assert.equal(qms.qvisible({type:'qms_record',data:{private:tru
  check(nav.canOpenSection(u,'qms'),!!u.permissions.qmsRoles?.length||has(expected.design,id),'QMS navigation',id);
  check(nav.canOpenSection(u,'sales'),has(expected.salesStaff,id)||has(expected.salesManager,id)||has(expected.salesFinance,id)||id==='sales_viewer'||id==='sales_agent','sales navigation',id);
  check(nav.canOpenSection(u,'routine-production'),['production','engineering','qc','ceo'].includes(id),'routine production navigation',id);
- check(nav.canOpenSection(u,'assets'),!['sales_agent','service_agent'].includes(id),'assets navigation',id);
+ check(nav.canOpenSection(u,'assets'),id==='custodian','assets navigation',id);
  check(nav.canOpenSection(u,'personnel'),!['sales_agent','service_agent'].includes(id),'personnel navigation',id);
  check(nav.canOpenSection(u,'guarantees'),['treasurer','finance_director'].includes(id),'guarantees navigation',id);
  check(nav.canOpenSection(u,'users'),false,'admin users',id);check(nav.canOpenSection(u,'llm'),false,'admin LLM',id);check(nav.canOpenSection(u,'system-reset'),false,'admin reset',id);

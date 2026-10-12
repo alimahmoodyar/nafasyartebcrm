@@ -1,3 +1,4 @@
+import {storedAccessPermissions} from '@/lib/permissions';
 import {requireAccess,checkOrigin,accessResponse,AccessError} from '@/lib/authorization';
 import {storage} from '@/lib/storage';
 import {boundedBody} from '@/lib/firmware-storage';
@@ -12,7 +13,7 @@ async function actor(request:Request){
  if(request.headers.get('x-assistant-account')&&request.headers.get('x-assistant-account')!==u.userId)fail('حساب ورود تغییر کرده است؛ صفحه را تازه کنید.',409);
  const member:any=u.isAdmin?null:await db.prepare("SELECT id,subject,permissions,status FROM app_members WHERE subject=? OR id=?").bind(u.userId,u.userId.startsWith('local:')?u.userId.slice(6):'').first();
  if(!u.isAdmin&&(!member||member.status!=='active'))fail('حساب فعال شرکت لازم است.',403);
- if(!canGenerateActivationCode(u)||!canGenerateActivationCode(member?{...u,permissions:JSON.parse(member.permissions)}:u))fail('تولید کد فقط برای مدیر فروش و کارشناسان خدمات خانگی مجاز است.',403);
+ if(!canGenerateActivationCode(u)||!canGenerateActivationCode(member?{...u,permissions:storedAccessPermissions(member.permissions)}:u))fail('تولید کد فقط برای مدیر فروش و کارشناسان خدمات خانگی مجاز است.',403);
  return {u,db,member};
 }
 export async function GET(request:Request){try{

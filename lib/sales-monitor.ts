@@ -1,10 +1,11 @@
+import {storedAccessPermissions} from './permissions';
 import {storage} from './storage';
 import {notice} from './duties';
 import {salesRows,salesDecode,salesLock,salesManager,salesStaff,salesFinance} from './sales';
 import {localDay} from './persian-date';
 import {monitorDefaults,detectSalesAlerts,dueReports,buildSalesReport,reportKinds} from './sales-monitor-contract';
 import {rial} from './sales-contract';
-export async function monitorMembers(){return (await storage().prepare("SELECT id,name,status,permissions FROM app_members WHERE status='active'").all()).results.map((m:any)=>{const u={isAdmin:false,permissions:JSON.parse(m.permissions)} as any;return {id:m.id,name:m.name,permissions:m.permissions,sales:salesStaff(u),finance:salesFinance(u),manager:salesManager(u)};});}
+export async function monitorMembers(){return (await storage().prepare("SELECT id,name,status,permissions FROM app_members WHERE status='active'").all()).results.map((m:any)=>{const u={isAdmin:false,permissions:storedAccessPermissions(m.permissions)} as any;return {id:m.id,name:m.name,permissions:m.permissions,sales:salesStaff(u),finance:salesFinance(u),manager:salesManager(u)};});}
 export async function monitorPolicy(){const r:any=await storage().prepare("SELECT * FROM flow_entities WHERE id='sales-monitor-policy' AND type='sales_monitor_policy'").first();return r?salesDecode(r):{id:'sales-monitor-policy',revision:0,data:{...monitorDefaults,startedDay:localDay()},created:null};}
 export async function monitorTasks(){return (await storage().prepare("SELECT * FROM duty_runs WHERE json_extract(data,'$.salesWorkflow')=1").all()).results.map(salesDecode);}
 export async function monitorDeliveries(){return (await storage().prepare("SELECT id,data,revision,updated FROM flow_entities WHERE type='sale' AND json_extract(data,'$.salesOrderId') IS NOT NULL").all()).results.map((r:any)=>{const d=JSON.parse(r.data);return {id:r.id,revision:r.revision,updated:r.updated,orderId:d.salesOrderId,productId:d.productId,count:d.count,state:d.state};});}

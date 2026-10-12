@@ -1,3 +1,4 @@
+import {storedAccessPermissions} from './permissions';
 import {financialAccess} from './financial-access';
 import {storage} from './storage';
 import {AccessError} from './authorization';
@@ -21,7 +22,7 @@ const actualDay=(v:any)=>{const d=req(v,10);if(!validDay(d)||d>dayAt())foreignFa
 const dueDay=(v:any)=>{const d=req(v,10);if(!validDay(d))foreignFail('تاریخ مهلت معتبر لازم است.');return d;};
 const amount=(v:any)=>{const n=foreignMoney(v);if(n<=BigInt(0))foreignFail('مبلغ مثبت لازم است.');return foreignMoneyText(n);};
 const uuid=(v:any)=>{const s=req(v,80);if(!/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(s))foreignFail('شناسه معتبر لازم است.');return s;};
-export const memberRole=(m:any,role:string)=>m?.status==='active'&&!!(foreignRoles({isAdmin:false,permissions:JSON.parse(m.permissions)}) as any)[role];
+export const memberRole=(m:any,role:string)=>m?.status==='active'&&!!(foreignRoles({isAdmin:false,permissions:storedAccessPermissions(m.permissions)}) as any)[role];
 export async function foreignApply(u:any,b:any){
  const roles=foreignRoles(u);if(!roles.read)foreignFail('دسترسی ندارید.',403);const id=uuid(b.id),mode=req(b.mode,40);if(b.confirmed!==true||!foreignModes.includes(mode as any))foreignFail('عملیات و تأیید صریح لازم است.');
  if(['register','permit','actual','amend'].includes(mode)){const s=await foreignBy(u,req(b.caseId));if(s.type!=='purchase_shipment')foreignFail('محموله لازم است.');return applyShipment(u,{...b,shipmentId:s.id});}

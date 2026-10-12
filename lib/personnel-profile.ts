@@ -1,8 +1,9 @@
+import {validatePermissions} from './permissions';
 // Base personnel identity is not an employment contract or a grant of HR access.
 export const personnelSetupFields=['code','unit','title','location','employment','managerId','start','leaveMinutes'] as const;
 function objectPermissions(value:unknown):Record<string,any>|null{try{const p=typeof value==='string'?JSON.parse(value):value;return p&&typeof p==='object'&&!Array.isArray(p)?p:null;}catch{return null;}}
 export function personnelStaff(member:any){
- const p=objectPermissions(member?.permissions);if(member?.status!=='active'||!p)return false;
+ const raw=objectPermissions(member?.permissions);if(member?.status!=='active'||!raw)return false;let p=raw;if(raw.roleAssignment!==undefined){try{p=validatePermissions(raw as any)}catch{return false}};
  if(p.salesAgentId||p.serviceAgentId||p.hospitalCenterId)return false;
  for(const key of ['salesRoles','serviceRoles'])if(p[key]!==undefined&&(!Array.isArray(p[key])||p[key].includes('agent')))return false;
  if(p.roleAssignment!==undefined){const assignment=objectPermissions(p.roleAssignment);if(!assignment||!Array.isArray(assignment.roles)||assignment.roles.some((role:any)=>['sales_agent','service_agent'].includes(role)))return false;}

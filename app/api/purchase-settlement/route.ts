@@ -1,3 +1,4 @@
+import {storedAccessPermissions} from '@/lib/permissions';
 import {checkOrigin,accessResponse} from '@/lib/authorization';
 import {storage} from '@/lib/storage';
 import {boundedBody} from '@/lib/firmware-storage';
@@ -67,7 +68,7 @@ export async function POST(request:Request){try{checkOrigin(request);const u=awa
  if(['submit','return','reopen','approve'].includes(b.mode)){
   stmts.push(db.prepare("UPDATE duty_runs SET state='completed',revision=revision+1,updated=? WHERE template_id=? AND state NOT IN ('completed','cancelled')").bind(now,'purchase-settlement:'+target));
   if(b.mode!=='approve'){const members=(await db.prepare("SELECT id,permissions FROM app_members WHERE status='active'").all()).results as any[];const title=d.state==='submitted'?'بررسی مالی تسویه خرید':'اصلاح پرونده تسویه خرید';
-   for(const m of members){const p=JSON.parse(m.permissions),who={isAdmin:false,permissions:p};if(!(d.state==='submitted'?settleFinance(who):settleBuyer(who,d.route)))continue;
+   for(const m of members){const p=storedAccessPermissions(m.permissions),who={isAdmin:false,permissions:p};if(!(d.state==='submitted'?settleFinance(who):settleBuyer(who,d.route)))continue;
     const tid='settlement:'+id+':'+m.id;stmts.push(db.prepare("INSERT INTO duty_runs(id,template_id,period,assignee,supervisor,due,state,data,revision,created,updated) VALUES(?,?,?, ?,NULL,?,'open',?,1,?,?)").bind(tid,'purchase-settlement:'+target,now.slice(0,10)+'#'+String(revision+1),m.id,new Date(Date.parse(now)+48*3600000).toISOString(),JSON.stringify({title:title+' · '+d.supplier+' / '+d.invoiceNumber,sourceSection:d.state==='submitted'?'costing':'sourcing',sourcePlanId:d.planId,settlementId:target,instructions:'فرم تسویه خرید را باز کنید. ثبت پاسخ متنی جای تأیید پرونده را نمی‌گیرد.',history:[],evidence:'text'}),now,now));}
   }
  }

@@ -1,3 +1,4 @@
+import {storedAccessPermissions} from './permissions';
 import {storage} from './storage';
 import {AccessError} from './authorization';
 import {allPermissions,validatePermissions,type Session} from './permissions';
@@ -7,14 +8,14 @@ import {env} from 'cloudflare:workers';
 export async function reminderRecipients(u:Session){
  if(u.permissions.hospitalCenterId)throw new AccessError('این حساب به صندوق ارجاع همکاران دسترسی ندارد.',403);
  const dir=await inboxDirectory(u),rows=(await storage().prepare("SELECT id,permissions FROM app_members WHERE status='active'").all()).results as any[];
- return dir.people.filter(p=>p.id!==dir.me&&(p.id==='@owner'||rows.some(m=>m.id===p.id&&!JSON.parse(m.permissions).hospitalCenterId)));
+ return dir.people.filter(p=>p.id!==dir.me&&(p.id==='@owner'||rows.some(m=>m.id===p.id&&!storedAccessPermissions(m.permissions).hospitalCenterId)));
 }
 /** Read-only principal for applying the recipient's existing record visibility. Never grants new rights. */
 export async function reminderRecipient(u:Session,id:string){
  if(!(await reminderRecipients(u)).some(p=>p.id===id))throw new AccessError('مسئول فعال و مجاز دیگری انتخاب کنید.',403);
  if(id==='@owner'){const row:any=await storage().prepare("SELECT subject FROM app_identity WHERE id='owner'").first();if(!row||!env.TRACE_OWNER_EMAIL)throw new AccessError('مدیر سامانه در دسترس نیست.',403);return {userId:row.subject,email:env.TRACE_OWNER_EMAIL,name:'مدیر سامانه',isAdmin:true,permissions:allPermissions} as Session;}
  const row:any=await storage().prepare("SELECT m.*,EXISTS(SELECT 1 FROM password_accounts p WHERE p.member_id=m.id) AS password_login FROM app_members m WHERE m.id=? AND m.status='active'").bind(id).first();if(!row)throw new AccessError('مسئول غیرفعال شده است.',403);
- return {userId:row.password_login||!row.subject?'local:'+row.id:row.subject,email:row.email,name:row.name,isAdmin:false,permissions:validatePermissions(JSON.parse(row.permissions))} as Session;
+ return {userId:row.password_login||!row.subject?'local:'+row.id:row.subject,email:row.email,name:row.name,isAdmin:false,permissions:validatePermissions(storedAccessPermissions(row.permissions))} as Session;
 }
 export async function prepareReminderDispatch(u:Session,r:any,d:any,op:string,now:Date){
  const db=storage(),at=now.toISOString(),deadline=new Date(now.getTime()+d.delegation.hours*3600000+210*60000).toISOString().slice(0,16)+':00+03:30';

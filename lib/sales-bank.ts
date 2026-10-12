@@ -1,3 +1,4 @@
+import {storedAccessPermissions} from './permissions';
 import type {Session} from './permissions';
 import {storage} from './storage';
 import {trainingContext} from './training-context';
@@ -15,7 +16,7 @@ import {parseSalesBankRows} from './sales-bank-import';
 export async function salesBankRoles(actor:Session){
  if(trainingContext.getStore())fail('تطبیق بانکی فقط در اطلاعات شرکت اجرا می‌شود.',403);
  const members=await leadMembers();let u=actor;
- if(!u.isAdmin){const m=members.find(m=>m.status==='active'&&(m.subject===u.userId||'local:'+m.id===u.userId));if(!m)fail('دسترسی فعال لازم است.',403);u={...u,permissions:JSON.parse(m.permissions)};}
+ if(!u.isAdmin){const m=members.find(m=>m.status==='active'&&(m.subject===u.userId||'local:'+m.id===u.userId));if(!m)fail('دسترسی فعال لازم است.',403);u={...u,permissions:storedAccessPermissions(m.permissions)};}
  if(salesRep(u)||u.permissions.serviceAgentId||u.permissions.hospitalCenterId)fail('دسترسی مالی داخلی شرکت لازم است.',403);
  const manage=salesManager(u)||salesFinance(u),bank=u.isAdmin||salesFinance(u)||financialWorkflowRole(u.permissions,'',[],'treasury');
  if(!manage&&!bank)fail('مجوز اتصال پوز یا تطبیق بانکی ندارید.',403);

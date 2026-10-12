@@ -1,3 +1,4 @@
+import {storedAccessPermissions} from './permissions';
 import {storage} from './storage';
 import {trainingContext} from './training-context';
 import {dayAt,notice} from './duties';
@@ -9,7 +10,7 @@ export async function syncPurchaseInvoiceTasks(today=dayAt()){
  const members=(await db.prepare('SELECT id,status,permissions FROM app_members ORDER BY id').all()).results as any[];
  const old=(await db.prepare("SELECT * FROM duty_runs WHERE template_id='purchase-invoice-document'").all()).results as any[],wanted=new Map<string,any>();
  for(const c of rows.filter(r=>r.type==='purchase_payable'))for(const item of invoiceFollowups(c,rows,today))for(const role of ['buyer','finance']){
- const eligible=members.filter(m=>m.status==='active').filter(m=>{const u={isAdmin:false,permissions:JSON.parse(m.permissions)};return role==='finance'?apFinance(u):apBuyer(u,c.data.route)}).map(m=>m.id);
+ const eligible=members.filter(m=>m.status==='active').filter(m=>{const u={isAdmin:false,permissions:storedAccessPermissions(m.permissions)};return role==='finance'?apFinance(u):apBuyer(u,c.data.route)}).map(m=>m.id);
  for(const mid of eligible.length?eligible:['@admin']){const id='purchase-invoice-document:'+c.id+':'+item.key+':'+role+':'+mid;wanted.set(id,{item,role,mid,missingOwner:!eligible.length});}}
  const writes:D1PreparedStatement[]=[];
  for(const [id,{item,role,mid,missingOwner}] of wanted){const existing=old.find(t=>t.id===id);if(existing&&['open','blocked','submitted'].includes(existing.state))continue;

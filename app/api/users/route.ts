@@ -1,3 +1,4 @@
+import {storedAccessPermissions} from '@/lib/permissions';
 import {username,password,hashPassword} from "@/lib/password-auth";
 import {env} from "cloudflare:workers";
 import {storage} from "@/lib/storage";
@@ -6,7 +7,7 @@ import {validatePermissions} from "@/lib/permissions";
 import {personnelProfileStatements} from "@/lib/personnel-profile";
 import {contactPatch,memberContactsForAccounts,memberContactAdminContext,memberContactGuards,contactRevisionGuard,memberContactWrite} from '@/lib/member-contact';
 
-function present(row: any) {return {...row,canDelete:!row.protected,email:row.username?"":row.email, userId: row.subject, permissions: JSON.parse(row.permissions)};}
+function present(row: any) {return {...row,canDelete:!row.protected,email:row.username?"":row.email, userId: row.subject, permissions: storedAccessPermissions(row.permissions)};}
 function payload(value: any) {
   if (!value || typeof value !== "object") throw new Error("اطلاعات حساب معتبر نیست.");
   const email = typeof value.email === "string" ? value.email.trim().toLowerCase() : "";

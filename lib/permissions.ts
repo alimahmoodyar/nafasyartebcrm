@@ -1,3 +1,4 @@
+import {roleWorkflowPrograms} from './workflow-programs';
 import {qmsRoles} from './qms-contract';
 import type {Kind} from "./model";
 
@@ -84,10 +85,10 @@ presets['بازرگانی خارجی']={read:[],write:[],eventStages:[],supplyRo
 
 // Versioned, explicit workflow dependencies. Assignments store both intent and the
 // validated effective snapshot; editing unrelated account fields never infers roles.
-export const rolePolicyVersion=4;
-export type JobRole={id:string;label:string;group:string;actions:string;grants:Permissions;scope?:'warehouses'|'services'|'salesAgent'|'serviceAgent'};
+export const rolePolicyVersion=5;
+export type JobRole={id:string;label:string;group:string;actions:string;programs:string[];grants:Permissions;scope?:'warehouses'|'services'|'salesAgent'|'serviceAgent'};
 const emptyGrants=():Permissions=>({read:[],write:[],eventStages:[]});
-const job=(id:string,label:string,group:string,actions:string,grants:Partial<Permissions>,scope?:JobRole['scope']):JobRole=>({id,label,group,actions,grants:{...emptyGrants(),...grants},scope});
+const job=(id:string,label:string,group:string,actions:string,grants:Partial<Permissions>,scope?:JobRole['scope']):JobRole=>({id,label,group,actions,programs:roleWorkflowPrograms[id]||[],grants:{...emptyGrants(),...grants},scope});
 export const jobRoles:JobRole[]=[
  job('inventory','انباردار','انبار و تولید','بررسی کسری، دریافت کالا، جانمایی، تحویل مواد و بستن سفارش پذیرفته‌شده',{...presets['انبار'],supplyRoles:['inventory']},'warehouses'),
  job('production','مسئول تولید','انبار و تولید','برنامه روزانه، مونتاژ، ثبت مصرف مواد و بسته‌بندی',presets['تولید']),
@@ -100,15 +101,15 @@ export const jobRoles:JobRole[]=[
  job('purchase_finance','کارشناس خرید مالی','مالی','بودجه و صدور خرید، بررسی بدهی، مجوز پرداخت و تأیید بهای خرید',{finance:'write',supplyRoles:['finance']}),
  job('finance','کارشناس مالی','مالی','مشاهده و ثبت بررسی‌های مالی و هزینه‌ها',presets['مالی']),
  job('ceo','مدیرعامل / تصمیم‌گیر خرید','مدیریت','تأیید برنامه و انتخاب پیشنهاد خرید؛ بدون مدیریت حساب‌های کاربری',presets['مدیرعامل']),
- job('sales','کارشناس فروش','فروش','ثبت و پیگیری فروش و درخواست تولید',{...presets['کارشناس فروش'],read:['product'],supplyRoles:['sales']}),
- job('sales_manager','مدیر فروش','فروش','مدیریت فروش، سفارش‌ها و درخواست تولید',{...presets['مدیر فروش'],read:['product'],supplyRoles:['sales']}),
+ job('sales','کارشناس فروش','فروش','ثبت سفارش و پیگیری خریداران تخصیص‌یافته و درخواست تولید',{...presets['کارشناس فروش'],read:[],supplyRoles:['sales']}),
+ job('sales_manager','مدیر فروش','فروش','مدیریت فروش، سفارش‌ها و درخواست تولید',{...presets['مدیر فروش'],read:[],supplyRoles:['sales']}),
  job('sales_finance','کارشناس حسابداری فروش','مالی','بررسی مالی سفارش‌های فروش',presets['مالی فروش']),
- job('delivery','فروش و تحویل','فروش','ثبت تحویل دستگاه و اطلاعات توزیع',presets['فروش و تحویل']),
+ job('delivery','فروش و تحویل','فروش','ثبت و پیگیری فروش، رزرو دستگاه و تحویل از گردش سفارش؛ بدون دسترسی عمومی به تولید و انبار',{salesRoles:['staff'],flowRoles:['sales']}),
  job('transport_manager','مسئول تدارکات','تدارکات','تخصیص و پیگیری مأموریت‌های حمل‌ونقل',presets['مسئول تدارکات']),
  job('driver','راننده تدارکات','تدارکات','انجام مأموریت‌های تخصیص‌یافته خرید، فروش و خدمات',presets['کارشناس تدارکات و حمل‌ونقل']),
  job('custodian','اموال‌دار','اداری','ثبت اموال، تحویل و بازپس‌گیری و پیگیری تأیید اموال امانی',presets['اموال‌دار']),
  job('firmware','مهندسی نرم‌افزار','انبار و تولید','ثبت و نگهداری نسخه نرم‌افزار دستگاه',presets['مهندسی نرم‌افزار']),
- job('viewer','مدیریت؛ مشاهده اطلاعات رهگیری','مدیریت','مشاهده اطلاعات رهگیری؛ بدون ثبت یا تأیید',presets['مدیریت — فقط مشاهده']),
+ job('viewer','مشاهده‌گر عمومی رهگیری و تولید','گزارش‌ها','مشاهده اطلاعات رهگیری؛ بدون ثبت یا تأیید',presets['مدیریت — فقط مشاهده']),
  job('sales_agent','نماینده فروش','حساب‌های بیرونی','فقط پرونده نمایندگی فروش انتخاب‌شده',{salesRoles:['agent']},'salesAgent'),
  job('service_agent','نماینده خدمات','حساب‌های بیرونی','فقط پرونده، موجودی و حساب نمایندگی خدمات انتخاب‌شده',{serviceRoles:['agent']},'serviceAgent'),
 ];
@@ -121,12 +122,12 @@ jobRoles.push(
  job('warehouse_finance','کارشناس انبار مالی','مالی','مشاهده موجودی و هزینه‌ها؛ بدون جابه‌جایی کالا',{finance:'read',read:['batch']}),
  job('warehouse_supervisor','مسئول انبار','انبار و تولید','دریافت، جانمایی و تحویل در انبارهای تعیین‌شده',{...presets['انبار'],supplyRoles:['inventory']},'warehouses'),
  job('production_store_assistant','کمک‌انباردار تولید','انبار و تولید','عملیات انبار خط تولید در محدوده انتخاب‌شده',presets['انبار'],'warehouses'),
- job('home_sales','کارشناس فروش خانگی','فروش','فروش و پیگیری نمایندگان و عاملین؛ دسترسی فروش داخلی مشترک',{...presets['کارشناس فروش'],read:['product'],supplyRoles:['sales']}),
- job('hospital_sales','کارشناس فروش بیمارستانی','فروش','پیگیری سرنخ و سفارش بیمارستانی؛ دسترسی فروش داخلی مشترک',{...presets['کارشناس فروش'],read:['product'],supplyRoles:['sales']}),
- job('sales_manager_assistant','دستیار مدیر فروش','فروش','پیگیری فروش؛ بدون اختیار تأیید مدیر فروش',{...presets['کارشناس فروش'],read:['product'],supplyRoles:['sales']}),
+ job('home_sales','کارشناس فروش خانگی','فروش','ثبت فروش، پیگیری خریداران تخصیص‌یافته و درخواست تولید؛ بدون دسترسی مالی یا تولید',{...presets['کارشناس فروش'],read:[],supplyRoles:['sales']}),
+ job('hospital_sales','کارشناس فروش بیمارستانی','فروش','ثبت سرنخ و فروش، پیگیری خریداران تخصیص‌یافته و درخواست تولید',{...presets['کارشناس فروش'],read:[],supplyRoles:['sales']}),
+ job('sales_manager_assistant','دستیار مدیر فروش','فروش','پیگیری فروش؛ بدون اختیار تأیید مدیر فروش',{...presets['کارشناس فروش'],read:[],supplyRoles:['sales']}),
  job('domestic_commerce_lead','مسئول بازرگانی داخلی','خرید','مدیریت و پیگیری خرید داخلی',{supplyRoles:['commerce_manager','domestic']}),
  job('foreign_commerce_lead','مسئول بازرگانی خارجی','خرید','مدیریت و پیگیری خرید خارجی',{supplyRoles:['commerce_manager','foreign']}),
- job('sales_viewer','مشاهده‌گر گزارش فروش','فروش','مشاهده فروش؛ بدون ثبت یا تأیید',{salesRoles:['viewer']})
+ job('sales_viewer','مشاهده‌گر گزارش فروش','گزارش‌ها','مشاهده گزارش و اطلاعات فروش؛ بدون اختیار ثبت یا تأیید و بدون دسترسی به گزارش تولید',{salesRoles:['viewer']})
 );
 for(const [id,label,actions] of [
  ['manager','مدیر خدمات','مدیریت پرونده‌ها و عملیات حوزه خدمات انتخاب‌شده'],
@@ -162,4 +163,15 @@ export function resolveRoleAssignment(value:RoleAssignment):Permissions {
  }
  if(roles.some(r=>r.scope==='serviceAgent')&&domains?.length!==1)throw Error('نماینده خدمات باید فقط یک حوزه داشته باشد.');
  return {...result,roleAssignment:assignment};
+}
+
+// Stored grants are only a snapshot for role-managed accounts. Every access
+// decision derives from the selected roles again; stale extras are discarded.
+export function accessPermissions(p:Permissions):Permissions {
+ if(!p)return {read:[],write:[],eventStages:[],finance:'none'};
+ if(!p.roleAssignment)return p;
+ try{return validatePermissions(p)}catch{return {read:[],write:[],eventStages:[],finance:'none'}}
+}
+export function storedAccessPermissions(value:string):Permissions {
+ try{return accessPermissions(JSON.parse(value))}catch{return {read:[],write:[],eventStages:[],finance:'none'}}
 }

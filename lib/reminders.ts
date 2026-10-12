@@ -1,3 +1,4 @@
+import {storedAccessPermissions} from './permissions';
 import {reminderRecipient,prepareReminderDispatch,reminderThread,delegationSourceSnapshot,delegationSourceGuard} from './reminder-delegation';
 import {storage} from './storage';
 import {session,resolveIdentity,AccessError} from './authorization';
@@ -11,7 +12,7 @@ export async function reminderActor(){
  if(trainingContext.getStore())reminderFail('یادآورها در محیط اطلاعات شرکت فعال‌اند.',403);
  const u=await session();if(u.isAdmin)return u;
  const m:any=await storage().prepare("SELECT * FROM app_members WHERE (id=? OR subject=?) AND status='active'").bind(u.userId.replace(/^local:/,''),u.userId).first();
- if(!m)reminderFail('حساب فعال نیست.',403);return {...u,permissions:validatePermissions(JSON.parse(m.permissions))};
+ if(!m)reminderFail('حساب فعال نیست.',403);return {...u,permissions:validatePermissions(storedAccessPermissions(m.permissions))};
 }
 export const reminderDecode=(r:any)=>({...r,data:JSON.parse(r.data)});
 export async function reminderTarget(u:Session,d:any,cache=new Map<string,Promise<any[]>>()){

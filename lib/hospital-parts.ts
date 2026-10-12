@@ -1,3 +1,4 @@
+import {storedAccessPermissions} from './permissions';
 import {AccessError} from './authorization';
 import {storage} from './storage';
 import {hospitalInventory,hospitalLogistics,hospitalTech,hreq,htext,hrow} from './hospital';
@@ -35,7 +36,7 @@ export async function hospitalPartAction(c:Context){
   if(!u.isAdmin&&!u.permissions.warehouses?.includes('raw'))fail('مجوز برداشت انبار مواد اولیه لازم است.',403);
   const job=await get(d.jobId,'hospital_job');if(job.data.technicianId!==d.technicianId)fail('تکنسین مأموریت تغییر کرده؛ دفتر خدمات درخواست را بررسی کند.',409);
   const tech:any=await db.prepare("SELECT id,permissions FROM app_members WHERE id=? AND status='active'").bind(d.technicianId).first();
-  if(!tech||!hospitalTech({isAdmin:false,permissions:JSON.parse(tech.permissions)} as Session))fail('تکنسین دریافت‌کننده فعال نیست.');
+  if(!tech||!hospitalTech({isAdmin:false,permissions:storedAccessPermissions(tech.permissions)} as Session))fail('تکنسین دریافت‌کننده فعال نیست.');
   guard("EXISTS(SELECT 1 FROM app_members WHERE id=? AND status='active' AND permissions=?)",tech.id,tech.permissions);
   const material=await hrow('material:'+hreq(d.partCode,12),'material');if(material.data.unit!=='عدد'||d.unit!=='عدد')fail('دفتر خدمات ابتدا کد قطعه با واحد عدد را تأیید کند.');
   guard('EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)',material.id,material.revision);

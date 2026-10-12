@@ -1,3 +1,4 @@
+import {storedAccessPermissions} from './permissions';
 import {storage} from './storage';
 import type {Session} from './permissions';
 import {dayAt,memberId as activeMemberId} from './duties';
@@ -33,7 +34,7 @@ export async function readPartRepairs(u:Session,domain:string,id=''){
  const all=(await list(type)).filter(r=>r.data.domain===domain&&allowed(u,r,assignedId)),rows=id?all.filter(r=>r.id===id):all;
  if(id&&!rows.length)fail('پروندهٔ قطعه پیدا نشد یا دسترسی ندارید.',404);
  const agents=(await list('as_agent')).filter(r=>r.data.domain===domain&&r.data.active&&(!isAgent(u)||r.id===u.permissions.serviceAgentId)&&(role(u,'coordinator')||role(u,'intake')||isAgent(u)||all.some(x=>x.data.agentId===r.id))).map(r=>({id:r.id,name:r.data.name}));
- const technicians=!isAgent(u)&&role(u,'coordinator')?(await storage().prepare("SELECT id,name,permissions FROM app_members WHERE status='active'").all()).results.filter((r:any)=>{const p=JSON.parse(r.permissions);return !p.serviceAgentId&&p.serviceDomains?.includes(domain)&&p.serviceRoles?.includes('technician')}).map((r:any)=>({id:r.id,name:r.name})):[];
+ const technicians=!isAgent(u)&&role(u,'coordinator')?(await storage().prepare("SELECT id,name,permissions FROM app_members WHERE status='active'").all()).results.filter((r:any)=>{const p=storedAccessPermissions(r.permissions);return !p.serviceAgentId&&p.serviceDomains?.includes(domain)&&p.serviceRoles?.includes('technician')}).map((r:any)=>({id:r.id,name:r.name})):[];
  const materials=!isAgent(u)&&(role(u,'coordinator')||role(u,'intake'))?(await list('material')).map(r=>({code:r.data.code,name:r.data.name})):[];
  const lots=role(u,'inventory')&&!isAgent(u)?(await storage().prepare("SELECT l.id,l.batch_id,l.quantity,r.payload,COALESCE((SELECT SUM(quantity) FROM service_reservations s WHERE s.lot_id=l.id),0) reserved FROM service_lots l JOIN records r ON r.id=l.batch_id WHERE l.owner='office' AND l.domain=? AND l.quantity>0").bind(domain).all()).results.map((r:any)=>{const p=JSON.parse(r.payload);return {id:r.id,partCode:p.partCode,name:p.part,code:p.code,free:r.quantity-r.reserved,status:p.status,expiry:p.expiry}}).filter(r=>r.free>=1000&&r.status==='تأیید'&&(!r.expiry||r.expiry>=dayAt())):[];
  return {domain,rows:rows.map(r=>publicRow(u,r,assignedId)),agents,technicians,materials,lots,canCreate:domainWriteAccess(u,domain)&&!isAgent(u)&&modeRoles.create.some(r=>role(u,r))};
@@ -69,7 +70,7 @@ export async function applyPartRepair(u:Session,b:any){
   if(d.serial&&(await list(type)).some(r=>r.data.domain===domain&&r.data.agentId===a.id&&r.data.serial===d.serial&&r.data.state!=='closed'))fail('برای این سریال قبلاً پروندهٔ باز ثبت شده است.',409);
   if(d.serial)guard("NOT EXISTS(SELECT 1 FROM flow_entities WHERE type='as_part_repair' AND json_extract(data,'$.domain')=? AND json_extract(data,'$.agentId')=? AND json_extract(data,'$.serial')=? AND json_extract(data,'$.state')!='closed')",domain,a.id,d.serial);
  }else if(mode==='assign'){
-  const t:any=await db.prepare("SELECT id,name,permissions FROM app_members WHERE id=? AND status='active'").bind(req(b.technicianId)).first(),p=t?JSON.parse(t.permissions):{};
+  const t:any=await db.prepare("SELECT id,name,permissions FROM app_members WHERE id=? AND status='active'").bind(req(b.technicianId)).first(),p=t?storedAccessPermissions(t.permissions):storedAccessPermissions('{}');
   if(!t||p.serviceAgentId||!p.serviceDomains?.includes(domain)||!p.serviceRoles?.includes('technician'))fail('تکنسین فعال همین حوزه را انتخاب کنید.');
   guard("EXISTS(SELECT 1 FROM app_members WHERE id=? AND status='active' AND permissions=?)",t.id,t.permissions);
   d.technicianId=t.id;d.technicianName=t.name;d.state='working';
