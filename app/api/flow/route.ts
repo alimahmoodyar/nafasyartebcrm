@@ -5,6 +5,7 @@ import {requireAccess,checkOrigin,AccessError,accessResponse} from '@/lib/author
 import {flowRole,flowRoles,entity,suggestion,warehouseAccess} from '@/lib/material-flow';
 import {qualityFields,qualityValues} from '@/lib/quality';
 import {scaled} from '@/lib/production';
+import {normalizeMaterialUnit} from '@/lib/material-units';
 import {normalizePartCode,receiptDay,suggestBatchNumber} from '@/lib/batch-number';
 import {tehranDay,serialPrefix,nextSerials} from '@/lib/serials';
 import {boundedBody} from '@/lib/firmware-storage';
@@ -46,7 +47,7 @@ export async function POST(request:Request){try{
  function assigned(e:any,key:string){if(u.isAdmin)return;const owner=e.data[key];if(owner&&u.userId!=='local:'+owner&&u.userId!==owner)guard('EXISTS(SELECT 1 FROM app_members WHERE id=? AND subject=?)',owner,u.userId);}
  if(mode==='material'){
  const code=normalizePartCode(needed(b.code,12)),eid='material:'+code;const oldRaw:any=await db.prepare('SELECT * FROM flow_entities WHERE id=?').bind(eid).first();let old:any;if(oldRaw){old=await get(eid,'material');if(b.revision!==old.revision)fail('شناسنامه تغییر کرده است.',409);}
- const unit=needed(b.unit,20);if(!['عدد','کیلوگرم','گرم','متر','سانتی‌متر','سانتی‌متر مربع','لیتر'].includes(unit))fail('واحد معتبر نیست.');if(old&&old.data.unit!==unit)fail('واحد کالای تعریف‌شده ثابت است.');
+ const unit=normalizeMaterialUnit(needed(b.unit,20));if(!unit)fail('واحد معتبر نیست.');if(old&&old.data.unit!==unit)fail('واحد کالای تعریف‌شده ثابت است.');
  if(old&&text(b.specs||'')!==(old.data.specs||'')&&(!u.isAdmin&&!u.permissions.supplyRoles?.includes('engineering')||Object.values(old.data.technicalControls||{}).some((v:any)=>v.held)))fail('تغییر طراحی موجود از کنترل فنی تحقیق‌وتوسعه یا تضمین کیفیت انجام شود.',403);
  const reorderPoint=zero(b.reorderPoint),targetStock=zero(b.targetStock);if(targetStock<reorderPoint)fail('موجودی هدف کمتر از حد سفارش نباشد.');
  put(eid,'material',{...(old?.data||{}),code,name:needed(b.name),unit,specs:text(b.specs||''),designVersion:(old?.data.designVersion||0)+(old&&text(b.specs||'')!==(old.data.specs||'')?1:0),defaultLocation:text(b.defaultLocation||'',100),reorderPoint,targetStock,fields:qualityFields(b.fields),qcOwner:await assignee(text(b.qcOwner||'',100),'qc'),warehouseOwner:await assignee(text(b.warehouseOwner||'',100),'inventory'),procurementOwner:await assignee(text(b.procurementOwner||'',100),'procurement')},old);

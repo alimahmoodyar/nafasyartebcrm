@@ -1,5 +1,6 @@
 import {validateBom,type BomLine} from './production';
-export const importUnits=['عدد','کیلوگرم','گرم','متر','سانتی‌متر','سانتی‌متر مربع','لیتر'];
+import {materialUnits,normalizeMaterialUnit} from './material-units';
+export const importUnits=materialUnits;
 export const clean=(v:unknown)=>String(v??'').replace(/[\u200e\u200f\u202a-\u202e\ufeff]/g,'').replace(/[۰-۹]/g,c=>String(c.charCodeAt(0)-1776)).replace(/[٠-٩]/g,c=>String(c.charCodeAt(0)-1632)).replace(/ي/g,'ی').replace(/ك/g,'ک').trim();
 export function importNumber(v:unknown){const s=clean(v).replace(/[,٬]/g,'').replace(/[\/٫]/g,'.');if(!/^\d+(\.\d+)?$/.test(s))throw Error('مقدار عددی قابل تشخیص نیست: '+clean(v).slice(0,30));return String(Number(s));}
 export type ImportLine=BomLine&{sourceQuantity:string;sourceSecondary:string;note:string};
@@ -27,7 +28,7 @@ export function parseMappedBomGrid(grid:unknown[][],header:number,mapping:Import
   if(!name||name.length>200){errors.push(at+'نام کالا خالی یا طولانی است.');return;}
   try{const quantity=importNumber(sourceQuantity);if(Number(quantity)<=0)throw Error('مصرف باید بیشتر از صفر باشد.');
    const rawUnit=mapping.unit>=0?clean(row[mapping.unit]):'';
-   const unit=importUnits.find(u=>clean(u).replace(/\s|‌/g,'')===rawUnit.replace(/\s|‌/g,''))||'';
+   const unit=normalizeMaterialUnit(rawUnit);
    lines.push({partCode,name,quantity,unit,sourceQuantity,sourceSecondary:'',note:rawUnit&&!unit?'واحد فایل «'+rawUnit+'»؛ واحد را انتخاب کنید.':''});
   }catch(e){errors.push(at+(e instanceof Error?e.message:'مقدار نامعتبر است.'));}
  });
@@ -46,7 +47,7 @@ export function parseBomGrid(grid:unknown[][]):ImportDraft{
   if(r[ci]==='کد کالا')continue;
   if(!r[ci]&&!r[ni]&&!r[qi]&&!(ri>=0&&/^\d+$/.test(r[ri]||'')))continue;
   if(!/^\d{2,12}$/.test(r[ci]||''))throw Error('کد کالا در یکی از ردیف‌ها خالی یا نامعتبر است.');
-  lines.push({partCode:r[ci],name:r[ni]||'',quantity:importNumber(r[qi]),unit:ui>=0?r[ui]:'',sourceQuantity:r[qi],sourceSecondary:si>=0?r[si]||'':'',note:''});
+  lines.push({partCode:r[ci],name:r[ni]||'',quantity:importNumber(r[qi]),unit:ui>=0?normalizeMaterialUnit(r[ui])||r[ui]:'',sourceQuantity:r[qi],sourceSecondary:si>=0?r[si]||'':'',note:''});
  }
  if(!lines.length||lines.length>200)throw Error('فایل باید بین ۱ تا ۲۰۰ قلم داشته باشد.');
  if(new Set(lines.map(l=>l.partCode)).size!==lines.length)throw Error('کد کالای تکراری در فایل وجود دارد؛ ابتدا بررسی کنید.');

@@ -21,6 +21,11 @@ async function run(body,status=200){const r=await importer.POST(request('/api/bo
  const mapping=parser.guessImportMapping(simple[1]);
  const mapped=parser.parseMappedBomGrid(simple,1,mapping);
  assert.equal(mapped.lines[0].partCode,'00123');assert.equal(mapped.lines[0].quantity,'2.5');assert.equal(mapped.lines[0].unit,'سانتی‌متر');
+ const packed=[simple[1],['ست تعمیر','2','989001','ست'],['جفت اتصال','3.5','989002','جفت'],['شلنگ','25.25','989003','سانتی متر']];
+ const packedLines=parser.parseMappedBomGrid(packed,0,mapping).lines;
+ assert.deepEqual(Array.from(packedLines,l=>l.unit),['ست','جفت','سانتی‌متر']);
+ assert.deepEqual(Array.from(parser.importLines(packedLines),l=>l.quantity),['2','3.5','25.25'],'set/pair spelling normalization must not convert amounts');
+ assert.throws(()=>parser.importLines([{partCode:'989004',name:'Unsupported',unit:'کارتن',quantity:'1'}]),/واحد/);
  assert.throws(()=>parser.parseMappedBomGrid([...simple,simple[2]],1,mapping),/ردیف 4.*تکراری/);
  assert.throws(()=>parser.parseMappedBomGrid([...simple,['جمع','5','','']],1,mapping),/ردیف 4/);
  assert.throws(()=>parser.parseMappedBomGrid(simple,1,{...mapping,name:mapping.partCode}),/جدا/);
@@ -56,6 +61,14 @@ async function run(body,status=200){const r=await importer.POST(request('/api/bo
  sql.exec("CREATE TRIGGER reject_test_bom BEFORE INSERT ON bom_versions BEGIN SELECT RAISE(ABORT,'test failure'); END");await run({...rb,mode:'commit',confirmed:true,id:rid,catalogSnapshot:rp.catalogSnapshot},400);sql.exec('DROP TRIGGER reject_test_bom');assert.equal(sql.prepare("SELECT count(*) n FROM flow_entities WHERE id='material:99999999'").get().n,0);assert.equal(sql.prepare('SELECT count(*) n FROM inventory_operations WHERE id=?').get(rid).n,0);
  const readToken=await mint('read');token=readToken.token;identity=null;assert.ok((await call('commit_bom_import',{...rb,id:crypto.randomUUID(),catalogSnapshot:rp.catalogSnapshot,confirmed:true})).error);
  identity=owner;const writeToken=await mint('read_write');token=writeToken.token;identity=null;const parsedMcp=await call('parse_material_spreadsheet',{grid:simple,header:1,mapping});assert.equal(parsedMcp.lines[0].partCode,'00123');const mp=await call('preview_bom_import',rb);assert.ok(mp.catalogSnapshot,JSON.stringify(mp));const mc=await call('commit_bom_import',{...rb,id:crypto.randomUUID(),catalogSnapshot:mp.catalogSnapshot,confirmed:true});assert.equal(mc.saved,true);
+ const packedProduct='packed-unit-product';sql.prepare("INSERT INTO records(id,kind,payload,created) VALUES(?,'product',?,'now')").run(packedProduct,JSON.stringify({code:'PACKED',name:'Packed unit fixture'}));
+ const packedImport={productId:packedProduct,previousVersion:0,source:'packed-units.xlsx',lines:parser.importLines(packedLines)};
+ const packedPreview=await call('preview_bom_import',packedImport);assert.ok(!packedPreview.error,JSON.stringify(packedPreview));
+ const packedCommit=await call('commit_bom_import',{...packedImport,id:crypto.randomUUID(),catalogSnapshot:packedPreview.catalogSnapshot,confirmed:true});assert.equal(packedCommit.saved,true);
+ const storedPacked=JSON.parse(sql.prepare('SELECT lines FROM bom_versions WHERE product_id=?').get(packedProduct).lines);
+ assert.deepEqual(storedPacked.map(l=>[l.unit,l.quantity]),[['ست','2'],['جفت','3.5'],['سانتی‌متر','25.25']]);
+ for(const l of storedPacked)assert.equal(JSON.parse(sql.prepare('SELECT data FROM flow_entities WHERE id=?').get('material:'+l.partCode).data).unit,l.unit);
+ assert.equal(sql.prepare('SELECT count(*) n FROM inventory_balances').get().n,0,'unit support does not invent or convert stock');
  identity=null;await run({...body,mode:'preview'},401);
  sql.prepare('INSERT INTO app_members(id,email,name,unit,status,subject,permissions,created,updated) VALUES(?,?,?,?,?,?,?,?,?)').run('reader','reader@example.com','Reader','unit','active','reader',JSON.stringify({read:['product'],write:[],eventStages:[]}),'now','now');identity={userId:'reader',email:'reader@example.com',displayName:'Reader',fullName:null};await run({...body,mode:'preview'},403);await run({mode:'parse',grid:simple,header:1,mapping},403);
  const reset=load('lib/reset-contract.ts');assert.equal(reset.resetWhere('bom_versions','operations'),'0=1');assert.ok(reset.resetWhere('flow_entities','operations').includes("'material'"));assert.equal(reset.resetWhere('bom_versions','full'),'1=1');

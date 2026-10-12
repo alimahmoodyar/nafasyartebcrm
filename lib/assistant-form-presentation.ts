@@ -3,11 +3,11 @@ import {personnelKinds} from './personnel-contract';
 import {operationDataSchema,visiblePersonnelFields} from './operation-form-fields';
 import {fieldTitles,toolFieldTitles,toolModeTitles,baseModeTitles} from './form-vocabulary';
 import {toolOptions} from './form-options';
-import {serviceForms} from './after-sales-contract';
+import {serviceForms,visibleServiceFields} from './after-sales-contract';
 import {transportForms} from './transport-contract';
 import {qmsKinds} from './qms-contract';
 export {fieldTitles};
-const technical=new Set(['requestId','confirmed','revision','previousVersion','previousRevision','quoteRevision','leadRevision','quoteHash','catalogSnapshot']);
+const technical=new Set(['requestId','confirmed','revision','previousVersion','previousRevision','quoteRevision','leadRevision','quoteHash','catalogSnapshot','customerTariffId','customerTariffRevision','customerPriceSource']);
 export function fieldTitle(tool:string,key:string,schema?:any):string {
  return schema?.title||toolFieldTitles[tool]?.[key]||fieldTitles[key]||(/[^\x00-\x7F]/.test(key)?key:`فیلد تعریف‌نشده (${key})`);
 }
@@ -37,8 +37,9 @@ export function generalPresentation(tool:string,args:any,input:any,title:string)
  if(tool==='apply_qms_record'&&schema.properties?.data?.properties?.kind){schema.properties.data.properties.kind={type:'string',enum:Object.keys(qmsKinds),enumLabels:Object.fromEntries(Object.entries(qmsKinds).map(([k,v])=>[k,v.title]))};}
  const forms=tool==='part_repair_apply'?partRepairForms:tool==='after_sales_apply'?serviceForms:tool==='transport_apply'?transportForms:null;
  if(forms?.[args.mode]){
-  const target=contractSchema(tool==='part_repair_apply'?visiblePartRepairFields(args.mode,args.data||{}):forms[args.mode]);
+  const target=contractSchema(tool==='part_repair_apply'?visiblePartRepairFields(args.mode,args.data||{}):tool==='after_sales_apply'?visibleServiceFields(args.mode,args.data||{}):forms[args.mode]);
   if(tool==='part_repair_apply'){for(const key of Object.keys(args.data||{}))if(!target.properties[key])target.properties[key]={uiHidden:true};if(target.properties.repairId&&args.data?.repairId)target.properties.repairId.uiHidden=true;}
+  if(tool==='after_sales_apply'&&args.mode==='tariff'&&args.data?.kind==='labor')for(const key of ['partCode','consumerPriceRial'])target.properties[key]={uiHidden:true};
   schema.properties??={};schema.properties.data={...schema.properties.data,...target};
  }
  if(tool==='apply_qms_record'&&qmsKinds[args.data?.kind]&&args.mode==='save'){

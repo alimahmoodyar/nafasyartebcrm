@@ -5,6 +5,7 @@ import {normalizeSerial} from './distribution';
 import {fail,req,txt,isAgent,role,domainAccess,need,visible,entity,list,past,amount,warehouse,monthsAfter} from './after-sales';
 import {supplyLock} from './sourcing';
 import {partRepairActions} from './part-repair-contract';
+import {selectRepresentativePartTariff,representativeTariffValue,servicePartTariffGuard} from './after-sales-pricing';
 
 const type='as_part_repair';
 const modeRoles:Record<string,string[]>={create:['intake','coordinator'],assign:['coordinator'],work:['technician'],review:['coordinator'],consent:['coordinator','agent'],issue:['inventory'],ship:['intake','inventory','coordinator'],receive:['agent','coordinator']};
@@ -84,10 +85,10 @@ export async function applyPartRepair(u:Session,b:any){
    const disposition=req(b.originalDisposition);if(!['hold','return'].includes(disposition))fail('تکلیف قطعهٔ قبلی مشخص شود.');
    d.originalDisposition=disposition;d.review.coverage=coverage;d.review.partCode=code;d.review.priceRial='0';
    if(coverage==='paid'){
-    const tariff=(await list('as_tariff')).filter(r=>r.data.domain===domain&&r.data.kind==='part'&&r.data.partCode===code&&r.data.active&&r.data.validFrom<=dayAt()).sort((a,b)=>b.data.validFrom.localeCompare(a.data.validFrom)||b.created.localeCompare(a.created))[0];
-    if(!tariff||BigInt(amount(tariff.data.priceRial))<=BigInt(0))fail('تعرفهٔ مصوب معتبر قطعه لازم است.');
-    guard('EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)',tariff.id,tariff.revision);
-    d.review.priceRial=amount(tariff.data.priceRial);d.review.tariffId=tariff.id;d.review.tariffRevision=tariff.revision;d.state='consent';
+    const day=dayAt(),tariff=selectRepresentativePartTariff(await list('as_tariff'),code,day,domain),price=tariff?representativeTariffValue(tariff):null;
+    if(!tariff||price===null||BigInt(price)<=BigInt(0))fail('تعرفهٔ مصوب فروش قطعه به نماینده لازم است.');
+    const check=servicePartTariffGuard(tariff,code,day,domain,'representative');guard(check.sql,...check.args);
+    d.review.priceRial=price;d.review.tariffId=tariff.id;d.review.tariffRevision=tariff.revision;d.state='consent';
    }else d.state='awaiting_stock';
   }
  }else if(mode==='consent'){
