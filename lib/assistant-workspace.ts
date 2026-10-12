@@ -19,9 +19,14 @@ export function operationForm(tool:any,args:any,section:string,title:string):Ope
  return {tool:tool.name,section,...formPresentation(tool.name,cleanFormArgs(args),schema,title),args:cleanFormArgs(args)};
 }
 
+export function requestsBuyerAssignment(message:string){
+ const text=message.replace(/ي/g,'ی').replace(/ك/g,'ک').replace(/‌/g,' ');
+ return /(خریدار|نماینده|نمایندگی|عامل|فروش)/.test(text)&&/(تخصیص|واگذاری?|ارجاع|تعیین\s+(?:کارشناس|مسئول)|(?:تغییر|عوض)\s+(?:کارشناس|مسئول)|(?:کارشناس|مسئول).*?(?:تغییر|عوض))/.test(text)&&!/(لغو|منصرف|تخصیص نده|واگذار نکن|ارجاع نده)/.test(text);
+}
 // Opening a requested draft must not depend on the model calling a display tool.
 export function requestedOperationForm(message:string,previous:any,available:any[]):OperationForm|undefined{
  const text=message.replace(/[ي]/g,'ی').replace(/[ك]/g,'ک').replace(/\u200c/g,' ');
+ if(requestsBuyerAssignment(message)){const tool=available.find(t=>t.name==='assign_sales_buyer'&&t.write);return tool?operationForm(tool,previous?.tool===tool.name?previous.args:{},'sales','تخصیص خریدار به کارشناس'):undefined;}
  const salesTemplate=/(الگو.*فروش|شرایط\s+عمومی\s+فروش|پروموشن)/.test(text)&&/(جدید|ایجاد|تعریف|ثبت|بساز|باز|بیار|نمایش)/.test(text)&&!/(حذف|لغو|ثبت نکن|منصرف)/.test(text);
  if(salesTemplate){const tool=available.find(t=>t.name==='sales_network_apply'&&t.write);if(tool){const args=previous?.tool===tool.name&&previous.args?.mode==='template'?previous.args:{mode:'template',data:{templateType:'fixed',productPrices:[]}};return operationForm(tool,args,'sales','الگوی عمومی فروش');}}
  const sale=/(بفروش|فروخت|سفارش\s+(?:فروش|مشتری|نماینده)|فروش\s+(?:دستگاه|محصول|کالا))/.test(text)&&!/(حذف|لغو|ثبت نکن|منصرف)/.test(text);
@@ -48,6 +53,7 @@ export function operationChoices(available:any[],sectionFor:(tool:string,args:an
   const modes=t.inputSchema.properties?.mode?.enum||[undefined];
   const kinds=['create_record','update_record','delete_record'].includes(t.name)?t.inputSchema.properties?.kind?.enum||[undefined]:[undefined];
   for(const mode of modes)for(const kind of kinds){
+   if(t.name==='sales_network_apply'&&mode==='assign')continue;
    const args:Record<string,string>={...(mode?{mode}:{}),...(kind?{kind}:{})},section=sectionFor(t.name,args);
    if(!canOpen(section))continue;
    const title=[operationForm(t,args,section,titles[t.name]||t.name).title,kind?names[kind as Kind]||kind:''].filter(Boolean).join(' — ');

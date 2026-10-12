@@ -8,7 +8,7 @@ const states:Record<string,string>={pending:'در انتظار بررسی',appro
 const recordNames:Record<string,string>={sales_contact:'تماس / بازدید',sales_case:'درخواست همکاری',sales_contract:'قرارداد پورسانت',sales_commission_settlement:'تسویه پورسانت'};
 const channels:Record<string,string>={call:'تماس',visit:'بازدید',meeting:'جلسه',message:'پیام'};
 
-export function SalesPartnerDossier({agent:a,portfolio:p,records,roles,onBegin,modeNames}:{agent:any;portfolio:any;records:any[];roles:any;onBegin:(mode:string,agent:any,record?:any)=>void;modeNames:Record<string,string>}){
+export function SalesPartnerDossier({agent:a,portfolio:p,records,roles,onBegin,onAssign,modeNames}:{agent:any;portfolio:any;records:any[];roles:any;onBegin:(mode:string,agent:any,record?:any)=>void;onAssign?:(buyerId:string)=>void;modeNames:Record<string,string>}){
  const scope='sales-partner-'+a.id,kind=partnerKinds[a.data.kind as keyof typeof partnerKinds]||partnerKinds.representative;
  if(!p?.account)return <article className="sales-partner-card" aria-labelledby={scope+'-name'}><h3 id={scope+'-name'}>{a.data.name}</h3><p role="alert">گزارش حساب این پرونده دریافت نشده است؛ گزارش را تازه‌سازی کنید.</p></article>;
  const ac=p.account,referrer=a.data.kind==='referrer',bounced=ac.payments.filter((row:any)=>row.data.state==='bounced');
@@ -39,7 +39,7 @@ export function SalesPartnerDossier({agent:a,portfolio:p,records,roles,onBegin,m
    <div className="tools sales-partner-actions">
     {roles.staff&&<button type="button" className="btn" onClick={()=>onBegin('contact',a)}><PhoneCall size={18} aria-hidden="true"/>ثبت تماس یا بازدید</button>}
     {(roles.staff||roles.agent||roles.finance)&&<button type="button" className="btn" onClick={()=>onBegin('case',a)}><MessagesSquare size={18} aria-hidden="true"/>درخواست همکاری یا پشتیبانی</button>}
-    {roles.manager&&<button type="button" className="btn" onClick={()=>onBegin('partner',a)}><Settings2 size={18} aria-hidden="true"/>تنظیم برنامه پیگیری</button>}
+    {roles.manager&&onAssign&&a.data.active&&!referrer&&<button type="button" className="btn" onClick={()=>onAssign(a.id)}><Settings2 size={18} aria-hidden="true"/>تخصیص خریدار به کارشناس</button>}{roles.manager&&<button type="button" className="btn" onClick={()=>onBegin('partner',a)}><Settings2 size={18} aria-hidden="true"/>تنظیم برنامه پیگیری</button>}
     {roles.manager&&referrer&&<button type="button" className="btn" onClick={()=>onBegin('contract',a)}><FileText size={18} aria-hidden="true"/>قرارداد پورسانت</button>}
    </div>
   </section>

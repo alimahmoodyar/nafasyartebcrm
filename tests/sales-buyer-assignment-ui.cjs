@@ -1,0 +1,30 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript');
+let slots=[],cursor=0,pendingEffects=[],requests=[],data,failPost=false,failRefresh=false,conflict=false,saved=0;
+const hook=init=>{const i=cursor++;if(!(i in slots))slots[i]=typeof init==='function'?init():init;return[slots[i],v=>slots[i]=typeof v==='function'?v(slots[i]):v]};
+const useRef=init=>{const i=cursor++;return slots[i]??=( {current:init})};
+const useEffect=(fn,deps)=>{const i=cursor++,old=slots[i];if(!old||deps.some((d,j)=>d!==old[j])){slots[i]=deps;pendingEffects.push(fn)}};
+const jsx=(type,props)=>({type,props}),out={};
+const fetch=async(url,options)=>{if(options?.method==='POST'){
+ const body=JSON.parse(options.body);requests.push(body);if(failPost){failPost=false;throw Error('Lost response')};
+ if(conflict){conflict=false;data.buyers[0].revision++;data.buyers[0].ownerId='first';return {ok:false,status:409,json:async()=>({error:'نسخه تغییر کرده'})}};
+ const b=data.buyers.find(b=>b.id===body.agentId);b.revision++;b.ownerId=body.ownerId;b.ownerName=data.members.find(m=>m.id===body.ownerId).name;return {ok:true,json:async()=>({saved:true})};
+ }if(failRefresh)throw Error('Refresh unavailable');return {ok:true,json:async()=>JSON.parse(JSON.stringify(data))}};
+vm.runInNewContext(ts.transpileModule(fs.readFileSync('components/trace/sales-buyer-assignments.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText,{exports:out,fetch,crypto:require('node:crypto').webcrypto,require:n=>n==='react'?{useState:hook,useRef,useEffect}:n==='react/jsx-runtime'?{jsx,jsxs:jsx}:n.includes('sales-network-contract')?{partnerKinds:{representative:'نماینده'}}:{BuyerSelect:'BuyerSelect'}});
+const flatten=x=>Array.isArray(x)?x.flatMap(flatten):x&&typeof x==='object'?[x,...flatten(x.props?.children)]:[];
+const text=x=>Array.isArray(x)?x.map(text).join(''):x&&typeof x==='object'?text(x.props?.children):x==null?'':String(x);
+const tree=()=>{cursor=0;const nodes=flatten(out.SalesBuyerAssignments({initialBuyerId:'buyer',onSaved:()=>{saved++}}));pendingEffects.splice(0).forEach(fn=>fn());return nodes};
+const render=()=>{tree();return tree()},changeOwner=id=>render().find(n=>n.type==='select').props.onChange({target:{value:id}});
+const save=()=>render().find(n=>n.type==='form').props.onSubmit({preventDefault(){}});
+(async()=>{
+ data={buyers:[{id:'buyer',name:'Existing buyer',kind:'representative',ownerId:'first',ownerName:'First expert',revision:7}],members:[{id:'first',name:'First expert'},{id:'second',name:'Second expert'}]};
+ tree();await new Promise(r=>setImmediate(r));let nodes=render();assert.equal(requests.length,0,'Opening a form never assigns');
+ const buyer=nodes.find(n=>n.type==='BuyerSelect');assert.equal(buyer.props.value,'buyer');assert.equal(buyer.props.choices[0].name,'Existing buyer');assert.equal(nodes.find(n=>n.type==='select').props.value,'first');
+ nodes.find(n=>n.type==='input').props.onChange({target:{value:'Second'}});nodes=render();assert.ok(text(nodes.find(n=>n.type==='select')).includes('Second expert'));assert.ok(text(nodes.find(n=>n.type==='select')).includes('First expert'),'Current selection retained while searching');
+ changeOwner('second');failPost=true;await save();assert.ok(text(render()).includes('Lost response'));await save();
+ assert.equal(requests[0].id,requests[1].id,'Network retry keeps same operation UUID');assert.equal(requests[1].revision,7);assert.equal(requests[1].agentId,'buyer');assert.equal(requests[1].ownerId,'second');assert.equal(requests[1].mode,'assign');assert.equal(requests[1].confirmed,true);
+ assert.deepEqual(Object.keys(requests[1]).sort(),['agentId','confirmed','id','mode','ownerId','revision'],'No buyer creation, unrelated finance or credentials');assert.equal(saved,1);assert.ok(text(render()).includes('تخصیص ثبت شد'));
+ changeOwner('first');conflict=true;await save();nodes=render();assert.ok(text(nodes).includes('نسخه تغییر کرده'));assert.equal(nodes.find(n=>n.type==='select').props.value,'first','Stale draft refreshes current owner rather than overwriting');
+ const stale=requests.at(-1);await save();assert.notEqual(requests.at(-1).id,stale.id);assert.equal(requests.at(-1).revision,stale.revision+1);
+ render();changeOwner('second');failRefresh=true;await save();nodes=render();assert.ok(text(nodes).includes('تخصیص ثبت شده، اما تازه‌سازی'));assert.ok(text(nodes).includes('تخصیص ثبت شد'),'Successful mutation is not labelled failure when refresh fails');
+ console.log('PASS buyer assignment UI: two searchable selections, existing buyer/revision, no automatic write, same UUID retry, stale refresh and accurate saved/refresh status.');
+})().catch(e=>{console.error(e);process.exitCode=1});

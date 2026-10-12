@@ -10,7 +10,7 @@ function fixture(role='staff',populated=false){
  return d;
 }
 async function run(){
- let slots=[],cursor=0,requests=[],currentFixture;
+ let slots=[],cursor=0,requests=[],currentFixture,assignedIds=[];
  const jsx=(type,props)=>typeof type==='function'?type(props):({type,props}),cache={};
  const state=init=>{const i=cursor++;if(!(i in slots))slots[i]=typeof init==='function'?init():init;return [slots[i],v=>slots[i]=typeof v==='function'?v(slots[i]):v]};
  function pure(file){if(cache[file])return cache[file];const out={};cache[file]=out;vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:out,Intl,Date,require:n=>pure(path.resolve(path.dirname(file),n+'.ts'))});return out;}
@@ -20,7 +20,7 @@ async function run(){
  for(const [file,exports] of [['sales-partner-dossier.tsx',dossier],['sales-network-panel.tsx',out]])vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(root,'components/trace',file),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText,{exports,fetch,crypto:require('node:crypto').webcrypto,require:requireModule});
  const flatten=x=>Array.isArray(x)?x.flatMap(flatten):x&&typeof x==='object'?[x,...flatten(x.props?.children)]:[];
  const text=x=>Array.isArray(x)?x.map(text).join(''):x&&typeof x==='object'?text(x.props?.children):x==null?'':String(x);
- const render=(selected='',templatesOnly=false)=>{cursor=0;return out.SalesNetworkPanel({selected,members:[{id:'seller',name:'کارشناس فروش',sales:true}],onChange(){},templatesOnly})};
+ const render=(selected='',templatesOnly=false)=>{cursor=0;return out.SalesNetworkPanel({selected,members:[{id:'seller',name:'کارشناس فروش',sales:true}],onChange(){},onAssign:id=>assignedIds.push(id),templatesOnly})};
  const nodes=(selected='',templatesOnly=false)=>flatten(render(selected,templatesOnly));
  const reset=(role='staff',populated=false)=>{currentFixture=fixture(role,populated);slots=[currentFixture];requests=[];return nodes()};
  const cards=()=>nodes().filter(n=>n.type==='article'&&n.props.className?.split(' ').includes('sales-partner-card'));
@@ -50,6 +50,7 @@ async function run(){
  currentFixture.portfolio[0].account.invoices[0].data.amount='0';currentFixture.portfolio[0].account.invoices[0].remaining='0';currentFixture.portfolio[0].account.invoices[0].installments=[];const zero=cards()[0];assert.equal(flatten(zero).find(n=>n.type==='progress').props.value,0,'Legacy zero-amount invoices do not crash the entire dossier');assert.ok(text(zero).includes('قسط بازی ندارد.'));
  currentFixture.portfolio[1].commission.available='-50';assert.ok(flatten(cards()[1]).some(n=>n.props.role==='alert'&&text(n).includes('تعدیل')),'Reversed commission is clearly warned');
  reset('staff');button(cards()[0],'ثبت تماس یا بازدید').props.onClick();const draftId=slots[2].id;slots[2].notes='ثبت تماس آزمایشی';slots[2].nextAction='ارسال پیشنهاد';await nodes().find(n=>n.type==='form').props.onSubmit({preventDefault(){}});const written=requests.filter(r=>r.method==='POST');assert.equal(written.length,1);assert.equal(written[0].body.id,draftId);assert.equal(written[0].body.agentId,'representative');assert.equal(written[0].body.mode,'contact');assert.equal(written[0].body.revision,7);assert.equal(written[0].body.notes,'ثبت تماس آزمایشی');assert.equal(slots[2],null,'Successful submission closes draft');
+ reset('staff');assert.ok(!button(cards()[0],'تخصیص خریدار به کارشناس'));reset('manager');button(cards()[0],'تخصیص خریدار به کارشناس').props.onClick();assert.deepEqual(assignedIds,['representative']);assert.equal(requests.filter(r=>r.method==='POST').length,0,'Assignment shortcut only navigates to existing buyer');assert.ok(!button(cards()[1],'تخصیص خریدار به کارشناس'),'Referrer is not a buyer for sale');currentFixture.agents[0].data.active=false;assert.ok(!button(cards()[0],'تخصیص خریدار به کارشناس'),'Inactive buyer cannot be assigned');
  reset('viewer');assert.ok(text(render('',true)).includes('فقط در دسترسی مدیر فروش'));assert.ok(!nodes('',true).some(n=>n.type==='form'));
  console.log('PASS sales dossier UI: readable three-section cards, empty history/invoices, representative versus referral commission, exact BigInt balances and debt aging, record-specific history, role-specific existing actions/drafts, no writes on opening, one contact submit and selected-buyer filtering.');
 }

@@ -7,7 +7,7 @@ import {VoiceInput} from './voice-input';
 import {ActionCards,type AssistantAction} from './assistant-actions';
 import {Bot,BotMessageSquare,Move,GripHorizontal,Maximize2,Minimize2,SlidersHorizontal,Send,X,LoaderCircle,RefreshCw} from 'lucide-react';
 type Message={role:'user'|'assistant';text:string};
-export function AssistantChat({admin,onSettings,accountId,accountName,onAccountChanged,onNavigate,onMutation,onWorkspace,workspace}:{admin:boolean;onSettings:()=>void;accountId:string;accountName:string;onAccountChanged:()=>void;onNavigate:(section:string)=>void;onMutation:()=>void;onWorkspace:(form:OperationForm)=>void;workspace:OperationForm|null}){
+export function AssistantChat({admin,onSettings,accountId,accountName,onAccountChanged,onNavigate,onMutation,onWorkspace,workspace}:{admin:boolean;onSettings:()=>void;accountId:string;accountName:string;onAccountChanged:()=>void;onNavigate:(section:string)=>void;onMutation:()=>void;onWorkspace:(form:OperationForm|null)=>void;workspace:OperationForm|null}){
  const [open,setOpen]=useState(false),[messages,setMessages]=useState<Message[]>([]),[profiles,setProfiles]=useState<{id:string;name:string;model:string}[]>([]),[profile,setProfile]=useState(''),[input,setInput]=useState(''),[busy,setBusy]=useState(false),[loading,setLoading]=useState(false),[error,setError]=useState('');
  const [compact,setCompact]=useState(true),[showOptions,setShowOptions]=useState(false);
  const taskPrompt=useRef('');
@@ -54,7 +54,7 @@ export function AssistantChat({admin,onSettings,accountId,accountName,onAccountC
  if(r.status===401||r.status===409&&d.error?.includes('حساب ورود')){setMessages([]);changed.current();return;}if(!r.ok)throw new Error(d.error);
  const check=await fetch('/api/session',{cache:'no-store'}),current=await check.json() as any;if(generation!==epoch.current)return;
  if(!check.ok||current.userId!==accountId||d.accountId!==accountId){setMessages([]);changed.current();return;}
- if(d.workspace)onWorkspace(d.workspace);else if(workspace?.actionId){const a=d.actions?.find((a:AssistantAction)=>a.id===workspace.actionId);if(a)onWorkspace({...workspace,state:a.state,result:a.result});}setActions(d.actions||[]);if(d.navigation){setCompact(true);onNavigate(d.navigation);}setMessages(m=>[...m,{role:'user',text:question},{role:'assistant',text:d.answer}]);setInput('');pending.current=null;
+ if(d.workspace===null)onWorkspace(null);else if(d.workspace)onWorkspace(d.workspace);else if(workspace?.actionId){const a=d.actions?.find((a:AssistantAction)=>a.id===workspace.actionId);if(a)onWorkspace({...workspace,state:a.state,result:a.result});}setActions(d.actions||[]);if(d.navigation){setCompact(true);onNavigate(d.navigation);}setMessages(m=>[...m,{role:'user',text:question},{role:'assistant',text:d.answer}]);setInput('');pending.current=null;
  }catch(e){if(generation===epoch.current)setError(e instanceof Error?e.message:'ارسال انجام نشد.')}finally{if(generation===epoch.current)setBusy(false)}}
  async function decide(id:string,decision:'confirm'|'cancel',password?:string){
  if(busy||loading)return false;const generation=epoch.current;setBusy(true);setError('');if(decision==='confirm'){const action=actions.find(a=>a.id===id);if(action){setCompact(true);onNavigate(action.section);}}try{

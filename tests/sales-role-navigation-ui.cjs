@@ -14,14 +14,16 @@ async function mount(d){slots=[];effects=[];reply={ok:true,json:async()=>d};tree
  const assigned={id:'owned',canOperate:true,data:{name:'Assigned buyer',kind:'representative',province:'',city:''}},other={id:'other',canOperate:false,data:{name:'REPORT_ONLY_BUYER',kind:'representative',province:'',city:''}};
  await mount(data({staff:true,manager:false,finance:false,agent:false,leads:true},[assigned,other]));
  const menu=nav().props.items;for(const key of ['new_order','new_payment','leads','orders','home'])assert.ok(menu.some(([id])=>id===key),key);
- for(const key of ['terms','bank','setup'])assert.ok(!menu.some(([id])=>id===key),'No manager/finance settings '+key);
+ for(const key of ['terms','bank','setup','assignments'])assert.ok(!menu.some(([id])=>id===key),'No manager/finance settings '+key);
  assert.equal(menu.find(([key])=>key==='new_order')[1],'ثبت فروش جدید');
  nav().props.onChange('new_order');let dialog=nodes(tree()).find(n=>n.type===leaves.Dialog);assert.equal(dialog.props.open,true,'Launcher opens actual order form');
  const form=nodes(dialog).find(n=>n.type==='form'),select=nodes(form).find(n=>n.type==='select');assert.ok(text(select).includes('Assigned buyer'));assert.ok(!text(select).includes('REPORT_ONLY_BUYER'),'Report grant is not a write grant');
  assert.ok(nodes(form).some(n=>n.type==='button'&&text(n).includes('پیش')),'Actual quote/confirmation form');
  await mount(data({staff:true,manager:false,finance:false,agent:false,leads:true},[assigned,other]));nav().props.onChange('new_payment');dialog=nodes(tree()).find(n=>n.type===leaves.Dialog);assert.equal(dialog.props.open,true);const buyer=nodes(dialog).find(n=>n.type===leaves.BuyerSelect);assert.deepEqual(buyer.props.choices.map(c=>c.id),['owned']);
- await mount(data({staff:false,manager:false,finance:false,agent:false,leads:false},[other]));for(const key of ['new_order','new_payment','leads','terms','bank','setup'])assert.ok(!nav().props.items.some(([id])=>id===key),'Viewer hides '+key);assert.ok(nav().props.items.some(([id])=>id==='home'));
+ await mount(data({staff:false,manager:false,finance:false,agent:false,leads:false},[other]));for(const key of ['new_order','new_payment','leads','terms','bank','setup','assignments'])assert.ok(!nav().props.items.some(([id])=>id===key),'Viewer hides '+key);assert.ok(nav().props.items.some(([id])=>id==='home'));
  await mount(data({staff:true,manager:false,finance:false,agent:false,leads:true},[other]));assert.ok(text(nodes(tree()).find(n=>n.type===leaves.ProgramWorkspace).props.status).includes('تخصیص'));assert.equal(nav().props.onChange('new_order'),false);dialog=nodes(tree()).find(n=>n.type===leaves.Dialog);assert.equal(dialog.props.open,false,'Unassigned buyer does not open a misleading empty order form');
+ assert.ok(text(nodes(tree()).find(n=>n.type===leaves.ProgramWorkspace).props.status).includes('فروش ← تخصیص خریدار به کارشناس'));
+ await mount(data({staff:true,manager:true,finance:false,agent:false,leads:true},[assigned,other]));assert.ok(nav().props.items.some(([id])=>id==='assignments'));nav().props.onChange('assignments');assert.ok(nodes(tree()).some(n=>n.type===leaves.SalesBuyerAssignments),'Manager opens assignment form');assert.ok(!nodes(tree()).some(n=>n.type==='select'&&text(n).includes('همه نمایندگان')),'No duplicated buyer filter on assignment page');
  // Render the real home launcher so concise labels cannot overwrite workflow
  // labels like production request / shipment tracking.
  const home={},source=ts.transpileModule(fs.readFileSync(path.join(root,'components/trace/personal-home.tsx'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;

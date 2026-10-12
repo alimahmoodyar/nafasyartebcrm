@@ -981,6 +981,7 @@ export const toolModeTitles:Record<string,Record<string,string>>={
     "opening_review": "تطبیق و تأیید افتتاحیه"
   },
   "sales_network_apply": {
+    "assign": "تخصیص خریدار به کارشناس",
     "commission_cancel": "لغو تسویه پرداخت‌نشده",
     "check_link": "اتصال چک به خرید",
     "template": "الگوی عمومی فروش",
@@ -1305,3 +1306,4 @@ toolFieldTitles.approve_pricing_proposal={kind:'نوع خریدار',token:'شن
 
 Object.assign(fieldTitles,{workspace:'بخش نمایندگی',salesRepresentation:'نمایندگی فروش',serviceRepresentation:'نمایندگی خدمات',serviceDomain:'حوزه خدمات',linkedServiceAgentId:'پرونده خدمات',linkedServiceRevision:'نسخه پرونده خدمات',serviceCode:'کد نمایندگی خدمات',linkedSalesAgentId:'پرونده فروش موجود',linkedSalesRevision:'نسخه پرونده فروش'});
 toolFieldTitles.get_representative_locations={province:'استان',workspace:'بخش نمایندگی',domain:'حوزه خدمات'};
+toolFieldTitles.assign_sales_buyer={agentId:'خریدار موجود',ownerId:'کارشناس مسئول',revision:'نسخه فعلی خریدار',notes:'توضیح تخصیص (اختیاری)'};
