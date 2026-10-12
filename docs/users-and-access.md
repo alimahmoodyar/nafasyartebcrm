@@ -14,6 +14,14 @@ Local .env and .env.example declare TRACE_OWNER_EMAIL without a default administ
 
 ## Authorization
 
+### Manual business access
+
+The manual account form displays the full home-section icon catalog with scoped operation choices and a non-admin visibility preview. System administration (users, LLM settings/usage, accounting connection and reset) remains administrator-only by owner decision. Shared employee entry points retain their own-record scope; an icon preview never bypasses domain record or action authorization.
+
+`treasuryWorkflowRoles` separately grants treasury execution, financial review, accounting reconciliation and CEO payment authorization. Manual `financialRead` / `financialWrite` arrays accept only `costing`, `control`, and `transport`; write requires the matching read grant. Each domain is independent, and the legacy generic `finance` field grants none of them. Transport financial readers may inspect authorized mission expenses/evidence but cannot approve expenses. Existing job assignments retain the same effective access; switching to manual materializes their validated effective permissions and preserves scopes. Role-based requests ignore extra client grants. External accounts cannot combine these company permissions.
+
+User creation/updates continue through the audited, revision-checked admin HTTP handler and matching MCP tools. Permissions are checked on every request, so removing a grant affects subsequent browser and assistant operations. No schema migration is needed because permissions remain in the existing account JSON snapshot.
+
 All data/session/user/suggestion endpoints check identity and current enabled membership. Record reads return only allowed module kinds. Writes require the module write permission; event creation also checks permitted stages. A write grant requires read access to that module. Event/service/action writers must be able to read referenced devices and batches. Permissions are checked on the server on each request and mirrored in the interface.
 
 - Inventory: batches read/write.

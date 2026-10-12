@@ -37,7 +37,7 @@ export function canOpenSection(u:Session,s:string){
  if(s==='overview')return u.isAdmin||!!p.read.length;
  if(u.isAdmin||s==='mobile-install'||s==='tasks'||s==='development')return true;
  if(s==='sales')return salesRead(u)||salesWarehouse(u);
- if(s==='transport')return !!p.salesAgentId||!!p.salesRoles?.some(r=>['manager','staff'].includes(r))||!!p.supplyRoles?.some(r=>['inventory','domestic','foreign'].includes(r))||!!p.transportRoles?.length||!!p.flowRoles?.some(r=>['inventory','sales','logistics'].includes(r))||!!p.serviceRoles?.length;
+ if(s==='transport')return financialAccess(u,'transport')||!!p.salesAgentId||!!p.salesRoles?.some(r=>['manager','staff'].includes(r))||!!p.supplyRoles?.some(r=>['inventory','domestic','foreign'].includes(r))||!!p.transportRoles?.length||!!p.flowRoles?.some(r=>['inventory','sales','logistics'].includes(r))||!!p.serviceRoles?.length;
  if(s==='after-sales')return serviceRead(u);
  if(s==='sourcing')return !!p.qmsRoles?.some(r=>['qa','qc'].includes(r))||!!p.flowRoles?.includes('qc')||!!p.supplyRoles?.length||!!p.flowRoles?.some(r=>['inventory','logistics'].includes(r))||!!p.transportRoles?.includes('manager');
  if(['users','llm','finance','system-reset'].includes(s))return false;
