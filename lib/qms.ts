@@ -1,3 +1,4 @@
+import {storedAccessPermissions} from './permissions';
 import {storage} from './storage';
 import {AccessError} from './authorization';
 import {trainingContext} from './training-context';
@@ -10,7 +11,7 @@ export const qt=(v:unknown,max=8000)=>{if(typeof v!=='string'||v.length>max)qfai
 export const qr=(v:unknown,max=8000)=>{const s=qt(v,max);if(!s)qfail('اطلاعات الزامی کامل نیست.');return s};
 export const qid=(v:unknown)=>{const s=qr(v,80);if(!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s))qfail('شناسه عملیات معتبر لازم است.');return s};
 export const qday=(v:unknown)=>{const s=qr(v,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(s)||!Number.isFinite(Date.parse(s))||new Date(s).toISOString().slice(0,10)!==s)qfail('تاریخ معتبر وارد کنید.');return s};
-export function qpermission(m:any){if(!m||m.status!=='active')return null;const p=JSON.parse(m.permissions);return p.hospitalCenterId||p.salesAgentId||p.serviceAgentId||p.salesRoles?.includes('agent')||p.serviceRoles?.includes('agent')?null:p;}
+export function qpermission(m:any){if(!m||m.status!=='active')return null;const p=storedAccessPermissions(m.permissions);return p.hospitalCenterId||p.salesAgentId||p.serviceAgentId||p.salesRoles?.includes('agent')||p.serviceRoles?.includes('agent')?null:p;}
 export function designMember(m:any){return qpermission(m)?.supplyRoles?.some((r:string)=>['engineering','ceo'].includes(r))||false;}
 export async function qactor(u:Session,members?:any[]){const ms=members||await leadMembers(),m=ms.find(m=>m.subject===u.userId||u.userId==='local:'+m.id),p=qpermission(m);
  if(trainingContext.getStore()||u.permissions.hospitalCenterId||u.permissions.salesAgentId||u.permissions.serviceAgentId||!u.isAdmin&&!p)qfail('این بخش برای کارکنان مجاز شرکت است.',403);

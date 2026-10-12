@@ -1,3 +1,4 @@
+import {storedAccessPermissions} from './permissions';
 import {storage} from './storage';
 import {leadRows,leadMembers,leadEligible,leadOpen,leadMemberGuard} from './sales-leads';
 import {salesManager} from './sales-access';
@@ -6,7 +7,7 @@ import {trainingContext} from './training-context';
 export async function syncLeadTasks(){
  if(trainingContext.getStore())return;
  const db=storage(),members=await leadMembers(),rows=await leadRows(),now=new Date().toISOString(),existing=(await db.prepare("SELECT * FROM duty_runs WHERE template_id='sales-lead' ORDER BY id").all()).results as any[],desired=new Set<string>();
- const managers=members.filter(m=>leadEligible(m)&&salesManager({isAdmin:false,permissions:JSON.parse(m.permissions)} as any));
+ const managers=members.filter(m=>leadEligible(m)&&salesManager({isAdmin:false,permissions:storedAccessPermissions(m.permissions)} as any));
  for(const r of rows){const d=r.data;if(!leadOpen(d)||!leadEligible(members.find(m=>m.id===d.ownerId)))continue;const id='sales-lead:'+r.id+':'+d.ownerId;desired.add(id);const old=existing.find(t=>t.id===id),supervisor=managers.find(m=>m.id!==d.ownerId)?.id||'@admin',due=d.nextDue+'T16:00:00+03:30';
   const data={...(old?JSON.parse(old.data):{}),salesLeadWorkflow:true,remindHours:24,escalateHours:24,leadId:r.id,sourceSection:'sales',sourceId:'lead:'+r.id,title:'پیگیری '+d.title,instructions:d.nextAction,evidence:'text',history:old?JSON.parse(old.data).history||[]:[],answer:old?JSON.parse(old.data).answer||'':''};
   if(old&&['open','blocked'].includes(old.state)&&old.due===due&&old.supervisor===supervisor&&JSON.parse(old.data).instructions===data.instructions&&JSON.parse(old.data).title===data.title&&JSON.parse(old.data).remindHours===24&&JSON.parse(old.data).escalateHours===24)continue;

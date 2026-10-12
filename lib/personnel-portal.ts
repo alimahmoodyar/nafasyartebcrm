@@ -1,10 +1,11 @@
+import {accessPermissions,storedAccessPermissions} from './permissions';
 import {internal,hrVisible,presentHr,workSummary} from './personnel';
 import type {HrActor} from './personnel';
 import {isIsoDay} from './persian-date';
 
 type MissingField={key:string;label:string;owner:string};
 const employeeFields:Record<string,string>={code:'کد پرسنلی',unit:'واحد محل خدمت',title:'عنوان شغلی',location:'محل کار',employment:'نوع همکاری',managerId:'مدیر مستقیم',start:'تاریخ شروع همکاری',leaveMinutes:'مانده اولیه مرخصی'};
-function permissions(member:any):Record<string,any>{try{const p=typeof member?.permissions==='string'?JSON.parse(member.permissions):member?.permissions;return p&&typeof p==='object'&&!Array.isArray(p)?p:{};}catch{return {};}}
+function permissions(member:any):Record<string,any>{try{const p=typeof member?.permissions==='string'?storedAccessPermissions(member.permissions):member?.permissions;return p&&typeof p==='object'&&!Array.isArray(p)?accessPermissions(p as any):{};}catch{return {};}}
 const missing=(key:string,label:string):MissingField=>({key,label,owner:'واحد اداری'});
 // This is a read projection. Viewing the portal never creates employee records.
 export function personnelProfileStatus(rows:any[],memberId:string,members:any[]){

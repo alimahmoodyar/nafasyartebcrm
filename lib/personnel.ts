@@ -1,3 +1,4 @@
+import {accessPermissions} from './permissions';
 import {advanceMonth} from './personnel-contract';
 import {storage} from './storage';
 import {AccessError} from './authorization';
@@ -16,7 +17,7 @@ export async function readHrRows(){const raw=(await storage().prepare("SELECT * 
 export async function hrRows(){const snapshot=await readHrRows();if(snapshot.issues.length)hrFail('دادهٔ پرسنلی ناقص یا نامعتبر است؛ مسئول سامانه باید آن را بررسی کند. ثبت تغییر تا اصلاح داده ممکن نیست.',409);return snapshot.rows;}
 export async function hrActor(u:Session,members?:any[]){const ms=members||await leadMembers(),m=ms.find(m=>m.subject===u.userId||m.id===(u.userId.startsWith('local:')?u.userId.slice(6):u.userId));if(trainingContext.getStore()||u.permissions.salesAgentId||u.permissions.serviceAgentId||u.permissions.hospitalCenterId||!u.isAdmin&&!internal(m))hrFail('پرتال پرسنلی فقط برای کارکنان فعال شرکت است.',403);const raw=u.isAdmin?Object.keys(personnelRoles):memberPermissions(m)?.personnelRoles,roles=Array.isArray(raw)?raw.filter(r=>typeof r==='string'&&Object.hasOwn(personnelRoles,r)):[];return {id:m?.id||'',userId:u.userId,admin:u.isAdmin,roles,has:(r:string)=>roles.includes(r)};}
 export type HrActor=Awaited<ReturnType<typeof hrActor>>;
-function memberPermissions(m:any):Record<string,any>|null{return parseHrData(m?.permissions);}
+function memberPermissions(m:any):Record<string,any>|null{const p=parseHrData(m?.permissions);return p?accessPermissions(p as any):null;}
 export const findHr=(rows:any[],id:string,type?:string)=>{const r=rows.find(r=>r.id===id&&(!type||r.type===type));if(!r)hrFail('پرونده در دسترس نیست.',404);return r};
 export function employee(rows:any[],id:string){return findHr(rows,id,'hr_employee');}
 export function managerOf(rows:any[],memberId:string,ownerId:string,day=dayAt()){const e=rows.find(r=>r.type==='hr_employee'&&r.data.memberId===ownerId);if(!e||memberId===ownerId)return false;return e.data.managerId===memberId||rows.some(r=>r.type==='hr_delegate'&&r.data.managerId===e.data.managerId&&r.data.memberId===memberId&&r.data.start<=day&&r.data.end>=day);}

@@ -1,3 +1,4 @@
+import {storedAccessPermissions} from './permissions';
 import {financialAccess} from './financial-access';
 import {financialWorkflowRole, type FinancialWorkflowRole} from './financial-workflow-roles';
 import {storage} from './storage';
@@ -28,7 +29,7 @@ export async function treasuryRoles(u:Session,rows:any[]){
  if(trainingContext.getStore()||!financialAccess(u,'treasury'))tFail('دسترسی مالی داخلی شرکت لازم است.',403);
  const members=(await storage().prepare('SELECT id,subject,status,permissions FROM app_members ORDER BY id').all()).results as any[];
  const m=members.find(m=>m.status==='active'&&(m.subject===u.userId||m.id===(u.userId.startsWith('local:')?u.userId.slice(6):u.userId)));
- const p=m?JSON.parse(m.permissions):null;
+ const p=m?storedAccessPermissions(m.permissions):null;
  if(!u.isAdmin&&(!p||!financialAccess({isAdmin:false,permissions:p},'treasury')))tFail('دسترسی فعال مالی لازم است.',403);
  const write=financialAccess(u,'purchase',true)&&(u.isAdmin||financialAccess({isAdmin:false,permissions:p},'purchase',true));
  const has=(role:FinancialWorkflowRole)=>u.isAdmin||!!p&&financialWorkflowRole(p,m.id,rows,role)&&financialWorkflowRole(u.permissions,m.id,rows,role);

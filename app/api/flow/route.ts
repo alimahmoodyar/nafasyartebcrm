@@ -1,3 +1,4 @@
+import {storedAccessPermissions} from '@/lib/permissions';
 import {syncMaterialTasks} from '@/lib/material-tasks';
 import {storage} from '@/lib/storage';
 import {holdChecks,supplyLock,allocateAcceptedPurchase} from '@/lib/sourcing';
@@ -24,7 +25,7 @@ export async function GET(){try{
  const builds=all.filter(r=>r.type==='build'),receipts=all.filter(r=>r.type==='receipt'),materials=all.filter(r=>r.type==='material');
  const lowStock=materials.map(m=>({materialId:m.id,...suggestion(m,balances,receipts,builds,boms)}));
  const allowed=u.isAdmin?all:all.filter(e=>e.type==='material'||e.type==='capacity'||e.type==='supply'&&flowRole(u,'procurement')||['receipt','request'].includes(e.type)&&['inventory','qc','production'].some(r=>flowRole(u,r))||['plan','build','repair','finaltest','assignment'].includes(e.type)&&['production','qc'].some(r=>flowRole(u,r)));
- const members=(await db.prepare("SELECT id,name,subject,permissions FROM app_members WHERE status='active'").all()).results.map((m:any)=>({id:m.id,name:m.name,roles:JSON.parse(m.permissions).flowRoles||[]}));
+ const members=(await db.prepare("SELECT id,name,subject,permissions FROM app_members WHERE status='active'").all()).results.map((m:any)=>({id:m.id,name:m.name,roles:storedAccessPermissions(m.permissions).flowRoles||[]}));
  const purchaseOrders=flowRole(u,'inventory')?all.filter(e=>e.type==='purchase_order'&&['issued','paid','preparing','shipped'].includes(e.data.state)).map(o=>({id:o.id,materialId:o.data.materialId,supplier:o.data.supplier,quantity:o.data.quantity,unit:o.data.unit,received:receipts.filter(r=>r.data.purchaseOrderId===o.id).reduce((n,r)=>n+r.data.quantity,0)})):[];
  return json({purchaseOrders,warehouseIds:["raw","semi","line","quarantine","nonconforming","finished"].filter(w=>warehouseAccess(u,w)),entities:allowed,rows:rows.filter((r:any)=>r.kind!=='device'||flowRole(u,'production')||flowRole(u,'qc')),balances:balances.filter((b:any)=>!String(b.item_id).startsWith('device:')||flowRole(u,'production')||flowRole(u,'qc')),slots:(await db.prepare('SELECT * FROM flow_slots WHERE quantity>0').all()).results,boms,members,lowStock,roles:flowRoles.filter(r=>flowRole(u,r))});
  }catch(e){return accessResponse(e)||Response.json({error:'دریافت گردش مواد ممکن نشد.'},{status:503})}}
@@ -43,7 +44,7 @@ export async function POST(request:Request){try{
  const touchedStock:string[]=[];
  const entry=(item:string,warehouse:string,delta:number)=>{touchedStock.push(item);const bid=item+'@'+warehouse;stmts.push(db.prepare('INSERT INTO inventory_balances(id,item_id,warehouse,quantity) VALUES(?,?,?,0) ON CONFLICT(id) DO NOTHING').bind(bid,item,warehouse),db.prepare('UPDATE inventory_balances SET quantity=quantity+? WHERE id=?').bind(delta,bid),db.prepare('INSERT INTO inventory_entries(id,operation_id,item_id,warehouse,delta) VALUES(?,?,?,?,?)').bind(crypto.randomUUID(),id,item,warehouse,delta));};
  const event=(device:string,stage:string,data:any)=>stmts.push(db.prepare("INSERT INTO records(id,kind,payload,created) VALUES(?,'event',?,?)").bind(crypto.randomUUID(),JSON.stringify({device,stage,date:tehranDay(),operator:u.name,...data}),now));
- async function assignee(mid:string,role:string){if(!mid)return '';const m:any=await db.prepare("SELECT permissions FROM app_members WHERE id=? AND status='active'").bind(mid).first();if(!m||!(JSON.parse(m.permissions).flowRoles||[]).includes(role))fail('مسئول انتخاب‌شده دسترسی این مرحله را ندارد.');return mid;}
+ async function assignee(mid:string,role:string){if(!mid)return '';const m:any=await db.prepare("SELECT permissions FROM app_members WHERE id=? AND status='active'").bind(mid).first();if(!m||!(storedAccessPermissions(m.permissions).flowRoles||[]).includes(role))fail('مسئول انتخاب‌شده دسترسی این مرحله را ندارد.');return mid;}
  function assigned(e:any,key:string){if(u.isAdmin)return;const owner=e.data[key];if(owner&&u.userId!=='local:'+owner&&u.userId!==owner)guard('EXISTS(SELECT 1 FROM app_members WHERE id=? AND subject=?)',owner,u.userId);}
  if(mode==='material'){
  const code=normalizePartCode(needed(b.code,12)),eid='material:'+code;const oldRaw:any=await db.prepare('SELECT * FROM flow_entities WHERE id=?').bind(eid).first();let old:any;if(oldRaw){old=await get(eid,'material');if(b.revision!==old.revision)fail('شناسنامه تغییر کرده است.',409);}

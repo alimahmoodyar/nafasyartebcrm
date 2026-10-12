@@ -6,7 +6,7 @@ export const manualPermissionSections = [
  {key:'sales-bank',title:'پوز و تطبیق دریافت‌ها',icon:ClipboardCheck,group:'sales'},
  {key:'reminders',title:'یادآورهای من',icon:ClipboardCheck,shared:true},
  {key:'treasury',title:'خزانه‌داری',icon:ClipboardCheck,group:'treasury'},
- {key:'assets',title:'اموال شرکت و امانی من',icon:Box,group:'assets'},
+ {key:'assets',title:'مدیریت اموال شرکت',icon:Box,group:'assets'},
  {key:'activation-code',title:'تولید کد پنج‌رقمی',icon:KeyRound,group:'sales'},
  {key:'qms',title:'کیفیت و تحقیق‌وتوسعه',icon:ShieldCheck,group:'qms'},
  {key:'personnel',title:'پرتال پرسنلی و حقوق',icon:Users,group:'personnel'},

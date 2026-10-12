@@ -4,7 +4,7 @@ import {cloneElement,useEffect,useState,type ReactElement} from 'react';
 import {ArrowUp,ArrowDown,GripVertical,Search,Settings2,RotateCcw,type LucideIcon} from 'lucide-react';
 import './personal-home.css';
 
-type App={key:string;title:string;icon:LucideIcon;control?:ReactElement<any>};
+type App={key:string;title:string;shortTitle?:string;icon:LucideIcon;control?:ReactElement<any>};
 const labels:Record<string,string>={assets:'اموال',tasks:'کارهای من',personnel:'پرسنلی',sales:'فروش',hospital:'بیمارستان',transport:'حمل‌ونقل','after-sales':'خدمات پس از فروش',sourcing:'تأمین',fulfillment:'ارسال',flow:'گردش مواد',overview:'گزارش کلی',inventory:'انبار',event:'ثبت تولید',serials:'سریال‌ها',device:'دستگاه‌ها',batch:'قطعات',product:'محصولات',action:'اقدامات کیفیت',service:'سوابق خدمات قبلی',firmware:'نرم‌افزار دستگاه',development:'پیشنهادها','routine-production':'کار تولید','build-projects':'پروژه‌ها','mobile-install':'نصب روی گوشی','llm-usage':'مصرف هوش مصنوعی',llm:'تنظیمات دستیار','finance-control':'کنترل مالی',finance:'حسابداری',guarantees:'ضمانت‌نامه‌ها',costing:'بهای تمام‌شده',users:'کاربران','system-reset':'پاک‌سازی آزمایشی',analytics:'گزارش تولید'};
 export function PersonalHome({accountId,name,apps,onNavigate,scope='',title='خانهٔ من',greeting=true,shortTitles=true,compact=false}:{accountId:string;name:string;apps:App[];onNavigate:(key:string)=>void;scope?:string;title?:string;greeting?:boolean;shortTitles?:boolean;compact?:boolean}){
  const storageKey='nafasyar-home:v1:'+accountId+(scope?':program:'+scope:'');
@@ -13,7 +13,7 @@ export function PersonalHome({accountId,name,apps,onNavigate,scope='',title='خ�
  const defaults=shortTitles?[...apps].sort((a,b)=>{const priorities=['tasks','sales','hospital','routine-production','flow','inventory','after-sales','sourcing','personnel'];const rank=(key:string)=>{const i=priorities.indexOf(key);return i<0?100:i};return rank(a.key)-rank(b.key)}):apps;
  const keys=[...new Set([...order,...defaults.map(a=>a.key)])].filter(k=>apps.some(a=>a.key===k));
  const ordered=keys.flatMap(k=>apps.filter(a=>a.key===k));
- const appTitle=(a:App)=>shortTitles?(labels[a.key]||a.title):a.title;
+ const appTitle=(a:App)=>shortTitles?(a.shortTitle||labels[a.key]||a.title):a.title;
  const filtered=ordered.filter(a=>(a.title+' '+appTitle(a)).includes(search.trim()));
  function save(next:string[]){setOrder(next);try{localStorage.setItem(storageKey,JSON.stringify(next));setNotice('چیدمان شما در این مرورگر ذخیره شد.')}catch{setNotice('ذخیره در این مرورگر ممکن نیست؛ چیدمان فقط تا بستن صفحه حفظ می‌شود.')}}
  function move(from:string,to:string){const next=[...keys],start=next.indexOf(from),end=next.indexOf(to);if(start<0||end<0||start===end)return;next.splice(start,1);next.splice(end,0,from);save(next)}

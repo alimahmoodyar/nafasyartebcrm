@@ -1,10 +1,11 @@
+import {storedAccessPermissions} from './permissions';
 import {storage} from './storage';
 import {dayAt,addDay} from './duties';
 import {salesRows,salesLock,salesStaff,salesFinance,salesRep,salesManager} from './sales';
 import {salesAccounts,salesTargetProgress,rial} from './sales-contract';
 export async function syncSalesTasks(){
  const db=storage(),op=crypto.randomUUID(),checks=await salesLock(db,op),rows=await salesRows(),today=dayAt(),now=new Date().toISOString();
- const members=(await db.prepare("SELECT id,name,permissions FROM app_members WHERE status='active'").all()).results.map((m:any)=>({...m,permissions:JSON.parse(m.permissions)}));
+ const members=(await db.prepare("SELECT id,name,permissions FROM app_members WHERE status='active'").all()).results.map((m:any)=>({...m,permissions:storedAccessPermissions(m.permissions)}));
  const old=(await db.prepare("SELECT * FROM duty_runs WHERE template_id LIKE 'sales:%'").all()).results as any[],wanted=new Set<string>(),stmts:D1PreparedStatement[]=[];
  function task(agent:any,key:string,title:string,due:string,role:string,instructions:string){
   const assigned=role==='staff'?agent.data.ownerId:role==='finance'?agent.data.financeId:'';

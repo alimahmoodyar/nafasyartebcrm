@@ -1279,6 +1279,7 @@ toolFieldTitles.get_development_requests={...toolFieldTitles.get_development_req
 
 Object.assign(fieldTitles,{roleAssignment:'انتخاب نقش شغلی',treasuryWorkflowRoles:'نقش‌های فرایند خزانه‌داری'});
 Object.assign(fieldTitles,{financialRead:'بخش‌های مالی مجاز برای مشاهده',financialWrite:'بخش‌های مالی مجاز برای ثبت و بررسی'});
+Object.assign(fieldTitles,{manualPrograms:'برنامه‌های کاری قابل نمایش'});
 
 Object.assign(fieldTitles,{roles:'نقش‌های شغلی'});
 

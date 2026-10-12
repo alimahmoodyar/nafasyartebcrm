@@ -21,8 +21,8 @@ function reset(p=blank()){current=p;search='';}
 assert.equal(catalog.length,40);assert.equal(new Set(catalog.map(s=>s.key)).size,40,'catalog cannot duplicate home icons');
 assert.equal(all().filter(n=>n.props['data-section']).length,40,'all admin icons appear immediately');
 for(const key of ['users','llm','llm-usage','finance','system-reset'])assert.equal(preview(key),'admin-only');
-for(const key of ['reminders','tasks','development','mobile-install','personnel','assets'])assert.equal(preview(key),'visible');
-for(const key of ['costing','finance-control','treasury','guarantees','product','transport'])assert.equal(preview(key),'hidden');
+for(const key of ['reminders','tasks','development','mobile-install','personnel'])assert.equal(preview(key),'visible');
+for(const key of ['costing','finance-control','treasury','guarantees','product','transport','assets'])assert.equal(preview(key),'hidden');
 assert.ok(!all().some(n=>n.type==='details'),'manual choices must not be hidden under advanced disclosure');
 for(const link of all().filter(n=>n.type==='a'))assert.ok(all().some(n=>n.props.id===link.props.href.slice(1)),'icon must lead to real choices '+link.props.href);
 assert.ok(html().includes('فقط مدیر سامانه'),'owner-only controls are explained');
@@ -43,6 +43,9 @@ assert.ok(all().some(n=>n.type==='input'&&n.props['aria-label']?.startsWith('گ�
 
 for(const kind of policy.modules){reset();click('ثبت و ویرایش '+names[kind],true);policy.validatePermissions(current);assert.ok(current.read.includes(kind)&&current.write.includes(kind));click('مشاهده '+names[kind],false);assert.ok(!current.write.includes(kind));}
 reset();click('ثبت و ویرایش '+names.event,true);assert.deepEqual(Array.from(current.eventStages),Array.from(policy.stages));for(const stage of policy.stages)assert.ok(checkbox('ثبت مرحله '+stage));click('مشاهده '+names.event,false);assert.equal(current.eventStages.length,0);
+reset(policy.toManualPermissions(policy.validatePermissions({roleAssignment:{roles:['engineering']}})));assert.equal(preview('product'),'hidden','role dependency must stay hidden on conversion');assert.equal(preview('sourcing'),'visible');click('ثبت و ویرایش '+names.product,true);assert.equal(preview('product'),'visible','explicit manual operation activates its icon');assert.equal(preview('sourcing'),'visible','manual edit preserves converted workflow icons');policy.validatePermissions(current);
+reset({...blank(),manualPrograms:[]});click('مشاهده بهای تمام‌شده',true);assert.equal(preview('costing'),'visible','new manual grant activates its business icon');click('مشاهده بهای تمام‌شده',false);assert.equal(preview('costing'),'hidden');assert.equal(preview('personnel'),'visible','personal apps survive manual business mask');
+reset({...blank(),financialRead:['costing'],manualPrograms:[]});click('ثبت و بررسی بهای تمام‌شده',true);assert.equal(preview('costing'),'visible','explicit write opens an icon whose dependency read already exists');assert.equal(preview('pricing'),'visible');assert.equal(preview('finance-control'),'hidden');assert.equal(preview('build-projects'),'hidden','explicit financial operation preserves other hidden programs');policy.validatePermissions(current);
 reset({...blank(),flowRoles:['inventory'],warehouses:['raw']});assert.ok(all().some(n=>n.type==='fieldset'&&renderToStaticMarkup(n).includes('انبارهای تحت مسئولیت')));const warehouse=all().find(n=>n.type==='input'&&n.props['aria-label']?.startsWith('دسترسی انبار')&&n.props.checked);warehouse.props.onChange({target:{checked:false}});assert.equal(current.warehouses.length,0);
 
 reset();click('حساب بیرونی نماینده فروش',true);assert.deepEqual(Array.from(current.salesRoles),['agent']);assert.equal(preview('personnel'),'hidden','pending agent must not preview internal pages');

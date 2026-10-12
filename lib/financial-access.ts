@@ -1,7 +1,8 @@
+import {accessPermissions} from './permissions';
 // Finance read/write is retained for stored-account compatibility, never as a domain grant.
 export type FinancialDomain='costing'|'control'|'purchase'|'treasury'|'guarantees'|'hospital'|'transport';
 export function financialAccess(u:any,domain:FinancialDomain,write=false){
- const p=u.permissions||{};
+ const p=accessPermissions(u.permissions||{});
  if(p.salesAgentId||p.serviceAgentId||p.hospitalCenterId||p.salesRoles?.includes('agent')||p.serviceRoles?.includes('agent'))return false;
  if(u.isAdmin)return true;
  const roles:string[]=p.roleAssignment?.roles||[];

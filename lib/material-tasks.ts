@@ -1,9 +1,10 @@
+import {storedAccessPermissions} from './permissions';
 import {storage} from './storage';
 import {supplyLock} from './sourcing';
 export async function syncMaterialTasks(){
  const db=storage(),op=crypto.randomUUID(),checks=await supplyLock(db,op),now=new Date().toISOString();
  const rows=(await db.prepare("SELECT * FROM flow_entities WHERE type IN ('receipt','request')").all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}));
- const members=(await db.prepare("SELECT id,permissions FROM app_members WHERE status='active'").all()).results.map((r:any)=>({...r,p:JSON.parse(r.permissions)}));
+ const members=(await db.prepare("SELECT id,permissions FROM app_members WHERE status='active'").all()).results.map((r:any)=>({...r,p:storedAccessPermissions(r.permissions)}));
  const old=(await db.prepare("SELECT * FROM duty_runs WHERE template_id LIKE 'material:%'").all()).results as any[],wanted=new Set<string>(),stmts:D1PreparedStatement[]=[];
  for(const r of rows){const d=r.data,isQC=r.type==='receipt'&&d.state==='pending_qc',isShelf=r.type==='receipt'&&d.state==='awaiting_warehouse',isIssue=r.type==='request'&&d.state==='pending';if(!isQC&&!isShelf&&!isIssue)continue;
   const role=isQC?'qc':'inventory',owner=isQC?d.qcOwner:d.warehouseOwner,title=isQC?'کنترل کیفیت ورودی محموله':isShelf?'جانمایی محموله تأییدشده':'تحویل مواد به تولید';

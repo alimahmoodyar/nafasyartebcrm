@@ -1,3 +1,4 @@
+import {storedAccessPermissions} from './permissions';
 import {storage} from './storage';
 import {AccessError} from './authorization';
 import {trainingContext} from './training-context';
@@ -33,7 +34,7 @@ async function context(actor:Session){
  const admin=actor.isAdmin&&identities.some(i=>i.id==='owner'&&i.subject===actor.userId||i.id==='local_admin'&&i.subject===own?.id&&own?.status==='active');
  if(actor.isAdmin&&!admin)fail('هویت مدیر تغییر کرده است؛ دوباره وارد شوید.',403);
  if(!admin&&own?.status!=='active')fail('حساب فعال لازم است.',403);
- let p:any;try{p=JSON.parse(own?.permissions||'{}')}catch{p={}}
+ let p:any;try{p=storedAccessPermissions(own?.permissions||'{}')}catch{p={}}
  const hr=personnelStaff(own)&&Array.isArray(p.personnelRoles)&&p.personnelRoles.includes('hr');
  return {db,members,identities,own,admin,hr};
 }

@@ -1,3 +1,4 @@
+import {storedAccessPermissions} from './permissions';
 import {storage} from './storage';
 import {AccessError} from './authorization';
 import {calculateCosts,moneyMicro,moneyText} from './costing';
@@ -38,7 +39,7 @@ export async function applyPricing(user:any,b:any){
  if(b.mode==='cost'? !pricingFinance(u):!['policy','approve'].includes(b.mode)||!pricingExecutive(u))fail('مجوز این مرحله قیمت‌گذاری را ندارید.',403);
  const db=storage(),signature=JSON.stringify(b),prior:any=await db.prepare('SELECT actor,payload FROM inventory_operations WHERE id=?').bind(b.id).first();if(prior){if(prior.actor!==u.userId||prior.payload!==signature)fail('شناسه تکراری برای درخواست متفاوت است.',409);return {saved:true,repeated:true,id:b.id};}
  const locks=await salesLock(db,b.id),w=await workspace(),members=await leadMembers(),now=new Date().toISOString(),notes=sreq(b.notes,4000),guards:any[]=[],writes:any[]=[];let target=b.id,data:any,type='';
- if(!u.isAdmin){const m=members.find(m=>m.status==='active'&&(m.subject===u.userId||'local:'+m.id===u.userId));if(!m||JSON.stringify(JSON.parse(m.permissions))!==JSON.stringify(u.permissions))fail('دسترسی تغییر کرده است؛ دوباره وارد شوید.',403);}
+ if(!u.isAdmin){const m=members.find(m=>m.status==='active'&&(m.subject===u.userId||'local:'+m.id===u.userId));if(!m||JSON.stringify(storedAccessPermissions(m.permissions))!==JSON.stringify(u.permissions))fail('دسترسی تغییر کرده است؛ دوباره وارد شوید.',403);}
  const guard=(condition:string,...args:any[])=>guards.push(db.prepare('UPDATE inventory_operations SET guard=CASE WHEN '+condition+' THEN guard ELSE 0 END WHERE id=?').bind(...args,b.id));
  const p=w.products.find((p:any)=>p.id===b.productId&&p.status==='فعال'),requireProduct=()=>{if(!p)fail('محصول فعال را انتخاب کنید.');return p;};
  if(b.mode==='cost'){

@@ -1,3 +1,4 @@
+import {storedAccessPermissions} from './permissions';
 import {salesScope,salesStaff,salesFinance} from './sales';
 import {storage} from './storage';
 import {AccessError,can} from './authorization';
@@ -8,8 +9,8 @@ export const inboxAssistantExecution=new AsyncLocalStorage<boolean>();
 export const inboxDecode=(r:any)=>r?({...r,data:JSON.parse(r.data)}):null;
 export async function inboxIdentity(u:Session){const id=await memberId(u);if(id)return id;if(u.isAdmin)return '@owner';throw new AccessError('حساب فعال برای مکاتبه یافت نشد.',403);}
 export async function inboxDirectory(u:Session){const me=await inboxIdentity(u),db=storage();let users=(await db.prepare("SELECT id,name,unit,permissions FROM app_members WHERE status='active' ORDER BY name,id").all()).results as any[];
- if(!u.isAdmin&&u.permissions.serviceAgentId)users=users.filter(r=>{const p=JSON.parse(r.permissions);return !p.serviceAgentId&&p.serviceRoles?.some((x:string)=>['manager','coordinator'].includes(x))&&p.serviceDomains?.some((x:string)=>u.permissions.serviceDomains?.includes(x));});
- if(!u.isAdmin&&u.permissions.salesAgentId){await salesScope(u,u.permissions.salesAgentId);users=users.filter(r=>{const p=JSON.parse(r.permissions),actor={isAdmin:false,permissions:p} as Session;return !p.salesAgentId&&!p.serviceAgentId&&(salesStaff(actor)||salesFinance(actor));});}
+ if(!u.isAdmin&&u.permissions.serviceAgentId)users=users.filter(r=>{const p=storedAccessPermissions(r.permissions);return !p.serviceAgentId&&p.serviceRoles?.some((x:string)=>['manager','coordinator'].includes(x))&&p.serviceDomains?.some((x:string)=>u.permissions.serviceDomains?.includes(x));});
+ if(!u.isAdmin&&u.permissions.salesAgentId){await salesScope(u,u.permissions.salesAgentId);users=users.filter(r=>{const p=storedAccessPermissions(r.permissions),actor={isAdmin:false,permissions:p} as Session;return !p.salesAgentId&&!p.serviceAgentId&&(salesStaff(actor)||salesFinance(actor));});}
  const people=users.map(({id,name,unit})=>({id,name,unit}));if(await db.prepare("SELECT subject FROM app_identity WHERE id='owner'").first())people.unshift({id:'@owner',name:'مدیر سامانه',unit:'مدیریت'});
  const positions=(await db.prepare("SELECT * FROM flow_entities WHERE type='position' AND json_extract(data,'$.active')=1 ORDER BY created,id").all()).results.map(inboxDecode).filter((r:any)=>!u.permissions.serviceAgentId||r.data.members.some((id:string)=>people.some(p=>p.id===id))).map((r:any)=>({id:r.id,name:r.data.name,unit:r.data.unit,members:r.data.members.filter((id:string)=>people.some(p=>p.id===id))}));
  return {me,people,positions:!u.isAdmin&&(u.permissions.serviceAgentId||u.permissions.salesAgentId)?[]:positions};}
