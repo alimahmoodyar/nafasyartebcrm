@@ -4,7 +4,7 @@ import type {OperationForm} from '@/lib/assistant-workspace';
 import {partnerKinds} from '@/lib/sales-network-contract';
 import {salesRequestChannels} from '@/lib/sales-contract';
 import {formatDate,localDay} from '@/lib/persian-date';
-import {selectSalesTemplate} from '@/lib/sales-template';
+import {resolveSalesOrderTemplates} from '@/lib/sales-template';
 import {salesPaymentDays,salesPaymentMaxDays} from '@/lib/sales-payment-terms';
 import {NumberInput} from './number-input';
 import {SolarDate} from './solar-date';
@@ -12,6 +12,12 @@ import {SalesReferralFields} from './sales-referral-fields';
 
 const money=(value:any)=>/^\d+$/.test(String(value))?BigInt(value).toLocaleString('fa-IR')+' ریال':'—';
 const percent=(value:number)=>Number(value/100).toLocaleString('fa-IR')+'٪';
+const quoteMatches=(quote:any,args:any)=>{
+ if(!quote||quote.agentId!==args.agentId||!Array.isArray(quote.lines)||!Array.isArray(args.items)||!args.items.length||args.items.some((i:any)=>!i.productId)||JSON.stringify(quote.lines.map((l:any)=>[l.productId,l.quantity]))!==JSON.stringify(args.items.map((i:any)=>[i.productId,i.quantity])))return false;
+ const terms=quote.salesTerms;if(!terms)return !args.salesTerms;
+ const day=quote.day||localDay(),requested=args.salesTerms,standardDays=salesPaymentDays(terms.standardDays!==undefined?{days:terms.standardDays}:{months:terms.standardMonths},day);
+ return terms.cashBps===(requested?.cashBps??terms.standardCashBps)&&salesPaymentDays(terms,day)===(requested?.days!==undefined||requested?.months!==undefined?salesPaymentDays(requested,day):standardDays);
+};
 export function SalesOrderSummary({quote,buyer}:{quote:any;buyer?:any}){
  if(!quote)return null;
  return <div aria-label="خلاصه فروش" style={{background:'#eef8f3',borderRadius:12,padding:16}}>
@@ -43,7 +49,7 @@ export function SalesOrderActionSummary({args}:{args:any}){
 export function SalesOrderWorkspace({form,accountId,locked,onChange,onPrepare,onReviewReady}:{form:OperationForm;accountId:string;locked:boolean;onChange:(form:OperationForm)=>void;onPrepare:(args:any)=>void;onReviewReady:(ready:boolean)=>void}){
  const [catalog,setCatalog]=useState<any>(null),[error,setError]=useState('');
  const key=JSON.stringify({agentId:form.args.agentId,items:form.args.items,salesTerms:form.args.salesTerms,referrerId:form.args.referrerId});
- const [preview,setPreview]=useState<{accountId:string;key:string;quote:any}>({accountId,key,quote:form.preview}),[previewError,setPreviewError]=useState(form.previewError||''),[loading,setLoading]=useState(false);
+ const [preview,setPreview]=useState<{accountId:string;key:string;quote:any}>({accountId,key,quote:quoteMatches(form.preview,form.args)?form.preview:null}),[previewError,setPreviewError]=useState(form.previewError||''),[loading,setLoading]=useState(false);
  const latest=useRef(form);latest.current=form;
  useEffect(()=>{
   const controller=new AbortController();setCatalog(null);setError('');
@@ -58,11 +64,11 @@ export function SalesOrderWorkspace({form,accountId,locked,onChange,onPrepare,on
   return ()=>controller.abort();
  },[key,accountId]);
  const currentCatalog=catalog?.me===accountId?catalog:null;
- const args=form.args,quote=preview.accountId===accountId&&preview.key===key?preview.quote:null,agent=currentCatalog?.agents.find((a:any)=>a.id===args.agentId),items=args.items?.length?args.items:[{productId:'',quantity:1}];
- const terms=quote?.salesTerms||form.preview?.salesTerms||selectSalesTemplate(currentCatalog?.templates||[],agent?.data.kind||'representative',quote?.day||currentCatalog?.today||localDay())?.data;
+ const args=form.args,quote=preview.accountId===accountId&&preview.key===key&&quoteMatches(preview.quote,args)?preview.quote:null,agent=currentCatalog?.agents.find((a:any)=>a.id===args.agentId),items=args.items?.length?args.items:[{productId:'',quantity:1}];
+ const termsDay=quote?.day||currentCatalog?.today||localDay(),resolution=resolveSalesOrderTemplates(currentCatalog?.templates||[],agent?.data.kind||'',termsDay,items.map((i:any)=>i.productId)),terms=resolution.terms,canQuote=resolution.state==='ready'||resolution.state==='missing'&&resolution.templates.length===0;
  const quoteChanged=!!form.actionId&&!!quote&&args.quoteHash!==quote.quoteHash;
  useEffect(()=>{onReviewReady(!form.actionId||!!quote&&!loading&&!quoteChanged);},[form.actionId,quote,loading,quoteChanged,onReviewReady]);
- function change(patch:any){const next={...latest.current,args:{...latest.current.args,...patch,quoteHash:undefined},preview:undefined,previewError:undefined};onChange(next);}
+ function change(patch:any){const previous=latest.current.args,productsChanged=patch.items&&JSON.stringify((previous.items||[]).map((i:any)=>i.productId))!==JSON.stringify(patch.items.map((i:any)=>i.productId)),buyerChanged=Object.hasOwn(patch,'agentId')&&patch.agentId!==previous.agentId;const next={...latest.current,args:{...previous,...patch,...(productsChanged||buyerChanged?{salesTerms:undefined}:{}),quoteHash:undefined},preview:undefined,previewError:undefined};onChange(next);}
  const source=args.requestSource||{},needsSource=currentCatalog&&!currentCatalog.roles.agent;
  function sourceChange(patch:any){change({requestSource:{...source,...patch}});}
  const sourceComplete=!needsSource||source.channel&&source.contactName?.trim()&&source.day;
@@ -97,9 +103,13 @@ export function SalesOrderWorkspace({form,accountId,locked,onChange,onPrepare,on
     <SolarDate label="تاریخ دریافت درخواست" value={source.day||''} onChange={day=>sourceChange({day})}/>
     <label className="field">خلاصه تماس یا مرجع پیام (اختیاری)<NumberInput maxLength={1000} fieldKey="reference" value={source.reference||''} onChange={e=>sourceChange({reference:e.target.value})}/></label>
    </div></details>}
-   {terms&&agent?.data.kind!=='branch'&&<><p id="assistant-sales-payment-limit" className="sales-order-negotiation-limit">حداکثر مهلت مجاز مذاکره در این الگو: <bdi>{salesPaymentMaxDays(terms,quote?.day||currentCatalog?.today||localDay()).toLocaleString('fa-IR')}</bdi> روز.</p><details style={{marginBlock:12}}><summary>شرایط متفاوت از مصوب، در صورت توافق</summary>{!args.salesTerms?<button type="button" className="link" onClick={()=>change({salesTerms:{cashBps:terms.cashBps,days:salesPaymentDays(terms,quote?.day||currentCatalog?.today||localDay())}})}>واردکردن شرایط پیشنهادی</button>:<><p>شرایط پیشنهادی به تأیید مدیر فروش نیاز دارد.</p><div className="formgrid"><label className="field">سهم نقد، درصد<NumberInput fieldKey="cashBps" type="number" min={(terms.minCashBps??0)/100} max={100} step="0.01" value={args.salesTerms.cashBps/100} onChange={e=>change({salesTerms:{...args.salesTerms,cashBps:Math.round(Number(e.target.value)*100)}})}/></label><label className="field">مهلت پرداخت، روز<NumberInput fieldKey="days" aria-describedby="assistant-sales-payment-limit" type="number" min={0} max={salesPaymentMaxDays(terms,quote?.day||currentCatalog?.today||localDay())} step="1" value={salesPaymentDays(args.salesTerms,quote?.day||currentCatalog?.today||localDay())} onChange={e=>change({salesTerms:{...args.salesTerms,days:Number(e.target.value)}})}/></label></div><button type="button" className="link" onClick={()=>change({salesTerms:undefined})}>برگشت به شرایط مصوب</button></>}</details></>}
+   {currentCatalog&&resolution.state==='unselected'&&<p className="notice">ابتدا خریدار و همه محصولات سفارش را انتخاب کنید تا شرایط مصوب همان کالاها نمایش داده شود.</p>}
+   {currentCatalog&&resolution.state==='missing'&&<p role="alert">برای {resolution.missingProductIds.map(id=>currentCatalog.products.find((p:any)=>p.id===id)?.name||id).join('، ')} الگوی فروش معتبر این نوع خریدار وجود ندارد؛ مدیر فروش شرایط همین کالاها را تعریف کند.{resolution.templates.length===0?' پیش‌فاکتور با قیمت مصوب موجود و بدون مذاکره الگو قابل بررسی است.':''}</p>}
+   {currentCatalog&&resolution.state==='incompatible'&&<p role="alert">شرایط پرداخت کالاهای انتخاب‌شده یکسان نیست؛ کالاها را در پیش‌فاکتورهای جدا ثبت کنید.</p>}
+   {agent?.data.kind==='branch'&&canQuote&&<p className="notice">تحویل شعبه امانی است؛ شرایط پرداخت فروش در این مرحله اعمال نمی‌شود.</p>}
+   {terms&&agent?.data.kind!=='branch'&&<><p>شرایط {agent?.data.name} ({partnerKinds[agent?.data.kind]||agent?.data.kind}) · {resolution.templates.map(row=>currentCatalog.products.find((p:any)=>p.id===row.productId)?.name||row.productId).join('، ')}: {percent(terms.cashBps)} نقد و باقیمانده {salesPaymentDays(terms,termsDay).toLocaleString('fa-IR')} روزه؛ حداقل نقد مجاز {percent(terms.minCashBps??0)}.</p><p id="assistant-sales-payment-limit" className="sales-order-negotiation-limit">حداکثر مهلت مجاز مذاکره در این الگو: <bdi>{salesPaymentMaxDays(terms,quote?.day||currentCatalog?.today||localDay()).toLocaleString('fa-IR')}</bdi> روز.</p><details style={{marginBlock:12}}><summary>شرایط متفاوت از مصوب، در صورت توافق</summary>{!args.salesTerms?<button type="button" className="link" onClick={()=>change({salesTerms:{cashBps:terms.cashBps,days:salesPaymentDays(terms,quote?.day||currentCatalog?.today||localDay())}})}>واردکردن شرایط پیشنهادی</button>:<><p>شرایط پیشنهادی به تأیید مدیر فروش نیاز دارد.</p><div className="formgrid"><label className="field">سهم نقد، درصد<NumberInput fieldKey="cashBps" type="number" min={(terms.minCashBps??0)/100} max={100} step="0.01" value={args.salesTerms.cashBps/100} onChange={e=>change({salesTerms:{...args.salesTerms,cashBps:Math.round(Number(e.target.value)*100)}})}/></label><label className="field">مهلت پرداخت، روز<NumberInput fieldKey="days" aria-describedby="assistant-sales-payment-limit" type="number" min={0} max={salesPaymentMaxDays(terms,quote?.day||currentCatalog?.today||localDay())} step="1" value={salesPaymentDays(args.salesTerms,quote?.day||currentCatalog?.today||localDay())} onChange={e=>change({salesTerms:{...args.salesTerms,days:Number(e.target.value)}})}/></label></div><button type="button" className="link" onClick={()=>change({salesTerms:undefined})}>برگشت به شرایط مصوب</button></>}</details></>}
    <details style={{marginBlock:12}}><summary>توضیح سفارش، در صورت نیاز</summary><label className="field">توضیح<NumberInput fieldKey="notes" value={args.notes||''} onChange={e=>change({notes:e.target.value})}/></label></details>
   </fieldset>
-  {!form.actionId&&<button type="button" className="btn primary" disabled={locked||!currentCatalog||!quote||loading||!sourceComplete} onClick={prepare}>بررسی و آماده‌سازی سفارش</button>}
+  {!form.actionId&&<button type="button" className="btn primary" disabled={locked||!currentCatalog||!quote||loading||!sourceComplete||!canQuote} onClick={prepare}>بررسی و آماده‌سازی سفارش</button>}
  </div>;
 }

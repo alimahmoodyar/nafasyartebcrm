@@ -23,7 +23,7 @@ async function workspace(){const source=await pricingSource(),db=storage(),rows=
 const basisFor=(w:any,p:any)=>w.rows.find((r:any)=>r.type==='pricing_cost'&&r.data.productId===p.id);
 const policyFor=(w:any,p:any)=>w.rows.find((r:any)=>r.type==='pricing_policy'&&r.data.scope==='product'&&r.data.productId===p.id)||w.rows.find((r:any)=>r.type==='pricing_policy'&&r.data.scope==='group'&&r.data.group===p.group);
 async function proposal(w:any,p:any,kind:string,proposalDay=dayAt()){
- const basis=basisFor(w,p),policy=policyFor(w,p),template:any=selectSalesTemplate(w.sales,kind,proposalDay),blockers:string[]=[];
+ const basis=basisFor(w,p),policy=policyFor(w,p),template:any=selectSalesTemplate(w.sales,kind,proposalDay,p.id),blockers:string[]=[];
  if(!basis)blockers.push('تأیید مالی مبنای هزینه لازم است.');else if(basis.data.method==='standard'&&basis.data.sourceToken!==w.token)blockers.push('منابع هزینه تغییر کرده؛ مالی مبنا را دوباره تأیید کند.');
  if(!policy)blockers.push('الگوی سود مدیرعامل تعریف نشده است.');if(!template)blockers.push('الگوی فروش این نوع خریدار تعریف نشده است.');
  const previous=w.rows.filter((r:any)=>r.type==='pricing_approval'&&r.data.productId===p.id&&r.data.kind===kind).at(-1);

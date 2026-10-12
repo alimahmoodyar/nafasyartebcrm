@@ -108,6 +108,14 @@ rendered = tree({loading: true}); assert.equal(control(rendered, 'فهرست ا�
 assert.equal(button(rendered, 'تعریف نسخه جدید الگوی فروش').props.disabled, true); assert.equal(control(rendered, 'نسخه جدید از پایه امروز').props.disabled, true);
 assert.ok(text(rendered).includes('در حال دریافت الگوها و قیمت‌ها'));
 slots = []; assert.ok(text(tree({data: {...data, templates: [], prices: []}})).includes('هنوز الگوی فروشی تعریف نشده است'));
+slots = []; const scopedData={...data,templates:[row('partial','بخشی از کالاها',{status:'active',isSelected:true,isFixedBaseline:true,selectedProductIds:['b'],fixedBaselineProductIds:['a','b']})]};
+const scopedTree=()=>{cursor=0;return SalesTemplateCatalog({data:scopedData,onCreate(){},onCopy(){}});};
+control(scopedTree(),'کالا').props.onChange({target:{value:'a'}});control(scopedTree(),'وضعیت الگو').props.onChange({target:{value:'active'}});
+assert.deepEqual(templateIds(scopedTree()),[], 'An active rule for B is not active when filtering A');
+control(scopedTree(),'وضعیت الگو').props.onChange({target:{value:'previous'}});assert.deepEqual(templateIds(scopedTree()),['partial']);
+control(scopedTree(),'کالا').props.onChange({target:{value:'b'}});control(scopedTree(),'وضعیت الگو').props.onChange({target:{value:'active'}});assert.deepEqual(templateIds(scopedTree()),['partial']);
+slots=[];
+
 assert.equal(JSON.stringify(data), before, 'Rendering, filters, expansion and copy never rewrite the report');
 console.log('PASS sales template catalog UI: controlled name/code/model/category/product/type/status search, version and current price separation, exact grouped rial prices, scoped expansion, copy/create callbacks, readable diagnostics, keyboard tabs and loading/empty states.');
 

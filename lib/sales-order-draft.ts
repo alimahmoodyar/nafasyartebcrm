@@ -23,3 +23,15 @@ export async function prepareSalesOrderArgs(u:Session,args:any){
  salesSubmission(u,args.agentId,args.requestSource,new Date().toISOString());
  return {...args,quoteHash:quote.quoteHash};
 }
+
+// A previous negotiation belongs to its exact buyer and product set, not the
+// next item the model happens to put in the draft. Quantities do not change it.
+export function salesDraftArgs(name:string,args:any,previous:any,message:string){
+ if(name!=='sales_apply'||args?.mode!=='order')return args;
+ const products=(draft:any):string[]|null=>Array.isArray(draft?.items)&&draft.items.length&&draft.items.every((item:any)=>typeof item?.productId==='string'&&item.productId.trim())?[...new Set<string>(draft.items.map((item:any)=>item.productId))].sort():null;
+ const currentProducts=products(args),previousArgs=previous?.tool==='sales_apply'&&previous.args?.mode==='order'?previous.args:null,previousProducts=products(previousArgs);
+ const sameContext=!!args.agentId&&args.agentId===previousArgs?.agentId&&!!currentProducts&&!!previousProducts&&JSON.stringify(currentProducts)===JSON.stringify(previousProducts);
+ const explicit=/(نقد|قسط|اقساط|ماه|[0-9۰-۹٠-٩]+\s*روزه|مهلت|شرایط\s+(?:پرداخت|متفاوت|پیشنهادی)|cash|installment)/i.test(message);
+ if(args.agentId&&currentProducts&&(explicit||sameContext&&previousArgs?.salesTerms))return args;
+ const {salesTerms,...defaults}=args;return defaults;
+}

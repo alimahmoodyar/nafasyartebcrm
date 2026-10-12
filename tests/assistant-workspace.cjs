@@ -131,6 +131,18 @@ const forms=load('app/api/assistant/forms/route.ts'),workspace=load('lib/assista
  assert.equal(saleDraft.workspace.args.mode,'order');assert.equal(saleDraft.workspace.args.salesTerms,undefined);assert.equal(saleDraft.workspace.preview.salesTerms.cashBps,5000);assert.equal(saleDraft.workspace.preview.salesTerms.days,47);
  assert.equal(saleDraft.workspace.preview.amount,'4500');assert.equal(saleDraft.workspace.preview.buyer.name,'باران سلامت');assert.equal(saleDraft.actions.filter(a=>a.state==='pending').length,0);
  assert.equal(sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type='sales_order'").get().n,0,'Showing a sales draft must not sell devices');
+ // An earlier negotiated rate cannot leak to a replacement product through a model draft.
+ sql.prepare('DELETE FROM login_attempts WHERE key=?').run('assistant:'+admin.userId);
+ seed('assistant-price-second','sales_price',{agentId:'',productId:'assistant-second',unitPrice:'2000',active:true});
+ seed('assistant-template-second','sales_template',{kind:'representative',discountBps:0,cashBps:6000,minCashBps:5000,days:20,maxDays:30,version:2,productPrices:[{productId:'assistant-second',unitPrice:'2000'}]});
+ sql.prepare("INSERT INTO records(id,kind,payload,created) VALUES('assistant-second','product',?,?)").run(JSON.stringify({name:'دستگاه دوم',status:'فعال'}),now);
+ round=0;cache[providerFile].providerRequest=async()=>({choices:[{message:round++===0?{tool_calls:[{id:'replacement',type:'function',function:{name:'show_operation_form',arguments:JSON.stringify({tool:'sales_apply',args:{mode:'order',agentId:'assistant-buyer',items:[{productId:'assistant-second',quantity:1}],salesTerms:{cashBps:4000,days:55}}})}}]}:{content:'شرایط محصول جدید آماده بررسی است.'}}]});
+ response=await run(admin,()=>chat.POST(request('/api/assistant','POST',{requestId:crypto.randomUUID(),profileId,message:'کالا را به دستگاه دوم تغییر بده',workspace:{...saleDraft.workspace,args:{...saleDraft.workspace.args,salesTerms:{cashBps:4000,days:55}}}})));
+ assert.equal(response.status,200,await response.clone().text());const replacementDraft=await response.json();
+ assert.equal(replacementDraft.workspace.args.salesTerms,undefined,'Changing products removes the prior negotiation even when the provider repeats it');
+ assert.equal(replacementDraft.workspace.preview.salesTerms.templateId,'assistant-template-second');
+ assert.equal(replacementDraft.workspace.preview.salesTerms.cashBps,6000);assert.equal(replacementDraft.workspace.preview.salesTerms.days,20);
+ assert.equal(sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type='sales_order'").get().n,0);
  // Existing-buyer assignment must override old representative-creation drafts and wrong model forms.
  sql.prepare('DELETE FROM login_attempts WHERE key=?').run('assistant:'+admin.userId);
  round=0;cache[providerFile].providerRequest=async()=>({choices:[{message:round++===0?{tool_calls:[{id:'wrong-new-buyer',type:'function',function:{name:'show_operation_form',arguments:JSON.stringify({tool:'sales_apply',args:{mode:'agent',agentId:''}})}}]}:{content:'خریدار موجود و کارشناس مسئول را انتخاب کنید.'}}]});

@@ -45,8 +45,8 @@ export async function applyNetwork(actor:Session,b:any){const {u,members}=await 
   let period:{}|{durationDays:number,effectiveTo:string}={};
   if(templateType==='promotion'){
    const durationDays=integer(b.durationDays,1,Number.MAX_SAFE_INTEGER),effectiveTo=promotionEndDay(effectiveFrom,durationDays);if(!effectiveTo)fail('مدت پروموشن باید تاریخ پایان معتبر ایجاد کند.');
-   if(!selectFixedSalesTemplate(rows,b.kind,effectiveFrom))fail('ابتدا الگوی ثابت معتبر برای تاریخ شروع پروموشن تعریف کنید.');
-   const overlap=overlappingSalesPromotion(rows,b.kind,effectiveFrom,effectiveTo!);if(overlap)fail('بازه پروموشن با پروموشن قبلی این نوع خریدار همپوشانی دارد؛ روز شروع و پایان هر دو جزو بازه هستند.');
+   if(productPrices.some(p=>!selectFixedSalesTemplate(rows,b.kind,effectiveFrom,p.productId)))fail('ابتدا برای تمام کالاهای پروموشن، الگوی ثابت همین نوع خریدار و معتبر در تاریخ شروع تعریف کنید.');
+   const overlap=overlappingSalesPromotion(rows,b.kind,effectiveFrom,effectiveTo!,productPrices.map(p=>p.productId));if(overlap)fail('بازه پروموشن برای کالای مشترک و همین نوع خریدار همپوشانی دارد؛ روز شروع و پایان هر دو جزو بازه هستند.');
    period={durationDays,effectiveTo:effectiveTo!};
   }
   // New templates use actual days. Retain the legacy HTTP contract without
@@ -55,7 +55,9 @@ export async function applyNetwork(actor:Session,b:any){const {u,members}=await 
   const term:{days:number,maxDays:number}|{months:number,minMonths:number,maxMonths:number}=b.days!==undefined?{days:integer(b.days,0,maxSalesPaymentDays),maxDays:integer(b.maxDays??maxSalesPaymentDays,0,maxSalesPaymentDays)}:{months:integer(b.months,0,12),minMonths:0,maxMonths:integer(b.maxMonths??12,0,12)};
   if(minCashBps>cashBps||('days' in term?term.days>term.maxDays:term.months>term.maxMonths))fail('مقدار پیش‌فرض باید داخل دامنه مجاز باشد.');
   const previous=latestSalesTemplate(rows,b.kind);if((previous?.id||'')!==(b.previousId||''))fail('الگو تغییر کرده؛ تازه‌سازی کنید.',409);
-  const baseline=selectFixedSalesTemplate(rows,b.kind,effectiveFrom),discountBps=integer(b.discountBps??baseline?.data.discountBps??0,0,9000);
+  const baselines=productPrices.map(p=>selectFixedSalesTemplate(rows,b.kind,effectiveFrom,p.productId)),rates=new Set(baselines.map(t=>t?.data.discountBps??0));
+  if(b.discountBps===undefined&&rates.size>1)fail('تخفیف پایه کالاهای انتخابی متفاوت است؛ درصد تخفیف این الگو را مشخص کنید.');
+  const discountBps=integer(b.discountBps??baselines[0]?.data.discountBps??0,0,9000);
   put(b.id,'sales_template',{kind:b.kind,title:sreq(b.title),templateType,effectiveFrom,...period,productPrices,discountBps,cashBps,minCashBps,maxCashBps:10000,...term,version:(previous?.data.version||0)+1,previousId:previous?.id||''});
  }
  else if(b.mode==='assign'){

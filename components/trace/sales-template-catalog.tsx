@@ -23,8 +23,13 @@ const productLabel=(p:Pick<ProductPrice,'name'|'model'>)=>p.name||p.model||'کا
 export function SalesTemplateCatalog({data,onCreate,onCopy,loading=false}:SalesTemplateCatalogProps){
  const [tab,setTab]=useState<'templates'|'prices'>('templates'),[search,setSearch]=useState(''),[kind,setKind]=useState(''),[product,setProduct]=useState(''),[type,setType]=useState(''),[status,setStatus]=useState(''),[expanded,setExpanded]=useState<string[]>([]);
  const query=text(search),kinds:Record<string,string>=data.kinds||{},allTemplates:CatalogTemplate[]=data.templates||[],allPrices:CurrentPrice[]=data.prices||[],products=data.products||[];
+ const viewState=(t:CatalogTemplate)=>{
+  if(!product||!t.selectedProductIds||!t.fixedBaselineProductIds)return t;
+  const isSelected=t.selectedProductIds.includes(product),isFixedBaseline=t.fixedBaselineProductIds.includes(product);
+  return {...t,isSelected,isFixedBaseline,status:t.temporalStatus==='active'?(isSelected?'active' as const:'previous' as const):t.temporalStatus};
+ };
  const matchTemplate=(t:CatalogTemplate)=>{
-  if(kind&&t.kind!==kind||type&&t.templateType!==type||status&&t.status!==status||product&&!t.productPrices.some(p=>p.productId===product))return false;
+  if(kind&&t.kind!==kind||type&&t.templateType!==type||status&&viewState(t).status!==status||product&&t.productPrices.length>0&&!t.productPrices.some(p=>p.productId===product))return false;
   return !query||text([t.title,kinds[t.kind],typeLabels[t.templateType],'نسخه '+t.version].join(' ')).includes(query)||t.productPrices.some(p=>productText(p).includes(query));
  };
  const templates=allTemplates.filter(matchTemplate),prices=allPrices.filter(p=>(!kind||p.kind===kind)&&(!product||p.productId===product)&&(!query||text([p.name,p.model,p.code,p.templateTitle,p.termsTemplateTitle,kinds[p.kind]].join(' ')).includes(query)));
@@ -33,7 +38,7 @@ export function SalesTemplateCatalog({data,onCreate,onCopy,loading=false}:SalesT
  const toggle=(id:string)=>setExpanded(ids=>ids.includes(id)?ids.filter(v=>v!==id):[...ids,id]);
  const tabs=[['templates','فهرست الگوها'],['prices','قیمت‌های معتبر امروز']] as const;
  const tabKey=(e:React.KeyboardEvent<HTMLButtonElement>,index:number)=>{const key=e.key;if(!['ArrowRight','ArrowLeft','Home','End'].includes(key))return;e.preventDefault();const next=key==='Home'?0:key==='End'?1:index===0?1:0;setTab(tabs[next][0]);e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();};
- const badge=(t:CatalogTemplate)=><span className={'badge '+(t.status==='active'?'good':'')}>{statusLabels[t.status]||'وضعیت نامشخص'}</span>;
+ const badge=(t:CatalogTemplate)=>{const current=viewState(t);return <span className={'badge '+(current.status==='active'?'good':'')}>{statusLabels[current.status]||'وضعیت نامشخص'}</span>;};
  const priceTable=(t:CatalogTemplate)=>{const selected=t.productPrices.filter(p=>!product||p.productId===product);return selected.length?<div className="sales-table" style={{maxWidth:'100%',overflowX:'auto'}}><table><caption>قیمت کالاهای {t.title||'الگوی فروش'} · نسخه {number(t.version)}</caption><thead><tr><th scope="col">کالا / کد</th><th scope="col">قیمت پایه هر واحد</th><th scope="col">تخفیف الگو</th><th scope="col">قیمت پس از تخفیف الگو</th></tr></thead><tbody>{selected.map((p,i)=><tr key={p.productId+':'+i}><th scope="row" style={{fontWeight:500}}>{productLabel(p)}{p.model&&p.model!==p.name&&<small style={{display:'block'}}>{p.model}</small>}{p.code&&<small className="code" dir="ltr" style={{display:'block'}}>{p.code}</small>}</th><td style={{whiteSpace:'nowrap'}}>{money(p.unitPrice)}</td><td>{percent(t.discountBps)}</td><td style={{whiteSpace:'nowrap'}}>{money(p.unitNet)}</td></tr>)}</tbody></table></div>:<p className="subtle">این نسخه فهرست قیمت کالا ندارد؛ برای قیمت قابل سفارش، «قیمت‌های معتبر امروز» را ببینید.</p>;};
  return <section className="sales-template-catalog" dir="rtl" aria-label="فهرست الگوها و قیمت‌های فروش" aria-busy={loading} style={{minWidth:0}}>
   <div className="tools" style={{justifyContent:'space-between',alignItems:'center'}}><div><h3 style={{marginBlock:'0 .25rem'}}>الگوها و قیمت‌های فروش</h3><p className="subtle" style={{margin:0}}>نسخه‌های قبلی برای بررسی سوابق باقی می‌مانند. تغییر شرایط با تعریف نسخه جدید انجام می‌شود.</p></div><button type="button" className="btn primary" disabled={loading} onClick={onCreate}><Plus size={18} aria-hidden="true"/>تعریف نسخه جدید الگوی فروش</button></div>
@@ -52,7 +57,7 @@ export function SalesTemplateCatalog({data,onCreate,onCopy,loading=false}:SalesT
     {!templates.length&&!loading&&<p className="notice">{allTemplates.length?'هیچ الگویی با این فیلتر پیدا نشد.':'هنوز الگوی فروشی تعریف نشده است؛ نسخه اول را از دکمه بالا تعریف کنید.'}</p>}
     <div style={{display:'grid',gap:12}}>{templates.map(t=>{const open=expanded.includes(t.id),title=t.title||'الگوی بدون عنوان';return <article className="flow-card" data-template-id={t.id} key={t.id} style={{margin:0,minWidth:0}}>
      <div className="tools" style={{justifyContent:'space-between',alignItems:'center'}}><h4 style={{margin:0}}>{title} <small>· نسخه {number(t.version)}</small></h4>{badge(t)}</div>
-     <p>{kinds[t.kind]||'نوع خریدار ثبت‌شده'} · {typeLabels[t.templateType]}{t.isFixedBaseline&&!t.isSelected?' · الگوی ثابت مبنا':''}</p>
+     <p>{kinds[t.kind]||'نوع خریدار ثبت‌شده'} · {typeLabels[t.templateType]}{viewState(t).isFixedBaseline&&!viewState(t).isSelected?' · الگوی ثابت مبنا':''}</p>
      <p className="subtle">شروع: {t.effectiveFrom?formatDate(t.effectiveFrom):'تاریخ شروع در سابقه ثبت نشده'} · پایان: {t.effectiveTo?formatDate(t.effectiveTo):'بدون تاریخ پایان'}{t.durationDays!==null?' · مدت '+number(t.durationDays)+' روز':''}</p>
      <p>تخفیف {percent(t.discountBps)} · سهم نقد پیش‌فرض {percent(t.cashBps)} · مهلت پرداخت {number(t.days)} روز · حداقل سهم نقد {percent(t.minCashBps)} · حداکثر مهلت {number(t.maxDays)} روز · {number(t.productPrices.length)} کالا</p>
      <div className="tools"><button type="button" className="btn" aria-expanded={open} aria-controls={'sales-template-products-'+t.id} aria-label={'نمایش قیمت کالاهای '+title} onClick={()=>toggle(t.id)}>{open?<ChevronUp size={16} aria-hidden="true"/>:<ChevronDown size={16} aria-hidden="true"/>}{open?'بستن قیمت کالاها':'قیمت کالاها'}</button><button type="button" className="btn" disabled={loading} aria-label={'نسخه جدید از '+title} onClick={()=>onCopy(t)}><Copy size={16} aria-hidden="true"/>نسخه جدید از این الگو</button></div>

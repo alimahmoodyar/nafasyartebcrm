@@ -339,16 +339,46 @@ async function expectQuote(templateId, rate, cashBps, months, agentId = 'buyer-r
   assert.equal(operations(staleStart.body.id).length, 0);
   await expectQuote(newBranch.body.id, 800, 6000, 1, 'buyer-branch');
   await expectQuote(otherCategory.body.id, 900, 10000, 0, 'buyer-end_customer');
-  const mixedItems = [{productId: 'product', quantity: 2}, {productId: 'product-fixed', quantity: 1}, {productId: 'product-legacy', quantity: 1}];
+  const incompatibleItems=[{productId:'product',quantity:2},{productId:'product-fixed',quantity:1}];
+  const conflict=await post(quoteApi,'/api/sales/quote',{agentId:'buyer-representative',items:incompatibleItems},staff,400);
+  assert.match(conflict.error,/پیش‌فاکتور جداگانه/,'Different product payment terms may not silently choose the first line');
+  await assert.rejects(()=>catalog.executeTool('preview_sales_order',{agentId:'buyer-representative',items:incompatibleItems},base,principal(staff,'read')),e=>e.status===400&&/پیش‌فاکتور جداگانه/.test(e.message));
+  const partial=await post(quoteApi,'/api/sales/quote',{agentId:'buyer-representative',items:[items[0],{productId:'product-legacy',quantity:1}]},staff,400);
+  assert.match(partial.error,/product-legacy/,'A partly covered basket identifies the product without an applicable template');
+  const fixedOnly=await post(quoteApi,'/api/sales/quote',{agentId:'buyer-representative',items:[{productId:'product-fixed',quantity:1}]},staff);
+  assert.equal(fixedOnly.salesTerms.templateId,fixed.body.id);
+  assert.equal(fixedOnly.salesTerms.cashBps,5000);
+  assert.equal(fixedOnly.lines[0].discountBps,1000,'A promotion for another product cannot supply its discount');
+  assert.equal(fixedOnly.lines[0].unitNet,'2999');
+  const legacyArgs={agentId:'buyer-representative',items:[{productId:'product-legacy',quantity:1}]};
+  const legacyOnly=await post(quoteApi,'/api/sales/quote',legacyArgs,staff);
+  assert.equal(legacyOnly.lines[0].unitPrice,'1777');assert.equal(legacyOnly.lines[0].discountBps,0);assert.equal(legacyOnly.salesTerms,undefined);assert.equal(legacyOnly.termDays,30,'Fully legacy products retain the buyer termDays fallback');
+  assert.equal((await catalog.executeTool('preview_sales_order',legacyArgs,base,principal(staff,'read'))).quoteHash,legacyOnly.quoteHash);
+  await post(quoteApi,'/api/sales/quote',{...legacyArgs,salesTerms:{cashBps:5000,days:20}},staff,400);
+  // An independent fixed definition for B leaves A's promotion and future fixed rows intact.
+  const fixedB=await saveTemplate('representative',{effectiveFrom:'2026-10-12',cashBps:7000,months:3,productPrices:[{productId:'product-fixed',unitPrice:'3333'}]});
+  await expectQuote(promotion.body.id,2000,7000,3,'buyer-representative','2501');
+  const mixedItems=incompatibleItems;
   const mixed = await post(quoteApi, '/api/sales/quote', {agentId: 'buyer-representative', items: mixedItems}, staff);
-  assert.deepEqual(mixed.lines.map(line => line.unitPrice), ['2501', '3333', '1777'], 'Promotion row wins, omitted promotion product uses current fixed row, and a product omitted from both uses its legacy price');
-  assert.deepEqual(mixed.lines.map(line => line.unitNet), ['2000', '2666', '1421'], 'Category discount applies exactly once to each selected base price using integer rial rounding');
-  assert.deepEqual(mixed.lines.map(line => line.priceSource), ['sales_template', 'sales_template', 'sales_price']);
-  assert.deepEqual(mixed.lines.map(line => line.priceTemplateId), [promotion.body.id, fixed.body.id, '']);
-  assert.equal(mixed.amount, '8087');
-  assert.equal(mixed.discount, '2025');
+  assert.deepEqual(mixed.lines.map(line => line.unitPrice), ['2501', '3333']);
+  assert.deepEqual(mixed.lines.map(line => line.unitNet), ['2000', '2999'], 'Each selected product uses its own matching discount exactly once');
+  assert.deepEqual(mixed.lines.map(line => line.discountBps), [2000,1000]);
+  assert.deepEqual(mixed.lines.map(line => line.priceTemplateId), [promotion.body.id, fixedB.body.id]);
+  assert.deepEqual(mixed.lines.map(line => line.termsTemplateId), [promotion.body.id, fixedB.body.id]);
+  assert.deepEqual(mixed.lines.map(line => line.termsTemplateRevision), [1,1]);
+  assert.equal(mixed.amount, '6999');
+  assert.equal(mixed.discount, '1336');
   const mixedMcp = await catalog.executeTool('preview_sales_order', {agentId: 'buyer-representative', items: mixedItems}, base, principal(staff, 'read'));
   assert.equal(mixedMcp.quoteHash, mixed.quoteHash);
+  // Overlap is product-specific, and a baseline for A is insufficient for C.
+  const promoB=await saveTemplate('representative',{templateType:'promotion',effectiveFrom:'2026-10-12',durationDays:3,discountBps:3000,cashBps:7000,months:3,productPrices:[{productId:'product-fixed',unitPrice:'4001'}]});
+  assert.equal(promoB.record.data.effectiveTo,'2026-10-14');
+  await expectQuote(promotion.body.id,2000,7000,3,'buyer-representative','2501');
+  const bPromoted=await post(quoteApi,'/api/sales/quote',{agentId:'buyer-representative',items:[{productId:'product-fixed',quantity:1}]},staff);
+  assert.equal(bPromoted.salesTerms.templateId,promoB.body.id);assert.equal(bPromoted.lines[0].unitNet,'2800');
+  await saveTemplate('representative',{templateType:'promotion',effectiveFrom:'2026-10-13',durationDays:1,productPrices:[{productId:'product-fixed',unitPrice:'4001'}]},400);
+  const noBaseline=await saveTemplate('representative',{templateType:'promotion',effectiveFrom:'2026-10-12',durationDays:3,productPrices:[{productId:'product-legacy',unitPrice:'1777'}]},400);
+  assert.equal(noBaseline.record,null);assert.equal(operations(noBaseline.body.id).length,0);
 
   const historicalQuote = await quote('buyer-snapshot');
   const historicalOrder = await order(historicalQuote);
@@ -369,6 +399,9 @@ async function expectQuote(templateId, rate, cashBps, months, agentId = 'buyer-r
   at('2026-10-14T20:30:00.000Z');
   assert.equal(duties.dayAt(), '2026-10-15');
   const afterEnd = await expectQuote(during.body.id, 1500, 6500, 2);
+  const bAfterEnd=await post(quoteApi,'/api/sales/quote',{agentId:'buyer-representative',items:[{productId:'product-fixed',quantity:1}]},staff);
+  assert.equal(bAfterEnd.salesTerms.templateId,fixedB.body.id,'An expired promotion returns only its own product to its independent fixed baseline');
+  assert.equal(bAfterEnd.lines[0].unitPrice,'3333');assert.equal(bAfterEnd.lines[0].discountBps,1000);
   assert.notEqual(afterEnd.quoteHash, onEnd.quoteHash);
   assert.notEqual(started.quoteHash, beforeStart.quoteHash);
   const staleEnd = await order(onEnd, {}, 409);
@@ -463,8 +496,37 @@ async function expectQuote(templateId, rate, cashBps, months, agentId = 'buyer-r
   const beforeNewVersion=sql.prepare('SELECT data FROM flow_entities WHERE id=?').get(dailyInvoiceBody.id).data;
   await saveTemplate('representative',{effectiveFrom:'2026-10-27',days:15,maxDays:60});assert.equal((await quote()).salesTerms.days,15);assert.equal(sql.prepare('SELECT data FROM flow_entities WHERE id=?').get(dailyInvoiceBody.id).data,beforeNewVersion);
   for(const previous of oldSnapshots)assert.equal(sql.prepare('SELECT data FROM flow_entities WHERE id=?').get(previous.id).data,previous.data,'Legacy order/invoice snapshot '+previous.id);
+  const payment=load('lib/sales-payment-terms.ts'),paymentContract=load('lib/sales-network-contract.ts'),selector=load('lib/sales-template.ts');
+  const policyRows=[
+    {id:'generic',type:'sales_template',created:'2026-10-27',data:{kind:'representative',version:999,cashBps:5000,minCashBps:0,months:1,maxMonths:3,discountBps:4000}},
+    {id:'a-scoped',type:'sales_template',created:'2026-10-01',data:{kind:'representative',version:1,cashBps:5000,minCashBps:0,months:1,maxMonths:3,discountBps:1000,productPrices:[{productId:'a',unitPrice:'1000'}]}},
+    {id:'b-scoped',type:'sales_template',created:'2026-10-02',data:{kind:'representative',version:2,cashBps:5000,minCashBps:0,days:payment.salesPaymentDays({months:1},duties.dayAt()),maxDays:payment.salesPaymentMaxDays({maxMonths:3},duties.dayAt()),discountBps:2000,productPrices:[{productId:'b',unitPrice:'2000'}]}},
+    {id:'a-future',type:'sales_template',created:'2026-10-27',data:{kind:'representative',version:1000,effectiveFrom:'2026-10-28',cashBps:10000,days:0,maxDays:0,productPrices:[{productId:'a',unitPrice:'3000'}]}},
+  ];
+  assert.equal(selector.selectSalesTemplate(policyRows,'representative',duties.dayAt(),'a').id,'a-scoped','An explicit product policy wins over a newer generic legacy fallback');
+  assert.equal(selector.selectSalesTemplate(policyRows,'representative',duties.dayAt(),'b').id,'b-scoped');
+  assert.equal(selector.selectSalesTemplate(policyRows,'representative',duties.dayAt(),'c').id,'generic');
+  assert.equal(selector.selectSalesTemplate(policyRows,'reseller',duties.dayAt(),'a'),undefined,'Exact buyer kind remains mandatory');
+  assert.equal(selector.selectSalesTemplate(policyRows,'representative',duties.dayAt(),''),undefined);
+  assert.equal(selector.resolveSalesOrderTemplates(policyRows,'representative',duties.dayAt(),[]).state,'unselected');
+  assert.equal(selector.resolveSalesOrderTemplates(policyRows,'representative',duties.dayAt(),['a','']).state,'unselected');
+  assert.equal(selector.resolveSalesOrderTemplates(policyRows,'representative',duties.dayAt(),['a','b']).state,'ready','Legacy months and day definitions compare their actual date-dependent durations');
+  assert.equal(selector.resolveSalesOrderTemplates(policyRows.filter(r=>r.id!=='generic'),'representative',duties.dayAt(),['a','c']).state,'missing');
+  assert.equal(selector.resolveSalesOrderTemplates(policyRows,'representative','2026-10-28',['a','b']).state,'incompatible','Only the selected product switches when its scheduled policy starts');
+  const baselineBeforeQuote=entity(fixedB.body.id).data;
+  const bCurrent=await post(quoteApi,'/api/sales/quote',{agentId:'buyer-representative',items:[{productId:'product-fixed',quantity:1}]},staff);
+  assert.equal(bCurrent.salesTerms.templateId,fixedB.body.id,'Many subsequent A versions cannot retire the B baseline');
+  assert.deepEqual(entity(fixedB.body.id).data,baselineBeforeQuote);
+  // Cost-based approval uses the exact product discount, never the newest other-product template.
+  const pricingCeo=actor('pricing-ceo',[],{supplyRoles:['ceo']});member(pricingCeo);
+  seed('pricing-cost-b','pricing_cost',{productId:'product-fixed',method:'documented',unitCost:'1000'});
+  seed('pricing-policy-b','pricing_policy',{scope:'product',productId:'product-fixed',targetProfitBps:2000,minProfitBps:1000,roundTo:1});
+  const pricingApi=load('app/api/pricing/route.ts'),pricingResponse=await context.run(pricingCeo,()=>pricingApi.GET(new Request(base+'/api/pricing')));
+  assert.equal(pricingResponse.status,200);const pricingWorkspace=await pricingResponse.json(),bPricing=pricingWorkspace.proposals.find(p=>p.productId==='product-fixed'&&p.kind==='representative');
+  assert.equal(bPricing.templateId,fixedB.body.id);assert.equal(bPricing.discountBps,1000);assert.equal(bPricing.blockers.length,0);
+  const pricingMcp=await catalog.executeTool('get_pricing_workspace',{},base,principal(pricingCeo,'read'));
+  assert.equal(pricingMcp.proposals.find(p=>p.productId==='product-fixed'&&p.kind==='representative').token,bPricing.token,'Pricing HTTP/MCP agree on the product-specific policy');
   for(const values of [{days:70,maxDays:60},{days:-1},{days:1.5},{days:'30'},{days:30,maxDays:367}])await saveTemplate('representative',{effectiveFrom:'2026-10-27',...values},400);
-  const payment=load('lib/sales-payment-terms.ts'),paymentContract=load('lib/sales-network-contract.ts');
   for(const [day,days,end] of [['2028-02-28',2,'2028-03-01'],['2026-12-31',1,'2027-01-01'],['2026-03-20',1,'2026-03-21'],['2026-10-27',0,'2026-10-27']])assert.equal(paymentContract.termsPlan('101',{cashBps:5000,days},day).find(p=>p.kind==='balance').due,end);
   for(const day of ['2026-03-20','2026-09-20','2028-02-28'])assert.equal(payment.addPaymentDays(day,payment.salesPaymentDays({months:1},day)),paymentContract.addSolarMonths(day,1));
   console.log('PASS day-based sales terms: exact day invoices, zero/maximum limits, invalid input rollback, month-end/year/leap boundaries, HTTP/MCP parity and immutable legacy snapshots.');
