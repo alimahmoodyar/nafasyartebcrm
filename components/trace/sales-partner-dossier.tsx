@@ -1,4 +1,5 @@
 'use client';
+import type {ReactNode} from 'react';
 import {PhoneCall,MessagesSquare,Settings2,FileText} from 'lucide-react';
 import {formatDate} from '@/lib/persian-date';
 import {partnerKinds} from '@/lib/sales-network-contract';
@@ -8,9 +9,9 @@ const states:Record<string,string>={pending:'در انتظار بررسی',appro
 const recordNames:Record<string,string>={sales_contact:'تماس / بازدید',sales_case:'درخواست همکاری',sales_contract:'قرارداد پورسانت',sales_commission_settlement:'تسویه پورسانت'};
 const channels:Record<string,string>={call:'تماس',visit:'بازدید',meeting:'جلسه',message:'پیام'};
 
-export function SalesPartnerDossier({agent:a,portfolio:p,records,roles,onBegin,onAssign,modeNames}:{agent:any;portfolio:any;records:any[];roles:any;onBegin:(mode:string,agent:any,record?:any)=>void;onAssign?:(buyerId:string)=>void;modeNames:Record<string,string>}){
+export function SalesPartnerDossier({agent:a,portfolio:p,records,roles,onBegin,onAssign,modeNames,profileContent}:{agent:any;portfolio:any;records:any[];roles:any;onBegin:(mode:string,agent:any,record?:any)=>void;onAssign?:(buyerId:string)=>void;modeNames:Record<string,string>;profileContent?:ReactNode}){
  const scope='sales-partner-'+a.id,kind=partnerKinds[a.data.kind as keyof typeof partnerKinds]||partnerKinds.representative;
- if(!p?.account)return <article className="sales-partner-card" aria-labelledby={scope+'-name'}><h3 id={scope+'-name'}>{a.data.name}</h3><p role="alert">گزارش حساب این پرونده دریافت نشده است؛ گزارش را تازه‌سازی کنید.</p></article>;
+ if(!p?.account)return <article className="sales-partner-card" aria-labelledby={scope+'-name'}><h3 id={scope+'-name'}>{a.data.name}</h3>{profileContent&&<section className="sales-partner-section"><h4>اطلاعات و مدارک</h4>{profileContent}</section>}<p role="alert">گزارش حساب این پرونده دریافت نشده است؛ گزارش را تازه‌سازی کنید.</p></article>;
  const ac=p.account,referrer=a.data.kind==='referrer',bounced=ac.payments.filter((row:any)=>row.data.state==='bounced');
  const metrics=referrer?[['پورسانت وصول‌شده',p.commission.earned],['پورسانت پرداخت‌شده',p.commission.paid],['در انتظار تسویه',p.commission.reserved],['قابل درخواست',p.commission.available]]:[['مانده حساب',ac.balance],['بدهی خریدها',ac.debt],['وجه تخصیص‌نیافته',ac.credit],['بدهی سررسیدگذشته',ac.overdue]];
  return <article className="sales-partner-card" aria-labelledby={scope+'-name'}>
@@ -18,7 +19,7 @@ export function SalesPartnerDossier({agent:a,portfolio:p,records,roles,onBegin,o
    <div><h3 id={scope+'-name'}>{a.data.name}</h3><p className="subtle">پرونده پیگیری {kind}</p></div>
    <span className={'badge '+(a.data.active?'good':'warn')}>{a.data.active?'فعال':'غیرفعال'}</span>
   </header>
-  {(a.data.contact||a.data.mobile||a.data.phone||a.data.address)&&<dl className="sales-partner-identity">
+  {profileContent?<section className="sales-partner-section"><h4>اطلاعات و مدارک</h4>{profileContent}</section>:(a.data.contact||a.data.mobile||a.data.phone||a.data.address)&&<dl className="sales-partner-identity">
    {a.data.contact&&<div><dt>مسئول تماس</dt><dd>{a.data.contact}</dd></div>}
    {a.data.mobile&&<div><dt>شماره موبایل</dt><dd><bdi>{a.data.mobile}</bdi></dd></div>}
    {a.data.phone&&<div><dt>شماره ثابت</dt><dd><bdi>{a.data.phone}</bdi></dd></div>}
