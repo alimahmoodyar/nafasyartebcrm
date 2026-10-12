@@ -69,11 +69,12 @@ export function generalPresentation(tool:string,args:any,input:any,title:string)
   // Hide retired fields even when a legacy template draft still carries them.
   const promotion=args.data?.templateType==='promotion';
   for(const node of [schema,schema.properties?.data])if(node){
-   const hidden=['notes','minMonths','maxCashBps','effectiveTo',...(!promotion?['durationDays']:[])];
+   const hidden=['notes','minMonths','maxCashBps','effectiveTo','previousId',...(!promotion?['durationDays']:[])];
    for(const key of hidden)if(node.properties?.[key])node.properties[key].uiHidden=true;
    if(Array.isArray(node.required))node.required=node.required.filter((key:string)=>!hidden.includes(key));
   }
-  const data=schema.properties?.data;if(data){data.required=[...new Set([...(data.required||[]),'effectiveFrom',...(promotion?['durationDays']:[])])];}
+  const data=schema.properties?.data;if(data){data.required=[...new Set([...(data.required||[]),'effectiveFrom','productPrices',...(promotion?['durationDays']:[])])];data.title='شرایط الگو';data.properties.kind.title='الگو برای';data.properties.title.title='عنوان الگو';}
+  return {schema,title:'الگوی عمومی فروش'};
  }
  if(tool==='sales_apply'&&args.mode==='payment'){
   const visible=new Set(['agentId','method','amount','day','reference','fileId','notes',...(args.method!=='cash'?['bank']:[]),...(args.method==='check'?['checkDue']:[]),...(args.cashOrderId?['cashOrderId']:[]),...(args.checkInvoiceId?['checkInvoiceId']:[])]);

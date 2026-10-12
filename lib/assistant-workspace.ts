@@ -22,6 +22,8 @@ export function operationForm(tool:any,args:any,section:string,title:string):Ope
 // Opening a requested draft must not depend on the model calling a display tool.
 export function requestedOperationForm(message:string,previous:any,available:any[]):OperationForm|undefined{
  const text=message.replace(/[ي]/g,'ی').replace(/[ك]/g,'ک').replace(/\u200c/g,' ');
+ const salesTemplate=/(الگو.*فروش|شرایط\s+عمومی\s+فروش|پروموشن)/.test(text)&&/(جدید|ایجاد|تعریف|ثبت|بساز|باز|بیار|نمایش)/.test(text)&&!/(حذف|لغو|ثبت نکن|منصرف)/.test(text);
+ if(salesTemplate){const tool=available.find(t=>t.name==='sales_network_apply'&&t.write);if(tool){const args=previous?.tool===tool.name&&previous.args?.mode==='template'?previous.args:{mode:'template',data:{templateType:'fixed',productPrices:[]}};return operationForm(tool,args,'sales','الگوی عمومی فروش');}}
  const sale=/(بفروش|فروخت|سفارش\s+(?:فروش|مشتری|نماینده)|فروش\s+(?:دستگاه|محصول|کالا))/.test(text)&&!/(حذف|لغو|ثبت نکن|منصرف)/.test(text);
  if(sale){const tool=available.find(t=>t.name==='sales_apply'&&t.write);if(tool){const args=previous?.tool===tool.name&&previous.args?.mode==='order'?previous.args:{mode:'order',items:[]};return operationForm(tool,args,'sales','ثبت سفارش فروش');}}
  const representative=/(نماینده|نمایندگی|عامل فروش)/.test(text)&&/(جدید|ایجاد|بساز|ساخت|تعریف|ثبت)/.test(text)&&!/(حذف|پاک|نساز|ایجاد نکن|ثبت نکن)/.test(text)&&!/(گیرنده|مقصد|ارسال کالا)/.test(text);

@@ -25,13 +25,14 @@ const quote=(qty=3,u=rep)=>post(quoteApi,'/api/sales/quote',{agentId:a,items:[{p
 const version=id=>entity(id).revision;
 async function upload(u=rep,extra={},status=201){const meta={id:crypto.randomUUID(),agentId:a,confirmed:true,title:'Evidence',...extra},form=new FormData();form.set('metadata',JSON.stringify(meta));form.set('file',new File(['%PDF-test'],'receipt.pdf'));const r=await context.run(u,()=>files.POST(new Request(base+'/api/sales/files',{method:'POST',headers:{origin:base},body:form})));const d=await r.json();assert.equal(r.status,status,JSON.stringify(d));return {...d,meta};}
 const network=load('app/api/sales/network/route.ts'),contract=load('lib/sales-network-contract.ts');
-const nw=(mode,extra={},u=manager,status=200)=>post(network,'/api/sales/network',{id:crypto.randomUUID(),mode,...(mode==='template'?{effectiveFrom:today}:{}),...(mode==='agent'&&!extra.agentId?{nationalId:String(++representativeSequence),mobile:'09123456789'}:{}),confirmed:true,agentId:a,notes:'Actual recorded decision',...extra},u,status);
+const nw=(mode,extra={},u=manager,status=200)=>post(network,'/api/sales/network',{id:crypto.randomUUID(),mode,...(mode==='template'?{effectiveFrom:today,productPrices:[{productId:'product',unitPrice:'1000'}]}:{}),...(mode==='agent'&&!extra.agentId?{nationalId:String(++representativeSequence),mobile:'09123456789'}:{}),confirmed:true,agentId:a,notes:'Actual recorded decision',...extra},u,status);
 (async()=>{
  for(const u of [manager,staff,finance,viewer])member(u);
  const second=actor('second',['staff']);member(second);
  const create={name:'Buyer',phone:'02112345678',contact:'Buyer',province:'Tehran',city:'Tehran',address:'Address',active:true,ownerId:'staff',financeId:'finance',managerId:'manager'};
  a=(await op('agent',{...create,agentId:''},manager)).id;b=(await op('agent',{...create,agentId:'',name:'PRIVATE OTHER',ownerId:'second'},manager)).id;
  rep=actor('rep',['agent'],{salesAgentId:a});member(rep);
+ sql.prepare("INSERT INTO records(id,kind,payload,created) VALUES('product','product',?,?)").run(JSON.stringify({name:'Device',model:'N1',code:'P1',status:'فعال'}),now);
  assert.equal((await get(staff)).agents.length,1);await get(staff,b,404);assert.equal((await get(manager)).agents.length,2);
  await nw('template',{kind:'representative',title:'Rep standard',cashBps:5000,months:1},staff,403);
  const t=await nw('template',{kind:'representative',title:'Rep standard',cashBps:5000,minCashBps:3000,maxCashBps:2000,months:1,minMonths:2,maxMonths:3,notes:undefined});
@@ -43,7 +44,7 @@ const nw=(mode,extra={},u=manager,status=200)=>post(network,'/api/sales/network'
  // An existing stored minimum must not obstruct a new shorter-term quote.
  sql.prepare('UPDATE flow_entities SET data=? WHERE id=?').run(JSON.stringify({...template.data,minMonths:1,maxCashBps:7000}),t.body.id);
  const presentation=load('lib/assistant-form-presentation.ts').generalPresentation('sales_network_apply',{mode:'template',data:{notes:'Legacy draft text'}},{type:'object',properties:{data:{type:'object',required:['notes']}}},'Template');assert.equal(presentation.schema.properties.data.properties.notes.uiHidden,true);assert.ok(!presentation.schema.properties.data.required.includes('notes'));
- const templateArgs={id:crypto.randomUUID(),confirmed:true,mode:'template',data:{effectiveFrom:today,kind:'reseller',title:'Reseller standard',cashBps:6000,months:2}};const principal={user:manager,scope:'write',tokenId:null};await catalog.executeTool('sales_network_apply',templateArgs,base,principal);assert.equal((await catalog.executeTool('sales_network_apply',templateArgs,base,principal)).repeated,true);
+ const templateArgs={id:crypto.randomUUID(),confirmed:true,mode:'template',data:{effectiveFrom:today,kind:'reseller',title:'Reseller standard',cashBps:6000,months:2,productPrices:[{productId:'product',unitPrice:'1000'}]}};const principal={user:manager,scope:'write',tokenId:null};await catalog.executeTool('sales_network_apply',templateArgs,base,principal);assert.equal((await catalog.executeTool('sales_network_apply',templateArgs,base,principal)).repeated,true);
  await nw('contact',{channel:'visit',day:today,nextDue:future,nextAction:'Still requires actual contact evidence',notes:undefined},staff,400);
  await nw('partner',{revision:version(a),kind:'representative',ownerId:'staff',contactDays:10,reorderDays:30});
  await nw('contact',{channel:'visit',day:today,nextDue:future,nextAction:'Confirm repeat purchase'},staff);
@@ -55,7 +56,6 @@ const nw=(mode,extra={},u=manager,status=200)=>post(network,'/api/sales/network'
  const referralUser=actor('ref',['agent'],{salesAgentId:ref});member(referralUser);
  const agreement=await nw('contract',{agentId:ref,reference:'CONTRACT-1',start:past,end:future,bps:1000});
  await nw('contract_review',{agentId:ref,recordId:agreement.body.id,revision:1,approved:true},finance);
- sql.prepare("INSERT INTO records(id,kind,payload,created) VALUES('product','product',?,?)").run(JSON.stringify({name:'Device',model:'N1',code:'P1',status:'فعال'}),now);
  await op('price',{agentId:'',productId:'product',unitPrice:'1000',active:true,reference:'PRICE'},manager);
  await op('terms',{revision:version(a),creditLimit:'100000',termDays:30});
  const items=[{productId:'product',quantity:1}],terms={cashBps:4000,months:2},source={channel:'phone',contactName:'Buyer',day:today,reference:'Actual negotiation'};

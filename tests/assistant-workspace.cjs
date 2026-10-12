@@ -28,6 +28,8 @@ const forms=load('app/api/assistant/forms/route.ts'),workspace=load('lib/assista
 (async()=>{
  const clean=workspace.cleanFormArgs({name:'A',data:{password:'SECRET',apiKey:'SECRET',token:'SECRET',qty:2},confirmed:true});assert.deepEqual(JSON.parse(JSON.stringify(clean)),{name:'A',data:{qty:2}});
  const salesTool=catalog.tools.find(t=>t.name==='sales_apply'),saleIntent=workspace.requestedOperationForm('میخوام پنج دستگاه سوشیا به نماینده باران سلامت بفروشم',null,catalog.tools);
+ const templateIntent=workspace.requestedOperationForm('الگوی عمومی فروش نماینده را تعریف کن',null,catalog.tools),templatePolicy=load('lib/assistant-policy.ts');
+ assert.equal(templateIntent.tool,'sales_network_apply');assert.equal(templateIntent.args.mode,'template');assert.equal(templateIntent.args.data.templateType,'fixed');assert.ok(templateIntent.schema.properties.data.required.includes('productPrices'));assert.equal(templatePolicy.actionSection(templateIntent.tool,templateIntent.args),'sales');assert.ok(templatePolicy.assistantWriteNames.has('sales_network_apply'));for(const name of ['get_sales_network','get_sales_network_guide'])assert.ok(templatePolicy.assistantReadNames.has(name));
  assert.equal(saleIntent.args.mode,'order','Selling to a representative must not create a representative profile');
  assert.equal(workspace.requestedOperationForm('سفارش خرید مواد اولیه ثبت کن',null,catalog.tools),undefined,'Purchase intent must not open a sales order');
  const simpleSale=workspace.operationForm(salesTool,{mode:'order',agentId:'actual-buyer',items:[{productId:'actual-product',quantity:5}]},'sales','Old generic form');

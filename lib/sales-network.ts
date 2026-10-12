@@ -1,5 +1,5 @@
 import {storage} from './storage';
-import {salesRows,salesScope,salesVisible,salesLock,salesFail as fail,sreq,stxt,sday,integer,money} from './sales';
+import {salesRows,salesScope,salesVisible,salesLock,salesFail as fail,sreq,stxt,sday,integer,money,arr} from './sales';
 import {salesRead,salesManager,salesStaff,salesFinance,salesRep} from './sales-access';
 import {leadMembers,leadMemberGuard,leadEligible} from './sales-leads';
 import {dayAt,addDay} from './duties';
@@ -11,8 +11,9 @@ import {isIsoDay} from './persian-date';
 import {latestSalesTemplate,selectFixedSalesTemplate,promotionEndDay,overlappingSalesPromotion} from './sales-template';
 export async function networkActor(u:Session){const members=await leadMembers();if(trainingContext.getStore())fail('این بخش در اطلاعات شرکت اجرا می‌شود.',403);if(!u.isAdmin){const m=members.find(m=>m.status==='active'&&(m.subject===u.userId||'local:'+m.id===u.userId));if(!m)fail('دسترسی فعال لازم است.',403);u={...u,permissions:JSON.parse(m.permissions)};}if(!salesRead(u))fail('دسترسی فروش لازم است.',403);return {u,members};}
 export async function readNetwork(actor:Session){const {u}=await networkActor(actor),rows=await salesRows(),today=dayAt(),agents=[];for(const a of rows.filter(r=>r.type==='sales_agent'))if(await salesVisible(u,a)&&(!salesRep(u)||a.data.active))agents.push(a);const ids=new Set(agents.map(a=>a.id));
+ const products=(await storage().prepare("SELECT id,payload FROM records WHERE kind='product'").all()).results.map((r:any)=>{const p=JSON.parse(r.payload);return {id:r.id,name:p.name||p.model||p.code,model:p.model||'',status:p.status};});
  const portfolio=agents.map(a=>{const own=rows.filter(r=>r.data.agentId===a.id),invoices=own.filter(r=>r.type==='sales_invoice'),contacts=own.filter(r=>r.type==='sales_contact'),lastPurchase=invoices.map(r=>r.data.day).sort().at(-1)||'',lastContact=contacts.map(r=>r.data.day).sort().at(-1)||'',nextContact=contacts.sort((a,b)=>b.created.localeCompare(a.created))[0]?.data.nextDue||addDay(lastContact||a.created.slice(0,10),a.data.contactDays||30),reorderDue=addDay(lastPurchase||a.created.slice(0,10),a.data.reorderDays||60);return {agentId:a.id,lastPurchase,lastContact,nextContact,reorderDue,contactLate:nextContact<=today,inactive:reorderDue<=today,account:salesAccounts(rows,a.id,today),commission:commissionAccount(rows,a.id)};});
- return {today,help:networkHelp,roles:{manager:salesManager(u),finance:salesFinance(u),staff:salesStaff(u),agent:salesRep(u)},agents,portfolio,templates:rows.filter(r=>r.type==='sales_template'),records:rows.filter(r=>ids.has(r.data.agentId)&&['sales_contact','sales_case','sales_contract','sales_commission_settlement'].includes(r.type))};}
+ return {today,help:networkHelp,roles:{manager:salesManager(u),finance:salesFinance(u),staff:salesStaff(u),agent:salesRep(u)},agents,portfolio,products,prices:rows.filter(r=>r.type==='sales_price'&&r.data.active&&r.data.agentId===''),templates:rows.filter(r=>r.type==='sales_template'),records:rows.filter(r=>ids.has(r.data.agentId)&&['sales_contact','sales_case','sales_contract','sales_commission_settlement'].includes(r.type))};}
 export async function applyNetwork(actor:Session,b:any){const {u,members}=await networkActor(actor),db=storage(),now=new Date().toISOString(),today=dayAt();if(b.confirmed!==true||!networkModes.includes(b.mode)||! /^[0-9a-f-]{36}$/i.test(b.id))fail('تأیید و شناسه معتبر عملیات لازم است.');
  const manager=salesManager(u),finance=salesFinance(u),staff=salesStaff(u);if(['template','partner','contract'].includes(b.mode)?!manager:['contract_review','commission_review','commission_pay','commission_cancel','check_link'].includes(b.mode)?!finance:!(staff||manager||finance||salesRep(u)))fail('مجوز این مرحله را ندارید.',403);
  const a=b.mode==='template'?null:await salesScope(u,sreq(b.agentId)),signature=JSON.stringify(b),prior:any=await db.prepare('SELECT actor,payload FROM inventory_operations WHERE id=?').bind(b.id).first();if(prior){if(prior.actor!==u.userId||prior.payload!==signature)fail('شناسه قبلاً استفاده شده است.',409);return {saved:true,repeated:true};}
@@ -22,6 +23,15 @@ export async function applyNetwork(actor:Session,b:any){const {u,members}=await 
  const next=()=>{const due=sday(b.nextDue);if(due<today)fail('موعد بعدی در گذشته نباشد.');return {nextDue:due,nextAction:sreq(b.nextAction,1000)};};
  if(b.mode==='template'){
   if(!['representative','reseller','branch','end_customer'].includes(b.kind))fail('نوع الگو معتبر نیست.');
+  const productPrices:{productId:string,unitPrice:string}[]=[];
+  for(const item of arr(b.productPrices,100)){
+   if(!item||typeof item!=='object'||Array.isArray(item))fail('کالا و قیمت پایه هر ردیف را مشخص کنید.');
+   const productId=sreq(item.productId),unitPrice=money(item.unitPrice,true);if(productPrices.some(p=>p.productId===productId))fail('کالای تکراری را در یک ردیف الگو ثبت کنید.');
+   const product:any=await db.prepare("SELECT payload FROM records WHERE id=? AND kind='product'").bind(productId).first();
+   if(!product||JSON.parse(product.payload).status!=='فعال')fail('کالای فعال برای الگوی فروش انتخاب کنید.');
+   checks.push(db.prepare("UPDATE inventory_operations SET guard=CASE WHEN EXISTS(SELECT 1 FROM records WHERE id=? AND kind='product' AND payload=?) THEN guard ELSE 0 END WHERE id=?").bind(productId,product.payload,b.id));
+   productPrices.push({productId,unitPrice});
+  }
   const templateType=b.templateType??'fixed';if(!['fixed','promotion'].includes(templateType))fail('نوع الگوی فروش معتبر نیست.');
   const effectiveFrom=sday(b.effectiveFrom);if(!isIsoDay(effectiveFrom))fail('تاریخ شروع معتبر لازم است.');
   let period:{}|{durationDays:number,effectiveTo:string}={};
@@ -36,7 +46,7 @@ export async function applyNetwork(actor:Session,b:any){const {u,members}=await 
   if(minCashBps>cashBps||months>maxMonths)fail('مقدار پیش‌فرض باید داخل دامنه مجاز باشد.');
   const previous=latestSalesTemplate(rows,b.kind);if((previous?.id||'')!==(b.previousId||''))fail('الگو تغییر کرده؛ تازه‌سازی کنید.',409);
   const baseline=selectFixedSalesTemplate(rows,b.kind,effectiveFrom),discountBps=integer(b.discountBps??baseline?.data.discountBps??0,0,9000);
-  put(b.id,'sales_template',{kind:b.kind,title:sreq(b.title),templateType,effectiveFrom,...period,discountBps,cashBps,minCashBps,maxCashBps:10000,months,minMonths:0,maxMonths,version:(previous?.data.version||0)+1,previousId:previous?.id||''});
+  put(b.id,'sales_template',{kind:b.kind,title:sreq(b.title),templateType,effectiveFrom,...period,productPrices,discountBps,cashBps,minCashBps,maxCashBps:10000,months,minMonths:0,maxMonths,version:(previous?.data.version||0)+1,previousId:previous?.id||''});
  }
  else if(b.mode==='partner'){if(a!.revision!==b.revision)fail('نسخه تغییر کرده است.',409);if(!Object.hasOwn(partnerKinds,b.kind)||!leadEligible(members.find(m=>m.id===b.ownerId)))fail('نوع همکاری و مسئول فروش فعال لازم است.');if((a!.data.kind==='referrer')!==(b.kind==='referrer')&&rows.some(r=>r.data.agentId===a!.id&&['sales_order','sales_invoice','sales_contract','sales_payment'].includes(r.type)))fail('نوع حساب دارای سابقه مالی قابل تبدیل نیست؛ پرونده جدا ایجاد کنید.');put(a!.id,'sales_agent',{...a!.data,kind:b.kind,ownerId:b.ownerId,contactDays:integer(b.contactDays,1,365),reorderDays:integer(b.reorderDays,1,365)},a);}
  else if(b.mode==='check_link'){const r=current('sales_payment');if(r.data.method!=='check'||!['received','bounced'].includes(r.data.state)||rows.some(v=>v.type==='sales_allocation'&&v.data.creditId===r.id))fail('فقط چک بدون تخصیص قبلی قابل اتصال است.');const invoice=rows.find(v=>v.type==='sales_invoice'&&v.id===b.invoiceId&&v.data.agentId===a!.id);if(!invoice)fail('فاکتور همین شریک لازم است.');put(r.id,r.type,{...r.data,checkInvoiceId:invoice.id},r);}

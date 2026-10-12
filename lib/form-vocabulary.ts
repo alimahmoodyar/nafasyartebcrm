@@ -1,5 +1,6 @@
 // Shared presentation vocabulary. Values/identifiers sent to domain APIs remain unchanged.
 export const fieldTitles:Record<string,string>={
+ productPrices:'کالاها و قیمت پایه الگو',priceSource:'منبع قیمت پایه',priceTemplateId:'الگوی قیمت پایه',priceTemplateRevision:'نسخه الگوی قیمت پایه',
  receivingAccountId:'حساب مقصد شرکت',terminalCode:'کد ترمینال پوز',provider:'شرکت پرداخت / بانک پذیرنده',validTo:'تا تاریخ',bankId:'شناسه یکتای تراکنش بانک',
   "customerName": "نام مشتری نهایی",
   "customerMobile": "موبایل مشتری نهایی",

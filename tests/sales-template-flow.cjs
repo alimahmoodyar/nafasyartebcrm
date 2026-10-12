@@ -35,10 +35,10 @@ const db = {
     }
   },
 };
-let tail = Promise.resolve();
+let tail = Promise.resolve(), beforeBatch = null;
 const batch = db.batch.bind(db);
 db.batch = statements => {
-  const next = tail.then(() => batch(statements));
+  const next = tail.then(() => { const hook = beforeBatch; beforeBatch = null; hook?.(); return batch(statements); });
   tail = next.catch(() => {});
   return next;
 };
@@ -134,6 +134,7 @@ const templateBody = (kind = 'representative', values = {}) => ({
   id: crypto.randomUUID(), mode: 'template', confirmed: true, kind,
   title: 'Approved ' + kind, effectiveFrom: '2026-10-01',
   discountBps: 1000, cashBps: 5000, minCashBps: 3000, maxCashBps: 7000,
+  productPrices: [{productId: 'product', unitPrice: '1000'}],
   months: 1, minMonths: 1, maxMonths: 3, previousId: latest(kind)?.id || '',
   ...values,
 });
@@ -157,14 +158,18 @@ async function order(quoted, values = {}, status = 200) {
   const result = await post(sales, '/api/sales', body, staff, status);
   return {body, result, record: entity(body.id)};
 }
-async function expectQuote(templateId, rate, cashBps, months, agentId = 'buyer-representative') {
+async function expectQuote(templateId, rate, cashBps, months, agentId = 'buyer-representative', unitPrice = '1000') {
   const recordCount = sql.prepare('SELECT COUNT(*) n FROM flow_entities').get().n;
   const operationCount = sql.prepare('SELECT COUNT(*) n FROM inventory_operations').get().n;
   const quoted = await quote(agentId);
   assert.equal(quoted.salesTerms.templateId, templateId);
   assert.equal(quoted.baseDiscountBps, rate);
   assert.equal(quoted.lines[0].discountBps, rate);
-  assert.equal(quoted.amount, String(2 * (1000 - rate / 10)));
+  assert.equal(quoted.lines[0].unitPrice, unitPrice);
+  const unitNet = BigInt(unitPrice) * BigInt(10000 - rate) / 10000n;
+  assert.equal(quoted.lines[0].unitNet, String(unitNet));
+  assert.equal(quoted.amount, String(2n * unitNet));
+  assert.equal(quoted.discount, String(2n * (BigInt(unitPrice) - unitNet)));
   assert.equal(quoted.salesTerms.cashBps, cashBps);
   assert.equal(quoted.salesTerms.months, months);
   assert.equal(quoted.installments.reduce((total, part) => total + BigInt(part.amount), 0n), BigInt(quoted.amount));
@@ -187,6 +192,12 @@ async function expectQuote(templateId, rate, cashBps, months, agentId = 'buyer-r
   sql.prepare("INSERT INTO records(id,kind,payload,created) VALUES('product','product',?,?)")
     .run(JSON.stringify({name: 'Device', model: 'N1', code: 'P1', status: 'فعال'}), new FrozenDate().toISOString());
   seed('price', 'sales_price', {agentId: '', productId: 'product', unitPrice: '1000', active: true, reference: 'Approved price'});
+  for (const [id, kind] of [['product-fixed', 'product'], ['product-legacy', 'product'], ['inactive-product', 'product'], ['non-product', 'customer']]) {
+    sql.prepare('INSERT INTO records(id,kind,payload,created) VALUES(?,?,?,?)')
+      .run(id, kind, JSON.stringify({name: id, model: id, status: id === 'inactive-product' ? 'غیرفعال' : 'فعال'}), new FrozenDate().toISOString());
+  }
+  seed('specific-price', 'sales_price', {agentId: 'buyer-representative', productId: 'product', unitPrice: '9900', active: true, reference: 'Earlier individual price'});
+  seed('legacy-price', 'sales_price', {agentId: '', productId: 'product-legacy', unitPrice: '1777', active: true, reference: 'Legacy fallback'});
 
   // Both transports must enforce active managerial authority and explicit confirmation.
   for (const user of [staff, finance, viewer]) {
@@ -222,11 +233,31 @@ async function expectQuote(templateId, rate, cashBps, months, agentId = 'buyer-r
   }
   await saveTemplate('representative', {templateType: 'seasonal'}, 400);
   await saveTemplate('representative', {cashBps: 2000}, 400);
-  const fixed = await saveTemplate('representative');
+  // Product prices are an explicit, bounded catalog selection, never arbitrary free-form data.
+  for (const productPrices of [undefined, null, [], {}, [{productId: 'missing', unitPrice: '1000'}], [{productId: 'non-product', unitPrice: '1000'}], [{productId: 'inactive-product', unitPrice: '1000'}],
+    [{productId: 'product', unitPrice: '1000'}, {productId: 'product', unitPrice: '2000'}],
+    ...[undefined, '', '0', '-1', '1.5', '1e3', '1,000', '1000000000000000000', 1000].map(unitPrice => [{productId: 'product', unitPrice}])]) {
+    const invalid = await saveTemplate('representative', {productPrices}, 400);
+    assert.equal(invalid.record, null);
+    assert.equal(operations(invalid.body.id).length, 0);
+    assert.equal(domainAudit(invalid.body.id).length, 0);
+  }
+  const missingMcpPrices = {id: crypto.randomUUID(), mode: 'template', confirmed: true, data: {...templateBody(), productPrices: []}};
+  await assert.rejects(() => catalog.executeTool('sales_network_apply', missingMcpPrices, base, principal()), error => error.status === 400);
+  assert.equal(entity(missingMcpPrices.id), null);
+  const productBeforeRace = sql.prepare("SELECT payload FROM records WHERE id='product'").get().payload;
+  beforeBatch = () => sql.prepare("UPDATE records SET payload=? WHERE id='product'").run(JSON.stringify({...JSON.parse(productBeforeRace), status: 'غیرفعال'}));
+  const raced = await saveTemplate('representative', {}, 409);
+  assert.equal(raced.record, null, 'A catalog mutation after validation must roll back the entire template save');
+  assert.equal(operations(raced.body.id).length, 0);
+  assert.equal(domainAudit(raced.body.id).length, 0);
+  sql.prepare("UPDATE records SET payload=? WHERE id='product'").run(productBeforeRace);
+  const fixed = await saveTemplate('representative', {productPrices: [{productId: 'product', unitPrice: '1000'}, {productId: 'product-fixed', unitPrice: '3333'}]});
   assert.equal(fixed.record.data.templateType, 'fixed', 'Omitting type defaults a new template to fixed');
   assert.equal(fixed.record.data.effectiveFrom, '2026-10-01');
   assert.ok(!fixed.record.data.effectiveTo, 'A fixed template has no expiry');
   assert.equal(fixed.record.data.version, 1);
+  assert.deepEqual(fixed.record.data.productPrices, [{productId: 'product', unitPrice: '1000'}, {productId: 'product-fixed', unitPrice: '3333'}]);
   assert.equal(fixed.record.data.history.length, 1);
   assert.equal(fixed.record.data.history[0].actor, manager.userId);
   assert.equal(fixed.record.data.history[0].at, new FrozenDate().toISOString());
@@ -242,7 +273,7 @@ async function expectQuote(templateId, rate, cashBps, months, agentId = 'buyer-r
   await post(network, '/api/sales/network', fixed.body, otherManager, 409);
 
   const mcpId = crypto.randomUUID();
-  const mcpData = {kind: 'end_customer', title: 'Direct baseline', templateType: 'fixed', effectiveFrom: '2026-10-01', discountBps: 500, cashBps: 10000, months: 0};
+  const mcpData = {kind: 'end_customer', title: 'Direct baseline', templateType: 'fixed', effectiveFrom: '2026-10-01', discountBps: 500, cashBps: 10000, months: 0, productPrices: [{productId: 'product', unitPrice: '1000'}]};
   const mcpArgs = {id: mcpId, mode: 'template', confirmed: true, data: mcpData};
   await catalog.executeTool('sales_network_apply', mcpArgs, base, principal());
   assert.equal((await catalog.executeTool('sales_network_apply', mcpArgs, base, principal())).repeated, true);
@@ -271,7 +302,7 @@ async function expectQuote(templateId, rate, cashBps, months, agentId = 'buyer-r
   await saveTemplate('representative', {previousId: fixed.body.id}, 409);
   const promotion = await saveTemplate('representative', {
     templateType: 'promotion', effectiveFrom: '2026-10-12', durationDays: 3, effectiveTo: '2027-01-01',
-    discountBps: 2000, cashBps: 7000, months: 3,
+    discountBps: 2000, cashBps: 7000, months: 3, productPrices: [{productId: 'product', unitPrice: '2501'}],
   });
   assert.equal(promotion.record.data.effectiveTo, '2026-10-14', 'The server computes inclusive expiry and ignores a submitted end');
   assert.equal(promotion.record.data.durationDays, 3);
@@ -302,12 +333,22 @@ async function expectQuote(templateId, rate, cashBps, months, agentId = 'buyer-r
   await expectQuote(fixed.body.id, 1000, 5000, 1);
   at('2026-10-11T20:30:00.000Z');
   assert.equal(duties.dayAt(), '2026-10-12');
-  const started = await expectQuote(promotion.body.id, 2000, 7000, 3);
+  const started = await expectQuote(promotion.body.id, 2000, 7000, 3, 'buyer-representative', '2501');
   const staleStart = await order(beforeStart, {}, 409);
   assert.equal(staleStart.record, null);
   assert.equal(operations(staleStart.body.id).length, 0);
   await expectQuote(newBranch.body.id, 800, 6000, 1, 'buyer-branch');
   await expectQuote(otherCategory.body.id, 900, 10000, 0, 'buyer-end_customer');
+  const mixedItems = [{productId: 'product', quantity: 2}, {productId: 'product-fixed', quantity: 1}, {productId: 'product-legacy', quantity: 1}];
+  const mixed = await post(quoteApi, '/api/sales/quote', {agentId: 'buyer-representative', items: mixedItems}, staff);
+  assert.deepEqual(mixed.lines.map(line => line.unitPrice), ['2501', '3333', '1777'], 'Promotion row wins, omitted promotion product uses current fixed row, and a product omitted from both uses its legacy price');
+  assert.deepEqual(mixed.lines.map(line => line.unitNet), ['2000', '2666', '1421'], 'Category discount applies exactly once to each selected base price using integer rial rounding');
+  assert.deepEqual(mixed.lines.map(line => line.priceSource), ['sales_template', 'sales_template', 'sales_price']);
+  assert.deepEqual(mixed.lines.map(line => line.priceTemplateId), [promotion.body.id, fixed.body.id, '']);
+  assert.equal(mixed.amount, '8087');
+  assert.equal(mixed.discount, '2025');
+  const mixedMcp = await catalog.executeTool('preview_sales_order', {agentId: 'buyer-representative', items: mixedItems}, base, principal(staff, 'read'));
+  assert.equal(mixedMcp.quoteHash, mixed.quoteHash);
 
   const historicalQuote = await quote('buyer-snapshot');
   const historicalOrder = await order(historicalQuote);
@@ -319,12 +360,12 @@ async function expectQuote(templateId, rate, cashBps, months, agentId = 'buyer-r
   assert.equal(approvedSnapshot.salesTerms.months, 3);
 
   at('2026-10-13T08:00:00Z');
-  await expectQuote(promotion.body.id, 2000, 7000, 3);
+  await expectQuote(promotion.body.id, 2000, 7000, 3, 'buyer-representative', '2501');
   await expectQuote(mcpId, 500, 10000, 0, 'buyer-end_customer');
   assert.equal(scheduled.record.data.effectiveFrom, '2026-10-13');
   at('2026-10-14T20:29:59.999Z');
   assert.equal(duties.dayAt(), '2026-10-14');
-  const onEnd = await expectQuote(promotion.body.id, 2000, 7000, 3);
+  const onEnd = await expectQuote(promotion.body.id, 2000, 7000, 3, 'buyer-representative', '2501');
   at('2026-10-14T20:30:00.000Z');
   assert.equal(duties.dayAt(), '2026-10-15');
   const afterEnd = await expectQuote(during.body.id, 1500, 6500, 2);
@@ -346,7 +387,7 @@ async function expectQuote(templateId, rate, cashBps, months, agentId = 'buyer-r
   assert.equal(invoice.data.discount, historicalQuote.discount);
   assert.deepEqual(invoice.data.lines, JSON.parse(JSON.stringify(historicalQuote.lines)));
   assert.deepEqual(invoice.data.salesTerms, JSON.parse(JSON.stringify(historicalQuote.salesTerms)));
-  assert.equal(invoice.data.installments[0].amount, '1120');
+  assert.equal(invoice.data.installments[0].amount, String(BigInt(historicalQuote.amount) * 7000n / 10000n));
   const invoiceBefore = sql.prepare('SELECT data FROM flow_entities WHERE id=?').get(invoice.id).data;
   const orderBefore = sql.prepare('SELECT data FROM flow_entities WHERE id=?').get(savedFixedOrder.body.id).data;
   const historicalTerms = JSON.stringify(entity(historicalOrder.body.id).data.salesTerms);
@@ -357,11 +398,18 @@ async function expectQuote(templateId, rate, cashBps, months, agentId = 'buyer-r
   assert.equal(sql.prepare('SELECT data FROM flow_entities WHERE id=?').get(savedFixedOrder.body.id).data, orderBefore);
   assert.equal(JSON.stringify(entity(historicalOrder.body.id).data.salesTerms), historicalTerms);
   assert.equal(sql.prepare('SELECT data FROM flow_entities WHERE id=?').get('legacy-branch').data, legacyBefore);
+  // A price-only revision invalidates a prepared quote without rewriting historical invoices.
+  const beforePriceChange = await quote();
+  const newPrice = await saveTemplate('representative', {effectiveFrom: '2026-10-15', discountBps: 1600, cashBps: 6600, months: 2, productPrices: [{productId: 'product', unitPrice: '1501'}]});
+  await expectQuote(newPrice.body.id, 1600, 6600, 2, 'buyer-representative', '1501');
+  await order(beforePriceChange, {}, 409);
+  assert.equal(sql.prepare('SELECT data FROM flow_entities WHERE id=?').get(invoice.id).data, invoiceBefore);
+  assert.equal(sql.prepare('SELECT data FROM flow_entities WHERE id=?').get(savedFixedOrder.body.id).data, orderBefore);
 
   at('2026-10-16T08:00:00Z');
   await expectQuote(oneDay.body.id, 2200, 7000, 3);
   at('2026-10-17T08:00:00Z');
-  await expectQuote(newer.body.id, 1600, 6600, 2);
+  await expectQuote(newPrice.body.id, 1600, 6600, 2, 'buyer-representative', '1501');
   const leapBaseline = await saveTemplate('reseller', {effectiveFrom: '2028-02-01'});
   const leapPromo = await saveTemplate('reseller', {templateType: 'promotion', effectiveFrom: '2028-02-28', durationDays: 3});
   assert.equal(leapPromo.record.data.effectiveTo, '2028-03-01', 'Inclusive duration crosses leap February correctly');
@@ -378,11 +426,27 @@ async function expectQuote(templateId, rate, cashBps, months, agentId = 'buyer-r
   at('2026-10-19T08:00:00Z');
   await expectQuote(inheritedPromotion.body.id, 800, 5000, 1, 'buyer-branch');
 
+  // Catalog-size boundaries are checked before the template/version/audit can be persisted.
+  const bulkPrices = Array.from({length: 101}, (_, i) => ({productId: 'bulk-product-' + i, unitPrice: i === 0 ? '999999999999999999' : String(i + 1)}));
+  for (const item of bulkPrices) sql.prepare('INSERT INTO records(id,kind,payload,created) VALUES(?,\'product\',?,?)').run(item.productId, JSON.stringify({name: item.productId, status: 'فعال'}), new FrozenDate().toISOString());
+  const maximum = await saveTemplate('end_customer', {effectiveFrom: '2099-01-01', productPrices: bulkPrices.slice(0, 100)});
+  assert.equal(maximum.record.data.productPrices.length, 100);
+  const tooMany = await saveTemplate('end_customer', {effectiveFrom: '2099-01-02', productPrices: bulkPrices}, 400);
+  assert.equal(tooMany.record, null);
+  assert.equal(domainAudit(tooMany.body.id).length, 0);
+  at('2099-01-01T08:00:00Z');
+  const preciseArgs = {agentId: 'buyer-end_customer', items: [{productId: bulkPrices[0].productId, quantity: 1}]};
+  const precise = await post(quoteApi, '/api/sales/quote', preciseArgs, staff);
+  assert.equal(precise.lines[0].unitPrice, '999999999999999999', 'Template prices work without a separate sales-price row and retain eighteen digits');
+  assert.equal(precise.amount, String(999999999999999999n * 9000n / 10000n));
+  assert.equal(precise.discount, String(999999999999999999n - 999999999999999999n * 9000n / 10000n));
+  assert.equal((await catalog.executeTool('preview_sales_order', preciseArgs, base, principal(staff, 'read'))).quoteHash, precise.quoteHash);
+
   sql.prepare("UPDATE app_members SET status='inactive' WHERE id='manager'").run();
   const revoked = templateBody();
   await post(network, '/api/sales/network', revoked, manager, 403);
   await assert.rejects(() => catalog.executeTool('sales_network_apply', {id: revoked.id, mode: 'template', confirmed: true, data: revoked}, base, principal()), error => error.status === 403);
   assert.equal(entity(revoked.id), null);
   assert.equal(sql.prepare('PRAGMA foreign_key_check').all().length, 0);
-  console.log('PASS sales template flow: HTTP/MCP authority, confirmation, validation, idempotent audit, legacy fixed terms, scheduled defaults, inclusive Tehran promotion dates, current fixed fallback, stale quotes, and immutable orders/invoices.');
+  console.log('PASS sales template flow: HTTP/MCP authority, confirmation, bounded catalog-price validation, concurrent product-change rollback, exact BigInt price/discount math, promotion/fixed/legacy price precedence, idempotent audit, legacy fixed terms, scheduled defaults, inclusive Tehran promotion dates, price-only stale quotes, and immutable orders/invoices.');
 })().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => sql.close());

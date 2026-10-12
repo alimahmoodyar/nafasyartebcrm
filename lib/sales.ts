@@ -10,7 +10,7 @@ export {salesRep,salesManager,salesStaff,salesFinance,salesRead,salesWarehouse} 
 import {salesRep,salesRead,salesWarehouse,salesStaff,salesManager,salesFinance} from './sales-access';
 import {memberId} from './duties';
 import {termsPlan} from './sales-network-contract';
-import {selectSalesTemplate} from './sales-template';
+import {selectSalesTemplate,selectSalesTemplatePrice} from './sales-template';
 // Defer imported validators until call time: duties and sales have circular imports.
 export function sreq(v:unknown,max=200){return taskRequired(v,max)}
 export function stxt(v:unknown,max=4000){return taskText(v,max)}
@@ -44,8 +44,11 @@ export async function salesQuote(agent:any,items:any[],rows:any[],options:any={}
  const discountBlocked=rial(salesAccounts(rows,agent.id,today).overdue)>BigInt(0);
  const lines:any[]=[];for(const i of arr(items,30)){const productId=sreq(i.productId),quantity=integer(i.quantity,1,10000);if(lines.some(l=>l.productId===productId))salesFail('کالای تکراری را در یک ردیف ثبت کنید.');
  const r:any=await storage().prepare("SELECT payload FROM records WHERE id=? AND kind='product'").bind(productId).first();if(!r||JSON.parse(r.payload).status==='غیرفعال'||JSON.parse(r.payload).status==='توقف تولید')salesFail('محصول فعال موجود نیست.');const product=JSON.parse(r.payload);
- const prices=rows.filter(p=>p.type==='sales_price'&&p.data.productId===productId&&p.data.active&&(p.data.agentId===''||p.data.agentId===agent.id));const price=prices.find(p=>p.data.agentId===agent.id)||prices.find(p=>p.data.agentId==='');if(!price)salesFail('قیمت فعال برای محصول ثبت نشده است.');const eligibleTarget=target&&(!target.data.productIds.length||target.data.productIds.includes(productId));const lineBps=discountBlocked?0:Math.max(baseDiscountBps,eligibleTarget?progress?.discountBps||0:0);const unitNet=(rial(price.data.unitPrice)*BigInt(10000-lineBps))/BigInt(10000);if(unitNet<=BigInt(0))salesFail('قیمت پس از تخفیف معتبر نیست.');
- lines.push({productId,name:product.name||product.model||product.code,model:product.model||'',quantity,priceId:price.id,priceRevision:price.revision,unitPrice:price.data.unitPrice,discountBps:lineBps,unitNet:String(unitNet),net:String(unitNet*BigInt(quantity)),discount:String((rial(price.data.unitPrice)-unitNet)*BigInt(quantity))});}
+ const templatePrice=selectSalesTemplatePrice(rows,agent.data.kind||'representative',today,productId);
+ const prices=rows.filter(p=>p.type==='sales_price'&&p.data.productId===productId&&p.data.active&&(p.data.agentId===''||p.data.agentId===agent.id));const price=prices.find(p=>p.data.agentId===agent.id)||prices.find(p=>p.data.agentId==='');if(!templatePrice&&!price)salesFail('قیمت پایه در الگوی فروش یا قیمت فعال برای محصول ثبت نشده است.');
+ const unitPrice=money(templatePrice?.unitPrice??price.data.unitPrice,true),priceSource=templatePrice?'sales_template':'sales_price',priceTemplateId=templatePrice?.template.id||'',priceTemplateRevision=templatePrice?.template.revision||0;
+ const eligibleTarget=target&&(!target.data.productIds.length||target.data.productIds.includes(productId));const lineBps=discountBlocked?0:Math.max(baseDiscountBps,eligibleTarget?progress?.discountBps||0:0);const unitNet=(rial(unitPrice)*BigInt(10000-lineBps))/BigInt(10000);if(unitNet<=BigInt(0))salesFail('قیمت پس از تخفیف معتبر نیست.');
+ lines.push({productId,name:product.name||product.model||product.code,model:product.model||'',quantity,priceSource,priceId:templatePrice?'':price.id,priceRevision:templatePrice?0:price.revision,priceTemplateId,priceTemplateRevision,unitPrice,discountBps:lineBps,unitNet:String(unitNet),net:String(unitNet*BigInt(quantity)),discount:String((rial(unitPrice)-unitNet)*BigInt(quantity))});}
  if(total(lines,l=>l.net)>BigInt('999999999999999999'))salesFail('جمع سفارش از سقف مبلغ مجاز بیشتر است.');
 
  if(!template&&options.salesTerms)salesFail('ابتدا مدیر الگوی عمومی را تعریف کند.');

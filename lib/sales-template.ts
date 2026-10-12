@@ -2,6 +2,7 @@ import {isIsoDay} from './persian-date';
 
 export type SalesTemplateType='fixed'|'promotion';
 export type SalesTemplateStatus='scheduled'|'active'|'expired';
+export type SalesTemplateProductPrice={productId:string,unitPrice:string};
 type TemplateRow={id:string,type:string,created:string,data:any};
 const templateData=(template:any)=>template?.data??template;
 
@@ -31,6 +32,20 @@ export function selectFixedSalesTemplate<T extends TemplateRow>(rows:T[],kind:st
 export function selectSalesTemplate<T extends TemplateRow>(rows:T[],kind:string,today:string):T|undefined {
  const promotion=templatesFor(rows,kind).filter(r=>salesTemplateType(r)==='promotion'&&salesTemplateStatus(r,today)==='active').sort(newestFirst)[0];
  return promotion??selectFixedSalesTemplate(rows,kind,today);
+}
+// Older templates did not carry prices. Promotions can override selected products
+// while the effective fixed template remains the price source for the rest.
+export function salesTemplateProductPrice(template:any,productId:string):SalesTemplateProductPrice|undefined {
+ const prices=templateData(template)?.productPrices;return Array.isArray(prices)?prices.find(p=>p?.productId===productId):undefined;
+}
+export function selectSalesTemplatePrice<T extends TemplateRow>(rows:T[],kind:string,today:string,productId:string):{template:T,unitPrice:string}|undefined {
+ const active=selectSalesTemplate(rows,kind,today),activePrice=salesTemplateProductPrice(active,productId);
+ if(active&&activePrice)return {template:active,unitPrice:activePrice.unitPrice};
+ if(active&&salesTemplateType(active)==='promotion'){
+  const fixed=selectFixedSalesTemplate(rows,kind,today),fixedPrice=salesTemplateProductPrice(fixed,productId);
+  if(fixed&&fixedPrice)return {template:fixed,unitPrice:fixedPrice.unitPrice};
+ }
+ return undefined;
 }
 export function overlappingSalesPromotion<T extends TemplateRow>(rows:T[],kind:string,start:string,end:string):T|undefined {
  return templatesFor(rows,kind).find(r=>{
