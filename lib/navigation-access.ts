@@ -8,6 +8,7 @@ import {pricingRead} from './pricing-access';
 import {salesRead,salesWarehouse,salesStaff,salesManager,salesFinance} from './sales-access';
 import type {Kind} from './model';
 import type {Session} from './permissions';
+import {serviceRead} from './service-access';
 
 const can=(u:Session,kind:Kind,operation:'read'|'write'='read')=>u.isAdmin||u.permissions[operation].includes(kind);
 
@@ -17,7 +18,7 @@ export function canOpenSection(u:Session,s:string){
  const internal=!p.hospitalCenterId&&!p.salesAgentId&&!p.serviceAgentId;
  if(s==='pricing')return pricingRead(u);
  if(s==='qms')return internal&&(u.isAdmin||!!p.qmsRoles?.length||!!p.supplyRoles?.some(r=>['engineering','ceo'].includes(r)));
- if(s==='hospital')return !!p.hospitalCenterId||u.isAdmin||financialAccess(u,'hospital')||!p.serviceAgentId&&!!p.serviceDomains?.includes('hospital');
+ if(s==='hospital')return !!p.hospitalCenterId||u.isAdmin||financialAccess(u,'hospital')||!p.serviceAgentId&&serviceRead(u,'hospital');
  if(s==='reminders')return true;
  if(s==='sales-bank')return internal&&(salesManager(u)||salesFinance(u)||financialWorkflowRole(p,'',[],'treasury'));
  if(s==='treasury')return internal&&(u.isAdmin||financialAccess(u,'treasury'));
@@ -37,7 +38,7 @@ export function canOpenSection(u:Session,s:string){
  if(u.isAdmin||s==='mobile-install'||s==='tasks'||s==='development')return true;
  if(s==='sales')return salesRead(u)||salesWarehouse(u);
  if(s==='transport')return !!p.salesAgentId||!!p.salesRoles?.some(r=>['manager','staff'].includes(r))||!!p.supplyRoles?.some(r=>['inventory','domestic','foreign'].includes(r))||!!p.transportRoles?.length||!!p.flowRoles?.some(r=>['inventory','sales','logistics'].includes(r))||!!p.serviceRoles?.length;
- if(s==='after-sales')return !!p.serviceRoles?.length;
+ if(s==='after-sales')return serviceRead(u);
  if(s==='sourcing')return !!p.qmsRoles?.some(r=>['qa','qc'].includes(r))||!!p.flowRoles?.includes('qc')||!!p.supplyRoles?.length||!!p.flowRoles?.some(r=>['inventory','logistics'].includes(r))||!!p.transportRoles?.includes('manager');
  if(['users','llm','finance','system-reset'].includes(s))return false;
  if(s==='fulfillment')return salesStaff(u)||!!p.salesAgentId||!!p.flowRoles?.some(r=>['inventory','production','sales','logistics'].includes(r));

@@ -34,7 +34,7 @@ export function ProgramWorkspace({programId,title,direct=false,children,status}:
  const parentPath=useContext(ProgramPathContext),path=parentPath?parentPath+'/'+programId:programId;
  const register=useCallback((next:Menu|null)=>setMenu(next),[]);
  const select=useCallback((key:string)=>{if(!menu?.items.some(([id])=>id===key))return;if(menu.onChange(key)!==false)setShowHome(false)},[menu]);
- const open=useCallback(()=>setShowHome(true),[]);
+ const open=useCallback(()=>{if(menu?.items.length)setShowHome(true);else if(parentNavigation)parentNavigation.open();else rootBack?.();},[menu?.items.length,parentNavigation?.open,rootBack]);
  const reveal=useCallback(()=>setShowHome(false),[]);
  useEffect(()=>{if(direct)setShowHome(false)},[direct]);
  const navigation=useMemo(()=>accountId?({register,showHome,open,reveal,select}):null,[accountId,register,showHome,open,reveal,select]);

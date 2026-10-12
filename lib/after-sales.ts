@@ -10,13 +10,13 @@ import {serviceSalesDealer} from './service-sales-dealer';
 import {normalizeSerial} from './distribution';
 import {scaled} from './production';
 import {serviceRoles,serviceDomains} from './after-sales-labels';
-import {isAgent,role,domainAccess} from './service-access';
+import {isAgent,role,domainAccess,domainWriteAccess} from './service-access';
 export {isAgent,role,domainAccess} from './service-access';
 export function fail(s:string,status=400):never{throw new AccessError(s,status)}
 export function req(v:unknown,max=200){return taskRequired(v,max)}
 export const txt=(v:unknown,max=4000)=>taskText(v??'',max);
 export const decode=(r:any)=>({...r,data:JSON.parse(r.data)});
-export function need(u:Session,d:string,...roles:string[]){if(!domainAccess(u,d)||!roles.some(r=>role(u,r)))fail('مجوز این مرحله خدمات را ندارید.',403);}
+export function need(u:Session,d:string,...roles:string[]){if(!domainWriteAccess(u,d)||!roles.some(r=>role(u,r)))fail('مجوز این مرحله خدمات را ندارید.',403);}
 export async function visible(u:Session,r:any){if(!r||!domainAccess(u,r.data.domain)||isAgent(u)&&r.data.agentId!==u.permissions.serviceAgentId)fail('پرونده پیدا نشد یا دسترسی ندارید.',404);if(isAgent(u)){const a:any=await storage().prepare("SELECT data FROM flow_entities WHERE id=? AND type='as_agent'").bind(u.permissions.serviceAgentId).first();if(!a||!JSON.parse(a.data).active)fail('نمایندگی غیرفعال است.',403);}return r;}
 export async function entity(id:string,type:string){const r:any=await storage().prepare('SELECT * FROM flow_entities WHERE id=? AND type=?').bind(id,type).first();if(!r)fail('رکورد مرتبط پیدا نشد.',404);return decode(r);}
 export async function caseAccess(id:string,u:Session){return visible(u,await entity(id,'as_case'));}

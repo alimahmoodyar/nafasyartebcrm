@@ -6,21 +6,23 @@ import {fail,req,txt,isAgent,role,domainAccess,need,visible,entity,list,past,amo
 import {supplyLock} from './sourcing';
 import {partRepairActions} from './part-repair-contract';
 import {selectRepresentativePartTariff,representativeTariffValue,servicePartTariffGuard} from './after-sales-pricing';
+import {serviceSupervisor,domainWriteAccess} from './service-access';
 
 const type='as_part_repair';
 const modeRoles:Record<string,string[]>={create:['intake','coordinator'],assign:['coordinator'],work:['technician'],review:['coordinator'],consent:['coordinator','agent'],issue:['inventory'],ship:['intake','inventory','coordinator'],receive:['agent','coordinator']};
-export function partRepairRead(u:Session,domain:string){return domainAccess(u,domain)&&['intake','coordinator','technician','inventory','agent'].some(r=>role(u,r));}
+export function partRepairRead(u:Session,domain:string){return domainAccess(u,domain)&&(serviceSupervisor(u)||['intake','coordinator','technician','inventory','agent'].some(r=>role(u,r)));}
 function memberId(u:Session){return u.userId.startsWith('local:')?u.userId.slice(6):u.userId;}
 function allowed(u:Session,r:any,assignedId=memberId(u)){if(!domainAccess(u,r.data.domain))return false;if(isAgent(u))return r.data.agentId===u.permissions.serviceAgentId;
+ if(serviceSupervisor(u))return true;
  if(role(u,'coordinator')||role(u,'intake'))return true;
  if(role(u,'inventory')&&['awaiting_stock','ready_send','shipped','closed'].includes(r.data.state))return true;
  return role(u,'technician')&&r.data.technicianId===assignedId;
 }
-export function partRepairModes(u:Session,r:any,assignedId=memberId(u)){const d=r.data;if(!allowed(u,r,assignedId))return [];
+export function partRepairModes(u:Session,r:any,assignedId=memberId(u)){const d=r.data;if(!domainWriteAccess(u,d.domain)||!allowed(u,r,assignedId))return [];
  const modes=d.state==='received'?['assign']:d.state==='working'?['assign','work']:d.state==='review'?['review']:d.state==='consent'?['consent']:d.state==='awaiting_stock'?['issue']:d.state==='ready_send'?['ship']:d.state==='shipped'?['receive']:[];
  return modes.filter(m=>modeRoles[m].some(x=>role(u,x))&&(m!=='work'||role(u,'manager')||d.technicianId===assignedId));
 }
-function publicRow(u:Session,r:any,assignedId:string){const d={...r.data};if(!role(u,'manager')&&!role(u,'inventory')){if(d.replacement){d.replacement={...d.replacement};delete d.replacement.unitCostRial;}}
+function publicRow(u:Session,r:any,assignedId:string){const d={...r.data};if(!domainWriteAccess(u,d.domain)||!role(u,'manager')&&!role(u,'inventory')){if(d.replacement){d.replacement={...d.replacement};delete d.replacement.unitCostRial;}}
  if(!isAgent(u)&&!role(u,'coordinator')&&!role(u,'intake')&&!role(u,'inventory')){if(d.review){d.review={...d.review};delete d.review.priceRial;}delete d.consent;delete d.freightRial;}
  return {...r,data:d,actions:partRepairModes(u,r,assignedId)};
 }
@@ -34,7 +36,7 @@ export async function readPartRepairs(u:Session,domain:string,id=''){
  const technicians=!isAgent(u)&&role(u,'coordinator')?(await storage().prepare("SELECT id,name,permissions FROM app_members WHERE status='active'").all()).results.filter((r:any)=>{const p=JSON.parse(r.permissions);return !p.serviceAgentId&&p.serviceDomains?.includes(domain)&&p.serviceRoles?.includes('technician')}).map((r:any)=>({id:r.id,name:r.name})):[];
  const materials=!isAgent(u)&&(role(u,'coordinator')||role(u,'intake'))?(await list('material')).map(r=>({code:r.data.code,name:r.data.name})):[];
  const lots=role(u,'inventory')&&!isAgent(u)?(await storage().prepare("SELECT l.id,l.batch_id,l.quantity,r.payload,COALESCE((SELECT SUM(quantity) FROM service_reservations s WHERE s.lot_id=l.id),0) reserved FROM service_lots l JOIN records r ON r.id=l.batch_id WHERE l.owner='office' AND l.domain=? AND l.quantity>0").bind(domain).all()).results.map((r:any)=>{const p=JSON.parse(r.payload);return {id:r.id,partCode:p.partCode,name:p.part,code:p.code,free:r.quantity-r.reserved,status:p.status,expiry:p.expiry}}).filter(r=>r.free>=1000&&r.status==='تأیید'&&(!r.expiry||r.expiry>=dayAt())):[];
- return {domain,rows:rows.map(r=>publicRow(u,r,assignedId)),agents,technicians,materials,lots,canCreate:!isAgent(u)&&modeRoles.create.some(r=>role(u,r))};
+ return {domain,rows:rows.map(r=>publicRow(u,r,assignedId)),agents,technicians,materials,lots,canCreate:domainWriteAccess(u,domain)&&!isAgent(u)&&modeRoles.create.some(r=>role(u,r))};
 }
 export async function applyPartRepair(u:Session,b:any){
  const db=storage(),mode=req(b.mode),domain=req(b.domain),op=req(b.id),now=new Date().toISOString();

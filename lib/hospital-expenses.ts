@@ -4,11 +4,12 @@ import {storage} from './storage';
 import {salesLock} from './sales';
 import {memberId} from './duties';
 import type {Session} from './permissions';
+import {serviceSupervisor} from './service-access';
 export const expenseStates:Record<string,string>={manager:'منتظر مدیر مستقیم',finance:'منتظر تأیید تنخواه مالی',approved:'تأیید نهایی هزینه',rejected:'رد شده'};
-export async function expenseUser(){const u=await session();if(u.permissions.hospitalCenterId||u.permissions.serviceAgentId||!hospitalTech(u)&&!hospitalFinance(u))throw new AccessError('دسترسی تنخواه مأموریت ندارید.',403);return u;}
+export async function expenseUser(write=false){const u=await session();if(u.permissions.hospitalCenterId||u.permissions.serviceAgentId||!hospitalTech(u)&&!hospitalFinance(u)&&(write||!serviceSupervisor(u)))throw new AccessError('دسترسی تنخواه مأموریت ندارید.',403);return u;}
 export async function expenseRows(){return (await storage().prepare("SELECT * FROM flow_entities WHERE type GLOB 'expense_*' ORDER BY created,id").all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}));}
 export async function expenseMembers(){return (await storage().prepare("SELECT id,name,permissions FROM app_members WHERE status='active'").all()).results.map((m:any)=>{const u={isAdmin:false,permissions:JSON.parse(m.permissions)} as Session;return {id:m.id,name:m.name,tech:!!hospitalTech(u),manager:!!hospitalManager(u),finance:!!hospitalFinance(u)};});}
-export function expenseVisible(u:Session,mid:string,r:any){return u.isAdmin||r.data.ownerId===mid||hospitalManager(u)&&r.data.managerId===mid||hospitalFinance(u)&&r.data.financeId===mid;}
+export function expenseVisible(u:Session,mid:string,r:any){return serviceSupervisor(u)||r.data.ownerId===mid||hospitalManager(u)&&r.data.managerId===mid||hospitalFinance(u)&&r.data.financeId===mid;}
 export async function expenseJob(u:Session,id:string){const j=await hrow(id,'hospital_job');if(!hospitalTech(u)||!hospitalManager(u)&&j.data.technicianId!==await memberId(u))throw new AccessError('مأموریت متعلق به شما نیست.',403);if(!['scheduled','dispatched','completed','confirmed','disputed'].includes(j.data.state))throw new AccessError('مأموریت برنامه‌ریزی‌شده لازم است.',400);return j;}
 export function expensePolicy(rows:any[],day:string){return rows.find(r=>r.type==='expense_policy'&&r.data.start<=day&&r.data.end>=day);}
 export function expenseControl(rows:any[],ownerId:string,day:string,groupId:string,cap:string,amount='0',exclude=''){

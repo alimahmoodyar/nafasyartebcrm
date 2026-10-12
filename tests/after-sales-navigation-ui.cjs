@@ -7,12 +7,12 @@ const {AfterSalesPanel}=load('components/trace/after-sales-panel.tsx');
 const nodes=x=>Array.isArray(x)?x.flatMap(nodes):React.isValidElement(x)?[x,...nodes(x.props.children)]:[],text=x=>Array.isArray(x)?x.map(text).join(''):React.isValidElement(x)?text(x.props.children):x==null?'':String(x);
 const user=(id,roles=[],inventory=false,domains=['home'])=>({userId:id,email:'',name:id,isAdmin:id==='admin',permissions:{read:[],write:[],eventStages:[],serviceRoles:roles,serviceDomains:domains,flowRoles:inventory?['inventory']:[]}});
 const catalog=roles=>({roles,cases:[],agents:[],tariffs:[],materials:[],lots:[],orders:[],claims:[],shipments:[],members:[],account:[],raw:[],ownAgent:''});
-let current;
-function tree(){cursor=0;return AfterSalesPanel({demo:false,user:current,onNavigate(){}})}
+let current,panelOptions={};
+function tree(){cursor=0;return AfterSalesPanel({demo:false,user:current,onNavigate(){},...panelOptions})}
 function navigation(){return nodes(tree()).find(n=>n.type===leaves.SubprogramNavigation)}
 function go(key){navigation().props.onChange(key)}
 function imports(){return nodes(tree()).filter(n=>n.type===leaves.ServicePartImport)}
-async function mount(actor,result,status=200){slots=[];effects=[];calls=[];current=actor;reply={ok:status<400,json:async()=>result};tree();effects.splice(0).forEach(fn=>fn());await new Promise(resolve=>setImmediate(resolve));tree()}
+async function mount(actor,result,status=200,options={}){slots=[];effects=[];calls=[];current=actor;panelOptions=options;reply={ok:status<400,json:async()=>result};tree();effects.splice(0).forEach(fn=>fn());await new Promise(resolve=>setImmediate(resolve));tree()}
 (async()=>{
  await mount(user('admin'),{error:'GENERAL_CATALOG_UNAVAILABLE'},500);
  assert.ok(navigation().props.items.some(([key])=>key==='settings'),'administrator settings cannot depend on the failed catalog response');
@@ -25,5 +25,10 @@ async function mount(actor,result,status=200){slots=[];effects=[];calls=[];curre
  await mount(user('inventory-only',[],true),catalog(['manager']));assert.ok(!navigation().props.items.some(([key])=>key==='settings'));go('settings');assert.equal(imports().length,0);
  await mount(user('no-domain',['manager'],true,[]),catalog(['manager']));assert.ok(!navigation().props.items.some(([key])=>key==='settings'));go('settings');assert.equal(imports().length,0,'missing domain authorization cannot open settings');
  await mount(user('agent',['agent'],false),catalog(['manager']));current.permissions.serviceAgentId='agent-id';assert.ok(!navigation().props.items.some(([key])=>key==='settings'));
+ await mount(user('admin'),catalog([]),200,{transportAvailable:false});assert.ok(!nodes(tree()).some(n=>n.type==='button'&&text(n)==='رهگیری ارسال‌ها و برگشتی‌ها'),'a hidden transport section must not leave a dead service shortcut');
+ await mount(user('admin'),catalog([]),200,{transportAvailable:true});assert.ok(nodes(tree()).some(n=>n.type==='button'&&text(n)==='رهگیری ارسال‌ها و برگشتی‌ها'),'authorized transport shortcut remains available');
+ function reportText(){const report=nodes(tree()).find(n=>typeof n.type==='function'&&n.type.name==='ServiceReport');assert.ok(report);const panelSlots=slots;slots=[];cursor=0;const result=text(report.type(report.props));slots=panelSlots;return result;}
+ const ceo=user('ceo');ceo.permissions.supplyRoles=['ceo'];await mount(ceo,{...catalog([]),readOnly:true},200,{transportAvailable:false});go('reports');assert.ok(reportText().includes('پرونده‌های بازه'));assert.ok(!reportText().includes('ارزش مصرف به نرخ ثبت‌شده'),'redacted supervisory report cannot present a fabricated zero cost');
+ await mount(user('admin'),{...catalog([]),readOnly:false});go('reports');assert.ok(reportText().includes('ارزش مصرف به نرخ ثبت‌شده'),'operational report retains its recorded cost card');
  console.log('PASS after-sales navigation: administrator and scoped service manager retain settings during catalog failure or absent response roles; importer independently reachable with material permission; spoofed roles and missing domain cannot grant access; visible failure and retry recover.');
 })().catch(e=>{console.error(e);process.exitCode=1});

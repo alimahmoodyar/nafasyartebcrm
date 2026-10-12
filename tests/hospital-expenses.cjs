@@ -51,8 +51,10 @@ async function call(name,path,body){const role=roles.find(r=>r.name===name);cons
  await act(finance,'finance_review',{...review(two.id),acceptOverLimit:true});assert.equal(entity(two.id).data.state,'approved');
  await act(finance,'policy',{...policy,policyId:p.id,revision:entity(p.id).revision},400);
  const data=await call(manager,'hospital/expenses');assert.equal(data.d.claims.length,2);
- const other=await call('مدیر خدمات پس از فروش','hospital/expenses');assert.equal(other.d.claims.length,0);
- assert.equal((await call('مدیر خدمات پس از فروش','hospital/expenses/files?id='+file.id)).status,404);
+ // Supervisory report access does not make this other manager the approver.
+ const other=await call('مدیر خدمات پس از فروش','hospital/expenses');assert.equal(other.d.claims.length,2);
+ assert.equal((await call('مدیر خدمات پس از فروش','hospital/expenses/files?id='+file.id)).status,200);
+ await act('مدیر خدمات پس از فروش','manager_review',{...review(one.id),approved:false,notes:'Not assigned'},403);assert.equal(entity(one.id).data.state,'manager');
  await act(manager,'manager_review',{...review(one.id),approved:false,notes:'Rejected'});assert.equal(entity(one.id).data.state,'rejected');
  assert.equal(sql.prepare("SELECT count(*) n FROM flow_entities WHERE type GLOB 'expense_*'").get().n,0);
  const reset=load('lib/reset-contract.ts');assert.ok(!reset.resetFlowPreserved.includes('expense_claim'));

@@ -2,12 +2,18 @@ import {financialAccess} from './financial-access';
 import {session,AccessError} from './authorization';
 import {storage} from './storage';
 import type {Session} from './permissions';
-export const hospitalManager=(u:Session)=>!u.permissions.hospitalCenterId&&(u.isAdmin||!u.permissions.serviceAgentId&&u.permissions.serviceDomains?.includes('hospital')&&u.permissions.serviceRoles?.some(r=>['manager','coordinator'].includes(r)));
-export const hospitalFinance=(u:Session)=>!u.permissions.hospitalCenterId&&(u.isAdmin||financialAccess(u,'hospital',true)||!u.permissions.serviceAgentId&&u.permissions.serviceDomains?.includes('hospital')&&u.permissions.serviceRoles?.includes('finance'));
-export const hospitalTech=(u:Session)=>hospitalManager(u)||!u.permissions.hospitalCenterId&&!u.permissions.serviceAgentId&&u.permissions.serviceDomains?.includes('hospital')&&u.permissions.serviceRoles?.includes('technician');
-export const hospitalInventory=(u:Session)=>!u.permissions.hospitalCenterId&&!u.permissions.serviceAgentId&&(u.isAdmin||u.permissions.serviceDomains?.includes('hospital')&&u.permissions.serviceRoles?.includes('inventory'));
-export const hospitalLogistics=(u:Session)=>!u.permissions.hospitalCenterId&&!u.permissions.serviceAgentId&&(u.isAdmin||u.permissions.serviceDomains?.includes('hospital')&&u.permissions.serviceRoles?.includes('logistics'));
-export async function hospitalUser(){const u=await session();if(!u.permissions.hospitalCenterId&&!hospitalManager(u)&&!hospitalFinance(u)&&!(u.permissions.serviceDomains?.includes('hospital')&&!u.permissions.serviceAgentId&&u.permissions.serviceRoles?.some(r=>['support','intake','technician','inventory','logistics'].includes(r))))throw new AccessError('دسترسی خدمات بیمارستانی ندارید.',403);if(u.permissions.hospitalCenterId)await hospitalCenter(u,u.permissions.hospitalCenterId);return u;}
+import {serviceSupervisor,domainWriteAccess} from './service-access';
+const staff=(u:Session)=>!u.permissions.hospitalCenterId&&!u.permissions.serviceAgentId&&!u.permissions.salesAgentId&&!u.permissions.serviceRoles?.includes('agent')&&!u.permissions.salesRoles?.includes('agent');
+export const hospitalManager=(u:Session)=>staff(u)&&(u.isAdmin||domainWriteAccess(u,'hospital')&&u.permissions.serviceRoles?.some(r=>['manager','coordinator'].includes(r)));
+export const hospitalFinance=(u:Session)=>staff(u)&&(u.isAdmin||financialAccess(u,'hospital',true)||domainWriteAccess(u,'hospital')&&u.permissions.serviceRoles?.includes('finance'));
+export const hospitalTech=(u:Session)=>hospitalManager(u)||staff(u)&&domainWriteAccess(u,'hospital')&&u.permissions.serviceRoles?.includes('technician');
+export const hospitalInventory=(u:Session)=>staff(u)&&(u.isAdmin||domainWriteAccess(u,'hospital')&&u.permissions.serviceRoles?.includes('inventory'));
+export const hospitalLogistics=(u:Session)=>staff(u)&&(u.isAdmin||domainWriteAccess(u,'hospital')&&u.permissions.serviceRoles?.includes('logistics'));
+export const hospitalRead=(u:Session)=>!!u.permissions.hospitalCenterId||serviceSupervisor(u)||hospitalManager(u)||hospitalFinance(u)||!!(staff(u)&&domainWriteAccess(u,'hospital')&&u.permissions.serviceRoles?.some(r=>['support','intake','technician','inventory','logistics'].includes(r)));
+// Creating requests and asking the device assistant were available to hospital
+// staff and center accounts. Supervisory reading alone does not add those rights.
+export const hospitalOperationAccess=(u:Session)=>!!u.permissions.hospitalCenterId||!!hospitalFinance(u)||domainWriteAccess(u,'hospital')&&staff(u);
+export async function hospitalUser(){const u=await session();if(!hospitalRead(u))throw new AccessError('دسترسی خدمات بیمارستانی ندارید.',403);if(u.permissions.hospitalCenterId)await hospitalCenter(u,u.permissions.hospitalCenterId);return u;}
 export const htext=(v:unknown,max=4000)=>{if(typeof v!=='string'||v.length>max)throw new AccessError('متن معتبر وارد کنید.',400);return v.trim()};
 export const hreq=(v:unknown,max=200)=>{const s=htext(v,max);if(!s)throw new AccessError('فیلد الزامی خالی است.',400);return s};
 export async function hrow(id:string,type:string){const r:any=await storage().prepare('SELECT * FROM flow_entities WHERE id=? AND type=?').bind(id,type).first();if(!r)throw new AccessError('پرونده پیدا نشد.',404);return {...r,data:JSON.parse(r.data)};}
