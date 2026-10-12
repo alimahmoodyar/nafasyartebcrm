@@ -11,6 +11,7 @@ export {salesRep,salesManager,salesStaff,salesFinance,salesRead,salesWarehouse} 
 import {salesRep,salesRead,salesWarehouse,salesStaff,salesManager,salesFinance} from './sales-access';
 import {memberId} from './duties';
 import {termsPlan} from './sales-network-contract';
+import {salesPaymentDays,salesPaymentMaxDays,maxSalesPaymentDays} from './sales-payment-terms';
 import {selectSalesTemplate,selectSalesTemplatePrice} from './sales-template';
 import {approvedCostPrice} from './pricing-contract';
 // Defer imported validators until call time: duties and sales have circular imports.
@@ -57,12 +58,15 @@ export async function salesQuote(agent:any,items:any[],rows:any[],options:any={}
 
  if(!template&&options.salesTerms)salesFail('ابتدا مدیر الگوی عمومی را تعریف کند.');
  const requestedCash=options.salesTerms?.cashBps??template?.data.cashBps,requestedMonths=options.salesTerms?.months??template?.data.months;
+ const daily=template?.data.days!==undefined||options.salesTerms?.days!==undefined;
+ const requestedDays=daily?salesPaymentDays(options.salesTerms?.days!==undefined?options.salesTerms:options.salesTerms?.months!==undefined?{months:integer(options.salesTerms.months,0,12)}:template?.data,today):0;
+ const maxDays=daily?salesPaymentMaxDays(template?.data,today):0;
  // Ignore legacy maxCashBps/minMonths: higher cash and earlier settlement are allowed.
- if(template&&options.salesTerms){const minCash=template.data.minCashBps??0,maxMonths=template.data.maxMonths??12;if(Number(requestedCash)<minCash||Number(requestedMonths)>maxMonths)salesFail('شرایط پیشنهادی خارج از دامنه مجاز این نوع خریدار است؛ مدیر فروش باید آن را تأیید یا اصلاح کند.');}
- const terms=template?{templateId:template.id,templateRevision:template.revision,cashBps:integer(requestedCash,0,10000),months:integer(requestedMonths,0,12),standardCashBps:template.data.cashBps,standardMonths:template.data.months,minCashBps:template.data.minCashBps??0,maxCashBps:10000,minMonths:0,maxMonths:template.data.maxMonths??12}:null;
+ if(template&&options.salesTerms){const minCash=template.data.minCashBps??0,maxMonths=template.data.maxMonths??12;if(Number(requestedCash)<minCash||(daily?requestedDays>maxDays:Number(requestedMonths)>maxMonths))salesFail('شرایط پیشنهادی خارج از دامنه مجاز این نوع خریدار است؛ مدیر فروش باید آن را تأیید یا اصلاح کند.');}
+ const terms=template?{templateId:template.id,templateRevision:template.revision,cashBps:integer(requestedCash,0,10000),standardCashBps:template.data.cashBps,minCashBps:template.data.minCashBps??0,maxCashBps:10000,...(daily?{days:integer(requestedDays,0,maxSalesPaymentDays),standardDays:salesPaymentDays(template.data,today),maxDays:integer(maxDays,0,maxSalesPaymentDays)}:{months:integer(requestedMonths,0,12),standardMonths:template.data.months,minMonths:0,maxMonths:template.data.maxMonths??12})}:null;
  let referral:any=null;if(options.referrerId){const ref=rows.find(r=>r.type==='sales_agent'&&r.id===options.referrerId&&r.data.active&&r.data.kind==='referrer'),contracts=rows.filter(r=>r.type==='sales_contract'&&r.data.agentId===ref?.id&&r.data.state==='approved'&&r.data.start<=today&&r.data.end>=today);if(!ref||contracts.length!==1)salesFail('عامل معرف با قرارداد مصوب معتبر انتخاب کنید.');const c=contracts[0];referral={agentId:ref.id,contractId:c.id,bps:c.data.bps,basis:'net-collected-v1'};}
- const deliveryMode=agent.data.kind==='branch'?'consignment':'sale';
- const quote={...(terms?{salesTerms:terms,installments:termsPlan(String(total(lines,l=>l.net)),terms,today)}:{}),...(referral?{referral}:{}),agentId:agent.id,agentRevision:agent.revision,deliveryMode,day:today,lines,amount:String(total(lines,l=>l.net)),discount:String(total(lines,l=>l.discount)),discountBps:discountBlocked?0:discountBps,baseDiscountBps,discountBlocked,targetId:target?.id||'',targetRevision:target?.revision||0,targetProgress:progress?.progress||'0',discountPolicy:'max-category-and-earned-tier-v1',termDays:agent.data.termDays,due:addDay(today,agent.data.termDays),recipient:{name:agent.data.name,phone:agent.data.phone,address:agent.data.address,province:agent.data.province,city:agent.data.city}};
+ const deliveryMode=agent.data.kind==='branch'?'consignment':'sale',termDays=terms?salesPaymentDays(terms,today):agent.data.termDays;
+ const quote={...(terms?{salesTerms:terms,installments:termsPlan(String(total(lines,l=>l.net)),terms,today)}:{}),...(referral?{referral}:{}),agentId:agent.id,agentRevision:agent.revision,deliveryMode,day:today,lines,amount:String(total(lines,l=>l.net)),discount:String(total(lines,l=>l.discount)),discountBps:discountBlocked?0:discountBps,baseDiscountBps,discountBlocked,targetId:target?.id||'',targetRevision:target?.revision||0,targetProgress:progress?.progress||'0',discountPolicy:'max-category-and-earned-tier-v1',termDays,due:addDay(today,termDays),recipient:{name:agent.data.name,phone:agent.data.phone,address:agent.data.address,province:agent.data.province,city:agent.data.city}};
  return {...quote,quoteHash:await sha256(new TextEncoder().encode(JSON.stringify(quote)).buffer)};
 }
 export function publicSalesFile(f:any){const {objectKey,uploadSignature,actor,...data}=f.data;return {...f,data};}

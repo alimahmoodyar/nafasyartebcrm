@@ -442,6 +442,32 @@ async function expectQuote(templateId, rate, cashBps, months, agentId = 'buyer-r
   assert.equal(precise.discount, String(999999999999999999n - 999999999999999999n * 9000n / 10000n));
   assert.equal((await catalog.executeTool('preview_sales_order', preciseArgs, base, principal(staff, 'read'))).quoteHash, precise.quoteHash);
 
+  // Day definitions use the real MCP/HTTP handlers and the actual invoice day.
+  // Older calendar-month snapshots must remain byte-for-byte unchanged.
+  at('2026-10-26T08:00:00Z');
+  const oldSnapshots=sql.prepare("SELECT id,data FROM flow_entities WHERE type IN ('sales_order','sales_invoice') ORDER BY id").all();
+  const dailyBody=templateBody('representative',{effectiveFrom:'2026-10-26',days:47,maxDays:60});
+  for(const key of ['months','minMonths','maxMonths'])delete dailyBody[key];
+  await catalog.executeTool('sales_network_apply',{id:dailyBody.id,mode:'template',confirmed:true,data:dailyBody},base,principal());
+  assert.equal(entity(dailyBody.id).data.days,47);assert.equal(entity(dailyBody.id).data.maxDays,60);assert.equal(entity(dailyBody.id).data.months,undefined);
+  const repeatedDaily=await post(network,'/api/sales/network',dailyBody);assert.equal(repeatedDaily.repeated,true);
+  const dailyQuote=await quote();assert.equal(dailyQuote.salesTerms.days,47);assert.equal(dailyQuote.salesTerms.maxDays,60);assert.equal(dailyQuote.termDays,47);assert.equal(dailyQuote.due,'2026-12-12');assert.equal(dailyQuote.installments.find(p=>p.kind==='balance').due,'2026-12-12');
+  assert.equal((await catalog.executeTool('preview_sales_order',{agentId:'buyer-representative',items},base,principal(staff,'read'))).quoteHash,dailyQuote.quoteHash);
+  for(const days of [61,-1,0.5,'47'])await post(quoteApi,'/api/sales/quote',{agentId:'buyer-representative',items,salesTerms:{cashBps:5000,days}},staff,400);
+  const earlyDaily=await post(quoteApi,'/api/sales/quote',{agentId:'buyer-representative',items,salesTerms:{cashBps:10000,days:0}},staff);assert.ok(earlyDaily.installments.every(p=>p.due==='2026-10-26'));
+  const atLimit=await post(quoteApi,'/api/sales/quote',{agentId:'buyer-representative',items,salesTerms:{cashBps:5000,days:60}},staff);assert.equal(atLimit.salesTerms.days,60);
+  const dailyOrder=await order(dailyQuote);await post(sales,'/api/sales',salesBody('order_review',{orderId:dailyOrder.body.id,revision:1,approved:true}));
+  at('2026-10-27T08:00:00Z');
+  const dailyInvoiceBody=salesBody('invoice',{orderId:dailyOrder.body.id,revision:entity(dailyOrder.body.id).revision,reference:'DAY-BASED-INVOICE'});
+  await post(sales,'/api/sales',dailyInvoiceBody,finance);assert.equal(entity(dailyInvoiceBody.id).data.installments.find(p=>p.kind==='balance').due,'2026-12-13');assert.equal(entity(dailyInvoiceBody.id).data.salesTerms.days,47);
+  const beforeNewVersion=sql.prepare('SELECT data FROM flow_entities WHERE id=?').get(dailyInvoiceBody.id).data;
+  await saveTemplate('representative',{effectiveFrom:'2026-10-27',days:15,maxDays:60});assert.equal((await quote()).salesTerms.days,15);assert.equal(sql.prepare('SELECT data FROM flow_entities WHERE id=?').get(dailyInvoiceBody.id).data,beforeNewVersion);
+  for(const previous of oldSnapshots)assert.equal(sql.prepare('SELECT data FROM flow_entities WHERE id=?').get(previous.id).data,previous.data,'Legacy order/invoice snapshot '+previous.id);
+  for(const values of [{days:70,maxDays:60},{days:-1},{days:1.5},{days:'30'},{days:30,maxDays:367}])await saveTemplate('representative',{effectiveFrom:'2026-10-27',...values},400);
+  const payment=load('lib/sales-payment-terms.ts'),paymentContract=load('lib/sales-network-contract.ts');
+  for(const [day,days,end] of [['2028-02-28',2,'2028-03-01'],['2026-12-31',1,'2027-01-01'],['2026-03-20',1,'2026-03-21'],['2026-10-27',0,'2026-10-27']])assert.equal(paymentContract.termsPlan('101',{cashBps:5000,days},day).find(p=>p.kind==='balance').due,end);
+  for(const day of ['2026-03-20','2026-09-20','2028-02-28'])assert.equal(payment.addPaymentDays(day,payment.salesPaymentDays({months:1},day)),paymentContract.addSolarMonths(day,1));
+  console.log('PASS day-based sales terms: exact day invoices, zero/maximum limits, invalid input rollback, month-end/year/leap boundaries, HTTP/MCP parity and immutable legacy snapshots.');
   sql.prepare("UPDATE app_members SET status='inactive' WHERE id='manager'").run();
   const revoked = templateBody();
   await post(network, '/api/sales/network', revoked, manager, 403);

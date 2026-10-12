@@ -10,6 +10,7 @@ import type {Session} from './permissions';
 import {trainingContext} from './training-context';
 import {isIsoDay} from './persian-date';
 import {latestSalesTemplate,selectFixedSalesTemplate,promotionEndDay,overlappingSalesPromotion} from './sales-template';
+import {maxSalesPaymentDays} from './sales-payment-terms';
 export async function networkActor(u:Session){const members=await leadMembers();if(trainingContext.getStore())fail('این بخش در اطلاعات شرکت اجرا می‌شود.',403);if(!u.isAdmin){const m=members.find(m=>m.status==='active'&&(m.subject===u.userId||'local:'+m.id===u.userId));if(!m)fail('دسترسی فعال لازم است.',403);u={...u,permissions:storedAccessPermissions(m.permissions)};}if(!salesRead(u))fail('دسترسی فروش لازم است.',403);return {u,members};}
 export async function readNetwork(actor:Session){const {u}=await networkActor(actor),rows=await salesRows(),today=dayAt(),agents=[];for(const a of rows.filter(r=>r.type==='sales_agent'))if(await salesVisible(u,a,'read')&&(!salesRep(u)||a.data.active))agents.push(a);const ids=new Set(agents.map(a=>a.id));
  const products=(await storage().prepare("SELECT id,payload FROM records WHERE kind='product'").all()).results.map((r:any)=>{const p=JSON.parse(r.payload);return {id:r.id,name:p.name||p.model||p.code,model:p.model||'',status:p.status};});
@@ -42,12 +43,14 @@ export async function applyNetwork(actor:Session,b:any){const {u,members}=await 
    const overlap=overlappingSalesPromotion(rows,b.kind,effectiveFrom,effectiveTo!);if(overlap)fail('بازه پروموشن با پروموشن قبلی این نوع خریدار همپوشانی دارد؛ روز شروع و پایان هر دو جزو بازه هستند.');
    period={durationDays,effectiveTo:effectiveTo!};
   }
-  // Earlier settlement and higher cash share are allowed; canonical legacy limits preserve client compatibility.
-  const cashBps=integer(b.cashBps,0,10000),minCashBps=integer(b.minCashBps??0,0,10000),months=integer(b.months,0,12),maxMonths=integer(b.maxMonths??12,0,12);
-  if(minCashBps>cashBps||months>maxMonths)fail('مقدار پیش‌فرض باید داخل دامنه مجاز باشد.');
+  // New templates use actual days. Retain the legacy HTTP contract without
+  // rewriting saved calendar-month templates or order snapshots.
+  const cashBps=integer(b.cashBps,0,10000),minCashBps=integer(b.minCashBps??0,0,10000);
+  const term:{days:number,maxDays:number}|{months:number,minMonths:number,maxMonths:number}=b.days!==undefined?{days:integer(b.days,0,maxSalesPaymentDays),maxDays:integer(b.maxDays??maxSalesPaymentDays,0,maxSalesPaymentDays)}:{months:integer(b.months,0,12),minMonths:0,maxMonths:integer(b.maxMonths??12,0,12)};
+  if(minCashBps>cashBps||('days' in term?term.days>term.maxDays:term.months>term.maxMonths))fail('مقدار پیش‌فرض باید داخل دامنه مجاز باشد.');
   const previous=latestSalesTemplate(rows,b.kind);if((previous?.id||'')!==(b.previousId||''))fail('الگو تغییر کرده؛ تازه‌سازی کنید.',409);
   const baseline=selectFixedSalesTemplate(rows,b.kind,effectiveFrom),discountBps=integer(b.discountBps??baseline?.data.discountBps??0,0,9000);
-  put(b.id,'sales_template',{kind:b.kind,title:sreq(b.title),templateType,effectiveFrom,...period,productPrices,discountBps,cashBps,minCashBps,maxCashBps:10000,months,minMonths:0,maxMonths,version:(previous?.data.version||0)+1,previousId:previous?.id||''});
+  put(b.id,'sales_template',{kind:b.kind,title:sreq(b.title),templateType,effectiveFrom,...period,productPrices,discountBps,cashBps,minCashBps,maxCashBps:10000,...term,version:(previous?.data.version||0)+1,previousId:previous?.id||''});
  }
  else if(b.mode==='partner'){if(a!.revision!==b.revision)fail('نسخه تغییر کرده است.',409);if(!Object.hasOwn(partnerKinds,b.kind)||!leadEligible(members.find(m=>m.id===b.ownerId)))fail('نوع همکاری و مسئول فروش فعال لازم است.');if((a!.data.kind==='referrer')!==(b.kind==='referrer')&&rows.some(r=>r.data.agentId===a!.id&&['sales_order','sales_invoice','sales_contract','sales_payment'].includes(r.type)))fail('نوع حساب دارای سابقه مالی قابل تبدیل نیست؛ پرونده جدا ایجاد کنید.');put(a!.id,'sales_agent',{...a!.data,kind:b.kind,ownerId:b.ownerId,contactDays:integer(b.contactDays,1,365),reorderDays:integer(b.reorderDays,1,365)},a);}
  else if(b.mode==='check_link'){const r=current('sales_payment');if(r.data.method!=='check'||!['received','bounced'].includes(r.data.state)||rows.some(v=>v.type==='sales_allocation'&&v.data.creditId===r.id))fail('فقط چک بدون تخصیص قبلی قابل اتصال است.');const invoice=rows.find(v=>v.type==='sales_invoice'&&v.id===b.invoiceId&&v.data.agentId===a!.id);if(!invoice)fail('فاکتور همین شریک لازم است.');put(r.id,r.type,{...r.data,checkInvoiceId:invoice.id},r);}

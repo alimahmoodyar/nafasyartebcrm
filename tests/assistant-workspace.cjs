@@ -118,17 +118,17 @@ const forms=load('app/api/assistant/forms/route.ts'),workspace=load('lib/assista
  assert.equal(workspace.matchedOperationForm('فرم ایجاد سرنخ فروش را بیار',allChoices,eligible).tool,'sales_lead_apply');
  for(const [tool,section] of [['generate_serials','serials'],['create_quality_template','product'],['move_batch_stock','inventory'],['create_production_sheet','event']])assert.equal(policy.actionSection(tool,{}),section);
  assert.equal(sql.prepare('SELECT COUNT(*) n FROM app_members').get().n,memberCount);
- // The model must not turn unspecified payment defaults into a zero-cash/zero-month override.
+ // The model must not turn unspecified payment defaults into a zero-cash/zero-day override.
  sql.prepare("DELETE FROM login_attempts WHERE key='assistant:owner'").run();
  const seed=(id,type,data)=>sql.prepare('INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?)').run(id,type,JSON.stringify(data),now,now);
  seed('assistant-buyer','sales_agent',{name:'باران سلامت',kind:'representative',active:true,termDays:30,creditLimit:'100000',phone:'02111111111',address:'Actual address'});
  seed('assistant-price','sales_price',{agentId:'',productId:'assistant-soshia',unitPrice:'1000',active:true});
- seed('assistant-template','sales_template',{kind:'representative',discountBps:1000,cashBps:5000,months:1,version:1});
+ seed('assistant-template','sales_template',{kind:'representative',discountBps:1000,cashBps:5000,days:47,maxDays:60,version:1});
  sql.prepare("INSERT INTO records(id,kind,payload,created) VALUES('assistant-soshia','product',?,?)").run(JSON.stringify({name:'سوشیا',model:'Soshia',status:'فعال'}),now);
- round=0;cache[providerFile].providerRequest=async()=>({choices:[{message:round++===0?{tool_calls:[{id:'sale',type:'function',function:{name:'show_operation_form',arguments:JSON.stringify({tool:'sales_apply',args:{mode:'order',agentId:'assistant-buyer',items:[{productId:'assistant-soshia',quantity:5}],salesTerms:{cashBps:0,months:0}}})}}]}:{content:'خلاصه فروش آماده بررسی است.'}}]});
- response=await run(admin,()=>chat.POST(request('/api/assistant','POST',{requestId:crypto.randomUUID(),profileId,message:'میخوام پنج دستگاه سوشیا به نماینده باران سلامت بفروشم'})));
+ round=0;cache[providerFile].providerRequest=async()=>({choices:[{message:round++===0?{tool_calls:[{id:'sale',type:'function',function:{name:'show_operation_form',arguments:JSON.stringify({tool:'sales_apply',args:{mode:'order',agentId:'assistant-buyer',items:[{productId:'assistant-soshia',quantity:5}],salesTerms:{cashBps:0,days:0}}})}}]}:{content:'خلاصه فروش آماده بررسی است.'}}]});
+ response=await run(admin,()=>chat.POST(request('/api/assistant','POST',{requestId:crypto.randomUUID(),profileId,message:'امروز میخوام پنج دستگاه سوشیا به نماینده باران سلامت بفروشم'})));
  assert.equal(response.status,200,await response.clone().text());const saleDraft=await response.json();
- assert.equal(saleDraft.workspace.args.mode,'order');assert.equal(saleDraft.workspace.args.salesTerms,undefined);assert.equal(saleDraft.workspace.preview.salesTerms.cashBps,5000);assert.equal(saleDraft.workspace.preview.salesTerms.months,1);
+ assert.equal(saleDraft.workspace.args.mode,'order');assert.equal(saleDraft.workspace.args.salesTerms,undefined);assert.equal(saleDraft.workspace.preview.salesTerms.cashBps,5000);assert.equal(saleDraft.workspace.preview.salesTerms.days,47);
  assert.equal(saleDraft.workspace.preview.amount,'4500');assert.equal(saleDraft.workspace.preview.buyer.name,'باران سلامت');assert.equal(saleDraft.actions.filter(a=>a.state==='pending').length,0);
  assert.equal(sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type='sales_order'").get().n,0,'Showing a sales draft must not sell devices');
  console.log('PASS assistant sale intent: compact named preview, configured discount/payment defaults, model-invented zero override removed, no business writes.');
