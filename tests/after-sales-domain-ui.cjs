@@ -25,10 +25,12 @@ const apps=[{key:'after-sales'},{key:'hospital'},{key:'service'}],supervisor=use
 slots=[];const html=renderToStaticMarkup(React.createElement(PersonalHome,{accountId:'test',name:'test',apps:[{key:'after-sales',title:'خدمات پس از فروش',icon:leaf('Icon')},{key:'service',title:'سوابق خدمات قبلی',icon:leaf('Icon')}],onNavigate(){}}));assert.ok(html.includes('<strong>خدمات پس از فروش</strong>'));assert.ok(html.includes('<strong>سوابق خدمات قبلی</strong>'));assert.ok(!html.includes('<strong>خدمات</strong>'));
 // A nested disclosure can request a parent menu before a failed/empty panel has
 // registered one. Relay through that panel instead of trapping the back action.
-const {ProgramWorkspace}=load('components/trace/program-workspace.tsx');assert.equal(contexts.length,4);let parentOpened=0,rootOpened=0;
-contextValues.set(contexts[0],'qa-account');contextValues.set(contexts[1],()=>rootOpened++);contextValues.set(contexts[2],'outer');contextValues.set(contexts[3],{open(){parentOpened++}});
+const {ProgramWorkspace,LayoutAccountProvider,SubprogramNavigation}=load('components/trace/program-workspace.tsx');let parentOpened=0,rootOpened=0;
+slots=[];cursor=0;const accountTree=LayoutAccountProvider({accountId:'qa-account',onBack:()=>rootOpened++,children:null});for(const element of nodes(accountTree))if(element.type?.$$typeof===Symbol.for('react.context'))contextValues.set(element.type,element.props.value);
 function workspace(){cursor=0;return ProgramWorkspace({programId:'empty-child',title:'Empty child',children:React.createElement('p',null,'Empty or failed catalog')})}
-slots=[];workspace().props.value.open();assert.equal(parentOpened,1,'opening the menu of an empty nested panel must relay to its parent');assert.equal(rootOpened,0);
+slots=[];const navigationContext=workspace().type;contextValues.set(navigationContext,{open(){parentOpened++}});workspace().props.value.open();assert.equal(parentOpened,1,'opening the menu of an empty nested panel must relay to its parent');assert.equal(rootOpened,0);
 workspace().props.value.register({items:[['one','One']],value:'one',onChange(){}});workspace().props.value.open();assert.equal(parentOpened,1,'a registered local menu opens locally');assert.equal(slots[1],true);
-slots=[];contextValues.set(contexts[3],null);workspace().props.value.open();assert.equal(rootOpened,1,'an empty top-level panel relays to the account root');
+assert.ok(!nodes(workspace()).some(n=>n.type==='button'),'workspaces cannot render a duplicate body back button');
+for(const value of ['one','']){cursor=0;const route=SubprogramNavigation({items:[['one','One']],value,onChange(){}});assert.ok(!nodes(route).some(n=>n.type==='button'),'scoped subprogram breadcrumbs cannot add another back/return button');}
+slots=[];contextValues.set(navigationContext,null);workspace().props.value.open();assert.equal(rootOpened,1,'an empty top-level panel relays to the account root');
 console.log('PASS service domain UI: full root label and legacy archive label; lazy two-domain supervisor navigation; fixed keyed home/hospital children; isolated hospital centers/partners; scoped staff and agents; no stale unauthorized child; direct hospital route hidden only when the service hub is available.');

@@ -1,21 +1,24 @@
 'use client';
 import {NumberInput} from '@/components/trace/number-input';
-import {IconDisclosure,IconActions} from "./program-workspace";
-import {useEffect,useState} from 'react';
+import {IconDisclosure,IconActions,useWorkspaceBack} from "./program-workspace";
+import {useEffect,useState,useRef} from 'react';
 import {SolarDate} from './solar-date';
 import {formatDate,formatDateTime,localDay,latinDigits} from '@/lib/persian-date';
 const money=(v:any)=>v===null||v===undefined?'—':Number(v).toLocaleString('fa-IR',{maximumFractionDigits:2})+' ریال';
 const states:Record<string,string>={draft:'پیش‌نویس بازرگانی',submitted:'منتظر تأیید مالی',returned:'برگشت برای اصلاح',approved:'تأیید و قیمت‌گذاری‌شده',reopened:'بازگشایی برای اصلاح'};
 export function PurchaseSettlementPanel({planId='',initialOrderId=''}:{planId?:string;initialOrderId?:string}){
  const [catalog,setCatalog]=useState<any>(null),[detail,setDetail]=useState<any>(null),[draft,setDraft]=useState<any>(null),[action,setAction]=useState<any>(null),[review,setReview]=useState<any>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[message,setMessage]=useState('');
+ const detailSequence=useRef(0),[detailLoading,setDetailLoading]=useState(false);
+ const backRef=useWorkspaceBack(()=>{if(busy)return;detailSequence.current++;setDetailLoading(false);setError('');if(action)setAction(null);else if(review)setReview(null);else if(draft)setDraft(null);else setDetail(null)},!!detail||!!draft||!!action||!!review||detailLoading||busy);
  const base='/api/purchase-settlement';
  async function read(url:string){const r=await fetch(url,{cache:'no-store'}),d=await r.json() as any;if(!r.ok)throw Error(d.error);return d;}
  async function load(){setCatalog(await read(base+(planId?'?plan='+encodeURIComponent(planId):'')));}
- async function open(id:string){setDraft(null);setReview(null);setAction(null);setError('');setDetail(await read(base+'?id='+encodeURIComponent(id)));}
+ async function open(id:string){const n=++detailSequence.current;setDraft(null);setReview(null);setAction(null);setDetail(null);setDetailLoading(true);setError('');try{const next=await read(base+'?id='+encodeURIComponent(id));if(n===detailSequence.current)setDetail(next)}catch(e){if(n===detailSequence.current)throw e}finally{if(n===detailSequence.current)setDetailLoading(false)}}
+ async function refresh(){const n=detailSequence.current;await load();if(n===detailSequence.current&&detail&&!draft&&!review&&!action)await open(detail.settlement.id);}
  useEffect(()=>{void load().catch(e=>setError(e.message));},[planId]);
  const set=(k:string,v:any)=>setDraft((d:any)=>({...d,[k]:v}));
  const setLine=(i:number,k:string,v:any)=>setDraft((d:any)=>({...d,lines:d.lines.map((l:any,n:number)=>i===n?{...l,[k]:v}:l)}));
- function start(s?:any){setReview(null);setAction(null);const candidates=catalog.receipts.filter((r:any)=>(!r.claimedBy||r.claimedBy===s?.id)&&(!initialOrderId||r.data.purchaseOrderId===initialOrderId));
+ function start(s?:any){detailSequence.current++;setDetailLoading(false);setReview(null);setAction(null);const candidates=catalog.receipts.filter((r:any)=>(!r.claimedBy||r.claimedBy===s?.id)&&(!initialOrderId||r.data.purchaseOrderId===initialOrderId));
   const rows=s?.data.lines||(initialOrderId?candidates:[]).map((r:any)=>({receiptId:r.id,invoiceQuantity:String((r.data.quantityCheck?.invoiceQuantity||r.data.quantity)/1000),unitPrice:'',discount:'0',notes:'مطابق فاکتور'}));
   setDraft({...s?.data,mode:'save',id:crypto.randomUUID(),confirmed:true,settlementId:s?.id,revision:s?.revision||0,invoiceNumber:s?.data.invoiceNumber||'',invoiceDay:s?.data.invoiceDay||localDay(),currency:s?.data.currency||'IRR',fxRate:s?.data.fxRate||'1',fxDate:s?.data.fxDate||localDay(),fxSource:s?.data.fxSource||'',shipmentScope:s?.data.shipmentScope||'',lines:rows,expenses:s?.data.expenses||[],recoverableTaxRial:s?.data.recoverableTaxRial||'0',reportedPaidRial:s?.data.reportedPaidRial||'0',paymentReference:s?.data.paymentReference||'پرداخت گزارش نشده',notes:''});
  }
@@ -28,9 +31,10 @@ export function PurchaseSettlementPanel({planId='',initialOrderId=''}:{planId?:s
  const s=detail?.settlement,d=s?.data,p=detail?.preview;
  const input=(key:string,label:string,numeric=false)=><label className="field">{label}<NumberInput fieldKey={key} required value={draft[key]??''} onChange={e=>set(key,numeric?latinDigits(e.target.value):e.target.value)}/></label>;
  const eligible=catalog.receipts.filter((r:any)=>!r.claimedBy||r.claimedBy===draft?.settlementId);
- return <div><h2>تسویه خرید و قیمت‌گذاری بچ</h2><p>فاکتور نهایی و مدارک با بازرگانی؛ تخصیص هزینه و تأیید قیمت با مالی.</p>{error&&<p className="notice error" role="alert">{error}</p>}{message&&<p role="status">{message}</p>}
- <IconActions scope="purchase-settlement-panel-actions-8d5ea69260"><button className="btn" disabled={busy} onClick={()=>{setDetail(null);setDraft(null);setReview(null);setAction(null);void load().catch(e=>setError(e.message));}}>فهرست / تازه‌سازی</button>{catalog.buyerRoutes.length>0&&<button className="btn primary" disabled={busy} onClick={()=>{setDetail(null);start();}}>پرونده جدید</button>}</IconActions>
- {!detail&&!draft&&<>{!catalog.settlements.length&&<p className="empty">پرونده تسویه‌ای ثبت نشده است. بعد از دریافت کالا، بازرگانی پرونده را ایجاد و فاکتور را پیوست کند.</p>}{catalog.settlements.filter((s:any)=>!initialOrderId||s.data.lines.some((l:any)=>catalog.receipts.find((r:any)=>r.id===l.receiptId)?.data.purchaseOrderId===initialOrderId)).map((s:any)=><article className="flow-card" key={s.id}><h3>{s.data.supplier} · فاکتور {s.data.invoiceNumber}</h3><p>{states[s.data.state]} · {formatDate(s.data.invoiceDay)}</p><button className="btn" disabled={busy} onClick={()=>void open(s.id).catch(e=>setError(e.message))}>باز کردن پرونده</button></article>)}</>}
+ return <div ref={backRef} data-workspace-mutation-busy={busy}><h2>تسویه خرید و قیمت‌گذاری بچ</h2><p>فاکتور نهایی و مدارک با بازرگانی؛ تخصیص هزینه و تأیید قیمت با مالی.</p>{error&&<p className="notice error" role="alert">{error}</p>}{message&&<p role="status">{message}</p>}
+ <IconActions scope="purchase-settlement-panel-actions-8d5ea69260"><button className="btn" disabled={busy} onClick={()=>void refresh().catch(e=>setError(e.message))}>تازه‌سازی</button>{catalog.buyerRoutes.length>0&&<button className="btn primary" disabled={busy} onClick={()=>{setDetail(null);start();}}>پرونده جدید</button>}</IconActions>
+ {detailLoading&&<p role="status">در حال دریافت پرونده…</p>}
+ {!detail&&!draft&&!detailLoading&&<>{!catalog.settlements.length&&<p className="empty">پرونده تسویه‌ای ثبت نشده است. بعد از دریافت کالا، بازرگانی پرونده را ایجاد و فاکتور را پیوست کند.</p>}{catalog.settlements.filter((s:any)=>!initialOrderId||s.data.lines.some((l:any)=>catalog.receipts.find((r:any)=>r.id===l.receiptId)?.data.purchaseOrderId===initialOrderId)).map((s:any)=><article className="flow-card" key={s.id}><h3>{s.data.supplier} · فاکتور {s.data.invoiceNumber}</h3><p>{states[s.data.state]} · {formatDate(s.data.invoiceDay)}</p><button className="btn" disabled={busy} onClick={()=>void open(s.id).catch(e=>setError(e.message))}>باز کردن پرونده</button></article>)}</>}
  {detail&&!draft&&<><h3>{d.supplier} · فاکتور {d.invoiceNumber}</h3><p>{states[d.state]} · {formatDate(d.invoiceDay)} · ارز {d.currency}</p><p>محدوده فاکتور/محموله: {d.shipmentScope}</p><p>نرخ ریالی فعلی: {p.fxRate} · منبع: {d.finance?.fxSource||d.fxSource}</p>{d.returnNote&&<p className="notice">علت برگشت: {d.returnNote}</p>}{d.approvals?.length>0&&d.state!=='approved'&&<p className="notice">قیمت تأیید قبلی تا تأیید اصلاحیه برقرار است.</p>}
  {table(['بچ / قطعه','فاکتور','دریافت','تأیید / رد','خالص کالا','سهم هزینه','خدمت متصل (بدون ثبت دوباره)','خارج از موجودی','قیمت واحد فعلی','قیمت واحد پیشنهادی'],p.lines.map((l:any)=>[l.receiptId+' / '+l.partCode,l.invoiceQuantity,l.received/1000,(l.accepted/1000)+' / '+(l.rejected/1000),money(l.net),money(l.extras),money(l.serviceCost),money(l.excluded),money(l.currentUnitCost),money(l.unitCost)]))}
  <p>جمع کالا و هزینه مستقیم: {money(p.total)} · مالیات قابل بازیافت، خارج از قیمت موجودی: {money(d.recoverableTaxRial)}</p><p>پرداخت اعلام‌شده: {money(d.reportedPaidRial)} · مرجع: {d.paymentReference} (بدون ثبت سند پرداخت)</p>
