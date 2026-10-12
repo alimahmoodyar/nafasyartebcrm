@@ -87,6 +87,47 @@ function latest(id){const r=sql.prepare('SELECT * FROM duty_runs WHERE id=?').ge
  assert.ok(!(await call('install_duty_starter',{id:crypto.randomUUID(),confirmed:true})).error);
  const roleList=await call('get_position_programs',{positionId:''});assert.equal(roleList.positions.length,17);const roleDetail=await call('get_position_programs',{positionId:existingId});assert.equal(roleDetail.templates.length,4);assert.equal(roleDetail.position.data.mission,'Updated through MCP');assert.ok(JSON.stringify(roleDetail).length<16000);
  assert.equal((await as(outsider,()=>tasks.GET(request('/api/tasks?view=positions&position='+existingId)))).status,404);const ownRole=await (await as(worker,()=>tasks.GET(request('/api/tasks?view=positions&position='+existingId)))).json();assert.equal(ownRole.templates.length,4);assert.equal(ownRole.position.data.members,undefined);
+ // Each catalog role must earn this specialized entry through purchase work or an actual receipt assignment.
+ const policy=load('lib/permissions.ts'),services=load('app/api/purchase-services/route.ts');
+ const purchaseRoles=new Set(['domestic','foreign','commerce','domestic_commerce_lead','foreign_commerce_lead','purchase_finance','ceo']),roleUsers=[];
+ const entity=(id,data)=>sql.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'purchase_service',?,1,?,?)").run(id,JSON.stringify(data),now,now);
+ const serviceData=ownerId=>({title:'Assigned service',expected:'Actual output',amount:'100',ownerId,due:day,design:false,state:'accepted',costs:[],history:[]});
+ const mcpRead=(name,u)=>catalog.executeTool(name,{},base,{user:u,scope:'read',tokenId:null});
+ for(const role of policy.jobRoles){
+  const assignment={roles:[role.id],...(role.scope==='warehouses'?{warehouses:[role.id==='production_store_assistant'?'line':'raw']}:{}),...(['services','serviceAgent'].includes(role.scope)?{serviceDomains:['home']}:{}),...(role.scope==='salesAgent'?{salesAgentId:'rep-test'}:{}),...(role.scope==='serviceAgent'?{serviceAgentId:'service-test'}:{})};
+  const u={...worker,userId:'role-user:'+role.id,email:role.id+'@role.test',permissions:policy.validatePermissions({roleAssignment:assignment})},mid='role-member:'+role.id;roleUsers.push({role,u,mid});
+  sql.prepare("INSERT INTO app_members(id,email,name,unit,status,subject,permissions,created,updated) VALUES(?,?,?,'Test','active',?,?,?,?)").run(mid,u.email,role.label,u.userId,JSON.stringify(u.permissions),now,now);
+  const inbox=await (await as(u,()=>tasks.GET())).json();assert.equal(inbox.canPurchaseServices,purchaseRoles.has(role.id),role.id+': unassigned icon');
+  assert.equal((await as(u,()=>services.GET())).status,purchaseRoles.has(role.id)?200:403,role.id+': unassigned HTTP');
+  assert.equal((await mcpRead('get_task_inbox',u)).canPurchaseServices,purchaseRoles.has(role.id),role.id+': MCP inbox');
+  if(!purchaseRoles.has(role.id))await assert.rejects(()=>mcpRead('get_purchase_services',u));
+ }
+ for(const {role,u,mid} of roleUsers){
+  const internal=!['sales_agent','service_agent'].includes(role.id),sid='assigned:'+role.id;entity(sid,serviceData(mid));
+  const inbox=await (await as(u,()=>tasks.GET())).json();assert.equal(inbox.canPurchaseServices,internal,role.id+': explicitly assigned icon');
+  const r=await as(u,()=>services.GET());assert.equal(r.status,internal?200:403,role.id+': assigned HTTP');
+  if(internal){const view=await r.json();assert.deepEqual(Array.from(view.services,s=>s.id),[sid],role.id+': receiver scope');assert.equal(view.services[0].canReceive,true);assert.equal(view.finance,role.id==='purchase_finance');const mcpView=await mcpRead('get_purchase_services',u);assert.deepEqual(Array.from(mcpView.services,s=>s.id),[sid],role.id+': MCP scope');}
+  else await assert.rejects(()=>mcpRead('get_purchase_services',u));
+  // Design receipt requires design authority even when it is explicitly assigned.
+  sql.prepare('UPDATE flow_entities SET data=? WHERE id=?').run(JSON.stringify({...serviceData(mid),design:true}),sid);
+  const allowed=purchaseRoles.has(role.id)||role.id==='engineering';assert.equal((await (await as(u,()=>tasks.GET())).json()).canPurchaseServices,allowed,role.id+': design icon');
+  assert.equal((await as(u,()=>services.GET())).status,allowed?200:403,role.id+': design HTTP');
+  sql.prepare('DELETE FROM flow_entities WHERE id=?').run(sid);
+ }
+ const tr=roleUsers.find(x=>x.role.id==='treasurer'),sid='treasury-receipt';entity(sid,serviceData(tr.mid));
+ assert.equal((await (await as(tr.u,()=>tasks.GET())).json()).canPurchaseServices,true);
+ sql.prepare('UPDATE flow_entities SET data=? WHERE id=?').run(JSON.stringify(serviceData('w')),sid);
+ assert.equal((await (await as(tr.u,()=>tasks.GET())).json()).canPurchaseServices,false);assert.equal((await as(tr.u,()=>services.GET())).status,403);await assert.rejects(()=>mcpRead('get_purchase_services',tr.u));
+ for(const [extra,allowed] of [['finance',false],['purchase_finance',true]]){const combined={...tr.u,permissions:policy.validatePermissions({roleAssignment:{roles:['treasurer',extra]}})};sql.prepare('UPDATE app_members SET permissions=? WHERE id=?').run(JSON.stringify(combined.permissions),tr.mid);assert.equal((await (await as(combined,()=>tasks.GET())).json()).canPurchaseServices,allowed,'Combined treasury + '+extra);assert.equal((await as(combined,()=>services.GET())).status,allowed?200:403);}
+ sql.prepare('UPDATE app_members SET permissions=? WHERE id=?').run(JSON.stringify(tr.u.permissions),tr.mid);assert.equal((await (await as(tr.u,()=>tasks.GET())).json()).canPurchaseServices,false,'Removing the purchase role removes the icon');
+ // Ownership is read from the source record, including completed receipts beyond the 300-task window.
+ for(let n=0;n<301;n++)sql.prepare("INSERT INTO duty_runs(id,template_id,period,assignee,supervisor,due,state,data,revision,created,updated) VALUES(?, 'test-limit', ?, 'w',NULL,?,'open',?,1,?,?)").run('limit:'+n,String(n),now,JSON.stringify({title:'Other work',instructions:'Test'}),now,now);
+ const workerInbox=await (await as(worker,()=>tasks.GET())).json();assert.equal(workerInbox.tasks.length,300);assert.equal(workerInbox.canPurchaseServices,true);assert.ok(!workerInbox.tasks.some(t=>t.data.purchaseServiceWorkflow));
+ // Member activation and current permissions override a stale caller's role grants.
+ const purchase=roleUsers.find(x=>x.role.id==='purchase_finance');sql.prepare("UPDATE app_members SET permissions=? WHERE id=?").run(JSON.stringify(worker.permissions),purchase.mid);
+ assert.equal((await (await as(purchase.u,()=>tasks.GET())).json()).canPurchaseServices,false);assert.equal((await as(purchase.u,()=>services.GET())).status,403);
+ sql.prepare("UPDATE app_members SET status='disabled' WHERE id='w'").run();assert.equal((await (await as(worker,()=>tasks.GET())).json()).canPurchaseServices,false);assert.equal((await as(worker,()=>services.GET())).status,403);
+ console.log('PASS specialized task access: '+roleUsers.length+' roles, unassigned/assigned HTTP and MCP scopes, design revocation, reassignment, stale roles, inactive accounts and ownership beyond 300 tasks.');
  console.log('Starter passed: 16 positions / 64 drafts, concurrent install once, normalized existing names, preserve edits/assignees, no automatic duties, safe activation dates, private own profiles and MCP edit parity.');
  console.log('Duties passed: concurrent/deduplicated scheduling, Tehran/Persian dates, owner/supervisor isolation, private evidence, required uploads, stale revisions, review, blocked/extension, no self approval, idempotency, no reminders after completion, scheduler auth and MCP scopes.');
 })().catch(e=>{console.error(e);process.exit(1)});

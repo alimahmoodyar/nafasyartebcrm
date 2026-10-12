@@ -8,7 +8,7 @@ const names:Record<string,string>={create:'تعهد خدمت جدید',deliver:'
 const money=(s:any)=>Number(s||0).toLocaleString('fa-IR')+' ریال';
 export function PurchaseServicesPanel({onNavigate}:{onNavigate?:(s:string)=>void}){
  const [data,setData]=useState<any>(null),[error,setError]=useState(''),[draft,setDraft]=useState<any>(null),[busy,setBusy]=useState(false),[filter,setFilter]=useState('all'),[search,setSearch]=useState('');
- async function load(){const r=await fetch('/api/purchase-services',{cache:'no-store'}),d:any=await r.json();if(!r.ok)throw Error(d.error);setData(d);}
+ async function load(){const r=await fetch('/api/purchase-services',{cache:'no-store'}),d:any=await r.json();if(!r.ok){setData(null);if(r.status===403)window.dispatchEvent(new Event('nafasyar-tasks-changed'));throw Error(d.error);}setData(d);}
  useEffect(()=>{void load().catch(e=>setError(e.message));const f=()=>void load().catch(e=>setError(e.message));window.addEventListener('focus',f);const t=setInterval(f,60000);return()=>{clearInterval(t);window.removeEventListener('focus',f)}},[]);
  const start=(mode:string,s?:any)=>{setError('');setDraft({mode,id:crypto.randomUUID(),confirmed:true,revision:s?.revision||0,serviceId:s?.id,notes:'',costs:[],ownerId:s?.data.ownerId||'',due:s?.data.due||'',amount:s?.data.amount||''});};
  const field=(k:string,v:any)=>setDraft({...draft,[k]:v});
