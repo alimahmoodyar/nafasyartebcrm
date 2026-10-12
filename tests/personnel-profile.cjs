@@ -12,6 +12,7 @@ const users=load('app/api/users/route.ts'),domain=load('lib/personnel.ts'),profi
 const now=new Date().toISOString(),day=load('lib/duties.ts').dayAt(),base='https://test.local',empty={read:[],write:[],eventStages:[]};
 function actor(id,grants={},admin=false){const p=permissions.validatePermissions({...empty,...grants}),session={userId:'local:'+id,email:id+'@local.invalid',name:id,isAdmin:admin,permissions:p};sql.prepare("INSERT INTO app_members(id,email,name,unit,status,subject,permissions,revision,created,updated) VALUES(?,?,?,'کارکنان','active',?,?,1,?,?)").run(id,session.email,id,session.userId,JSON.stringify(p),now,now);return session;}
 const admin=actor('admin',{},true),hr=actor('hr',{personnelRoles:['hr']}),manager=actor('manager'),legacy=actor('legacy'),other=actor('other');
+sql.prepare("INSERT INTO app_identity(id,subject) VALUES('local_admin','admin')").run();
 const req=(url,body)=>new Request(base+url,{method:'POST',headers:{origin:base,'Content-Type':'application/json'},body:JSON.stringify(body)});
 const create=async(name,extra={})=>{const response=await ctx.run(admin,()=>users.POST(req('/api/users',{email:name+'@example.com',name,unit:'Office',status:'active',permissions:empty,...extra})));return {status:response.status,data:await response.json()};};
 const setup=(extra={})=>({id:crypto.randomUUID(),confirmed:true,mode:'profile_setup',revision:0,notes:'Connect my real staff account',...extra});

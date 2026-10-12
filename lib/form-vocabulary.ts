@@ -1,5 +1,6 @@
 // Shared presentation vocabulary. Values/identifiers sent to domain APIs remain unchanged.
 export const fieldTitles:Record<string,string>={
+ contactEmail:'ایمیل تماس (اختیاری)',contactRevision:'نسخه اطلاعات تماس',
  productPrices:'کالاها و قیمت پایه الگو',priceSource:'منبع قیمت پایه',priceTemplateId:'الگوی قیمت پایه',priceTemplateRevision:'نسخه الگوی قیمت پایه',
  receivingAccountId:'حساب مقصد شرکت',terminalCode:'کد ترمینال پوز',provider:'شرکت پرداخت / بانک پذیرنده',validTo:'تا تاریخ',bankId:'شناسه یکتای تراکنش بانک',
   "customerName": "نام مشتری نهایی",
@@ -1285,3 +1286,6 @@ Object.assign(fieldTitles,{newPassword:'رمز عبور تازه'});
 
 Object.assign(toolModeTitles.sales_apply,{branch_release:'تأیید ارسال امانی شعبه'});
 toolFieldTitles.sales_bank_apply={terminalId:'اتصال پوز برای ویرایش',accountId:'حساب بانکی مقصد شرکت',sheet:'برگهٔ فایل اکسل',rowIds:'ردیف‌های منتخب گردش بانک'};
+
+for(const tool of ['create_user','create_password_user','update_user','update_password_user','update_member_contact']){toolFieldTitles[tool]={...toolFieldTitles[tool],mobile:'شماره موبایل (اختیاری)',contactEmail:'ایمیل تماس (اختیاری)',contactRevision:'نسخه اطلاعات تماس'};}
+toolFieldTitles.update_member_contact.memberId='فرد (برای حساب خودتان خالی بگذارید)';

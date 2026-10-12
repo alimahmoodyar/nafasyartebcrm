@@ -25,6 +25,7 @@ export function UsersPanel({owner}: {owner: Session}) {
   const [members, setMembers] = useState<Member[]>([]), [loading, setLoading] = useState(true), [error, setError] = useState("");
   const [open, setOpen] = useState(false), [editing, setEditing] = useState<Member | null>(null), [busy, setBusy] = useState(false), [formError, setFormError] = useState("");
   const [email, setEmail] = useState(""), [name, setName] = useState(""), [status, setStatus] = useState("active");
+  const [mobile,setMobile]=useState(""),[contactEmail,setContactEmail]=useState(""),[formConflict,setFormConflict]=useState(false);
   const [permissions, setPermissions] = useState<Permissions>({read:[],write:[],eventStages:[],roleAssignment:{roles:[]}});
   const [username,setUsername]=useState(""),[password,setPassword]=useState("");
   const [roleMode,setRoleMode]=useState(true);
@@ -39,7 +40,8 @@ export function UsersPanel({owner}: {owner: Session}) {
     catch (err) {setError(err instanceof Error ? err.message : "دریافت کاربران انجام نشد.");} finally {setLoading(false);}
   }
   useEffect(() => {void load();void fetch('/api/sales').then(r=>r.json()).then((d:any)=>setSalesAgents(d.agents||[])).catch(()=>{});void Promise.all(['home','hospital'].map(async domain=>{const r=await fetch('/api/after-sales?domain='+domain);if(!r.ok)return [];return ((await r.json()) as any).agents||[]})).then(r=>setServiceAgents(r.flat())).catch(()=>{});}, []);
-  function start(member?: Member) {setEditing(member || null);setUsername(member?.username||"");setPassword("");setShowPassword(false); setEmail(member?.email || ""); setName(member?.name || ""); setStatus(member?.status || "active"); setPermissions(member?.permissions || {read:[],write:[],eventStages:[],roleAssignment:{roles:[]}}); setRoleMode(!member||!!member.permissions.roleAssignment); setFormError(""); setOpen(true);}
+  function start(member?: Member) {setEditing(member || null);setUsername(member?.username||"");setPassword("");setShowPassword(false); setEmail(member?.email || ""); setName(member?.name || ""); setStatus(member?.status || "active");setMobile(member?.mobile||"");setContactEmail(member?.contactEmail||"");setFormConflict(false); setPermissions(member?.permissions || {read:[],write:[],eventStages:[],roleAssignment:{roles:[]}}); setRoleMode(!member||!!member.permissions.roleAssignment); setFormError(""); setOpen(true);}
+  async function reloadEditing(){if(!editing||busy)return;setBusy(true);setFormError("");try{const response=await fetch('/api/users',{cache:'no-store',headers:{'x-assistant-account':owner.userId}}),result=await response.json() as {members:Member[];error?:string;accountId?:string};if(result.accountId&&result.accountId!==owner.userId)throw Error('حساب ورود تغییر کرده است؛ صفحه را تازه کنید.');if(!response.ok)throw Error(result.error||'دریافت آخرین اطلاعات حساب انجام نشد.');const member=result.members.find(m=>m.id===editing.id);if(!member)throw Error('این حساب دیگر در فهرست حساب‌ها موجود نیست.');setMembers(result.members);start(member);}catch(err){setFormError(err instanceof Error?err.message:'دریافت آخرین اطلاعات حساب انجام نشد.');}finally{setBusy(false);}}
   function toggle(kind: Kind, operation: "read" | "write", enabled: boolean) {
     setPermissions(previous => {
       const next = {...previous,read: [...previous.read], write: [...previous.write], eventStages: [...previous.eventStages]};
@@ -56,12 +58,12 @@ export function UsersPanel({owner}: {owner: Session}) {
     });
   }
   async function save(event: React.FormEvent) {
-    event.preventDefault(); if (busy) return; setBusy(true); setFormError("");
+    event.preventDefault(); if (busy||formConflict) return; setBusy(true); setFormError("");
     try {
       const effectivePermissions=validatePermissions(permissions);
-      const response = await fetch("/api/users", {method: editing ? "PATCH" : "POST", headers: {"Content-Type": "application/json","x-assistant-account":owner.userId}, body: JSON.stringify({id: editing?.id, revision: editing?.revision, email, name, unit: editing?.unit || "کارکنان", status, permissions:effectivePermissions,username,password})});
+      const response = await fetch("/api/users", {method: editing ? "PATCH" : "POST", headers: {"Content-Type": "application/json","x-assistant-account":owner.userId}, body: JSON.stringify({id: editing?.id, revision: editing?.revision,contactRevision:editing?editing.contactRevision??0:undefined,mobile,contactEmail, email, name, unit: editing?.unit || "کارکنان", status, permissions:effectivePermissions,username,password})});
       const result = await response.json() as {member: Member; error?: string;reauthenticate?:boolean};
-      if (!response.ok) throw new Error(result.error);
+      if (!response.ok) {if(response.status===409)setFormConflict(true);throw new Error(result.error);}
       setMembers(previous => [result.member, ...previous.filter(m => m.id !== result.member.id)]); setOpen(false);setPassword("");setShowPassword(false); setMessage("اطلاعات حساب ذخیره شد.");if(result.reauthenticate){notifyAccountChange();window.location.reload();}
     } catch (err) {setFormError(err instanceof Error ? err.message : "ذخیره حساب انجام نشد.");} finally {setBusy(false);}
   }
@@ -96,7 +98,10 @@ export function UsersPanel({owner}: {owner: Session}) {
         </div>
       </>:<label className="field">ایمیل ورود قبلی<NumberInput fieldKey={"email"} disabled value={email} dir="ltr"/></label>}
       <label className="field">وضعیت حساب<Select dir="rtl" value={status} onValueChange={setStatus}><SelectTrigger className="full"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="active">فعال</SelectItem><SelectItem value="disabled" disabled={editing?.canDelete===false}>غیرفعال</SelectItem></SelectContent></Select></label>
+      <label className="field">شماره موبایل (اختیاری)<input type="tel" dir="ltr" autoComplete="tel" maxLength={24} value={mobile} onChange={e=>setMobile(e.target.value)}/></label>
+      <label className="field">ایمیل تماس (اختیاری)<input type="email" dir="ltr" autoComplete="email" maxLength={254} value={contactEmail} onChange={e=>setContactEmail(e.target.value)}/></label>
     </div>
+    <p className="subtle">موبایل و ایمیل تماس اختیاری‌اند. برای کارکنان شرکت، این اطلاعات با پرونده پرسنلی مشترک است؛ تغییر ایمیل تماس، اطلاعات ورود را تغییر نمی‌دهد.</p>
     {roleMode?<JobRolePicker permissions={permissions} onChange={setPermissions} salesAgents={salesAgents} serviceAgents={serviceAgents}/>:<p className="notice">دسترسی‌های فعلی این حساب حفظ می‌شود. برای تنظیم خودکار، مسئولیت‌های فرد را انتخاب کنید.</p>}
     <div className="tools" style={{marginTop:12}}><button type="button" className="btn" onClick={()=>{if(roleMode){const {roleAssignment,...manual}=permissions;setPermissions(manual);setRoleMode(false);}else{setPermissions({read:[],write:[],eventStages:[],roleAssignment:{roles:[]}});setRoleMode(true);}}}>{roleMode?'تنظیم دستی به‌جای نقش‌ها':'انتخاب مسئولیت‌ها و جایگزینی دسترسی‌ها'}</button></div>
     {!roleMode&&<details style={{marginTop:16}}><summary>تنظیمات پیشرفته دسترسی</summary><div style={{marginTop: 18}}><Table><TableHeader><TableRow><TableHead className="tablehead">بخش</TableHead><TableHead className="tablehead">مشاهده</TableHead><TableHead className="tablehead">ثبت / ویرایش</TableHead></TableRow></TableHeader><TableBody>{modules.map(kind => <TableRow key={kind}><TableCell className="tablecell">{names[kind]}</TableCell><TableCell className="tablecell"><Checkbox aria-label={"مشاهده " + names[kind]} checked={permissions.read.includes(kind)} onCheckedChange={value => toggle(kind, "read", value === true)}/></TableCell><TableCell className="tablecell"><Checkbox aria-label={"ثبت " + names[kind]} checked={permissions.write.includes(kind)} onCheckedChange={value => toggle(kind, "write", value === true)}/></TableCell></TableRow>)}</TableBody></Table></div>
@@ -112,7 +117,7 @@ export function UsersPanel({owner}: {owner: Session}) {
     {permissions.write.includes("event") && <fieldset className="stage-permissions"><legend>مراحل مجاز برای ثبت رویداد</legend>{stages.map(stage => <label key={stage}><Checkbox checked={permissions.eventStages.includes(stage)} onCheckedChange={value => setPermissions(p => ({...p, eventStages: value === true ? [...p.eventStages, stage] : p.eventStages.filter(s => s !== stage)}))}/>{stage}</label>)}</fieldset>}
     <p className="subtle" style={{marginTop: 12}}>دسترسی مشاهده، تمام فیلدهای ثبت‌شده آن بخش را شامل می‌شود؛ در نسخه‌های نرم‌افزار، دانلود فایل HEX نیز مجاز می‌شود. با غیرفعال‌کردن حساب، درخواست‌های بعدی کاربر رد می‌شوند.</p>
     </details>}
-    {formError && <p className="notice error" role="alert" style={{marginTop: 12}}>{formError}</p>}<div className="tools" style={{marginTop: 18}}><button className="btn primary" disabled={busy}>{busy ? "در حال ذخیره…" : "ذخیره حساب و دسترسی"}</button><button type="button" className="btn" disabled={busy} onClick={() => setOpen(false)}>انصراف</button></div></form></DialogContent></Dialog>
+    {formError && <p className="notice error" role="alert" style={{marginTop: 12}}>{formError}</p>}{formConflict&&editing&&<p role="alert">اطلاعات این حساب هم‌زمان تغییر کرده است. با دریافت آخرین اطلاعات، مقادیر واردشده در این فرم جایگزین می‌شوند.</p>}<div className="tools" style={{marginTop: 18}}><button className="btn primary" disabled={busy||formConflict}>{busy ? "در حال ذخیره…" : "ذخیره حساب و دسترسی"}</button>{formConflict&&editing&&<button type="button" className="btn" disabled={busy} onClick={()=>void reloadEditing()}>دریافت آخرین اطلاعات حساب</button>}<button type="button" className="btn" disabled={busy} onClick={() => setOpen(false)}>انصراف</button></div></form></DialogContent></Dialog>
   <AlertDialog open={!!deleteTarget} onOpenChange={v=>{if(!v&&!deleting)setDeleteTarget(null);}}>
       <AlertDialogContent dir="rtl"><AlertDialogTitle>حذف حساب «{deleteTarget?.name}»؟</AlertDialogTitle>
         <AlertDialogDescription>ورود این کاربر قطع و حساب از فهرست حذف می‌شود. سوابق تولید، خدمات، پیام‌ها و گزارش‌های ثبت‌شده او حفظ می‌شود. نام کاربری قبلی برای حفظ هویت سوابق قابل استفاده مجدد نیست. اگر کار باز یا سمت فعالی دارد، مسئول جایگزین را مشخص کنید.</AlertDialogDescription>

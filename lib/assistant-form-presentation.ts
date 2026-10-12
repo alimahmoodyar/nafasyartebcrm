@@ -7,7 +7,7 @@ import {serviceForms} from './after-sales-contract';
 import {transportForms} from './transport-contract';
 import {qmsKinds} from './qms-contract';
 export {fieldTitles};
-const technical=new Set(['requestId','confirmed','revision','previousVersion','previousRevision','quoteRevision','leadRevision','quoteHash','catalogSnapshot']);
+const technical=new Set(['requestId','confirmed','revision','contactRevision','previousVersion','previousRevision','quoteRevision','leadRevision','quoteHash','catalogSnapshot']);
 export function fieldTitle(tool:string,key:string,schema?:any):string {
  return schema?.title||toolFieldTitles[tool]?.[key]||fieldTitles[key]||(/[^\x00-\x7F]/.test(key)?key:`فیلد تعریف‌نشده (${key})`);
 }
