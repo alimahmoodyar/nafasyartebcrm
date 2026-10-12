@@ -28,7 +28,7 @@ export function subprogramIcon(key:string,title:string):LucideIcon{
  if(/file|document|form|سند|اسناد|فرم|احکام/.test(text))return FileText;
  return ClipboardList;
 }
-export function ProgramWorkspace({programId,title,direct=false,children}:{programId:string;title:string;direct?:boolean;children:ReactNode}){
+export function ProgramWorkspace({programId,title,direct=false,children,status}:{programId:string;title:string;direct?:boolean;children:ReactNode;status?:ReactNode}){
  const parentNavigation=useContext(NavigationContext),rootBack=useContext(RootBackContext);
  const accountId=useContext(AccountContext),[menu,setMenu]=useState<Menu|null>(null),[showHome,setShowHome]=useState(!direct);
  const parentPath=useContext(ProgramPathContext),path=parentPath?parentPath+'/'+programId:programId;
@@ -40,6 +40,7 @@ export function ProgramWorkspace({programId,title,direct=false,children}:{progra
  const navigation=useMemo(()=>accountId?({register,showHome,open,reveal,select}):null,[accountId,register,showHome,open,reveal,select]);
  const canLaunch=!!accountId&&!!menu?.items.length;
  return <NavigationContext.Provider value={navigation}><div className="program-workspace">
+ {status}
  {accountId&&<nav className="tools" aria-label="بازگشت به مرحله قبل"><button type="button" className="btn" data-workspace-back={canLaunch&&!showHome||parentNavigation?"step":undefined} onClick={()=>{if(canLaunch&&!showHome)setShowHome(true);else if(parentNavigation)parentNavigation.open();else rootBack?.()}}><ArrowRight size={18}/>بازگشت</button></nav>}
  {canLaunch&&showHome&&<PersonalHome key={accountId+path} accountId={accountId} name="" scope={path} title={title} greeting={false} shortTitles={false} apps={menu!.items.map(([key,label])=>({key,title:label,icon:subprogramIcon(key,label)}))} onNavigate={select}/>}
  <ProgramPathContext.Provider value={path+(menu?.value?'/'+menu.value:'')}><div className="program-workspace-content" hidden={canLaunch&&showHome}>{children}</div></ProgramPathContext.Provider>
