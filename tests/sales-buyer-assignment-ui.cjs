@@ -1,30 +1,52 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript');
-let slots=[],cursor=0,pendingEffects=[],requests=[],data,failPost=false,failRefresh=false,conflict=false,saved=0;
+let slots=[],cursor=0,pendingEffects=[],requests=[],data,failPost=false,failRefresh=false,conflict=false,saved=0,invalidAcknowledgment=false,uuidFailure=false,nextGet=null,postGate=null,lostAfterCommit=false;
+const operations=new Map();
 const hook=init=>{const i=cursor++;if(!(i in slots))slots[i]=typeof init==='function'?init():init;return[slots[i],v=>slots[i]=typeof v==='function'?v(slots[i]):v]};
-const useRef=init=>{const i=cursor++;return slots[i]??=( {current:init})};
+const useRef=init=>{const i=cursor++;return slots[i]??={current:init}};
 const useEffect=(fn,deps)=>{const i=cursor++,old=slots[i];if(!old||deps.some((d,j)=>d!==old[j])){slots[i]=deps;pendingEffects.push(fn)}};
-const jsx=(type,props)=>({type,props}),out={};
+const jsx=(type,props)=>({type,props}),contract={partnerKinds:{representative:'نماینده خریدار',reseller:'عامل فروش',branch:'شعبه',end_customer:'مصرف‌کننده نهایی',referrer:'عامل معرف'}};
+const compile=(file,require,globals={})=>{const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText,{exports,require,...globals});return exports;};
+const buyerSearch=compile('lib/buyer-search.ts',()=>{}),assignments=compile('lib/sales-buyer-assignments.ts',n=>n.includes('buyer-search')?buyerSearch:contract);
 const fetch=async(url,options)=>{if(options?.method==='POST'){
- const body=JSON.parse(options.body);requests.push(body);if(failPost){failPost=false;throw Error('Lost response')};
- if(conflict){conflict=false;data.buyers[0].revision++;data.buyers[0].ownerId='first';return {ok:false,status:409,json:async()=>({error:'نسخه تغییر کرده'})}};
- const b=data.buyers.find(b=>b.id===body.agentId);b.revision++;b.ownerId=body.ownerId;b.ownerName=data.members.find(m=>m.id===body.ownerId).name;return {ok:true,json:async()=>({saved:true})};
- }if(failRefresh)throw Error('Refresh unavailable');return {ok:true,json:async()=>JSON.parse(JSON.stringify(data))}};
-vm.runInNewContext(ts.transpileModule(fs.readFileSync('components/trace/sales-buyer-assignments.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText,{exports:out,fetch,crypto:require('node:crypto').webcrypto,require:n=>n==='react'?{useState:hook,useRef,useEffect}:n==='react/jsx-runtime'?{jsx,jsxs:jsx}:n.includes('sales-network-contract')?{partnerKinds:{representative:'نماینده'}}:{BuyerSelect:'BuyerSelect'}});
+ const body=JSON.parse(options.body);requests.push(body);if(postGate){const gate=postGate;postGate=null;await gate;}
+ if(failPost){failPost=false;throw Error('Lost response');}
+ if(operations.has(body.id))return {ok:true,json:async()=>({saved:true,repeated:true})};
+ if(invalidAcknowledgment){invalidAcknowledgment=false;return {ok:true,json:async()=>({})};}
+ if(conflict){conflict=false;data.buyers[0].revision++;data.buyers[0].ownerId='first';data.buyers[0].ownerName='First expert';return {ok:false,status:409,json:async()=>({error:'نسخه تغییر کرده'})};}
+ const b=data.buyers.find(b=>b.id===body.agentId);b.revision++;b.ownerId=body.ownerId;b.ownerName=data.members.find(m=>m.id===body.ownerId).name;operations.set(body.id,true);if(lostAfterCommit){lostAfterCommit=false;throw Error('Lost acknowledgment after commit');}return {ok:true,json:async()=>({saved:true})};
+ }if(nextGet){const gate=nextGet;nextGet=null;return gate;}if(failRefresh)throw Error('Refresh unavailable');return {ok:true,json:async()=>JSON.parse(JSON.stringify(data))};};
+const out=compile('components/trace/sales-buyer-assignments.tsx',n=>n==='react'?{useState:hook,useRef,useEffect}:n==='react/jsx-runtime'?{jsx,jsxs:jsx}:n.includes('sales-network-contract')?contract:n.includes('sales-buyer-assignments')?assignments:n.includes('buyer-search')?buyerSearch:{BuyerSelect:'BuyerSelect'},{fetch,crypto:{randomUUID(){if(uuidFailure)throw Error('UUID unavailable');return require('node:crypto').randomUUID();}},AbortController,setTimeout,clearTimeout});
 const flatten=x=>Array.isArray(x)?x.flatMap(flatten):x&&typeof x==='object'?[x,...flatten(x.props?.children)]:[];
 const text=x=>Array.isArray(x)?x.map(text).join(''):x&&typeof x==='object'?text(x.props?.children):x==null?'':String(x);
-const tree=()=>{cursor=0;const nodes=flatten(out.SalesBuyerAssignments({initialBuyerId:'buyer',onSaved:()=>{saved++}}));pendingEffects.splice(0).forEach(fn=>fn());return nodes};
-const render=()=>{tree();return tree()},changeOwner=id=>render().find(n=>n.type==='select').props.onChange({target:{value:id}});
-const save=()=>render().find(n=>n.type==='form').props.onSubmit({preventDefault(){}});
+const tree=()=>{cursor=0;const nodes=flatten(out.SalesBuyerAssignments({initialBuyerId:'buyer',onSaved:()=>{saved++}}));pendingEffects.splice(0).forEach(fn=>fn());return nodes;};
+const render=()=>{tree();return tree();},select=label=>render().find(n=>n.type==='label'&&text(n).startsWith(label)).props.children.find(n=>n?.type==='select'),input=placeholder=>render().find(n=>n.type==='input'&&n.props.placeholder===placeholder);
+const changeOwner=id=>select('کارشناس مسئول').props.onChange({target:{value:id}}),save=()=>render().find(n=>n.type==='form').props.onSubmit({preventDefault(){}}),refresh=()=>render().find(n=>n.type==='button'&&text(n)==='تازه‌سازی فهرست').props.onClick();
+const plain=v=>JSON.parse(JSON.stringify(v)),tick=()=>new Promise(r=>setImmediate(r));
 (async()=>{
- data={buyers:[{id:'buyer',name:'Existing buyer',kind:'representative',ownerId:'first',ownerName:'First expert',revision:7}],members:[{id:'first',name:'First expert'},{id:'second',name:'Second expert'}]};
- tree();await new Promise(r=>setImmediate(r));let nodes=render();assert.equal(requests.length,0,'Opening a form never assigns');
- const buyer=nodes.find(n=>n.type==='BuyerSelect');assert.equal(buyer.props.value,'buyer');assert.equal(buyer.props.choices[0].name,'Existing buyer');assert.equal(nodes.find(n=>n.type==='select').props.value,'first');
- nodes.find(n=>n.type==='input').props.onChange({target:{value:'Second'}});nodes=render();assert.ok(text(nodes.find(n=>n.type==='select')).includes('Second expert'));assert.ok(text(nodes.find(n=>n.type==='select')).includes('First expert'),'Current selection retained while searching');
- changeOwner('second');failPost=true;await save();assert.ok(text(render()).includes('Lost response'));await save();
- assert.equal(requests[0].id,requests[1].id,'Network retry keeps same operation UUID');assert.equal(requests[1].revision,7);assert.equal(requests[1].agentId,'buyer');assert.equal(requests[1].ownerId,'second');assert.equal(requests[1].mode,'assign');assert.equal(requests[1].confirmed,true);
- assert.deepEqual(Object.keys(requests[1]).sort(),['agentId','confirmed','id','mode','ownerId','revision'],'No buyer creation, unrelated finance or credentials');assert.equal(saved,1);assert.ok(text(render()).includes('تخصیص ثبت شد'));
- changeOwner('first');conflict=true;await save();nodes=render();assert.ok(text(nodes).includes('نسخه تغییر کرده'));assert.equal(nodes.find(n=>n.type==='select').props.value,'first','Stale draft refreshes current owner rather than overwriting');
- const stale=requests.at(-1);await save();assert.notEqual(requests.at(-1).id,stale.id);assert.equal(requests.at(-1).revision,stale.revision+1);
- render();changeOwner('second');failRefresh=true;await save();nodes=render();assert.ok(text(nodes).includes('تخصیص ثبت شده، اما تازه‌سازی'));assert.ok(text(nodes).includes('تخصیص ثبت شد'),'Successful mutation is not labelled failure when refresh fails');
- console.log('PASS buyer assignment UI: two searchable selections, existing buyer/revision, no automatic write, same UUID retry, stale refresh and accurate saved/refresh status.');
+ data={buyers:[{id:'buyer',name:'Existing buyer',kind:'representative',ownerId:'first',ownerName:'First expert',revision:7},{id:'iran',name:'باران سلامت',kind:'reseller',ownerId:'second',ownerName:'علی کیانی',revision:1},{id:'empty',name:'خریدار بدون مسئول',kind:'end_customer',ownerId:'',ownerName:'',revision:1},{id:'old',name:'شعبه قدیمی',kind:'branch',ownerId:'disabled',ownerName:'کارشناس سابق',revision:2}],members:[{id:'first',name:'First expert'},{id:'second',name:'علی کیانی'}]};
+ tree();await tick();let nodes=render();assert.equal(requests.length,0,'Opening never assigns');
+ assert.equal(nodes.find(n=>n.type==='BuyerSelect').props.value,'buyer');assert.equal(select('کارشناس مسئول').props.value,'first');
+ input('نام کارشناس فروش').props.onChange({target:{value:'علي كياني'}});assert.ok(text(select('کارشناس مسئول')).includes('علی کیانی'));assert.ok(text(select('کارشناس مسئول')).includes('First expert'),'Current selection retained while searching');
+ changeOwner('second');refresh();await tick();assert.equal(select('کارشناس مسئول').props.value,'second','Refreshing does not erase the chosen expert');
+ changeOwner('');await save();assert.ok(text(render().filter(n=>n.props?.role==='alert')).includes('کارشناس فروش مسئول'));assert.equal(requests.length,0);
+ render().find(n=>n.type==='BuyerSelect').props.onChange('');await save();assert.ok(text(render()).includes('خریدار را از نتیجه'));assert.equal(requests.length,0);assert.equal(render().find(n=>n.type==='form').props.noValidate,true,'Explicit validation reports a reason beside submit instead of browser blocking silently');
+ render().find(n=>n.type==='BuyerSelect').props.onChange('buyer');changeOwner('second');uuidFailure=true;await save();assert.ok(text(render()).includes('UUID unavailable'));uuidFailure=false;
+ failPost=true;await save();assert.ok(text(render()).includes('Lost response'));await save();
+ assert.equal(requests[0].id,requests[1].id,'Retry keeps same operation UUID');assert.equal(requests[1].revision,7);assert.equal(requests[1].agentId,'buyer');assert.equal(requests[1].ownerId,'second');assert.equal(requests[1].mode,'assign');assert.equal(requests[1].confirmed,true);
+ assert.deepEqual(Object.keys(requests[1]).sort(),['agentId','confirmed','id','mode','ownerId','revision']);assert.equal(saved,1);assert.ok(text(render().find(n=>n.type==='form')).includes('تخصیص ثبت شد: Existing buyer ← علی کیانی'),'Named result beside submit');
+ assert.ok(assignments.assignmentGroups(data).find(g=>g.id==='second').buyers.some(b=>b.id==='buyer'),'Confirmed transfer moves buyer to new group');assert.ok(!assignments.assignmentGroups(data).some(g=>g.id==='first'),'Old owner no longer listed with transferred buyer');
+ input('نام خریدار یا کارشناس').props.onChange({target:{value:'باران'}});let list=render().find(n=>n.props?.['aria-label']==='فهرست تخصیص خریداران');assert.ok(!text(list).includes('Existing buyer'));assert.ok(text(list).includes('باران سلامت'));
+ input('نام خریدار یا کارشناس').props.onChange({target:{value:''}});select('فیلتر کارشناس').props.onChange({target:{value:'unassigned'}});assert.ok(text(render().find(n=>n.props?.['aria-label']==='فهرست تخصیص خریداران')).includes('خریدار بدون مسئول'));assert.equal(requests.length,2,'Searching/filtering never writes');
+ select('فیلتر کارشناس').props.onChange({target:{value:'all'}});select('نوع خریدار').props.onChange({target:{value:'branch'}});assert.ok(text(render()).includes('کارشناس سابق'));assert.ok(text(render()).includes('مسئول فعلی فعال یا دارای نقش فروش نیست'));select('نوع خریدار').props.onChange({target:{value:''}});
+ const choose=render().find(n=>n.type==='button'&&text(n).includes('برای خریدار بدون مسئول'));choose.props.onClick();assert.equal(select('کارشناس مسئول').props.value,'');assert.equal(requests.length,2);
+ render().find(n=>n.type==='BuyerSelect').props.onChange('buyer');changeOwner('first');conflict=true;await save();assert.ok(text(render()).includes('نسخه تغییر کرده'));assert.equal(select('کارشناس مسئول').props.value,'first');const stale=requests.at(-1);await save();assert.notEqual(requests.at(-1).id,stale.id);assert.equal(requests.at(-1).revision,stale.revision+1);
+ changeOwner('second');failRefresh=true;await save();assert.ok(text(render()).includes('تخصیص ثبت شده، اما تازه‌سازی'));assert.ok(text(render()).includes('تخصیص ثبت شد'));assert.ok(render().find(n=>n.type==='button'&&text(n)==='تأیید و ثبت تخصیص').props.disabled,'Unknown revision prevents another write');let count=requests.length;await save();assert.equal(requests.length,count);failRefresh=false;refresh();await tick();
+ changeOwner('first');invalidAcknowledgment=true;await save();assert.ok(text(render()).includes('تأیید ثبت از سامانه دریافت نشد'));assert.ok(!text(render()).includes('تخصیص ثبت شد:'));
+ let resolve;postGate=new Promise(r=>resolve=r);const firstSave=save(),secondSave=save();assert.equal(requests.length,count+2,'Double click issues only one new POST');resolve();await Promise.all([firstSave,secondSave]);
+ // A GET started before saving must not overwrite the newer confirmed directory or the expert draft.
+ let resolveGet;const old=plain(data);nextGet=new Promise(r=>resolveGet=r);refresh();changeOwner('second');await save();resolveGet({ok:true,json:async()=>old});await tick();assert.equal(select('کارشناس مسئول').props.value,'second');assert.ok(text(render()).includes('مسئول فعلی Existing buyer: علی کیانی'));
+ const grouped=plain(assignments.assignmentGroups(data,'علي كياني','member:second','reseller'));assert.equal(grouped.length,1);assert.deepEqual(grouped[0].buyers.map(b=>b.id),['iran']);assert.equal(grouped[0].total,2);assert.equal(assignments.assignmentGroups(data,'missing').length,0);assert.deepEqual(plain(assignments.assignmentGroups(data,'','unassigned')).map(g=>g.buyers[0].id),['empty']);
+ changeOwner('first');lostAfterCommit=true;await save();const committed=requests.at(-1),committedRevision=data.buyers[0].revision;assert.ok(text(render()).includes('Lost acknowledgment after commit'));await save();assert.equal(requests.at(-1).id,committed.id);assert.equal(data.buyers[0].revision,committedRevision,'Lost acknowledgment retry does not apply ownership twice');
+ let rejectOld;nextGet=new Promise((_,reject)=>rejectOld=reject);refresh();changeOwner('second');await save();rejectOld(Error('Stale refresh error'));await tick();assert.ok(!text(render()).includes('Stale refresh error'),'Old GET error cannot replace a successful newer result');
+ console.log('PASS assignment UI: visible validation and named feedback, refresh keeps draft, normalized search/groups/filters, unassigned/inactive owners, transfer list, no automatic writes, UUID error/retry, double click, stale revision and late GET guards.');
 })().catch(e=>{console.error(e);process.exitCode=1});

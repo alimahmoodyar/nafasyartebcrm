@@ -59,6 +59,7 @@ const nw=(mode,extra={},u=manager,status=200)=>post(network,'/api/sales/network'
  await assert.rejects(()=>catalog.executeTool('assign_sales_buyer',{...args,confirmed:false},base,principal(manager)));
  await catalog.executeTool('assign_sales_buyer',args,base,principal(manager));
  assert.equal(entity(a).data.ownerId,'second');assert.equal(version(a),2);
+ list=await assignmentGet(manager);assert.equal(list.buyers.find(b=>b.id===a).ownerId,'second');assert.equal(list.buyers.find(b=>b.id===a).revision,2,'Confirmed directory reflects the stored assignment');
  assert.equal((await catalog.executeTool('assign_sales_buyer',args,base,principal(manager))).repeated,true);assert.equal(version(a),2);
  assert.equal(sql.prepare("SELECT COUNT(*) n FROM access_audit WHERE action='sales_network_assign'").get().n,1,'One audit record for repeated command');
  await assert.rejects(()=>catalog.executeTool('assign_sales_buyer',{...args,ownerId:'staff'},base,principal(manager)),e=>e.status===409);
@@ -73,6 +74,7 @@ const nw=(mode,extra={},u=manager,status=200)=>post(network,'/api/sales/network'
  const oldBatch=db.batch;db.batch=async stmts=>{db.batch=oldBatch;sql.prepare("UPDATE app_members SET status='disabled' WHERE id='staff'").run();return oldBatch(stmts);};
  const raceId=crypto.randomUUID();await assign(manager,{id:raceId,ownerId:'staff'},409);assert.equal(entity(a).data.ownerId,'second');assert.equal(sql.prepare('SELECT id FROM inventory_operations WHERE id=?').get(raceId),undefined);
  sql.prepare("UPDATE app_members SET status='active' WHERE id='staff'").run();await assign(manager,{ownerId:'staff'});assert.equal(entity(a).data.ownerId,'staff');
+ list=await assignmentGet(manager);assert.equal(list.buyers.filter(b=>b.ownerId==='second').length,0);assert.equal(list.buyers.filter(b=>b.ownerId==='staff').length,1,'Directory moves the buyer between owners without duplicate assignment rows');
  assert.equal((await get(second)).agents.find(v=>v.id===a).canOperate,false,'Report viewer remains read-only after ownership removal');
  await get(staff,a);await quote(1,staff);assert.deepEqual(plain(entity('snapshot')),snapshot);
  // Cached session permissions cannot override a manager's revoked stored role.
