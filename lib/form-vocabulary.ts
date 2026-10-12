@@ -1284,3 +1284,4 @@ Object.assign(toolFieldTitles.sales_apply,{nationalId:'کد ملی مسئول ن
 Object.assign(fieldTitles,{newPassword:'رمز عبور تازه'});
 
 Object.assign(toolModeTitles.sales_apply,{branch_release:'تأیید ارسال امانی شعبه'});
+toolFieldTitles.sales_bank_apply={terminalId:'اتصال پوز برای ویرایش',accountId:'حساب بانکی مقصد شرکت',sheet:'برگهٔ فایل اکسل',rowIds:'ردیف‌های منتخب گردش بانک'};
