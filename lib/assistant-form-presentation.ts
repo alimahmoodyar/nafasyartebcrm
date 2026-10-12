@@ -66,6 +66,15 @@ export function generalPresentation(tool:string,args:any,input:any,title:string)
   }
  }
  decorate(schema,args);
+ if(tool==='confirm_pricing_cost_basis'){
+  for(const key of ['sourceToken',...(args.method==='standard'?['unitCost']:[])])if(schema.properties?.[key])schema.properties[key].uiHidden=true;
+  if(args.method==='documented')schema.required=[...new Set([...(schema.required||[]),'unitCost'])];
+ }
+ if(tool==='save_pricing_profit_policy'){
+  const hidden=args.scope==='group'?'productId':'group',needed=args.scope==='group'?'group':'productId';if(schema.properties?.[hidden])schema.properties[hidden].uiHidden=true;
+  schema.required=[...new Set([...(schema.required||[]),needed])];
+ }
+ if(tool==='approve_pricing_proposal'){if(schema.properties?.token)schema.properties.token.uiHidden=true;if(schema.properties?.effectiveFrom)schema.properties.effectiveFrom.format='date';}
  if(tool==='sales_network_apply'&&args.mode==='template'){
   // Hide retired fields even when a legacy template draft still carries them.
   const promotion=args.data?.templateType==='promotion';

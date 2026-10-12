@@ -4,6 +4,7 @@ import {canGenerateActivationCode} from './activation-code-access';
 import {routineRoles} from './routine-production';
 import {projectRoles} from './build-projects';
 import {costRead} from './costing';
+import {pricingRead} from './pricing-access';
 import {salesRead,salesWarehouse,salesStaff,salesManager,salesFinance} from './sales-access';
 import type {Kind} from './model';
 import type {Session} from './permissions';
@@ -14,6 +15,7 @@ const can=(u:Session,kind:Kind,operation:'read'|'write'='read')=>u.isAdmin||u.pe
 export function canOpenSection(u:Session,s:string){
  const p=u.permissions;
  const internal=!p.hospitalCenterId&&!p.salesAgentId&&!p.serviceAgentId;
+ if(s==='pricing')return pricingRead(u);
  if(s==='qms')return internal&&(u.isAdmin||!!p.qmsRoles?.length||!!p.supplyRoles?.some(r=>['engineering','ceo'].includes(r)));
  if(s==='hospital')return !!p.hospitalCenterId||u.isAdmin||financialAccess(u,'hospital')||!p.serviceAgentId&&!!p.serviceDomains?.includes('hospital');
  if(s==='reminders')return true;

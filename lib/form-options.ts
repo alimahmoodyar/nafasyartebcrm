@@ -1557,3 +1557,6 @@ for(const name of ['create_user','create_password_user','update_user','update_pa
 for(const name of ['create_user','create_password_user','update_user','update_password_user']){toolOptions[name]['permissions.roleAssignment.roles.*']=Object.fromEntries(jobRoles.map(r=>[r.id,r.label]));toolOptions[name]['permissions.roleAssignment.warehouses.*']=toolOptions[name]['permissions.warehouses.*'];toolOptions[name]['permissions.roleAssignment.serviceDomains.*']=toolOptions[name]['permissions.serviceDomains.*'];}
 
 toolOptions.sales_bank_apply={mode:{terminal:'اتصال پوز به خریدار',import:'ورود اکسل بانک',reconcile:'تطبیق وصول و تخصیص بدهی',reverse:'برگشت وصول متصل به بانک'}};
+toolOptions.confirm_pricing_cost_basis={method:{standard:'استاندارد محاسبه‌شده',documented:'بهای تمام‌شدهٔ مستند'}};
+toolOptions.save_pricing_profit_policy={scope:{product:'محصول',group:'گروه محصول'}};
+toolOptions.approve_pricing_proposal={kind:{representative:'نماینده',reseller:'عامل فروش',branch:'شعبه',end_customer:'مصرف‌کننده'}};

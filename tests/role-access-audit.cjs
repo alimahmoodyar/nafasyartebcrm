@@ -47,6 +47,7 @@ for(const [id,u] of users){
  check(hospital.hospitalFinance(u),false,'hospitalFinance',id);
  check(nav.canOpenSection(u,'hospital'),false,'hospital navigation',id);
  check(nav.canOpenSection(u,'costing'),['finance','finance_director','accounting_head','warehouse_finance'].includes(id),'costing exact role',id);
+ check(nav.canOpenSection(u,'pricing'),['finance','finance_director','accounting_head','warehouse_finance','ceo'].includes(id),'pricing exact role',id);
  check(nav.canOpenSection(u,'finance-control'),['finance','finance_director','accounting_head'].includes(id),'control exact role',id);
  check(nav.canOpenSection(u,'guarantees'),['treasurer','finance_director'].includes(id),'guarantees exact role',id);
  check(nav.canOpenSection(u,'treasury'),['treasurer','finance_director','accounting_head','ceo_payment','purchase_finance'].includes(id),'treasury exact role',id);

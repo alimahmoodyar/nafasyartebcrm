@@ -1291,3 +1291,8 @@ Object.assign(fieldTitles,{consumerPriceRial:'قیمت واحد قطعه برا�
 
 for(const tool of ['create_user','create_password_user','update_user','update_password_user','update_member_contact']){toolFieldTitles[tool]={...toolFieldTitles[tool],mobile:'شماره موبایل (اختیاری)',contactEmail:'ایمیل تماس (اختیاری)',contactRevision:'نسخه اطلاعات تماس'};}
 toolFieldTitles.update_member_contact.memberId='فرد (برای حساب خودتان خالی بگذارید)';
+
+toolFieldTitles.confirm_pricing_cost_basis={method:'مبنای هزینه',sourceToken:'شناسه منابع هزینه',unitCost:'بهای مستند هر واحد (ریال)',reference:'مرجع واقعی تأیید مالی'};
+toolFieldTitles.save_pricing_profit_policy={scope:'دامنه الگوی سود',group:'گروه محصول',targetPercent:'سود هدف روی هزینه، درصد',minPercent:'حداقل سود پس از تخفیف، درصد',roundTo:'گردکردن رو به بالا (ریال)'};
+toolFieldTitles.get_pricing_workspace={effectiveFrom:'تاریخ شروع قیمت پیشنهادی'};
+toolFieldTitles.approve_pricing_proposal={kind:'نوع خریدار',token:'شناسه پیشنهاد بررسی‌شده',effectiveFrom:'تاریخ شروع قیمت مصوب'};
