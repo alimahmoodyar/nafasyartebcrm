@@ -1406,6 +1406,7 @@ export const toolOptions:Record<string,Record<string,Record<string,string>>>={
  },
  "sales_network_apply": {
   "mode": {
+   "assign": "تخصیص خریدار به کارشناس",
    "template": "الگوی عمومی فروش",
    "partner": "نوع همکاری و برنامه پیگیری",
    "contact": "ثبت تماس یا بازدید",

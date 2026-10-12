@@ -981,6 +981,7 @@ export const toolModeTitles:Record<string,Record<string,string>>={
     "opening_review": "تطبیق و تأیید افتتاحیه"
   },
   "sales_network_apply": {
+    "assign": "تخصیص خریدار به کارشناس",
     "commission_cancel": "لغو تسویه پرداخت‌نشده",
     "check_link": "اتصال چک به خرید",
     "template": "الگوی عمومی فروش",
@@ -1302,3 +1303,5 @@ toolFieldTitles.confirm_pricing_cost_basis={method:'مبنای هزینه',sourc
 toolFieldTitles.save_pricing_profit_policy={scope:'دامنه الگوی سود',group:'گروه محصول',targetPercent:'سود هدف روی هزینه، درصد',minPercent:'حداقل سود پس از تخفیف، درصد',roundTo:'گردکردن رو به بالا (ریال)'};
 toolFieldTitles.get_pricing_workspace={effectiveFrom:'تاریخ شروع قیمت پیشنهادی'};
 toolFieldTitles.approve_pricing_proposal={kind:'نوع خریدار',token:'شناسه پیشنهاد بررسی‌شده',effectiveFrom:'تاریخ شروع قیمت مصوب'};
+
+toolFieldTitles.assign_sales_buyer={agentId:'خریدار موجود',ownerId:'کارشناس مسئول',revision:'نسخه فعلی خریدار',notes:'توضیح تخصیص (اختیاری)'};
