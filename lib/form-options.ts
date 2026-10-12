@@ -1,3 +1,4 @@
+import {materialUnitLabels} from './material-units';
 import {jobRoles} from './permissions';
 import {supplyRoles} from './sourcing-labels';
 import {reminderLinks,reminderTriggers,reminderModes,reminderConditions,reminderFields,reminderDelegationKinds} from './reminder-contract';
@@ -608,37 +609,13 @@ export const toolOptions:Record<string,Record<string,Record<string,string>>>={
   }
  },
  "preview_bom_import": {
-  "lines.*.unit": {
-   "عدد": "عدد",
-   "کیلوگرم": "کیلوگرم",
-   "گرم": "گرم",
-   "متر": "متر",
-   "سانتی‌متر": "سانتی‌متر",
-   "سانتی‌متر مربع": "سانتی‌متر مربع",
-   "لیتر": "لیتر"
-  }
+  "lines.*.unit": materialUnitLabels
  },
  "commit_bom_import": {
-  "lines.*.unit": {
-   "عدد": "عدد",
-   "کیلوگرم": "کیلوگرم",
-   "گرم": "گرم",
-   "متر": "متر",
-   "سانتی‌متر": "سانتی‌متر",
-   "سانتی‌متر مربع": "سانتی‌متر مربع",
-   "لیتر": "لیتر"
-  }
+  "lines.*.unit": materialUnitLabels
  },
  "save_product_bom": {
-  "lines.*.unit": {
-   "عدد": "عدد",
-   "کیلوگرم": "کیلوگرم",
-   "گرم": "گرم",
-   "متر": "متر",
-   "سانتی‌متر": "سانتی‌متر",
-   "سانتی‌متر مربع": "سانتی‌متر مربع",
-   "لیتر": "لیتر"
-  }
+  "lines.*.unit": materialUnitLabels
  },
  "initialize_batch_stock": {
   "to": {
@@ -886,15 +863,7 @@ export const toolOptions:Record<string,Record<string,Record<string,string>>>={
   }
  },
  "save_material_master": {
-  "unit": {
-   "عدد": "عدد",
-   "کیلوگرم": "کیلوگرم",
-   "گرم": "گرم",
-   "متر": "متر",
-   "سانتی‌متر": "سانتی‌متر",
-   "سانتی‌متر مربع": "سانتی‌متر مربع",
-   "لیتر": "لیتر"
-  },
+  "unit": materialUnitLabels,
   "fields.*.type": {
    "number": "عدد",
    "text": "متن",

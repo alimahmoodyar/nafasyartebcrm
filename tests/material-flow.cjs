@@ -119,6 +119,21 @@ const p=await create('product',{code:'FLOW',name:'FlowDevice',group:'G',model:'M
  await op('receipt',{materialId:'material:01',day:'2026-10-05',quantity:'0.375',invoiceQuantity:'0.400',discrepancyNotes:'Measured shortage',supplier:'Supplier',specs:'V1'});
  const fractional=entities('receipt').find(r=>r.data.quantity===375);await op('incoming_qc',{receiptId:fractional.id,accepted:'0',values:{purity:'70'},notes:'All failed'});assert.equal(entities('receipt').find(r=>r.id===fractional.id).data.rejected,375);
  console.log('Actual receipt 95 / invoice 100 / accepted 90: shortage 5, QC reject 5; limits, full rejection, decimals and replay passed');
+ // Set and pair quantities remain in their exact own unit through master and receipt snapshots.
+ for(const [code,sourceUnit,unit] of [['9401','ست','ست'],['9402','جفت','جفت'],['9403','سانتی متر','سانتی‌متر']]){
+  const master={code,name:'Unit fixture '+code,unit:sourceUnit,specs:'',defaultLocation:'',reorderPoint:'0',targetStock:'0',fields,qcOwner:'',warehouseOwner:'',procurementOwner:'',revision:0};
+  await op('material',master);assert.equal(entities('material').find(m=>m.data.code===code).data.unit,unit);
+  await op('material',{...master,revision:1,unit:'عدد'},400);assert.equal(entities('material').find(m=>m.data.code===code).revision,1,'unit immutable after creation');
+  await op('receipt',{materialId:'material:'+code,day:'2026-10-05',quantity:'1.25',supplier:'Supplier'});
+  const receipt=entities('receipt').find(r=>r.data.materialId==='material:'+code);
+  const batch=JSON.parse(sql.prepare('SELECT payload FROM records WHERE id=?').get(receipt.id).payload);
+  assert.equal(batch.unit,unit);assert.equal(batch.quantity,'1.25');assert.equal(stock(receipt.id,'quarantine'),1250,'pairs and sets are not multiplied into units');
+ }
+ await op('material',{code:'9404',name:'Invalid',unit:'کارتن',reorderPoint:'0',targetStock:'0',fields},400);
+ assert.equal(entities('material').some(m=>m.data.code==='9404'),false);
+ const unitMcp=await call('save_material_master',{id:crypto.randomUUID(),code:'9405',name:'MCP pair',unit:'جفت',specs:'',defaultLocation:'',reorderPoint:'0',targetStock:'0',fields,qcOwner:'',warehouseOwner:'',procurementOwner:'',revision:0,confirmed:true});assert.ok(!unitMcp.error,JSON.stringify(unitMcp));
+ assert.equal(entities('material').find(m=>m.data.code==='9405').data.unit,'جفت');
+ console.log('Set/pair units passed: HTTP and MCP master, immutable unit, receipt quantity and canonical centimetre spelling.');
  identity=null;assert.equal((await flow.GET()).status,401);
  console.log('Material flow passed: partial incoming QC, quarantine, slot conflicts, FIFO/split batches, idempotency, role checks, serial capacity, assembler, stock rollback, actual consumption, repair and retained retest, procurement deduplication.');
 })().catch(e=>{console.error(e);process.exit(1)});
