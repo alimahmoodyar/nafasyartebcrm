@@ -14,6 +14,10 @@
 // Operations reset preserves the definitions/prices; full reset backs up/deletes them.
 // Migration 0016 flow/inventory freeze guards the whole import; no new tables or blobs.
 export const resetScopes:Record<string,string>={operations:'پاک‌سازی سوابق و موجودی؛ حفظ تعاریف کالا',full:'پاک‌سازی سوابق، موجودی و تعاریف کالا'};
+// build_intake, approval/specification versions and linked build_project are operational
+// flow_entities: both scopes back up/delete them; generic 0016 freezes all mutations.
+// Product customer-order templates remain qms_record catalogs; attachments reuse sales_file
+// manifests and existing private storage. No new table/FK/blob type or migration is needed.
 export const resetPreserved=['محیط آزمایش نقش‌ها (جدول‌های training_* و فایل‌های training/v1/) مستقل است و با پاک‌سازی شرکت تغییر نمی‌کند','عکس‌های پروفایل و اطلاعات تماس کاربران (همراه حساب‌ها حفظ می‌شوند)','حساب‌ها، هش و نسخه رمزگذاری‌شده رمز ورود، الزام تغییر رمز اولیه، دسترسی‌ها و سمت‌های کارکنان','هویت نماینده‌های فروش و شرایط پایه اعتباری و ارتباط حساب آن‌ها','هویت نماینده‌های خدمات و ارتباط آن‌ها با حساب کاربران','تنظیمات مدل‌ها، کلیدهای اتصال و هویت سامانه','درخواست‌های توسعه و نتیجه تست‌های ثبت‌شده در آن بخش','سوابق امنیتی و نسخه پشتیبان پاک‌سازی','شرح وظایف و الگوهای برنامه کاری؛ پس از پاک‌سازی غیرفعال می‌شوند'];
 // Technical controls/history are embedded in catalog material and supplier_material;
 // operations reset preserves them, full reset backs up/deletes them; 0016 freeze covers both.
@@ -152,3 +156,5 @@ resetHelp.push('نوع رسمی یا غیررسمی، سند متصل و ساب�
 // Pricing cost/policy/approval snapshots are price catalogs preserved with sales_price
 // by operations reset; full reset removes all four. Generic 0016 flow freeze and
 // full flow_entities backups cover these types; no new table, FK or file blob.
+
+resetHelp.push("فرم‌های مشخصات سفارش مشتری، نسخه‌های تأیید و اتصال قرارداد و پروژه در هر دو محدوده پشتیبان‌گیری و حذف می‌شوند؛ الگوهای مصوب محصول در پاک‌سازی عملیات حفظ می‌شوند. پیوست‌های سفارش از مدارک خصوصی فروش در پشتیبان هستند.");

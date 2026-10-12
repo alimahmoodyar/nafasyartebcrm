@@ -13,6 +13,7 @@ export const manualPermissionSections = [
  {key:'llm-usage',title:'گزارش مصرف هوش مصنوعی',icon:Activity,ownerOnly:true},
  {key:'routine-production',title:'کار روزانه و قطعات واسط',icon:Factory,group:'flow'},
  {key:'build-projects',title:'پروژه‌های ساخت بیمارستانی',icon:Factory,group:'flow'},
+ {key:'build-intake',title:'مشخصات سفارش ساخت',icon:ClipboardCheck,group:'sales'},
  {key:'costing',title:'بهای تمام‌شده',icon:ClipboardCheck,group:'financial-costing'},
  {key:'hospital',title:'مرکز و خدمات بیمارستانی',icon:Wrench,group:'services'},
  {key:'sales',title:'فروش و نمایندگان',icon:Users,group:'sales'},

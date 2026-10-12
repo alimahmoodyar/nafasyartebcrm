@@ -49,6 +49,38 @@ async function part(u,id,index,bytes,op=crypto.randomUUID()){const r=await ctx.r
  const form=await ok(eng,basic('form',{private:true,fields:[{key:'test',label:'Test',type:'choice',required:true,options:['pass','fail']}]}));await success(eng,form,'submit');await success(ceo,form,'approve');
  const response=await ok(eng,basic('response',{templateId:form,values:{test:'pass'}}));assert.equal(row(response).data.private,true);await success(eng,response,'submit');await success(ceo,response,'approve');assert.equal(row(response).data.template.version,1);
  assert.equal((await post(eng,basic('response',{templateId:form,values:{test:'hacked'}}))).status,400);
+ // Customer-order forms publish only explicitly approved public schemas, with
+ // the same product and an immutable form-version snapshot for each order.
+ const orderForms=load('lib/build-order-forms.ts'),sales=actor('sales',{salesRoles:['staff'],supplyRoles:['sales']});
+ const allQms=()=>sql.prepare("SELECT * FROM flow_entities WHERE type IN ('qms_record','qms_file')").all().map(r=>({...r,data:JSON.parse(r.data)}));
+ const customerFields=[{key:'name',label:'Customer specification',type:'text',required:true},{key:'capacity',label:'Capacity',type:'number',required:true},{key:'delivery',label:'Delivery day',type:'date',required:true},{key:'location',label:'Installation',type:'choice',required:true,options:['indoor','outdoor']},{key:'included',label:'Included',type:'boolean',required:true}];
+ const customerValues={name:'Documented customer need',capacity:'2.5',delivery:today,location:'indoor',included:'yes'};
+ assert.equal(row(form).data.formPurpose,'quality');assert.equal(orderForms.customerOrderForms(allQms()).length,0);
+ assert.equal((await get(sales)).status,403);
+ assert.equal((await post(eng,basic('form',{private:true,formPurpose:'customer_order',fields:customerFields}))).status,400);
+ assert.equal((await post(eng,basic('form',{private:false,formPurpose:'arbitrary',fields:customerFields}))).status,400);
+ assert.equal((await post(eng,basic('form',{private:false,fields:customerFields}))).status,403);
+ const orderForm=await ok(eng,basic('form',{title:'Approved customer order specification',private:false,formPurpose:'customer_order',reviewerId:'eng2',fields:customerFields}));
+ assert.equal(orderForms.customerOrderForms(allQms()).length,0);
+ await success(eng,orderForm,'submit');assert.equal((await apply(eng,orderForm,'approve')).status,403);await success(eng2,orderForm,'approve');
+ const safe=orderForms.customerOrderForm(allQms(),orderForm,'p1');assert.deepEqual(Object.keys(safe).sort(),['fields','id','productId','title','version']);
+ assert.equal(orderForms.customerOrderForms(allQms(),'another-product').length,0);
+ assert.throws(()=>orderForms.customerOrderForm(allQms(),form,'p1'),/فرم مصوب/);
+ assert.throws(()=>orderForms.customerOrderForm(allQms(),orderForm,'another-product'),/فرم مصوب/);
+ assert.equal((await apply(eng,orderForm,'save',{...basic('form'),private:false,formPurpose:'customer_order',fields:customerFields})).status,409);
+ const snapshot=orderForms.snapshotCustomerOrderForm(allQms(),orderForm,'p1',customerValues);
+ assert.equal(snapshot.template.version,1);assert.equal(snapshot.answers.capacity,'2.5');
+ assert.throws(()=>orderForms.snapshotCustomerOrderForm(allQms(),orderForm,'p1',{...customerValues,privateDesign:'unexpected'}),/فیلد ناشناخته/);
+ for(const [key,value] of [['capacity','bad-number'],['delivery','2026-02-30'],['location','unknown'],['included','unknown'],['name','']])assert.throws(()=>orderForms.snapshotCustomerOrderForm(allQms(),orderForm,'p1',{...customerValues,[key]:value}));
+ const forgedPrivate=allQms().map(r=>r.id===orderForm?{...r,data:{...r.data,private:true}}:r);assert.equal(orderForms.customerOrderForms(forgedPrivate).length,0);
+ const legacy=allQms().map(r=>r.id===orderForm?{...r,data:{...r.data,formPurpose:undefined}}:r);assert.equal(orderForms.customerOrderForms(legacy).length,0);
+ const orderRev=await success(eng,orderForm,'revise');assert.equal(row(orderRev).data.formPurpose,'customer_order');assert.equal(orderForms.customerOrderForms(allQms())[0].version,1);
+ await success(eng,orderRev,'save',{...basic('form',{private:false,reviewerId:'eng2',fields:customerFields.map(f=>({...f,label:f.label+' v2'}))})});
+ assert.equal(row(orderRev).data.formPurpose,'customer_order');await success(eng,orderRev,'submit');await success(eng2,orderRev,'approve');
+ assert.equal(orderForms.customerOrderForms(allQms())[0].version,2);assert.throws(()=>orderForms.customerOrderForm(allQms(),orderForm,'p1'),/فرم مصوب/);
+ assert.equal(snapshot.template.version,1);assert.equal(snapshot.template.fields[0].label,'Customer specification');
+ assert.ok(!JSON.stringify(safe).includes('SECRET-DESIGN'));assert.ok(!JSON.stringify(safe).includes('reviewerId'));assert.ok(!JSON.stringify(safe).includes('links'));
+ assert.equal((await post(eng,basic('form',{private:false,formPurpose:'customer_order',reviewerId:'eng2',fields:customerFields,links:[design]}))).status,400);
  const doc=await ok(qa,basic('document',{ownerId:'qa',reviewerId:'qa2',private:false}));assert.equal((await apply(viewer,doc,'save',{...basic('document')})).status,403);await success(qa,doc,'submit');await success(qa2,doc,'approve');assert.ok((await get(viewer)).data.records.some(r=>r.id===doc));
  const cap=await ok(qa,basic('capa',{ownerId:'qa',reviewerId:'qa2'}));await success(qa,cap,'submit');await success(qa2,cap,'approve');assert.equal((await apply(qa,cap,'close',{evidence:'Self'})).status,403);await success(qa2,cap,'close',{evidence:'Measured independent effectiveness'});
  const mcp={id:crypto.randomUUID(),confirmed:true,mode:'save',data:{...basic('design'),notes:'MCP actual evidence',revision:0}};delete mcp.data.mode;

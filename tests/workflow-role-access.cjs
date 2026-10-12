@@ -27,10 +27,10 @@ const assignment=id=>{const r=policy.jobRoles.find(r=>r.id===id);return{roles:[i
  for(const roles of [['home_sales','delivery','sales_viewer'],['sales_viewer','home_sales','delivery'],['delivery','sales_viewer','home_sales']]){
   const p=policy.validatePermissions({roleAssignment:{roles}}),u={...admin,isAdmin:false,permissions:p};
   assert.deepEqual(plain(p.read),[]);assert.deepEqual(plain(p.write),[]);
-  for(const k of ['sales','fulfillment','transport','sourcing','personnel'])assert.equal(nav.canOpenSection(u,k),true,k);
-  for(const k of ['treasury','guarantees','assets','inventory','batch','device','product','serials','analytics','event','routine-production','flow','qms','finance-control','costing','pricing'])assert.equal(nav.canOpenSection(u,k),false,k);
+  for(const k of ['sales','fulfillment','transport','personnel'])assert.equal(nav.canOpenSection(u,k),true,k);
+  for(const k of ['sourcing','build-intake','treasury','guarantees','assets','inventory','batch','device','product','serials','analytics','event','routine-production','flow','qms','finance-control','costing','pricing'])assert.equal(nav.canOpenSection(u,k),false,k);
   assert.deepEqual(plain(nav.sectionDestination(u,'assets','my-asset')),{section:'personnel',target:'asset:my-asset'});
-  assert.equal(nav.workflowSectionTitle(u,'sourcing','x'),'درخواست تولید');
+  assert.equal(nav.workflowSectionTitle(u,'sourcing','x'),'x');
   assert.equal(nav.workflowSectionTitle(u,'transport','x'),'پیگیری ارسال سفارش');
  }
  const malformed={...policy.allPermissions,roleAssignment:{roles:['invalid']}};

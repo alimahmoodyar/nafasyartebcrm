@@ -32,7 +32,7 @@ async function detail(id,user){const go=()=>sourcing.GET(request('/api/sourcing?
  identity=owner;await auth.session();
  const today=load('lib/duties.ts').dayAt(),later=new Date(Date.now()+10*86400000).toISOString().slice(0,10),future=new Date(Date.now()+20*86400000).toISOString().slice(0,10),now=new Date().toISOString();
  for(const role of ['sales','ceo','inventory','engineering','finance','domestic','foreign']){const a=actor(role);sql.prepare("INSERT INTO app_members(id,email,name,unit,status,subject,permissions,revision,created,updated) VALUES(?,?,?,'تست','active',?,?,1,?,?)").run(a.userId,a.email,a.name,a.userId,JSON.stringify(a.permissions),now,now);}
- const p=await create('product',{code:'SUP',name:'SupplyDevice',group:'G',model:'M',warrantyMonths:'12',status:'فعال'});
+ const p=await create('product',{code:'SUP',name:'SupplyDevice',group:'G',model:'M',productionMode:'project',warrantyMonths:'12',status:'فعال'});
  const fields=[{key:'purity',label:'Purity',type:'number',unit:'%',min:'90',max:'96',required:true}];
  await op('material',{code:'01',name:'Part',unit:'عدد',specs:'V1',defaultLocation:'A-1-1-1',reorderPoint:'0',targetStock:'0',fields,qcOwner:'',warehouseOwner:'',procurementOwner:'',revision:0});
  const bom=await operate({mode:'bom',productId:p.id,previousVersion:0,lines:[{partCode:'01',name:'Part',unit:'عدد',quantity:'2'}]});
@@ -126,7 +126,7 @@ async function detail(id,user){const go=()=>sourcing.GET(request('/api/sourcing?
  assert.equal(current(mcpCreated.planId).data.state,'pending');
  const replay=await catalog.executeTool('create_sourcing_plan',mcpArgs,base,principal);assert.equal(replay.repeated,true);
  await assert.rejects(()=>catalog.executeTool('create_sourcing_plan',{...mcpArgs,id:crypto.randomUUID()},base,{...principal,scope:'read'}));
- await source('create',{productId:p2.id,count:1,origin:'forecast',needBy:future,reference:'UNAUTHORIZED'},403,actor('engineering'));
+ await source('create',{productId:p2.id,count:1,origin:'forecast',needBy:future,reference:'ENGINEERING-INTERNAL'},200,actor('engineering'));
  const definition=catalog.discoverTools().find(t=>t.name==='update_user');
  assert.ok(definition.inputSchema.properties.permissions.properties.supplyRoles.items.enum.includes('production_planning'));
  console.log('Sourcing passed: production planning HTTP/MCP requests, CEO gate, independent finance, role checks, frozen BOM, stock reservations, forecast deduplication, RFQ, budget, QC receipts and idempotency.');

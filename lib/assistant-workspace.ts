@@ -15,7 +15,7 @@ export function operationForm(tool:any,args:any,section:string,title:string):Ope
  if(tool.name==='sales_apply'&&args.mode==='agent'&&!args.agentId&&args.active===undefined)args={...args,active:true};
  if(tool.name==='guarantee_apply'&&args.mode==='save'&&!args.guaranteeId&&args.originalLocation===undefined)args={...args,originalLocation:'زونکن اسناد مالی'};
  const schema:any={...tool.inputSchema,properties:Object.fromEntries(Object.entries(tool.inputSchema.properties||{}).filter(([k])=>!secret.test(k)&&k!=='confirmed')),required:(tool.inputSchema.required||[]).filter((k:string)=>!secret.test(k)&&!['confirmed','id','requestId'].includes(k))};
- if(['create_record','update_record'].includes(tool.name)&&fields[args.kind as Kind]){const fs=fields[args.kind as Kind].filter(f=>f.type!=='snapshot');schema.properties.data={type:'object',properties:Object.fromEntries(fs.map(f=>[f.key,{type:'string',title:f.label,...(f.options?{enum:f.options}:{})}])),required:fs.filter(f=>f.required).map(f=>f.key)};}
+ if(['create_record','update_record'].includes(tool.name)&&fields[args.kind as Kind]){const fs=fields[args.kind as Kind].filter(f=>f.type!=='snapshot');schema.properties.data={type:'object',properties:Object.fromEntries(fs.map(f=>[f.key,{type:'string',title:f.label,...(f.options?{enum:f.options,...(f.optionLabels?{enumLabels:f.optionLabels}:{})}:{})}])),required:fs.filter(f=>f.required).map(f=>f.key)};}
  return {tool:tool.name,section,...formPresentation(tool.name,cleanFormArgs(args),schema,title),args:cleanFormArgs(args)};
 }
 
@@ -27,6 +27,11 @@ export function requestsBuyerAssignment(message:string){
 export function requestedOperationForm(message:string,previous:any,available:any[]):OperationForm|undefined{
  const text=message.replace(/[ي]/g,'ی').replace(/[ك]/g,'ک').replace(/\u200c/g,' ');
  if(requestsBuyerAssignment(message)){const tool=available.find(t=>t.name==='assign_sales_buyer'&&t.write);return tool?operationForm(tool,previous?.tool===tool.name?previous.args:{},'sales','تخصیص خریدار به کارشناس'):undefined;}
+ const cancelled=/(حذف|لغو|ثبت نکن|منصرف|نساز|ایجاد نکن)/.test(text);
+ const homeProduction=/(خانگی|روتین)/.test(text)&&/(سفارش|درخواست|فرم).*(تولید|ساخت)|(تولید|ساخت).*(سفارش|درخواست|فرم)/.test(text)&&!cancelled;
+ if(homeProduction){const tool=available.find(t=>t.name==='sales_apply'&&t.write);if(tool)return operationForm(tool,previous?.tool===tool.name&&previous.args?.mode==='order'?previous.args:{mode:'order',items:[]},'sales','ثبت سفارش فروش');}
+ const buildIntake=/(فرم\s+(?:سفارش\s+)?ساخت|مشخصات\s+(?:سفارش|ساخت|مشتری)|سفارش\s+ساخت|درخواست\s+(?:ساخت|تولید).*بیمارستان|بیمارستان.*درخواست\s+(?:ساخت|تولید))/.test(text)&&/(فرم|جدید|ایجاد|تعریف|ثبت|بساز|باز|بیار|نمایش|سفارش|درخواست)/.test(text)&&!cancelled;
+ if(buildIntake){const tool=available.find(t=>t.name==='build_intake_apply'&&t.write);if(tool)return operationForm(tool,previous?.tool===tool.name&&previous.args?.mode==='save'?previous.args:{mode:'save',revision:0,items:[]},'build-intake','فرم سفارش ساخت بیمارستانی');}
  const salesTemplate=/(الگو.*فروش|شرایط\s+عمومی\s+فروش|پروموشن)/.test(text)&&/(جدید|ایجاد|تعریف|ثبت|بساز|باز|بیار|نمایش)/.test(text)&&!/(حذف|لغو|ثبت نکن|منصرف)/.test(text);
  if(salesTemplate){const tool=available.find(t=>t.name==='sales_network_apply'&&t.write);if(tool){const args=previous?.tool===tool.name&&previous.args?.mode==='template'?previous.args:{mode:'template',data:{templateType:'fixed',productPrices:[]}};return operationForm(tool,args,'sales','الگوی عمومی فروش');}}
  const sale=/(بفروش|فروخت|سفارش\s+(?:فروش|مشتری|نماینده)|فروش\s+(?:دستگاه|محصول|کالا))/.test(text)&&!/(حذف|لغو|ثبت نکن|منصرف)/.test(text);

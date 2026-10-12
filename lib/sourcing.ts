@@ -1,4 +1,5 @@
-import {storedAccessPermissions} from './permissions';
+import {accessPermissions,storedAccessPermissions} from './permissions';
+import {productProductionMode} from './model';
 import {supplierWork,rfqComplete} from './suppliers';
 import {replenishSteps,replenishTasks} from './replenishment';
 import {storage} from './storage';
@@ -8,7 +9,21 @@ import {dayAt,taskRequired,taskText,validDay} from './duties';
 import {scaled} from './production';
 import {supplyRoles} from './sourcing-labels';
 export {supplyRoles,supplyStates} from './sourcing-labels';
-export const hasSupply=(u:Session,r:string)=>u.isAdmin||!!u.permissions.supplyRoles?.includes(r);
+export const hasSupply=(u:Session,r:string)=>u.isAdmin||!!accessPermissions(u.permissions).supplyRoles?.includes(r);
+export function productionRequestAccess(u:Session){
+ const p=accessPermissions(u.permissions),inside=!p.salesAgentId&&!p.serviceAgentId&&!p.hospitalCenterId;
+ const internal=inside&&(u.isAdmin||!!p.supplyRoles?.some(r=>['production_planning','engineering'].includes(r))||!!p.flowRoles?.includes('production'));
+ const canCreate=inside&&(internal||!!p.supplyRoles?.includes('sales'));
+ return {canCreate,internal,allowedProductionModes:internal?['routine','project']:canCreate?['project']:[]};
+}
+export function needProductionRequest(u:Session,product:any){
+ const access=productionRequestAccess(u);if(!access.canCreate)throw new AccessError('فروش خانگی پیش‌فاکتور ثبت می‌کند؛ درخواست تولید با فروش بیمارستانی یا واحد تولید است.',403);
+ if(access.internal)return access;
+ const mode=productProductionMode(product);
+ if(!mode)throw new AccessError('روش تولید این محصول هنوز مشخص نشده است؛ مسئول تعریف محصول ابتدا روتین یا ساخت سفارشی بیمارستانی را تعیین کند.',400);
+ if(mode==='routine')throw new AccessError('محصول روتین خانگی به درخواست تولید فروش نیاز ندارد؛ پیش‌فاکتور را از بخش فروش ثبت کنید.',400);
+ return access;
+}
 export function needSupply(u:Session,r:string){if(!hasSupply(u,r))throw new AccessError('مجوز این مرحله تأمین را ندارید.',403);}
 export function day(v:unknown){const s=taskRequired(v,10);if(!validDay(s))throw new AccessError('تاریخ معتبر انتخاب کنید.',400);return s;}
 export function quantity(v:unknown){try{return scaled(v)}catch(e){throw new AccessError((e as Error).message,400)}}

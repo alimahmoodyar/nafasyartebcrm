@@ -6,6 +6,7 @@ import {boundedBody} from '@/lib/firmware-storage';
 import {storage} from '@/lib/storage';
 import {publicAction} from '../actions/route';
 import {prepareSalesOrderArgs} from '@/lib/sales-order-draft';
+import {hydrateBuildIntakeForm} from '@/lib/build-intake-draft';
 import {prepareServiceDiagnosisArgs,comparableServiceDiagnosisRetry} from '@/lib/service-consumer-prepare';
 export async function POST(request:Request){try{
  checkOrigin(request);const u=await requireAccess();if(request.headers.get('x-assistant-account')!==u.userId)throw new AccessError('حساب ورود تغییر کرده است.',409);
@@ -19,6 +20,7 @@ export async function POST(request:Request){try{
  if(tool.name==='save_material_master'&&args.revision===0)args.id=crypto.randomUUID();
  const section=actionSection(tool.name,args);if(!canOpenSection(u,section))throw new AccessError('دسترسی فرم مجاز نیست.',403);
  if(tool.name==='sales_apply')args=await prepareSalesOrderArgs(u,args);
+ if(tool.name==='build_intake_apply'){const draft=await hydrateBuildIntakeForm(u,operationForm(tool,args,section,actionTitles[tool.name]));if(draft.previewError)throw new AccessError(draft.previewError,400);args=draft.args;}
  if(tool.name==='after_sales_apply')args=await prepareServiceDiagnosisArgs(u,args);
  if(!validateToolArguments(tool.name,{...args,confirmed:true,...(tool.name==='create_password_user'?{password:'validation-only'}:{})}))throw new AccessError('موارد لازم فرم را کامل و بررسی کنید.',400);
  const turn=crypto.randomUUID(),now=new Date().toISOString(),expires=new Date(Date.now()+15*60000).toISOString();
@@ -34,5 +36,8 @@ export async function GET(request:Request){try{
  if(!key)return Response.json({accountId:u.userId,choices},{headers:{'Cache-Control':'private, no-store'}});
  const choice=choices.find(c=>c.key===key);if(!choice)throw new AccessError('این فرم برای شما مجاز نیست.',403);
  const tool=available.find(t=>t.name===choice.tool)!;
- return Response.json({accountId:u.userId,workspace:operationForm(tool,choice.args,choice.section,actionTitles[tool.name]||choice.title)},{headers:{'Cache-Control':'private, no-store'}});
+ let args:any=choice.args;const raw=new URL(request.url).searchParams.get('args');
+ if(raw){if(tool.name!=='build_intake_apply'||raw.length>16000)throw new AccessError('اطلاعات فرم معتبر نیست.',400);args=cleanFormArgs(JSON.parse(raw));if(!args||typeof args!=='object'||Array.isArray(args)||args.mode!==choice.args.mode)throw new AccessError('عملیات فرم تغییر کرده است.',400);}
+ const workspace=await hydrateBuildIntakeForm(u,operationForm(tool,args,choice.section,actionTitles[tool.name]||choice.title));
+ return Response.json({accountId:u.userId,workspace},{headers:{'Cache-Control':'private, no-store'}});
  }catch(e){return accessResponse(e)||Response.json({error:'بازکردن فرم انجام نشد.'},{status:400,headers:{'Cache-Control':'no-store'}});}}

@@ -1,4 +1,6 @@
 export type QField={key:string;label:string;type:'text'|'number'|'date'|'choice'|'boolean';required?:boolean;options?:string[]};
+export const qmsFormPurposes={quality:'فرم داخلی کیفیت و مدارک محصول',customer_order:'مشخصات سفارش مشتری برای فروش'} as const;
+export type QmsFormPurpose=keyof typeof qmsFormPurposes;
 export const qmsRoles:Record<string,string>={qa:'مدیر تضمین کیفیت',documents:'کارشناس تضمین کیفیت و کنترل مدارک',qc:'مسئول کنترل کیفیت',regulatory:'کارشناس مجوزها',technical:'مسئول فنی',calibration:'مسئول تجهیزات آزمون',auditor:'ممیز داخلی',observer:'ممیز بیرونی — فقط مشاهده'};
 const f=(key:string,label:string,type:QField['type']='text',required=true):QField=>({key,label,type,required});
 export const qmsKinds:Record<string,{title:string;roles:string[];private?:boolean;product?:boolean;fields:QField[]}>={
@@ -21,6 +23,7 @@ export const qmsKinds:Record<string,{title:string;roles:string[];private?:boolea
 export const qmsStates:Record<string,string>={draft:'پیش‌نویس',review:'در انتظار بررسی',approved:'تأییدشده',closed:'بسته‌شده با تأیید اثربخشی',superseded:'نسخه پیشین',hold:'توقف / قرنطینه'};
 export const qmsModes=['save','submit','approve','return','close','revise','acknowledge','hold','install_positions'];
 export const qmsHelp=['هر محصول پرونده، فرم‌های نام‌دار و پیوست‌های مستقل دارد. فرم منتشرشده تغییر نمی‌کند؛ بازنگری، نسخه جدید می‌سازد.','طراحی، تغییر مهندسی و ریسک محصول همیشه محرمانه‌اند؛ صرفاً حساب فعال با نقش صریح تحقیق‌وتوسعه یا مدیرعامل دسترسی دارد. مدیر سامانه به‌تنهایی مجاز نیست.','تأیید باید توسط بررسی‌کننده تعیین‌شده و مستقل از سازنده و ویرایش‌کنندگان انجام شود. CAPA و شکایت برای بسته‌شدن نیاز به مدرک اثربخشی دارند.','فایل‌ها خصوصی و به قطعه‌های ۸ مگابایتی بارگذاری می‌شوند؛ سهمیه کل تجاری تعیین نشده است. ظرفیت و هزینه واقعی مخزن و اتصال همچنان محدودیت فنی دارند. پس از قطع، همان فایل را دوباره انتخاب کنید.','مدرک ناقص یا پیش‌نویس به معنی تأیید قانونی نیست. مرجع مجوز، بندهای استاندارد و موعدها باید مطابق مدارک واقعی ثبت شوند.','برای فعال‌کردن کنترل آزادسازی، یک پرونده آزادسازی برای محصول ثبت کنید. پس از آن ارسال هر سریال آن محصول نیاز به آزادسازی مصوب دارد.'];
+qmsHelp.push('برای مشخصات سفارش مشتری، فرم همان محصول را با کاربرد صریح «مشخصات سفارش مشتری برای فروش» و بدون محرمانگی بسازید؛ پس از تأیید مستقل، فقط عنوان و فیلدهای نسخه مصوب در سفارش فروش نمایش داده می‌شوند. فرم‌های داخلی و مدارک طراحی برای فروش منتشر نمی‌شوند.');
 export const QMS_PART_SIZE=8*1024*1024;
 
 export const qmsPositions:Record<string,{name:string;unit:string;responsibilities:string;reportingTo:string}>={

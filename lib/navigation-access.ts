@@ -5,6 +5,7 @@ import {financialAccess} from './financial-access';
 import {canGenerateActivationCode} from './activation-code-access';
 import {routineRoles} from './routine-production';
 import {projectRoles} from './build-projects';
+import {buildIntakeRoles} from './build-intake-access';
 import {costRead} from './costing';
 import {pricingRead} from './pricing-access';
 import {salesRead,salesWarehouse,salesStaff,salesManager,salesFinance} from './sales-access';
@@ -38,6 +39,7 @@ export function canOpenSection(user:Session,s:string){
  if(s==='llm-usage')return u.isAdmin;
  if(s==='routine-production')return routineRoles(u).section;
  if(s==='build-projects')return projectRoles(u).read;
+ if(s==='build-intake')return buildIntakeRoles(u).read;
  if(s==='costing')return costRead(u);
  if(s==='overview')return u.isAdmin||!!p.read.length;
  if(u.isAdmin||s==='mobile-install'||s==='tasks'||s==='development')return true;
@@ -63,7 +65,7 @@ export function workflowSectionTitle(user:Session,key:string,fallback:string){
  if(key==='assets')return 'مدیریت اموال شرکت';
  if(!user.isAdmin&&key==='event'&&p.eventStages.length===1&&p.eventStages[0]==='تحویل')return 'ثبت تحویل دستگاه';
  if(!user.isAdmin&&p.salesRoles?.some(r=>['staff','manager'].includes(r))){
-  if(key==='sourcing'&&p.supplyRoles?.every(r=>r==='sales'))return 'درخواست تولید';
+  if(key==='sourcing'&&!!p.supplyRoles?.length&&p.supplyRoles.every(r=>r==='sales'))return 'درخواست تولید';
   if(key==='transport'&&!p.transportRoles?.length)return 'پیگیری ارسال سفارش';
   if(key==='fulfillment'&&!p.flowRoles?.some(r=>['inventory','production','logistics'].includes(r)))return 'رزرو و تحویل فروش';
  }

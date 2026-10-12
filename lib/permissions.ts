@@ -8,7 +8,7 @@ export const stages = ["مصرف قطعه", "مونتاژ", "آزمون نهای
 export const manualFinancialDomains = ['costing','control','transport'] as const;
 // A navigation mask only; each program still needs its independent domain grant.
 // Administrator settings and shared personal programs cannot be delegated here.
-export const manualBusinessPrograms = ['pricing','sales-bank','treasury','assets','activation-code','qms','routine-production','build-projects','costing','hospital','sales','transport','after-sales','sourcing','fulfillment','flow','overview','analytics','serials','product','device','batch','event','inventory','service','action','distribution','firmware','guarantees','finance-control'] as const;
+export const manualBusinessPrograms = ['pricing','sales-bank','treasury','assets','activation-code','qms','routine-production','build-intake','build-projects','costing','hospital','sales','transport','after-sales','sourcing','fulfillment','flow','overview','analytics','serials','product','device','batch','event','inventory','service','action','distribution','firmware','guarantees','finance-control'] as const;
 export type RoleAssignment = {roles:string[]; warehouses?:string[]; serviceDomains?:string[]; salesAgentId?:string; serviceAgentId?:string};
 export type Permissions = {roleAssignment?:RoleAssignment;manualPrograms?:string[];financialRead?:string[];financialWrite?:string[];treasuryWorkflowRoles?:string[];assetRoles?:string[];qmsRoles?:string[];personnelRoles?:string[];hospitalCenterId?:string;salesRoles?:string[];salesAgentId?:string;transportRoles?:string[];serviceRoles?:string[];serviceDomains?:string[];serviceAgentId?:string;supplyRoles?: string[];warehouses?: string[];flowRoles?: string[];read: Kind[]; write: Kind[]; eventStages: string[]; finance?: "none"|"read"|"write"};
 export type Session = {username?:string;authType?:"password"|"chatgpt";mustChangePassword?:boolean;userId: string; email: string; name: string; isAdmin: boolean; permissions: Permissions};
@@ -93,13 +93,13 @@ presets['بازرگانی خارجی']={read:[],write:[],eventStages:[],supplyRo
 
 // Versioned, explicit workflow dependencies. Assignments store both intent and the
 // validated effective snapshot; editing unrelated account fields never infers roles.
-export const rolePolicyVersion=6;
+export const rolePolicyVersion=7;
 export type JobRole={id:string;label:string;group:string;actions:string;programs:string[];grants:Permissions;scope?:'warehouses'|'services'|'salesAgent'|'serviceAgent'};
 const emptyGrants=():Permissions=>({read:[],write:[],eventStages:[]});
 const job=(id:string,label:string,group:string,actions:string,grants:Partial<Permissions>,scope?:JobRole['scope']):JobRole=>({id,label,group,actions,programs:roleWorkflowPrograms[id]||[],grants:{...emptyGrants(),...grants},scope});
 export const jobRoles:JobRole[]=[
  job('inventory','انباردار','انبار و تولید','بررسی کسری، دریافت کالا، جانمایی، تحویل مواد و بستن سفارش پذیرفته‌شده',{...presets['انبار'],supplyRoles:['inventory']},'warehouses'),
- job('production','مسئول تولید','انبار و تولید','برنامه روزانه، مونتاژ، ثبت مصرف مواد و بسته‌بندی',presets['تولید']),
+ job('production','مسئول تولید','انبار و تولید','برنامه روزانه، درخواست تولید داخلی، مونتاژ، ثبت مصرف مواد و بسته‌بندی',{...presets['تولید'],supplyRoles:['production_planning']}),
  job('planning','برنامه‌ریزی تولید','انبار و تولید','ثبت و پیگیری برنامه تولید و نیاز تأمین',presets['برنامه‌ریزی تولید']),
  job('engineering','تحقیق و توسعه','انبار و تولید','مشخصات و BOM، مسیر تأمین، بررسی فنی پیشنهاد و تغییر طراحی',presets['تحقیق‌وتوسعه و مهندسی طراحی']),
  job('qc','کنترل کیفیت','کیفیت','کنترل ورودی و نهایی، صلاحیت منبع و ثبت عدم انطباق',{...presets['کنترل کیفیت'],qmsRoles:['qc']}),
@@ -130,8 +130,8 @@ jobRoles.push(
  job('warehouse_finance','کارشناس انبار مالی','مالی','مشاهده موجودی و هزینه‌ها؛ بدون جابه‌جایی کالا',{finance:'read',financialRead:['costing'],read:['batch']}),
  job('warehouse_supervisor','مسئول انبار','انبار و تولید','دریافت، جانمایی و تحویل در انبارهای تعیین‌شده',{...presets['انبار'],supplyRoles:['inventory']},'warehouses'),
  job('production_store_assistant','کمک‌انباردار تولید','انبار و تولید','عملیات انبار خط تولید در محدوده انتخاب‌شده',presets['انبار'],'warehouses'),
- job('home_sales','کارشناس فروش خانگی','فروش','ثبت فروش، پیگیری خریداران تخصیص‌یافته و درخواست تولید؛ بدون دسترسی مالی یا تولید',{...presets['کارشناس فروش'],read:[],supplyRoles:['sales']}),
- job('hospital_sales','کارشناس فروش بیمارستانی','فروش','ثبت سرنخ و فروش، پیگیری خریداران تخصیص‌یافته و درخواست تولید',{...presets['کارشناس فروش'],read:[],supplyRoles:['sales']}),
+ job('home_sales','کارشناس فروش خانگی','فروش','ثبت پیش‌فاکتور و فروش و پیگیری خریداران تخصیص‌یافته؛ تولید روتین به درخواست تولید فروش نیاز ندارد',{...presets['کارشناس فروش'],read:[]}),
+ job('hospital_sales','کارشناس فروش بیمارستانی','فروش','ثبت سرنخ، پیش‌فاکتور و فرم سفارش ساخت مطابق مشخصات مشتری و قرارداد',{...presets['کارشناس فروش'],read:[],supplyRoles:['sales']}),
  job('sales_manager_assistant','دستیار مدیر فروش','فروش','پیگیری فروش؛ بدون اختیار تأیید مدیر فروش',{...presets['کارشناس فروش'],read:[],supplyRoles:['sales']}),
  job('domestic_commerce_lead','مسئول بازرگانی داخلی','خرید','مدیریت و پیگیری خرید داخلی',{supplyRoles:['commerce_manager','domestic']}),
  job('foreign_commerce_lead','مسئول بازرگانی خارجی','خرید','مدیریت و پیگیری خرید خارجی',{supplyRoles:['commerce_manager','foreign']}),

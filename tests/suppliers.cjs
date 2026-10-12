@@ -36,7 +36,7 @@ async function supplier(mode,b={},status=200,user=actor('domestic')){const body=
  identity=owner;await auth.session();
  const today=load('lib/duties.ts').dayAt(),later=new Date(Date.now()+10*86400000).toISOString().slice(0,10),future=new Date(Date.now()+20*86400000).toISOString().slice(0,10),now=new Date().toISOString();
  for(const role of ['sales','ceo','inventory','engineering','finance','domestic','foreign']){const a=actor(role);sql.prepare("INSERT INTO app_members(id,email,name,unit,status,subject,permissions,revision,created,updated) VALUES(?,?,?,'test','active',?,?,1,?,?)").run(a.userId,a.email,a.name,a.userId,JSON.stringify(a.permissions),now,now);}
- const p=await create('product',{code:'SUP',name:'SupplierTest',group:'G',model:'M',warrantyMonths:'12',status:'فعال'});
+ const p=await create('product',{code:'SUP',name:'SupplierTest',group:'G',model:'M',productionMode:'project',warrantyMonths:'12',status:'فعال'});
  await op('material',{code:'01',name:'Part',unit:'عدد',specs:'V1',defaultLocation:'A-1-1-1',reorderPoint:'0',targetStock:'0',fields:[{key:'quality',label:'Quality',type:'number',unit:'%',min:'90',max:'100',required:true}],qcOwner:'',warehouseOwner:'',procurementOwner:'',revision:0});
  const material=entities('material')[0];
  await source('routes',{materialId:material.id,revision:material.revision,routes:['domestic']},200,actor('engineering'));

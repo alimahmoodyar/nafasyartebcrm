@@ -3,10 +3,14 @@ import {distributionFields} from "./distribution";
 import {validateBatchIdentity} from "./batch-number";
 export type Kind="product"|"batch"|"device"|"event"|"service"|"action"|"distribution"|"firmware";
 export type Row={id:string;kind:Kind;created:string;data:Record<string,string>};
-export type Field={key:string;label:string;required?:boolean;type?:string;options?:string[];ref?:Kind};
+export type Field={key:string;label:string;required?:boolean;type?:string;options?:string[];optionLabels?:Record<string,string>;ref?:Kind};
+export const productProductionModes:Record<string,string>={routine:'تولید روتین خانگی',project:'ساخت سفارشی بیمارستانی'};
+// Legacy products are deliberately unclassified; names and free-text groups do
+// not establish a manufacturing workflow or permission.
+export function productProductionMode(data:any):'routine'|'project'|''{return data?.productionMode==='routine'||data?.productionMode==='project'?data.productionMode:'';}
 export const names:Record<Kind,string>={product:"محصول",batch:"بچ قطعات",device:"دستگاه",event:"رویداد تولید و تحویل",service:"گزارش خدمات",action:"اقدام اصلاحی",distribution:"نماینده و مشتری",firmware:"نسخه‌های نرم‌افزار"};
 export const fields:Record<Kind,Field[]>={
-product:[{key:"code",label:"کد یکتای محصول",required:true},{key:"name",label:"نام محصول",required:true},{key:"group",label:"گروه محصول",required:true},{key:"model",label:"مدل محصول",required:true},{key:"warrantyMonths",label:"مدت گارانتی (ماه؛ صفر یعنی بدون گارانتی)",type:"number",required:true},{key:"status",label:"وضعیت محصول",options:["فعال","توقف تولید"],required:true},{key:"notes",label:"توضیحات",type:"textarea"}],
+product:[{key:"code",label:"کد یکتای محصول",required:true},{key:"name",label:"نام محصول",required:true},{key:"group",label:"گروه محصول",required:true},{key:"model",label:"مدل محصول",required:true},{key:"productionMode",label:"روش تولید محصول",options:Object.keys(productProductionModes),optionLabels:productProductionModes},{key:"warrantyMonths",label:"مدت گارانتی (ماه؛ صفر یعنی بدون گارانتی)",type:"number",required:true},{key:"status",label:"وضعیت محصول",options:["فعال","توقف تولید"],required:true},{key:"notes",label:"توضیحات",type:"textarea"}],
 distribution:distributionFields,
 firmware:[{key:"name",label:"نام نرم‌افزار",required:true},{key:"version",label:"شماره نسخه",required:true},{key:"deviceModel",label:"مدل دستگاه"},{key:"board",label:"نسخه / مدل برد"},{key:"notes",label:"توضیحات و تغییرات این نسخه",type:"textarea"}],
 batch:[{key:"partCode",label:"کد ثابت قطعه / کد انبار (برای پیشنهاد بچ)"},{key:"part",label:"نام و مدل قطعه / ماده",required:true},{key:"date",label:"تاریخ ورود",type:"date",required:true},{key:"code",label:"کد یکتای بچ",required:true},{key:"manufacturerLot",label:"شماره لات سازنده (عین برچسب؛ در صورت وجود)"},{key:"supplier",label:"تأمین‌کننده",required:true},{key:"maker",label:"سازنده"},{key:"purchase",label:"شماره خرید در همکاران سیستم"},{key:"quantity",label:"مقدار ورودی",type:"number",required:true},{key:"unit",label:"واحد",options:materialUnits,required:true},{key:"status",label:"کنترل ورودی",options:["در انتظار بررسی","تأیید","قرنطینه","رد"],required:true},{key:"test",label:"نتیجه آزمون ورودی",type:"textarea"},{key:"notes",label:"توضیحات و تفاوت با بچ قبلی",type:"textarea"}],
@@ -29,7 +33,7 @@ export function validate(kind:Kind,d:Record<string,string>){
 }
 export function label(r:Row){if(r.kind==="product")return r.data.code+" — "+r.data.name+" · "+r.data.model;if(r.kind==="firmware")return r.data.name+" — "+r.data.version;return r.data.code||r.data.title||r.data.complaint||r.data.stage||r.id;}
 
-export const editable:Partial<Record<Kind,string[]>>={product:["name","group","model","warrantyMonths","status","notes"],batch:["status","test","notes"],service:["status","diagnosis","cause","notes","cost","operator"],action:["title","cause","plan","owner","due","status","effectiveness"]};
+export const editable:Partial<Record<Kind,string[]>>={product:["name","group","model","productionMode","warrantyMonths","status","notes"],batch:["status","test","notes"],service:["status","diagnosis","cause","notes","cost","operator"],action:["title","cause","plan","owner","due","status","effectiveness"]};
 
 // Admin may correct batch business details with audit history; identifiers remain stable.
 export const adminBatchEditable=[...editable.batch!,"part","supplier","maker","purchase","manufacturerLot","quantity","unit"];

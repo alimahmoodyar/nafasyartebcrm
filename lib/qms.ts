@@ -3,7 +3,7 @@ import {storage} from './storage';
 import {AccessError} from './authorization';
 import {trainingContext} from './training-context';
 import {leadMembers,leadMemberGuard} from './sales-leads';
-import {qmsKinds,qmsRoles,qmsModes,qmsPositions,type QField} from './qms-contract';
+import {qmsKinds,qmsRoles,qmsModes,qmsPositions,qmsFormPurposes,type QField,type QmsFormPurpose} from './qms-contract';
 import type {Session} from './permissions';
 export const qtoday=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tehran',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 export const qfail=(m:string,status=400):never=>{throw new AccessError(m,status)};
@@ -22,7 +22,8 @@ export async function qactor(u:Session,members?:any[]){const ms=members||await l
 export type QActor=Awaited<ReturnType<typeof qactor>>;
 export async function qrows(){return (await storage().prepare("SELECT * FROM flow_entities WHERE type IN ('qms_record','qms_file') ORDER BY created,id").all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}));}
 export function qvisible(r:any,a:QActor,rows:any[]):boolean {if(r.type==='qms_file'||r.type==='qms_part'){const parent=rows.find(x=>x.id===(r.type==='qms_file'?r.data.parentId:r.data.fileId));return !!parent&&qvisible(parent,a,rows)}return r.type==='qms_record'&&(!r.data.private||a.design);}
-export function qwrite(d:any,a:QActor){return d.private?a.design:a.ceo||qmsKinds[d.kind]?.roles.some(r=>a.roles.includes(r));}
+export function qwrite(d:any,a:QActor){return d.private?a.design:a.ceo||d.kind==='form'&&d.formPurpose==='customer_order'&&a.design||qmsKinds[d.kind]?.roles.some(r=>a.roles.includes(r));}
+export function qformPurpose(value:unknown,privateForm:boolean):QmsFormPurpose{const purpose=value??'quality';if(typeof purpose!=='string'||!Object.hasOwn(qmsFormPurposes,purpose))qfail('کاربرد فرم محصول معتبر نیست.');if(purpose==='customer_order'&&privateForm)qfail('فرم محرمانه برای سفارش فروش منتشر نمی‌شود؛ یک فرم مستقل و غیرمحرمانه برای مشخصات مشتری بسازید.');return purpose as QmsFormPurpose;}
 export function qfind(rows:any[],id:string,a:QActor,type='qms_record'){const r=rows.find(r=>r.id===id&&r.type===type);if(!r||!qvisible(r,a,rows))qfail('پرونده در دسترس نیست.',404);return r;}
 export function qpresent(r:any){if(r.type==='qms_file'){const {parentId,filename,size,state,parts,createdBy}=r.data;return {...r,data:{parentId,filename,size,state,parts,createdBy}}}return r;}
 export function qfields(v:unknown):QField[]{if(!Array.isArray(v)||!v.length||v.length>100)qfail('فرم باید ۱ تا ۱۰۰ فیلد داشته باشد.');const keys=new Set();return (v as any[]).map(f=>{const key=qr(f.key,60),label=qr(f.label,200);if(!/^[a-z][a-z0-9_]*$/.test(key)||keys.has(key)||['__proto__','constructor','prototype'].includes(key)||!['text','number','date','choice','boolean'].includes(f.type))qfail('شناسه یا نوع فیلد معتبر نیست یا تکراری است.');keys.add(key);const options=f.type==='choice'?(Array.isArray(f.options)?f.options.map((s:unknown)=>qr(s,200)):[]):undefined;if(options&&(!options.length||options.length>100||new Set(options).size!==options.length))qfail('گزینه‌های معتبر و غیرتکراری لازم است.');return {key,label,type:f.type,required:f.required===true,...(options?{options}:{})}});}
@@ -45,13 +46,13 @@ export async function applyQms(u:Session,b:any){const members=await leadMembers(
  const now=new Date().toISOString(),mode=b.mode,note=qr(b.notes,4000),changes:any[]=[];let d:any=old?structuredClone(old.data):{},id=old?.id||op;
  const mustWrite=()=>{if(!qwrite(d,a))qfail('مجوز ثبت این نوع پرونده لازم است.',403)};
  const reviewer=()=>{if(d.reviewerId!==a.id||d.editors.includes(a.id)||!qwrite(d,a))qfail('بررسی‌کننده مستقلِ تعیین‌شده باید تأیید کند.',403);};
- const validate=()=>{if(rows.some(r=>r.type==='qms_file'&&r.data.parentId===id&&r.data.state==='uploading'))qfail('بارگذاری باز را تکمیل یا لغو کنید.');const fields=d.kind==='response'?d.template.fields:qmsKinds[d.kind].fields;d.values=qvalues(fields,d.values,true);if(d.kind==='form')d.fields=qfields(d.fields);if(!d.ownerId||!d.reviewerId||d.ownerId===d.reviewerId)qfail('مسئول و بررسی‌کننده مستقل تعیین کنید.');const rm=members.find(m=>m.id===d.reviewerId),rp=qpermission(rm);if(!rp||d.private&&!designMember(rm)||!d.private&&!rp.supplyRoles?.includes('ceo')&&!qmsKinds[d.kind].roles.some(r=>rp.qmsRoles?.includes(r)))qfail('بررسی‌کننده مجاز و فعال انتخاب کنید.');};
+ const validate=()=>{if(rows.some(r=>r.type==='qms_file'&&r.data.parentId===id&&r.data.state==='uploading'))qfail('بارگذاری باز را تکمیل یا لغو کنید.');const fields=d.kind==='response'?d.template.fields:qmsKinds[d.kind].fields;d.values=qvalues(fields,d.values,true);if(d.kind==='form'){d.fields=qfields(d.fields);d.formPurpose=qformPurpose(d.formPurpose,!!d.private);}if(!d.ownerId||!d.reviewerId||d.ownerId===d.reviewerId)qfail('مسئول و بررسی‌کننده مستقل تعیین کنید.');const rm=members.find(m=>m.id===d.reviewerId),rp=qpermission(rm);if(!rp||d.private&&!designMember(rm)||!d.private&&!rp.supplyRoles?.includes('ceo')&&!(d.kind==='form'&&d.formPurpose==='customer_order'&&designMember(rm))&&!qmsKinds[d.kind].roles.some(r=>rp.qmsRoles?.includes(r)))qfail('بررسی‌کننده مجاز و فعال انتخاب کنید.');};
  if(mode==='save'){
   if(old&&d.state!=='draft')qfail('فقط پیش‌نویس قابل ویرایش است.',409);
   const kind=old?d.kind:qr(b.kind,40);if(!qmsKinds[kind])qfail('نوع پرونده معتبر نیست.');
   let productId=old?d.productId:qt(b.productId||'',200),priv=old?d.private:!!qmsKinds[kind].private||b.private===true;
   if(productId&&!await storage().prepare("SELECT id FROM records WHERE id=? AND kind='product'").bind(productId).first())qfail('محصول معتبر انتخاب کنید.');if(qmsKinds[kind].product&&!productId)qfail('محصول لازم است.');
-  d={...d,kind,productId,private:priv,title:qr(b.title,200),ownerId:qr(b.ownerId,200),reviewerId:qr(b.reviewerId,200),due:qday(b.due),state:'draft',version:d.version||1,series:d.series||id,editors:[...new Set([...(d.editors||[]),a.id])],createdBy:d.createdBy||a.id};
+  d={...d,kind,productId,private:priv,...(kind==='form'?{formPurpose:qformPurpose(b.formPurpose??d.formPurpose,priv)}:{}),title:qr(b.title,200),ownerId:qr(b.ownerId,200),reviewerId:qr(b.reviewerId,200),due:qday(b.due),state:'draft',version:d.version||1,series:d.series||id,editors:[...new Set([...(d.editors||[]),a.id])],createdBy:d.createdBy||a.id};
   if(kind==='response'&&!old){const t=qfind(rows,qr(b.templateId,200),a);if(t.data.kind!=='form'||t.data.state!=='approved'||t.data.productId!==productId)qfail('فرم مصوب همان محصول انتخاب کنید.');d.private=t.data.private;d.template={id:t.id,title:t.data.title,version:t.data.version,fields:t.data.fields};}
   mustWrite();const owner=members.find(m=>m.id===d.ownerId);if(!qpermission(owner)||d.private&&!designMember(owner))qfail('مسئول فعال و مجاز لازم است.');
   d.values=qvalues(kind==='response'?d.template.fields:qmsKinds[kind].fields,b.values||{},false);if(kind==='form')d.fields=qfields(b.fields);

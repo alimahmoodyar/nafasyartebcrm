@@ -6,6 +6,7 @@ import {guidanceOutline,guidanceProfiles,type GuideCheck} from './workflow-guida
 import type {Session} from './permissions';
 type Source={load:()=>Promise<any>;path:string;keys:string[];single?:string[]};
 const sources:Record<string,Source>={
+ buildIntake:{load:()=>import('@/app/api/build-intake/route'),path:'build-intake',keys:['intakes']},
  purchaseService:{load:()=>import('@/app/api/purchase-services/route'),path:'purchase-services',keys:['services']},
  treasury:{load:()=>import('@/app/api/treasury/route'),path:'treasury',keys:['requests','accounts','checks','expenses','statements']},
  guarantees:{load:()=>import('@/app/api/guarantees/route'),path:'guarantees',keys:['records']},
