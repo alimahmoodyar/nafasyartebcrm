@@ -271,3 +271,5 @@ html,button,input,textarea,select,option,svg text{font-family:"Vazirmatn",sans-s
 
 /* Keep the order payment summary separate from editable terms. */
 .sales-order-terms{grid-column:1/-1;min-width:0;padding:18px;border:1px solid #d7e1fa;border-radius:12px;background:#eef2ff;text-align:right}.sales-order-terms h3{margin:0 0 10px;font-size:16px}.sales-order-terms p{margin:0;line-height:1.9;overflow-wrap:break-word}.sales-order-terms-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-block:16px}.sales-order-terms-controls .field{min-width:0}.sales-order-terms-controls input{width:100%;min-width:0}.sales-order-terms .subtle{font-size:13px}@media(max-width:600px){.sales-order-terms-controls{grid-template-columns:minmax(0,1fr)}}
+
+.sales-order-negotiation-limit{line-height:1.9;color:#334a79}.sales-order-terms .sales-order-negotiation-limit{margin-top:8px}
