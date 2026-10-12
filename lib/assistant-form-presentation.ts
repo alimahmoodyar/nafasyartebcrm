@@ -102,7 +102,7 @@ export function generalPresentation(tool:string,args:any,input:any,title:string)
   return {schema,title:'ثبت سفارش فروش'};
  }
  if(tool==='sales_apply'&&args.mode==='agent'){
-  const visible=new Set(['mode','agentId','kind','name','contact','nationalId','mobile','phone','address','active']);
+  const visible=new Set(['mode','agentId','kind','name','contact','nationalId','mobile','phone','address','active','province','city','salesRepresentation','serviceRepresentation','serviceDomain','linkedServiceAgentId','linkedServiceRevision','serviceCode']);
   for(const [key,f] of Object.entries(schema.properties||{}) as [string,any][])f.uiHidden=!visible.has(key)||f.uiHidden;
   if(schema.properties?.mode)schema.properties.mode.uiHidden=true;
   if(!args.agentId&&schema.properties?.agentId)schema.properties.agentId.uiHidden=true;

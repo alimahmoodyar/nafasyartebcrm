@@ -29,7 +29,7 @@ async function evidence(cid,user,id=crypto.randomUUID(),contents=new Uint8Array(
  for(const role of ['support','intake','technician','coordinator','inventory','logistics','finance']){const a=actor(role);sql.prepare("INSERT INTO app_members(id,email,name,unit,status,subject,permissions,revision,created,updated) VALUES(?,?,?,'خدمات','active',?,?,1,?,?)").run(a.userId,a.email,a.name,a.userId,JSON.stringify(a.permissions),now,now);}
  seedEntity('material:01','material',{code:'01',name:'Compressor',unit:'عدد'});
  const raw='batch:TEST';sql.prepare("INSERT INTO records(id,kind,payload,created) VALUES(?,'batch',?,?)").run(raw,JSON.stringify({code:'B01',partCode:'01',part:'Compressor',unit:'عدد',status:'تأیید',supplier:'private supplier',quantity:'20'}),now);sql.prepare('INSERT INTO inventory_balances(id,item_id,warehouse,quantity) VALUES(?,?,?,?)').run(raw+'@raw',raw,'raw',20000);
- const a=(await op('agent',{name:'Agent A',code:'A',city:'A',phone:'0912',address:'A',active:true})).id,b=(await op('agent',{name:'Agent B',code:'B',city:'B',phone:'0913',address:'B',active:true})).id,agent=actor('agent',a),other=actor('agent',b);
+ const a=(await op('agent',{name:'Agent A',code:'A',province:'فارس',city:'شیراز',phone:'0912',address:'A',active:true})).id,b=(await op('agent',{name:'Agent B',code:'B',province:'بوشهر',city:'بوشهر',phone:'0913',address:'B',active:true})).id,agent=actor('agent',a),other=actor('agent',b);
  const coverage=load('lib/service-coverage.ts');
  assert.throws(()=>coverage.coverageRows([{province:'فارس',allCities:false,cities:''}]),/شهر/);
  assert.throws(()=>coverage.coverageRows([{province:'نامعتبر',allCities:true,cities:''}]),/استان/);
@@ -46,7 +46,7 @@ async function evidence(cid,user,id=crypto.randomUUID(),contents=new Uint8Array(
  assert.equal(coverage.suggestedServiceAgents(entities('as_agent'),'hospital','فارس','شیراز').length,0);
  await op('agent',{...entity(a).data,agentId:a,coverage:[]},403,agent);
  // Old API clients omit geography: updates must retain it, not erase it.
- await op('agent',{agentId:a,name:'Agent A',code:'A',city:'A',phone:'0912',address:'A',active:true});
+ await op('agent',{agentId:a,name:'Agent A',code:'A',phone:'0912',address:'A',active:true});
  assert.equal(entity(a).data.coverage.length,2);
  const part=(await op('tariff',{kind:'part',name:'Compressor',partCode:'01',priceRial:'100',costRial:'70',validFrom:today,active:true})).id,labor=(await op('tariff',{kind:'labor',name:'Replacement',priceRial:'50',costRial:'0',validFrom:today,active:true})).id;
  await op('order',{agentId:b,lines:[{tariffId:part,quantity:'1'}]},403,agent);

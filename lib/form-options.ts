@@ -1562,3 +1562,6 @@ toolOptions.sales_bank_apply={mode:{terminal:'اتصال پوز به خریدا�
 toolOptions.confirm_pricing_cost_basis={method:{standard:'استاندارد محاسبه‌شده',documented:'بهای تمام‌شدهٔ مستند'}};
 toolOptions.save_pricing_profit_policy={scope:{product:'محصول',group:'گروه محصول'}};
 toolOptions.approve_pricing_proposal={kind:{representative:'نماینده',reseller:'عامل فروش',branch:'شعبه',end_customer:'مصرف‌کننده'}};
+
+toolOptions.sales_apply.serviceDomain={home:'خدمات خانگی',hospital:'خدمات بیمارستانی'};
+toolOptions.get_representative_locations={workspace:{sales:'نمایندگی فروش',home:'خدمات خانگی',hospital:'خدمات بیمارستانی'},domain:{home:'خدمات خانگی',hospital:'خدمات بیمارستانی'}};

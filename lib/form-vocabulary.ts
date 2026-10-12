@@ -1302,3 +1302,6 @@ toolFieldTitles.confirm_pricing_cost_basis={method:'مبنای هزینه',sourc
 toolFieldTitles.save_pricing_profit_policy={scope:'دامنه الگوی سود',group:'گروه محصول',targetPercent:'سود هدف روی هزینه، درصد',minPercent:'حداقل سود پس از تخفیف، درصد',roundTo:'گردکردن رو به بالا (ریال)'};
 toolFieldTitles.get_pricing_workspace={effectiveFrom:'تاریخ شروع قیمت پیشنهادی'};
 toolFieldTitles.approve_pricing_proposal={kind:'نوع خریدار',token:'شناسه پیشنهاد بررسی‌شده',effectiveFrom:'تاریخ شروع قیمت مصوب'};
+
+Object.assign(fieldTitles,{workspace:'بخش نمایندگی',salesRepresentation:'نمایندگی فروش',serviceRepresentation:'نمایندگی خدمات',serviceDomain:'حوزه خدمات',linkedServiceAgentId:'پرونده خدمات',linkedServiceRevision:'نسخه پرونده خدمات',serviceCode:'کد نمایندگی خدمات',linkedSalesAgentId:'پرونده فروش موجود',linkedSalesRevision:'نسخه پرونده فروش'});
+toolFieldTitles.get_representative_locations={province:'استان',workspace:'بخش نمایندگی',domain:'حوزه خدمات'};
