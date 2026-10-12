@@ -29,7 +29,7 @@ const nw=(mode,extra={},u=manager,status=200)=>post(network,'/api/sales/network'
 (async()=>{
  for(const u of [manager,staff,finance,viewer])member(u);
  const second=actor('second',['staff']);member(second);
- const create={name:'Buyer',phone:'02112345678',contact:'Buyer',province:'Tehran',city:'Tehran',address:'Address',active:true,ownerId:'staff',financeId:'finance',managerId:'manager'};
+ const create={name:'Buyer',phone:'02112345678',contact:'Buyer',province:'تهران',city:'تهران',address:'Address',active:true,ownerId:'staff',financeId:'finance',managerId:'manager'};
  a=(await op('agent',{...create,agentId:''},manager)).id;b=(await op('agent',{...create,agentId:'',name:'PRIVATE OTHER',ownerId:'second'},manager)).id;
  rep=actor('rep',['agent'],{salesAgentId:a});member(rep);
  sql.prepare("INSERT INTO records(id,kind,payload,created) VALUES('product','product',?,?)").run(JSON.stringify({name:'Device',model:'N1',code:'P1',status:'فعال'}),now);

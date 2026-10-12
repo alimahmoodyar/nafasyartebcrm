@@ -8,6 +8,7 @@ import {selectSalesTemplate} from '@/lib/sales-template';
 import {salesPaymentDays,salesPaymentMaxDays} from '@/lib/sales-payment-terms';
 import {NumberInput} from './number-input';
 import {SolarDate} from './solar-date';
+import {SalesReferralFields} from './sales-referral-fields';
 
 const money=(value:any)=>/^\d+$/.test(String(value))?BigInt(value).toLocaleString('fa-IR')+' ریال':'—';
 const percent=(value:number)=>Number(value/100).toLocaleString('fa-IR')+'٪';
@@ -19,6 +20,7 @@ export function SalesOrderSummary({quote,buyer}:{quote:any;buyer?:any}){
   <p>جمع تخفیف: {money(quote.discount)}<br/><strong>{quote.deliveryMode==='consignment'?'ارزش محموله امانی':'مبلغ نهایی'}: {money(quote.amount)}</strong></p>
   {quote.deliveryMode==='consignment'?<p>ارسال به شعبه امانی است؛ تحویل شعبه فاکتور فروش و بدهی ایجاد نمی‌کند.</p>:quote.salesTerms?<p>شرایط پرداخت{quote.salesTerms.cashBps!==quote.salesTerms.standardCashBps||(quote.salesTerms.days!==undefined?quote.salesTerms.days!==quote.salesTerms.standardDays:quote.salesTerms.months!==quote.salesTerms.standardMonths)?' پیشنهادی':' مصوب'}: {percent(quote.salesTerms.cashBps)} نقد{quote.salesTerms.cashBps<10000?'؛ باقی‌مانده '+salesPaymentDays(quote.salesTerms,quote.day||localDay()).toLocaleString('fa-IR')+' روزه':''}<br/>{quote.installments?.map((p:any)=><span key={p.id}>{p.kind==='cash'?'نقد':'مانده'}: {money(p.amount)} · {formatDate(p.due)}<br/></span>)}</p>:<p>الگوی پرداخت این نوع خریدار تعریف نشده است؛ مهلت فعلی پرونده: {quote.termDays?.toLocaleString('fa-IR')||'۰'} روز، سررسید {formatDate(quote.due)}.</p>}
   {quote.discountBlocked&&<p>به‌دلیل بدهی سررسیدشده، تخفیف فعلاً اعمال نمی‌شود.</p>}
+  {quote.referral&&<p>این سفارش با معرف پورسانتی است؛ نرخ قرارداد مصوب: {percent(quote.referral.bps)} از وصول خالص فروش. این مبلغ تخفیف خریدار نیست.</p>}
  </div>;
 }
 
@@ -84,6 +86,7 @@ export function SalesOrderWorkspace({form,accountId,locked,onChange,onPrepare,on
     {items.length>1&&<button type="button" className="link" onClick={()=>change({items:items.filter((_:any,n:number)=>n!==index)})}>حذف</button>}
    </div>)}
    {!locked&&<button type="button" className="link" style={{marginBlock:12}} onClick={()=>change({items:[...items,{productId:'',quantity:1}]})}>افزودن محصول دیگر</button>}
+   {currentCatalog&&!currentCatalog.roles.agent&&<SalesReferralFields kind={agent?.data.kind} value={args.referrerId} choices={currentCatalog.agents.filter((a:any)=>a.data.active&&a.data.kind==='referrer').map((a:any)=>({id:a.id,name:a.data.name}))} disabled={locked} onChange={referrerId=>change({referrerId:referrerId||undefined})}/>}
    {quote&&<SalesOrderSummary quote={quote} buyer={agent?{name:agent.data.name,kind:agent.data.kind||'representative'}:form.preview?.buyer}/>}
    {quoteChanged&&<p role="alert">قیمت یا شرایط مصوب تغییر کرده است؛ فرمان قبلی را لغو و خلاصهٔ جدید را آماده کنید.</p>}
    {loading&&<p role="status">در حال محاسبه قیمت و شرایط مصوب…</p>}
