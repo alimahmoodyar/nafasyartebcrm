@@ -42,6 +42,7 @@ type WorkspaceContext={register:(menu:Menu|null)=>void;showHome:boolean;open:()=
 const NavigationContext=createContext<WorkspaceContext|null>(null);
 export function subprogramIcon(key:string,title:string):LucideIcon{
  const text=key+' '+title;
+ if(/\bterms\b|template|الگو/.test(text))return FileText;
  if(/settings|polic|تنظیم|قواعد|استاندارد/.test(text))return Settings2;
  if(/report|analysis|overview|گزارش|تحلیل/.test(text))return ChartNoAxesCombined;
  if(/account|finance|pay|cost|price|expense|settlement|حقوق|فیش|مالی|هزینه|قیمت|تسویه|پرداخت|حساب/.test(text))return Wallet;

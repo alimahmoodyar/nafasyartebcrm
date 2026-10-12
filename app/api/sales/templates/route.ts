@@ -1,0 +1,3 @@
+import {requireAccess,accessResponse} from '@/lib/authorization';
+import {readSalesTemplateWorkspace} from '@/lib/sales-template-workspace';
+export async function GET(request:Request){try{const query=new URL(request.url).searchParams,filters=Object.fromEntries(['kind','product','search','type','status'].map(key=>[key,query.get(key)||'']));return Response.json(await readSalesTemplateWorkspace(await requireAccess(),filters),{headers:{'Cache-Control':'private, no-store','Vary':'Cookie, Authorization'}});}catch(error){return accessResponse(error)||Response.json({error:'فهرست الگوهای فروش و قیمت روز دریافت نشد؛ دوباره تلاش کنید.'},{status:503,headers:{'Cache-Control':'private, no-store'}});}}
