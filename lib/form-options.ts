@@ -1,3 +1,4 @@
+import {salesRoles as salesPermissionTitles} from './sales-contract';
 import {materialUnitLabels} from './material-units';
 import {jobRoles} from './permissions';
 import {supplyRoles} from './sourcing-labels';
@@ -1568,3 +1569,5 @@ toolOptions.sales_apply.serviceDomain={home:'خدمات خانگی',hospital:'خ
 toolOptions.get_representative_locations={workspace:{sales:'نمایندگی فروش',home:'خدمات خانگی',hospital:'خدمات بیمارستانی'},domain:{home:'خدمات خانگی',hospital:'خدمات بیمارستانی'}};
 for(const name of ["create_user","create_password_user","update_user","update_password_user"])toolOptions[name]["permissions.manualPrograms.*"]["build-intake"]="مشخصات سفارش ساخت";
 toolOptions.apply_qms_record["data.formPurpose"]={quality:"فرم داخلی کیفیت",customer_order:"مشخصات سفارش مشتری"};
+
+for(const name of ['create_user','create_password_user','update_user','update_password_user'])if(toolOptions[name])toolOptions[name]['permissions.salesRoles.*']=salesPermissionTitles;

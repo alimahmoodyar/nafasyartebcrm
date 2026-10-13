@@ -1,6 +1,15 @@
-import {salesManager} from './sales-access';
-import type {Session} from './permissions';
-export function assistantToolAvailable(u:Session,name:string){return !['get_sales_buyer_assignments','assign_sales_buyer','get_sales_template_workspace'].includes(name)||salesManager(u);}
+import {salesManager,salesStaff,salesFinance,salesRep,salesWarehouse,salesViewer,salesReportRead} from './sales-access';
+import {accessPermissions,type Session} from './permissions';
+export function assistantToolAvailable(u:Session,name:string){
+ if(['get_sales_buyer_assignments','assign_sales_buyer','get_sales_template_workspace'].includes(name))return salesManager(u);
+ if(name==='get_sales_monitor')return !salesRep(u)&&(salesStaff(u)||salesFinance(u)||salesViewer(u)||salesReportRead(u));
+ if(name==='sales_monitor_apply')return !salesRep(u)&&(salesStaff(u)||salesFinance(u));
+ if(name==='sales_lead_apply')return salesStaff(u);
+ if(['sales_apply','preview_sales_order'].includes(name))return salesStaff(u)||salesFinance(u)||salesRep(u)||name==='sales_apply'&&salesWarehouse(u);
+ if(name==='sales_network_apply')return salesStaff(u)||salesFinance(u)||salesRep(u);
+ if(name==='sales_bank_apply')return salesManager(u)||salesFinance(u)||!salesRep(u)&&!!accessPermissions(u.permissions).treasuryWorkflowRoles?.includes('treasury');
+ return true;
+}
 export {canAccessSection as canOpenSection} from './navigation-access';
 export const assistantReadNames=new Set(['get_sales_buyer_assignments','get_member_contact','preview_service_part_import','get_sales_template_workspace','get_sales_network','get_sales_network_guide','get_sales_bank','get_purchase_services','get_workflow_guidance','get_reminder_recipients','get_personal_reminders','get_reminder_links','get_formal_purchase_invoices','get_treasury','get_treasury_guide','get_company_assets','get_assets_guide','get_activation_code_history','get_service_warranty','get_foreign_purchases','get_foreign_purchase_guide','print_personnel_document','get_personnel','get_personnel_guide','get_sales_leads','get_sales_lead_guide','get_guarantees','get_guarantee_guide','get_llm_usage','get_routine_production','get_routine_production_guide','get_build_projects','get_build_projects_guide','get_build_intakes','get_purchase_payables','get_purchase_payables_guide','get_expense_register','suggest_expense_classification','get_purchase_settlements','get_purchase_settlement_guide','get_costing','get_costing_guide','get_sales_monitor','get_sales_monitor_guide','get_sales','get_sales_guide','preview_sales_order','get_sales_file_link','get_supplier_quality','get_supplier_quality_guide','get_supplier_document_link','get_suppliers','get_supplier_guide','suggest_service_agents','preview_bom_import','get_replenishment_status','get_mobile_install_guide','get_system_reset_status','get_development_guide','get_development_requests','get_development_attention','get_calendar_context','get_message_inbox','get_inbox_directory','get_inbox_contract','list_inbox_files','get_transport','get_transport_contract','list_transport_files','list_users','get_user_creation_guide','get_part_repairs','get_part_repair_guide','get_after_sales','get_after_sales_contract','preview_service_activations','print_service_document','get_after_sales_report','get_sourcing_plan','get_position_programs','get_task_inbox','list_task_files','get_fulfillment','get_session','get_record_schema','list_records','get_device_passport','list_serial_runs','suggest_batch_number','device_analytics','distribution_history','list_firmware','list_quality_templates','list_quality_reports','finance_report_catalog','get_finance_period','get_production_inventory','get_material_flow']);
 // Account proposals exclude secrets; passwords are supplied only at confirmation.

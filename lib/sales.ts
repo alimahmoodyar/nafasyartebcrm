@@ -7,8 +7,8 @@ import {dayAt,addDay,validDay,taskRequired,taskText} from './duties';
 import {salesAccounts,salesTargetProgress,rial,total,salesRequestChannels} from './sales-contract';
 import {sha256} from './firmware';
 export const salesFail=(m:string,status=400):never=>{throw new AccessError(m,status)};
-export {salesRep,salesManager,salesStaff,salesFinance,salesRead,salesWarehouse} from './sales-access';
-import {salesRep,salesRead,salesWarehouse,salesStaff,salesManager,salesFinance} from './sales-access';
+export {salesRep,salesManager,salesStaff,salesFinance,salesRead,salesWarehouse,salesViewer,salesReportRead} from './sales-access';
+import {salesRep,salesRead,salesWarehouse,salesStaff,salesManager,salesFinance,salesViewer,salesReportRead} from './sales-access';
 import {memberId} from './duties';
 import {termsPlan} from './sales-network-contract';
 import {salesPaymentDays,salesPaymentMaxDays,maxSalesPaymentDays} from './sales-payment-terms';
@@ -37,7 +37,14 @@ export const salesDecode=(r:any)=>({...r,data:JSON.parse(r.data)});
 export async function salesRows(){return (await storage().prepare("SELECT * FROM flow_entities WHERE type GLOB 'sales_*' AND type<>'sales_report' ORDER BY created,id").all()).results.map(salesDecode);}
 export async function salesEntity(id:string,type:string){const r:any=await storage().prepare('SELECT * FROM flow_entities WHERE id=? AND type=?').bind(id,type).first();if(!r)salesFail('پرونده پیدا نشد.',404);return salesDecode(r);}
 export async function liveSalesUser(u:Session){if(u.isAdmin||trainingContext.getStore())return u;const m:any=await storage().prepare("SELECT status,permissions FROM app_members WHERE subject=? OR id=?").bind(u.userId,u.userId.startsWith('local:')?u.userId.slice(6):u.userId).first();if(!m||m.status!=='active')salesFail('دسترسی فعال لازم است.',403);return {...u,permissions:storedAccessPermissions(m.permissions)};}
-export async function salesVisible(u:Session,a:any,operation:'read'|'write'='write'){return salesRep(u)?a.id===u.permissions.salesAgentId:operation==='read'&&u.permissions.salesRoles?.includes('viewer')||!salesStaff(u)||salesManager(u)||salesFinance(u)||a.data.ownerId===await memberId(u);}
+export async function salesVisible(u:Session,a:any,operation:'read'|'write'='write'){
+ if(salesRep(u))return a.id===u.permissions.salesAgentId;
+ if(salesManager(u)||salesFinance(u))return true;
+ if(operation==='read'&&salesReportRead(u))return true;
+ if(salesStaff(u)||operation==='read'&&salesViewer(u))return a.data.ownerId===await memberId(u);
+ // Warehouse-only return reception retains its existing minimal scope.
+ return salesWarehouse(u);
+}
 export async function salesScope(u:Session,id:string,operation:'read'|'write'='write'){u=await liveSalesUser(u);if(!salesRead(u)&&!salesWarehouse(u)||salesRep(u)&&id!==u.permissions.salesAgentId)salesFail('پرونده پیدا نشد یا دسترسی ندارید.',404);const a=await salesEntity(id,'sales_agent');if(!await salesVisible(u,a,operation))salesFail('پرونده در دسترسی شما نیست.',404);if(salesRep(u)&&!a.data.active)salesFail('نمایندگی غیرفعال شده است.',403);return a;}
 export async function salesLock(db:D1Database,id:string){const r:any=await db.prepare("SELECT revision FROM flow_entities WHERE id='sales-lock'").first();const now=new Date().toISOString();return [db.prepare("UPDATE inventory_operations SET guard=CASE WHEN COALESCE((SELECT revision FROM flow_entities WHERE id='sales-lock'),0)=? THEN guard ELSE 0 END WHERE id=?").bind(r?.revision||0,id),db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES('sales-lock','sales_lock','{}',1,?,?) ON CONFLICT(id) DO UPDATE SET revision=flow_entities.revision+1,updated=excluded.updated").bind(now,now)];}
 // Shared by order quotes and the manager's current-price report. A report omits

@@ -48,20 +48,20 @@ const assignment=id=>{const r=policy.jobRoles.find(r=>r.id===id);return{roles:[i
  entity('my-asset','asset_item',{name:'My entrusted computer',holderKind:'employee',holderId:m.id,history:[]});
  entity('other-asset','asset_item',{name:'OTHER_ASSET_SECRET',holderKind:'employee',holderId:'other-member',history:[]});
  let r=await as(u,()=>salesApi.GET(new Request(base+'/api/sales'))),d=await r.json();assert.equal(r.status,200,JSON.stringify(d));assert.equal(d.roles.staff,true);assert.equal(d.roles.leads,true);assert.equal(d.roles.finance,false);assert.equal(d.roles.manager,false);
- assert.deepEqual(Array.from(d.agents,a=>[a.id,a.canOperate]).sort(),[['other',false],['owned',true]]);
- await assert.rejects(()=>sales.salesScope(u,'other'),e=>e.status===404);assert.equal((await sales.salesScope(u,'other','read')).id,'other');
- const mcp=await catalog.executeTool('get_sales',{},base,{user:u,scope:'read',tokenId:null});assert.equal(mcp.roles.staff,true);assert.equal(mcp.agents.length,2);
+ assert.deepEqual(Array.from(d.agents,a=>[a.id,a.canOperate]).sort(),[['owned',true]]);
+ await assert.rejects(()=>sales.salesScope(u,'other'),e=>e.status===404);await assert.rejects(()=>sales.salesScope(u,'other','read'),e=>e.status===404);
+ const mcp=await catalog.executeTool('get_sales',{},base,{user:u,scope:'read',tokenId:null});assert.equal(mcp.roles.staff,true);assert.equal(mcp.agents.length,1);
  for(const api of [treasury,guarantees]){r=await as(u,()=>api.GET(new Request(base+'/api/test')));assert.equal(r.status,403)}
  r=await as(u,()=>assetApi.GET(new Request(base+'/api/assets')));d=await r.json();assert.equal(r.status,200,JSON.stringify(d));assert.ok(JSON.stringify(d).includes('My entrusted computer'));assert.ok(!JSON.stringify(d).includes('OTHER_ASSET_SECRET'));assert.equal(d.custodian,false);
  // A role-managed stored snapshot can be old, incomplete or contaminated. The
  // active domain must recompute it, not overwrite the authenticated role result.
  sql.prepare('UPDATE app_members SET permissions=? WHERE id=?').run(JSON.stringify({roleAssignment:{roles:['home_sales','delivery','sales_viewer']},read:policy.modules,write:policy.modules,eventStages:policy.stages,treasuryWorkflowRoles:['treasury'],assetRoles:['custodian'],salesRoles:[]}),m.id);
- r=await as(u,()=>salesApi.GET(new Request(base+'/api/sales')));d=await r.json();assert.equal(r.status,200);assert.equal(d.roles.staff,true);assert.equal(d.roles.finance,false);assert.equal(d.agents.length,2);
+ r=await as(u,()=>salesApi.GET(new Request(base+'/api/sales')));d=await r.json();assert.equal(r.status,200);assert.equal(d.roles.staff,true);assert.equal(d.roles.finance,false);assert.equal(d.agents.length,1);
  for(const api of [treasury,guarantees])assert.equal((await as(u,()=>api.GET(new Request(base+'/api/test')))).status,403);
  r=await as(u,()=>assetApi.GET(new Request(base+'/api/assets')));d=await r.json();assert.equal(d.custodian,false);assert.ok(!JSON.stringify(d).includes('OTHER_ASSET_SECRET'));
  // Removing operational roles retains reports only and denies mutations.
  sql.prepare('UPDATE app_members SET permissions=? WHERE id=?').run(JSON.stringify({...p,roleAssignment:{roles:['sales_viewer']}}),m.id);
- r=await as(u,()=>salesApi.GET(new Request(base+'/api/sales')));d=await r.json();assert.equal(d.roles.staff,false);assert.equal(d.agents.length,2);assert.ok(d.agents.every(a=>a.canOperate===false));
+ r=await as(u,()=>salesApi.GET(new Request(base+'/api/sales')));d=await r.json();assert.equal(d.roles.staff,false);assert.equal(d.agents.length,1);assert.ok(d.agents.every(a=>a.canOperate===false));
  r=await as(u,()=>salesApi.POST(request('/api/sales',{id:crypto.randomUUID(),mode:'order',agentId:'owned',confirmed:true})));assert.equal(r.status,403);
  const guide=await catalog.executeTool('get_user_creation_guide',{},base,{user:admin,scope:'read',tokenId:null});assert.equal(guide.rolePolicyVersion,policy.rolePolicyVersion);assert.ok(guide.jobRoles.find(r=>r.id==='home_sales').programs.includes('sales'));
  console.log('PASS workflow role policy: '+policy.jobRoles.length+' explicit roles / '+checks+' launcher checks, sales+delivery+reports permutations, real account creation, scoped HTTP/MCP sales, read/write ownership separation, private treasury/guarantee denial, personal assets, stale stored grants and role removal.');
