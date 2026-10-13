@@ -1312,3 +1312,5 @@ toolFieldTitles.build_intake_apply={title:"عنوان پروژه ساخت",order
 toolModeTitles.build_intake_apply={save:"ذخیره پیش‌نویس سفارش ساخت",submit:"ارسال برای بررسی فنی",technical_accept:"تأیید بررسی فنی",return:"برگشت برای اصلاح",approve:"تأیید و اتصال به پروژه ساخت",revise:"بازنگری مشخصات سفارش"};
 
 Object.assign(toolFieldTitles,{save_hospital_profile_template:{definitionId:'فرم برای ویرایش',revision:'نسخه فرم',model:'مدل دستگاه',title:'نام فرم مشخصات',fields:'مشخصه‌های فنی',active:'فعال'},save_hospital_service_kit:{definitionId:'فهرست برای ویرایش',revision:'نسخه فهرست',componentModel:'مدل کمپرسور',intervalHours:'فاصله سرویس، ساعت',lines:'کد و تعداد فیلترها برای هر کمپرسور',active:'فعال'},save_hospital_technical_profile:{assetId:'دستگاه بیمارستان',revision:'نسخه شناسنامه',templateId:'فرم مشخصات همین مدل',values:'مشخصات فنی واقعی'},preview_hospital_periodic_quote:{jobId:'درخواست سرویس دوره‌ای'}});
+
+Object.assign(toolFieldTitles,{register_hospital_installation:{centerId:'بیمارستان موجود',assetId:'دستگاه برای ویرایش',revision:'نسخه شناسنامه',center:'اطلاعات مرکز جدید',installation:'محصول و مشخصات دستگاه نصب‌شده'}});

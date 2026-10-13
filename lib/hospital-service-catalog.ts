@@ -39,14 +39,15 @@ export async function hospitalPeriodicDraft(job:any,asset:any,catalog:Awaited<Re
  if(!Number.isSafeInteger(intervalHours)||intervalHours<=0)blockers.push('فاصله سرویس دستگاه در شناسنامه مشخص نشده است.');
  const template=catalog.templates.filter(t=>t.data.active&&t.data.modelKey===hospitalModelKey(asset.data.model||''));
  const profile=asset.data.technicalProfile;
- if(template.length!==1)blockers.push('برای مدل دستگاه یک فرم فعال مشخصات فنی تعریف کنید.');
+ if(asset.data.equipment?.kind==='oxygen'&&profile?.kind==='installed_oxygen'){if(!asset.data.equipment.generatorModel||!asset.data.equipment.dryerModel)blockers.push('مدل مولد و درایر را در شناسنامه تکمیل کنید.');}
+ else if(template.length!==1)blockers.push('برای مدل دستگاه یک فرم فعال مشخصات فنی تعریف کنید.');
  else if(!profile||profile.templateId!==template[0].id||profile.templateRevision!==template[0].revision)blockers.push('مشخصات فنی دستگاه با فرم فعلی مدل تکمیل یا بازبینی نشده است.');
  else{try{hospitalTechnicalSnapshot(template[0],asset,profile.values);}catch(e){blockers.push((e as Error).message);}}
  const compressors=(asset.data.components||[]).filter((c:any)=>c.kind==='compressor');if(!compressors.length)blockers.push('کمپرسور و مدل آن را در قطعات نصب‌شده دستگاه مشخص کنید.');
  for(const component of compressors){
   const kits=catalog.kits.filter(k=>k.data.active&&k.data.modelKey===hospitalModelKey(component.model)&&k.data.intervalHours===intervalHours);
   if(kits.length!==1){blockers.push('فهرست یکتای فیلترهای سرویس '+intervalHours+' ساعته برای کمپرسور '+component.model+' موجود نیست.');continue;}
-  const kit=kits[0];sources.push({id:kit.id,revision:kit.revision,component:{model:component.model,quantity:component.quantity,serial:component.serial||''},intervalHours});
+  const kit=kits[0];sources.push({id:kit.id,revision:kit.revision,component:{model:component.model,quantity:component.quantity,serial:component.serial||''},filters:kit.data.lines,intervalHours});
   for(const item of kit.data.lines){
    const material=catalog.materials.find(m=>m.data.code===item.partCode),tariff=selectConsumerPartTariff(catalog.tariffs,item.partCode,today,'hospital');
    if(!material||material.data.unit!=='عدد'){blockers.push('قطعه '+item.partCode+' با واحد عدد در فهرست کالا موجود نیست.');continue;}
@@ -61,7 +62,7 @@ export async function hospitalPeriodicDraft(job:any,asset:any,catalog:Awaited<Re
  if(!lines.length&&!blockers.length)blockers.push('فهرست سرویس فاقد قطعه است.');
  if(lines.length>50)blockers.push('پیش‌فاکتور بیش از ۵۰ کد قطعه دارد.');
  const total=lines.reduce((sum,l)=>sum+BigInt(l.unitPrice)*BigInt(l.quantity),BigInt(0)).toString();if(BigInt(total)>BigInt('999999999999999999'))blockers.push('مبلغ پیش‌فاکتور خارج از محدوده است.');
- const source={jobId:job.id,jobRevision:job.revision,assetId:asset.id,assetRevision:asset.revision,centerId:asset.data.centerId,day:today,intervalHours:intervalHours||null,device:{serial:asset.data.serial,model:asset.data.model},technicalProfile:profile||null,template:template.length===1?{id:template[0].id,revision:template[0].revision}:null,kits:sources,lines,total,blockers:[...new Set(blockers)]};
+ const source={jobId:job.id,jobRevision:job.revision,assetId:asset.id,assetRevision:asset.revision,centerId:asset.data.centerId,day:today,intervalHours:intervalHours||null,device:{serial:asset.data.serial,model:asset.data.model,...(asset.data.equipment?{equipment:asset.data.equipment}:{})},technicalProfile:profile||null,template:profile?.kind!=='installed_oxygen'&&template.length===1?{id:template[0].id,revision:template[0].revision}:null,kits:sources,lines,total,blockers:[...new Set(blockers)]};
  const token=await sha256(new TextEncoder().encode(JSON.stringify(source)));return {...source,token,ready:!source.blockers.length};
 }
 export function guardHospitalPeriodicDraft(draft:Awaited<ReturnType<typeof hospitalPeriodicDraft>>,catalog:Awaited<ReturnType<typeof hospitalServiceCatalog>>,guard:(sql:string,...args:any[])=>unknown){
