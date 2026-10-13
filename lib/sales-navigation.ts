@@ -2,8 +2,8 @@ export type SalesMenuItem=[string,string];
 type SalesNavigationContext={warehouseOnly?:boolean;roles:{agent?:boolean;staff?:boolean;finance?:boolean;manager?:boolean;leads?:boolean}};
 
 export function salesViewGroup(view:string){
- if(['finance','new_payment','bank','account'].includes(view))return 'finance';
- if(['settings','terms','targets','assignments'].includes(view))return 'settings';
+ if(['finance','new_payment','bank','account','opening'].includes(view))return 'finance';
+ if(['settings','terms','targets','assignments','prices'].includes(view))return 'settings';
  return '';
 }
 
@@ -14,11 +14,13 @@ export function salesNavigation({warehouseOnly,roles}:SalesNavigationContext):{m
   ...(!rep&&(manager||finance)?[['bank','پوز و تطبیق دریافت‌ها'] as SalesMenuItem]:[]),
   ...(rep||staff||finance?[['new_payment','اعلام پرداخت خریدار'] as SalesMenuItem]:[]),
   ['account','حساب و پرداخت'],
+  ...(!rep&&(manager||finance)?[['opening','مانده‌های قبلی خریداران'] as SalesMenuItem]:[]),
  ];
  const settings:SalesMenuItem[]=[
   ...(manager?[['terms','الگوهای فروش'] as SalesMenuItem]:[]),
   ['targets','تارگت و تخفیف'],
   ...(manager?[['assignments','تخصیص خریدار به کارشناس'] as SalesMenuItem]:[]),
+  ...(!rep&&(manager||finance)?[['prices','قیمت فروش'] as SalesMenuItem]:[]),
  ];
  return {main:[
   ...(rep||staff?[['new_order','ثبت فروش جدید'] as SalesMenuItem]:[]),
@@ -27,6 +29,5 @@ export function salesNavigation({warehouseOnly,roles}:SalesNavigationContext):{m
   ['home',rep?'نمای من':'گزارش فروش'],['orders','سفارش‌ها'],
   ['finance','مالی فروش'],['settings','تنظیمات فروش'],
   ['returns','برگشت کالا'],['profiles','خریداران و نمایندگان'],
-  ...(!rep&&(manager||finance)?[['setup','قیمت و افتتاحیه'] as SalesMenuItem]:[]),
  ],finance:financial,settings};
 }
