@@ -32,20 +32,21 @@ async function mount(d){slots=[];effects=[];requests=[];reply={ok:true,json:asyn
  nav().props.onChange('settings');assert.equal(nav('settings').props.items.find(([id])=>id==='terms')[1],'الگوهای فروش');nav('settings').props.onChange('terms');const catalog=nodes(tree()).find(n=>n.type===leaves.SalesNetworkPanel);assert.ok(catalog,'Manager settings icon opens the real sales-template workspace');assert.equal(catalog.props.templatesOnly,true);assert.equal(nav().props.value,'settings');
  let managerTop;
  for(const roles of [{staff:true,manager:true,finance:false,agent:false},{staff:true,manager:true,finance:true,agent:false,admin:true}]){
-  await mount(data(roles,[assigned,other]));managerTop=topActions();
+  await mount(data(roles,[assigned,other]));assert.equal(topActions(),undefined,'No order toolbar on the sales report or root launcher');nav().props.onChange('orders');managerTop=topActions();
   const topLabels=nodes(managerTop).filter(n=>n.type==='button').map(text);
-  assert.deepEqual(topLabels,['سفارش جدید','تازه‌سازی'],'No duplicate payment/template icons beside the grouped launcher');
+  assert.deepEqual(topLabels,['سفارش جدید','تازه‌سازی'],'Order toolbar is confined to the orders page');
   for(const key of ['bank','new_payment','account','terms','targets','assignments'])assert.ok(!nav().props.items.some(([id])=>id===key),'Moved leaf is absent from root '+key);
-  const before=requests.length;nav().props.onChange('finance');
+  for(const key of ['home','profiles','leads','monitor','returns','setup','finance','settings']){nav().props.onChange(key);assert.equal(topActions(),undefined,'No inherited order/refresh toolbar on '+key);}nav().props.onChange('orders');assert.ok(topActions(),'Returning to orders restores its tools');
+  const before=requests.length;nav().props.onChange('finance');assert.equal(topActions(),undefined,'Finance launcher has no unrelated order tools');
   assert.deepEqual(Array.from(nav('finance').props.items,([key])=>key),['bank','new_payment','account']);
   let workspace=nodes(tree()).find(n=>n.type===leaves.ProgramWorkspace&&n.props.programId==='financial-tools');assert.equal(workspace.props.direct,false,'Finance opens its icon launcher');
   assert.ok(!nodes(workspace).some(n=>n.type==='select'),'Group launcher does not render irrelevant buyer filters');
-  nav('finance').props.onChange('bank');assert.ok(nodes(tree()).some(n=>n.type===leaves.SalesBankPanel));assert.equal(nav().props.value,'finance');
-  nav('finance').props.onChange('account');workspace=nodes(tree()).find(n=>n.type===leaves.ProgramWorkspace&&n.props.programId==='financial-tools');assert.equal(workspace.props.direct,true,'Actual account leaf opens below its group');
+  nav('finance').props.onChange('bank');assert.equal(topActions(),undefined,'Bank page does not inherit order tools');assert.ok(nodes(tree()).some(n=>n.type===leaves.SalesBankPanel));assert.equal(nav().props.value,'finance');
+  nav('finance').props.onChange('account');assert.equal(topActions(),undefined,'Account page does not inherit order tools');workspace=nodes(tree()).find(n=>n.type===leaves.ProgramWorkspace&&n.props.programId==='financial-tools');assert.equal(workspace.props.direct,true,'Actual account leaf opens below its group');
   nav('finance').props.onChange('new_payment');assert.equal(nodes(tree()).find(n=>n.type===leaves.Dialog).props.open,true,'Nested payment opens actual dialog');
   nav().props.onChange('settings');assert.equal(nodes(tree()).find(n=>n.type===leaves.Dialog).props.open,false,'Changing groups closes unrelated draft');
   workspace=nodes(tree()).find(n=>n.type===leaves.ProgramWorkspace&&n.props.programId==='sales-settings');assert.equal(workspace.props.direct,false);assert.deepEqual(Array.from(nav('settings').props.items,([key])=>key),['terms','targets','assignments']);
-  nav('settings').props.onChange('terms');const opened=nodes(tree()).find(n=>n.type===leaves.SalesNetworkPanel);assert.ok(opened);assert.equal(opened.props.templatesOnly,true);
+  nav('settings').props.onChange('terms');assert.equal(topActions(),undefined,'Template page does not inherit order tools');const opened=nodes(tree()).find(n=>n.type===leaves.SalesNetworkPanel);assert.ok(opened);assert.equal(opened.props.templatesOnly,true);
   assert.equal(requests.length,before,'Opening groups and forms never posts or saves business records');assert.ok(requests.every(r=>r.method==='GET'));
  }
  await mount(data({staff:true,manager:true,finance:false,agent:false},[other]));
@@ -68,7 +69,7 @@ async function mount(d){slots=[];effects=[];requests=[];reply={ok:true,json:asyn
  vm.runInNewContext(workspaceSource,{exports:workspace,require:n=>n==='./personal-home'?home:n==='@/lib/workspace-back'?load('lib/workspace-back.ts'):require(n),console});
  const iconMarkup=require('react-dom/server').renderToStaticMarkup(React.createElement(workspace.LayoutAccountProvider,{accountId:'sales-manager'},React.createElement(workspace.IconActions,managerTop.props)));
  assert.ok(iconMarkup.includes('personal-home-compact'),'Top tools render as compact app icons');
- for(const label of ['سفارش جدید','تازه‌سازی'])assert.ok(iconMarkup.includes('title="'+label+'"'),'Visible top icon '+label);
+ for(const label of ['سفارش جدید','تازه‌سازی'])assert.ok(iconMarkup.includes('title="'+label+'"'),'Visible orders-page icon '+label);
  assert.ok(!iconMarkup.includes('title="الگوهای فروش"'));assert.ok(!iconMarkup.includes('title="ثبت پرداخت"'));
  console.log('PASS grouped sales launcher: finance/settings nesting, no duplicate leaf icons, actual order/payment/bank/template screens, role-specific groups, report-only edits denied, assignment blocker and no navigation writes.');
 })().catch(e=>{console.error(e);process.exit(1)});
