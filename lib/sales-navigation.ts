@@ -3,7 +3,7 @@ type SalesNavigationContext={warehouseOnly?:boolean;roles:{agent?:boolean;staff?
 
 export function salesViewGroup(view:string){
  if(['finance','new_payment','bank','account'].includes(view))return 'finance';
- if(['settings','terms','targets'].includes(view))return 'settings';
+ if(['settings','terms','targets','assignments'].includes(view))return 'settings';
  return '';
 }
 
@@ -18,12 +18,12 @@ export function salesNavigation({warehouseOnly,roles}:SalesNavigationContext):{m
  const settings:SalesMenuItem[]=[
   ...(manager?[['terms','الگوهای فروش'] as SalesMenuItem]:[]),
   ['targets','تارگت و تخفیف'],
+  ...(manager?[['assignments','تخصیص خریدار به کارشناس'] as SalesMenuItem]:[]),
  ];
  return {main:[
   ...(rep||staff?[['new_order','ثبت فروش جدید'] as SalesMenuItem]:[]),
   ...(leads?[['leads','سرنخ و فرصت فروش'] as SalesMenuItem]:[]),
   ...(!rep&&(staff||finance)?[['monitor','گزارش مدیر و هشدارها'] as SalesMenuItem]:[]),
-  ...(manager?[['assignments','تخصیص خریدار به کارشناس'] as SalesMenuItem]:[]),
   ['home',rep?'نمای من':'گزارش فروش'],['orders','سفارش‌ها'],
   ['finance','مالی فروش'],['settings','تنظیمات فروش'],
   ['returns','برگشت کالا'],['profiles','خریداران و نمایندگان'],
