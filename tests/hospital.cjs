@@ -21,6 +21,14 @@ async function call(name,path,body){const role=roles.find(r=>r.name===name);cons
  assert.equal((await call(center,'hospital?center=training-hospital-2')).status,404);
  for(const p of ['records','inbox','tasks','sales','flow'])assert.equal((await call(center,p)).status,403,p);
  await act(center,'request',{assetId:'training-hospital-asset-2',kind:'fault',urgency:'normal',description:'test',contact:'test'},404);
+ assert.deepEqual(Object.keys(view.d.requestKinds).sort(),['fault','service']);assert.equal(view.d.requestKinds.service,'سرویس دوره‌ای');
+ for(const kind of ['general','other','repair','periodic','toString'])await act(center,'request',{assetId:'training-hospital-asset-1',kind,urgency:'normal',description:'Invalid category',contact:'Synthetic contact'},400);
+ const manualPeriodic=await act(center,'request',{assetId:'training-hospital-asset-1',kind:'service',urgency:'normal',description:'سرویس دوره‌ای آزمایشی',contact:'مرکز فرضی'});assert.equal(entity(manualPeriodic.id).data.kind,'service','Periodic requests retain the established storage key and do not require a fabricated meter reading');
+ const replayPeriodic=await call(center,'hospital',manualPeriodic.body);assert.equal(replayPeriodic.status,200);assert.equal(sql.prepare("SELECT count(*) n FROM training_flow_entities WHERE id=? AND type='hospital_job'").get(manualPeriodic.id).n,1);
+ const kindsContext=load('lib/training-context.ts'),kindsCatalog=load('lib/mcp/tools.ts'),kindsPrincipal={user:roles.find(r=>r.name===center).session,scope:'read_write',tokenId:null};
+ const kindsWorkspace=await kindsContext.trainingContext.run({actor:'test',role:'test'},()=>kindsCatalog.executeTool('hospital_get_workspace',{},base,kindsPrincipal));assert.equal(kindsWorkspace.requestKinds.service,'سرویس دوره‌ای');
+ await assert.rejects(()=>kindsContext.trainingContext.run({actor:'test',role:'test'},()=>kindsCatalog.executeTool('hospital_apply',{confirmed:true,body:JSON.stringify({id:crypto.randomUUID(),mode:'request',assetId:'training-hospital-asset-1',kind:'general',urgency:'normal',description:'Invalid MCP request',contact:'Synthetic contact'})},base,kindsPrincipal)),/نوع درخواست/);
+ if(process.argv.includes('--request-kinds-only')){console.log('PASS hospital request types: only fault and periodic service, center scope, invalid/third categories rejected, no observed meter prerequisite, idempotent replay and HTTP/MCP parity');return;}
  const contacts=[{id:'contact-test',name:'مسئول تست',role:'تجهیزات پزشکی',mobile:'۰۹۱۲۱۲۳۴۵۶۷',landline:'02112345678',extension:'123',assetId:'training-hospital-asset-1',active:true,notes:'تماس هماهنگی'}];
  const cb=()=>({centerId:'training-hospital-1',revision:entity('training-hospital-1').revision,contacts});
  await act(center,'contacts',cb(),403);
