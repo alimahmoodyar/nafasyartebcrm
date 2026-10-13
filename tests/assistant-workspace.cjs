@@ -54,6 +54,9 @@ const forms=load('app/api/assistant/forms/route.ts'),workspace=load('lib/assista
   check(form.schema);assert.equal(JSON.stringify(args),before);assert.equal(JSON.stringify(tool.inputSchema),original);
   const normalized=presentation.formPresentation(tool.name,args,form.schema,form.title);assert.equal(normalized.title,form.title,'Repeated normalization must not repeat title');
  }}
+ const callerSourceTool=catalog.tools.find(t=>t.name==='sales_apply'),callerSourceSchemaBefore=JSON.stringify(callerSourceTool.inputSchema);
+ const unnamedPresentation=workspace.operationForm(callerSourceTool,{mode:'order'},'sales','Sales');assert.equal(unnamedPresentation.schema.properties.requestSource.properties.contactName.uiHidden,true);assert.ok(!unnamedPresentation.schema.properties.requestSource.required.includes('contactName'));
+ const cancelPresentation=workspace.operationForm(callerSourceTool,{mode:'order_cancel'},'sales','Sales');assert.ok(cancelPresentation.schema.properties.requestSource.required.includes('contactName'));assert.equal(JSON.stringify(callerSourceTool.inputSchema),callerSourceSchemaBefore,'Mode presentation cannot mutate shared tool schema');
  const repair=workspace.operationForm(catalog.tools.find(t=>t.name==='after_sales_apply'),{mode:'diagnose',data:{}},'after-sales','خدمات');assert.equal(repair.schema.properties.data.properties.lines.items.properties.coverage.enumLabels.warranty,'گارانتی دستگاه');
  const foreign=workspace.operationForm(catalog.tools.find(t=>t.name==='foreign_purchase_apply'),{mode:'fx_buy',data:{}},'sourcing','بازرگانی');assert.equal(foreign.schema.properties.data.properties.account.title,'شناسه حساب صراف');assert.equal(foreign.schema.properties.data.properties.documentId.title,'مدرک همین مرحله');
  const rootIds=presentation.formPresentation('delete_record',{id:'target'},{type:'object',properties:{id:{type:'string'}}},'حذف');assert.ok(!rootIds.schema.properties.id.uiHidden,'Deletion target must stay visible');

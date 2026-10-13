@@ -16,7 +16,7 @@ const mockFetch=async(url,options)=>{
 const pureCache={};function pure(file){if(pureCache[file])return pureCache[file];const exports={};pureCache[file]=exports;vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports,Intl,Date,require:n=>pure(require('node:path').resolve(require('node:path').dirname(file),n+'.ts'))});return exports;}
 const source=ts.transpileModule(fs.readFileSync('components/trace/sales-order-workspace.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText;
 vm.runInNewContext(source,{exports:exportsObject,require:n=>n==='react'?react:n==='react/jsx-runtime'?{jsx,jsxs:jsx}:n.endsWith('sales-network-contract')?{partnerKinds:{representative:'نماینده'}}:n.endsWith('sales-contract')?{salesRequestChannels:{phone:'تلفن'}}:n.endsWith('persian-date')?{formatDate:v=>v,localDay:()=>catalog.today}:n.endsWith('sales-payment-terms')?pure(require('node:path').resolve('lib/sales-payment-terms.ts')):n.endsWith('sales-template')?pure(require('node:path').resolve('lib/sales-template.ts')):n==='./sales-referral-fields'?referralFields:n==='./number-input'?{NumberInput:'input'}:n==='./solar-date'?{SolarDate:'date'}:{},fetch:mockFetch,AbortController,JSON,Number,BigInt,Response,console});
-let form={tool:'sales_apply',args:{mode:'order',agentId:'baran',items:[{productId:'soshia',quantity:5}],requestSource:{channel:'phone',contactName:'Requester',day:'2026-10-11'}}},prepared=[],reviewReady=false,accountId='sales-person';
+let form={tool:'sales_apply',args:{mode:'order',agentId:'baran',items:[{productId:'soshia',quantity:5}],requestSource:{channel:'phone',day:'2026-10-11'}}},prepared=[],reviewReady=false,accountId='sales-person';
 const onReviewReady=value=>reviewReady=value;
 function flatten(node){if(Array.isArray(node))return node.flatMap(flatten);if(!node||typeof node!=='object')return [];if(typeof node.type==='function')return flatten(node.type(node.props));return [node,...flatten(node.props?.children)];}
 function render(){cursor=0;const tree=exportsObject.SalesOrderWorkspace({form,accountId,locked:!!form.actionId,onChange:next=>form=next,onPrepare:args=>prepared.push(args),onReviewReady});const queued=effects;effects=[];queued.forEach(f=>f());return flatten(tree);}
@@ -27,9 +27,10 @@ const quantity=nodes=>nodes.find(n=>n.type==='input'&&n.props.fieldKey==='quanti
 (async()=>{
  render();await settle();let nodes=render();
  assert.equal(nodes.filter(n=>n.type==='select').length,3,'Internal sale has buyer, product and receipt channel selectors; reference is optional');
+ assert.ok(!nodes.some(n=>n.props.fieldKey==='contactName'),'Caller name is absent from the assistant order form');
  assert.equal(quantity(nodes).props.value,5);assert.equal(form.args.salesTerms,undefined);
  assert.equal(button(nodes,'بررسی و آماده‌سازی سفارش').props.disabled,false);
- button(nodes,'بررسی و آماده‌سازی سفارش').props.onClick();assert.equal(prepared[0].quoteHash,'quote-5');assert.equal(prepared[0].salesTerms,undefined,'Approved defaults are never zeroed by the UI');
+ button(nodes,'بررسی و آماده‌سازی سفارش').props.onClick();assert.equal(prepared[0].quoteHash,'quote-5');assert.equal(prepared[0].salesTerms,undefined,'Approved defaults are never zeroed by the UI');assert.equal(prepared[0].requestSource.contactName,undefined,'Preparation does not need or fabricate a caller');
  // Responses arriving out of order cannot restore a stale total or quoteHash.
  defer=true;quantity(nodes).props.onChange({target:{value:'6'}});nodes=render();assert.equal(button(nodes,'بررسی و آماده‌سازی سفارش').props.disabled,true);
  quantity(nodes).props.onChange({target:{value:'7'}});render();assert.equal(pending.length,2);

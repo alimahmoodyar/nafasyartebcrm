@@ -86,6 +86,10 @@ export function generalPresentation(tool:string,args:any,input:any,title:string)
   const data=schema.properties?.data;if(data){data.required=[...new Set([...(data.required||[]),'effectiveFrom','productPrices','days','maxDays',...(promotion?['durationDays']:[])])];data.title='شرایط الگو';data.properties.kind.title='الگو برای';data.properties.title.title='عنوان الگو';}
   return {schema,title:'الگوی عمومی فروش'};
  }
+ if(tool==='sales_apply'&&schema.properties?.requestSource){
+  const source=schema.properties.requestSource;source.required=['channel','day',...(args.mode==='order'?[]:['contactName'])];
+  if(args.mode==='order'&&source.properties?.contactName)source.properties.contactName.uiHidden=true;
+ }
  if(tool==='sales_apply'&&args.mode==='payment'){
   const visible=new Set(['agentId','method','amount','day','reference','fileId','notes',...(args.method!=='cash'?['bank']:[]),...(args.method==='check'?['checkDue']:[]),...(args.cashOrderId?['cashOrderId']:[]),...(args.checkInvoiceId?['checkInvoiceId']:[])]);
   for(const [key,f] of Object.entries(schema.properties||{}) as [string,any][])f.uiHidden=!visible.has(key);

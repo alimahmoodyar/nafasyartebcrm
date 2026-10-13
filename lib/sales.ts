@@ -19,11 +19,11 @@ export function sreq(v:unknown,max=200){return taskRequired(v,max)}
 export function stxt(v:unknown,max=4000){return taskText(v,max)}
 export function money(v:unknown,positive=false){const s=sreq(v,18);if(!/^\d{1,18}$/.test(s)||positive&&BigInt(s)<=BigInt(0))salesFail('مبلغ باید ریال صحیح '+(positive?'مثبت':'نامنفی')+' باشد.');return BigInt(s).toString();}
 export function sday(v:unknown){const s=sreq(v,10);if(!validDay(s))salesFail('تاریخ معتبر لازم است.');return s;}
-export function salesSubmission(u:Session,agentId:string,source:any,at:string){
+export function salesSubmission(u:Session,agentId:string,source:any,at:string,contactRequired=true){
  if(salesRep(u)){if(source!=null)salesFail('نماینده درخواست را مستقیماً از حساب خودش ثبت می‌کند.');return {actor:u.userId,actorName:u.name,agentId,onBehalf:false,channel:'portal',at};}
  if(!source||typeof source!=='object'||Array.isArray(source)||!Object.hasOwn(salesRequestChannels,source.channel))salesFail('روش دریافت درخواست نماینده را مشخص کنید.');
  const day=sday(source.day);if(day>dayAt())salesFail('تاریخ دریافت درخواست در آینده نباشد.');
- return {actor:u.userId,actorName:u.name,agentId,onBehalf:true,channel:source.channel,contactName:sreq(source.contactName,200),day,reference:stxt(source.reference??'',1000),at};
+ return {actor:u.userId,actorName:u.name,agentId,onBehalf:true,channel:source.channel,contactName:contactRequired?sreq(source.contactName,200):stxt(source.contactName??'',200),day,reference:stxt(source.reference??'',1000),at};
 }
 // Staff payment entry is based on a receipt, not a fabricated customer request.
 // Explicit legacy request metadata is still validated when supplied.

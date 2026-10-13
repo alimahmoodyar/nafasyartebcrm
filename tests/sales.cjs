@@ -83,9 +83,17 @@ async function upload(u=rep,extra={},status=201){const meta={id:crypto.randomUUI
  await op('terms',{agentId:c,revision:version(c),creditLimit:'100000',termDays:0});
  const cq=await post(quoteApi,'/api/sales/quote',{agentId:c,items:[{productId:'product',quantity:1}]},staff);
  const cb={agentId:c,items:cq.body.items,quoteHash:cq.quoteHash};await op('order',cb,staff,400);await op('order',{...cb,requestSource:{...source,day:future}},staff,400);
- const co=await op('order',{...cb,requestSource:{...source,reference:undefined,actor:'forged-rep'}},staff);
+ const co=await op('order',{...cb,requestSource:{...source,contactName:undefined,reference:undefined,actor:'forged-rep'}},staff);
 assert.equal(entity(co.id).data.submission.reference,'','No message reference is required for a real phone request');
  assert.equal(entity(co.id).data.submission.actor,'local:staff');assert.equal(entity(co.id).data.submission.onBehalf,true);assert.equal(entity(co.id).data.createdBy,'local:staff');
+ assert.equal(entity(co.id).data.submission.contactName,'','A sale can be registered without a caller name');
+ const unnamedSource={channel:'phone',day:today},unnamedOrder={...cb,mode:'order',requestSource:unnamedSource};
+ const preparedUnnamed=await context.run(staff,()=>load('lib/sales-order-draft.ts').prepareSalesOrderArgs(staff,unnamedOrder));assert.equal(preparedUnnamed.quoteHash,cq.quoteHash,'Assistant prepares the same quote without a caller');
+ const unnamedMcpBody={id:crypto.randomUUID(),...unnamedOrder,confirmed:true};
+ const unnamedMcp=await catalog.executeTool('sales_apply',unnamedMcpBody,base,{user:staff,scope:'read_write',tokenId:null});assert.equal(entity(unnamedMcp.id).data.submission.contactName,'');assert.equal(entity(unnamedMcp.id).data.submission.actor,'local:staff');
+ await catalog.executeTool('sales_apply',unnamedMcpBody,base,{user:staff,scope:'read_write',tokenId:null});assert.equal(all('sales_order').filter(v=>v.id===unnamedMcp.id).length,1,'Retry does not duplicate an unnamed order');
+ await op('order',{...cb,requestSource:unnamedSource},viewer,403);await op('order_cancel',{agentId:c,orderId:co.id,revision:version(co.id),requestSource:unnamedSource},staff,400);
+ await op('order',{...cb,requestSource:{...unnamedSource,channel:'invalid'}},staff,400);await op('order',{...cb,requestSource:{...unnamedSource,contactName:'x'.repeat(201)}},staff,400);
  await op('payment',{agentId:c,method:'cash',amount:'30',day:today,reference:'OFFLINE',requestSource:source},viewer,403);
  const cp=await op('payment',{agentId:c,method:'cash',amount:'30',day:today,reference:'OFFLINE',requestSource:source},staff);
  const directBody={agentId:c,method:'cash',amount:'7',day:today,reference:'DIRECT-STAFF',actor:'forged-user'};
