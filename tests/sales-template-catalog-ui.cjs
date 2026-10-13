@@ -61,6 +61,8 @@ assert.equal(control(rendered, 'فهرست الگوها و قیمت‌های ف�
 assert.deepEqual(templateIds(rendered), data.templates.map(t => t.id));
 for (const label of ['جست‌وجوی الگو یا کالا', 'نوع خریدار', 'کالا', 'نوع الگو', 'وضعیت الگو']) assert.ok(control(rendered, label), label);
 button(rendered, 'تعریف نسخه جدید الگوی فروش').props.onClick(); assert.equal(creates, 1);
+slots = []; rendered = tree({showCreate: false});
+assert.ok(!button(rendered, 'تعریف نسخه جدید الگوی فروش'), 'The standalone list can hide its duplicate create action');
 for (const [status, ids] of [['active', ['promotion', 'legacy']], ['scheduled', ['future']], ['expired', ['expired']], ['previous', ['old', 'fixed']]]) {change('وضعیت الگو', status); assert.deepEqual(templateIds(tree()), ids);}
 clear(); change('نوع الگو', 'promotion'); assert.deepEqual(templateIds(tree()), ['promotion', 'expired']);
 change('وضعیت الگو', 'active'); assert.deepEqual(templateIds(tree()), ['promotion']);
@@ -156,9 +158,16 @@ async function mountNetwork(manager = true, fail = false, failNetwork = false, m
 }
 (async () => {
   await mountNetwork();
-  assert.deepEqual(requests.map(r => r.url), ['/api/sales/network', '/api/sales/templates']);
+  assert.deepEqual(requests.map(r => r.url), ['/api/sales/network'], 'Landing page loads only access and form prerequisites');
+  const landingButtons = nodes(networkTree()).filter(n => n.type === 'button').map(text);
+  assert.deepEqual(landingButtons, ['تعریف نسخه جدید الگوی فروش', 'فهرست الگوها'], 'Landing page contains exactly the two requested launchers');
+  button(networkTree(), 'تعریف نسخه جدید الگوی فروش').props.onClick();
+  assert.ok(networkSlots[2]); assert.equal(requests.filter(r => r.method === 'POST').length, 0, 'Create launcher only opens the form');
+  networkSlots[2] = null;
+  button(networkTree(), 'فهرست الگوها').props.onClick(); await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(requests.map(r => r.url), ['/api/sales/network', '/api/sales/network', '/api/sales/templates']);
   assert.ok(catalogNode()); assert.equal(catalogNode().props.data, reportFixture);
-  assert.equal(nodes(networkTree()).filter(n => n.type === 'button' && text(n) === 'تعریف نسخه جدید الگوی فروش').length, 0, 'Loaded child owns one create action');
+  assert.equal(catalogNode().props.showCreate, false, 'List does not repeat the create launcher');
   const source = reportFixture.templates[0], original = JSON.stringify({reportFixture, fixture});
   catalogNode().props.onCopy(source);
   let draft = networkSlots[2];
@@ -183,16 +192,21 @@ async function mountNetwork(manager = true, fail = false, failNetwork = false, m
   assert.equal(requests.filter(r => r.url === '/api/sales/templates').length, 2);
   catalogNode().props.onCreate(); draft = networkSlots[2]; assert.notEqual(draft.id, newId); assert.equal(draft.kind, 'representative'); assert.equal(networkSlots[7], '', 'Ordinary creation clears copied-history notice');
   await mountNetwork(false); assert.deepEqual(requests.map(r => r.url), ['/api/sales/network']); assert.ok(!catalogNode()); assert.ok(text(networkTree()).includes('فقط در دسترسی مدیر فروش'));
-  await mountNetwork(true, true); assert.ok(!catalogNode(), 'Report failure never presents empty data as a real catalog'); assert.ok(text(networkTree()).includes('Report unavailable'));
-  assert.ok(button(networkTree(), 'تعریف نسخه جدید الگوی فروش'), 'Manager retains a working form launcher if report cannot load');
-  await mountNetwork(true, false, false, true); assert.ok(!catalogNode(), 'Malformed successful response is an error, not an empty valid catalog');
-  assert.ok(nodes(networkTree()).some(n => n.props.role === 'alert')); assert.ok(button(networkTree(), 'تعریف نسخه جدید الگوی فروش'));
+  await mountNetwork(true, true); assert.ok(button(networkTree(), 'تعریف نسخه جدید الگوی فروش'), 'Manager retains a working form launcher before opening a failing report');
+  button(networkTree(), 'فهرست الگوها').props.onClick(); await new Promise(resolve => setImmediate(resolve));
+  assert.ok(!catalogNode(), 'Report failure never presents empty data as a real catalog'); assert.ok(text(networkTree()).includes('Report unavailable'));
+  await mountNetwork(true, false, false, true); button(networkTree(), 'فهرست الگوها').props.onClick(); await new Promise(resolve => setImmediate(resolve));
+  assert.ok(!catalogNode(), 'Malformed successful response is an error, not an empty valid catalog');
+  assert.ok(nodes(networkTree()).some(n => n.props.role === 'alert'));
   await mountNetwork(true, false, true); assert.ok(!catalogNode()); assert.deepEqual(requests.map(r => r.url), ['/api/sales/network']);
   assert.ok(nodes(networkTree()).some(n => n.props.role === 'alert' && text(n).includes('Access revoked')));
   networkFailure = false; button(networkTree(), 'تلاش مجدد').props.onClick(); await new Promise(resolve => setImmediate(resolve));
-  assert.ok(catalogNode(), 'Initial access/connection failure can recover by retrying the real load');
+  assert.ok(button(networkTree(), 'فهرست الگوها'), 'Initial access/connection failure can recover to the two-launcher landing');
+  button(networkTree(), 'فهرست الگوها').props.onClick(); await new Promise(resolve => setImmediate(resolve));
+  assert.ok(catalogNode());
+  networkSlots[8] = 'home'; const reopenList = button(networkTree(), 'فهرست الگوها').props.onClick; networkSlots[8] = 'list';
   catalogNode().props.onCopy(reportFixture.templates[0]); assert.ok(networkSlots[2]);
-  networkFailure = true; button(networkTree(), 'تازه‌سازی الگوها و قیمت‌ها').props.onClick(); await new Promise(resolve => setImmediate(resolve));
+  networkFailure = true; reopenList(); await new Promise(resolve => setImmediate(resolve));
   assert.equal(networkSlots[0], null); assert.equal(networkSlots[2], null); assert.equal(networkSlots[5], null, 'Revocation/load failure clears stale manager data, catalog and editable draft');
   assert.ok(!catalogNode()); assert.ok(!nodes(networkTree()).some(n => n.type === 'form')); assert.ok(button(networkTree(), 'تلاش مجدد'));
   console.log('PASS sales catalog integration: manager-only report fetch, single create action, historical copy as new UUID with latest version pointer, precise cloned payload, no write before submit, independent refresh and visible report failure.');

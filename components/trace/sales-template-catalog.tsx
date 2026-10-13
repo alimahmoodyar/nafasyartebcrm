@@ -8,7 +8,7 @@ type ProductPrice=SalesTemplateProductPrice;
 type CatalogTemplate=SalesTemplateSummary;
 type CurrentPrice=SalesTemplateCurrentPrice;
 export type SalesTemplateCatalogData=SalesTemplateWorkspace;
-export type SalesTemplateCatalogProps={data:SalesTemplateCatalogData;onCreate:()=>void;onCopy:(template:CatalogTemplate)=>void;loading?:boolean};
+export type SalesTemplateCatalogProps={data:SalesTemplateCatalogData;onCreate:()=>void;onCopy:(template:CatalogTemplate)=>void;loading?:boolean;showCreate?:boolean};
 const statusLabels:Record<CatalogTemplate['status'],string>={active:'فعال',scheduled:'شروع در آینده',expired:'پایان‌یافته',previous:'نسخه قبلی'};
 const typeLabels={fixed:'الگوی ثابت',promotion:'پروموشن'};
 const sourceLabels={cost_approved:'قیمت مصوب بهای تمام‌شده',sales_template:'قیمت ثبت‌شده در الگوی فروش',sales_price:'قیمت فروش مصوب'};
@@ -20,7 +20,7 @@ const productText=(p:Pick<ProductPrice,'name'|'model'|'code'>)=>text([p.name,p.m
 const productLabel=(p:Pick<ProductPrice,'name'|'model'>)=>p.name||p.model||'کالای ثبت‌شده';
 
 /** Read-only catalog; edits always begin a new version through the parent form. */
-export function SalesTemplateCatalog({data,onCreate,onCopy,loading=false}:SalesTemplateCatalogProps){
+export function SalesTemplateCatalog({data,onCreate,onCopy,loading=false,showCreate=true}:SalesTemplateCatalogProps){
  const [tab,setTab]=useState<'templates'|'prices'>('templates'),[search,setSearch]=useState(''),[kind,setKind]=useState(''),[product,setProduct]=useState(''),[type,setType]=useState(''),[status,setStatus]=useState(''),[expanded,setExpanded]=useState<string[]>([]);
  const query=text(search),kinds:Record<string,string>=data.kinds||{},allTemplates:CatalogTemplate[]=data.templates||[],allPrices:CurrentPrice[]=data.prices||[],products=data.products||[];
  const viewState=(t:CatalogTemplate)=>{
@@ -41,7 +41,7 @@ export function SalesTemplateCatalog({data,onCreate,onCopy,loading=false}:SalesT
  const badge=(t:CatalogTemplate)=>{const current=viewState(t);return <span className={'badge '+(current.status==='active'?'good':'')}>{statusLabels[current.status]||'وضعیت نامشخص'}</span>;};
  const priceTable=(t:CatalogTemplate)=>{const selected=t.productPrices.filter(p=>!product||p.productId===product);return selected.length?<div className="sales-table" style={{maxWidth:'100%',overflowX:'auto'}}><table><caption>قیمت کالاهای {t.title||'الگوی فروش'} · نسخه {number(t.version)}</caption><thead><tr><th scope="col">کالا / کد</th><th scope="col">قیمت پایه هر واحد</th><th scope="col">تخفیف الگو</th><th scope="col">قیمت پس از تخفیف الگو</th></tr></thead><tbody>{selected.map((p,i)=><tr key={p.productId+':'+i}><th scope="row" style={{fontWeight:500}}>{productLabel(p)}{p.model&&p.model!==p.name&&<small style={{display:'block'}}>{p.model}</small>}{p.code&&<small className="code" dir="ltr" style={{display:'block'}}>{p.code}</small>}</th><td style={{whiteSpace:'nowrap'}}>{money(p.unitPrice)}</td><td>{percent(t.discountBps)}</td><td style={{whiteSpace:'nowrap'}}>{money(p.unitNet)}</td></tr>)}</tbody></table></div>:<p className="subtle">این نسخه فهرست قیمت کالا ندارد؛ برای قیمت قابل سفارش، «قیمت‌های معتبر امروز» را ببینید.</p>;};
  return <section className="sales-template-catalog" dir="rtl" aria-label="فهرست الگوها و قیمت‌های فروش" aria-busy={loading} style={{minWidth:0}}>
-  <div className="tools" style={{justifyContent:'space-between',alignItems:'center'}}><div><h3 style={{marginBlock:'0 .25rem'}}>الگوها و قیمت‌های فروش</h3><p className="subtle" style={{margin:0}}>نسخه‌های قبلی برای بررسی سوابق باقی می‌مانند. تغییر شرایط با تعریف نسخه جدید انجام می‌شود.</p></div><button type="button" className="btn primary" disabled={loading} onClick={onCreate}><Plus size={18} aria-hidden="true"/>تعریف نسخه جدید الگوی فروش</button></div>
+  <div className="tools" style={{justifyContent:'space-between',alignItems:'center'}}><div><h3 style={{marginBlock:'0 .25rem'}}>فهرست الگوها</h3><p className="subtle" style={{margin:0}}>نسخه‌های قبلی برای بررسی سوابق باقی می‌مانند. تغییر شرایط با تعریف نسخه جدید انجام می‌شود.</p></div>{showCreate&&<button type="button" className="btn primary" disabled={loading} onClick={onCreate}><Plus size={18} aria-hidden="true"/>تعریف نسخه جدید الگوی فروش</button>}</div>
   <div role="tablist" aria-label="گزارش الگوهای فروش" className="tools" style={{marginBlock:'1rem'}}>{tabs.map(([key,label],index)=><button key={key} id={'sales-template-tab-'+key} type="button" role="tab" aria-controls={'sales-template-panel-'+key} aria-selected={tab===key} tabIndex={tab===key?0:-1} className={'btn '+(tab===key?'primary':'')} onKeyDown={e=>tabKey(e,index)} onClick={()=>setTab(key)}>{label}</button>)}</div>
   <div className="formgrid" style={{marginBottom:'1rem'}}>
    <label className="field wide"><span><Search size={16} aria-hidden="true" style={{display:'inline',verticalAlign:'middle',marginInlineEnd:6}}/>جست‌وجوی الگو یا کالا</span><input type="search" aria-label="جست‌وجوی الگو یا کالا" value={search} placeholder="نام الگو، نام کالا، مدل یا کد کالا" onChange={e=>setSearch(e.target.value)}/></label>
