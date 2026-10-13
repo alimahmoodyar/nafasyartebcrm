@@ -7,53 +7,57 @@ const {SalesPanel}=load('components/trace/sales-panel.tsx');
 const nodes=x=>Array.isArray(x)?x.flatMap(nodes):React.isValidElement(x)?[x,...nodes(x.props.children)]:[];
 const text=x=>Array.isArray(x)?x.map(text).join(''):React.isValidElement(x)?text(x.props.children):x==null?'':String(x);
 function tree(){cursor=0;return SalesPanel({demo:false,onNavigate(){}})}
-function nav(){return nodes(tree()).find(n=>n.type===leaves.SubprogramNavigation)}
+function nav(group=''){const workspace=nodes(tree()).find(n=>n.type===leaves.ProgramWorkspace&&n.props.programId===(group==='finance'?'financial-tools':group==='settings'?'sales-settings':'sales'));return nodes(workspace).find(n=>n.type===leaves.SubprogramNavigation)}
 function topActions(){return nodes(tree()).find(n=>n.type===leaves.IconActions&&n.props.scope==='sales-panel-actions-d9f7a81a09')}
-function topTemplate(){return nodes(topActions()).find(n=>n.type==='button'&&text(n)==='الگوهای فروش')}
 function data(roles,agents){return{today:'2026-10-12',meName:'Sales',roles,agents,products:[{id:'p',name:'Soshia'}],accounts:[],pipeline:[],tasks:[],orders:[],deliveries:[],returns:[],targets:[],prices:[],openings:[],members:[],files:[],goals:[],templates:[],allocationPlans:[],help:[]}}
 async function mount(d){slots=[];effects=[];requests=[];reply={ok:true,json:async()=>d};tree();effects.splice(0).forEach(f=>f());await new Promise(r=>setImmediate(r));tree();effects=[]}
 (async()=>{
  const assigned={id:'owned',canOperate:true,data:{name:'Assigned buyer',kind:'representative',province:'',city:'',creditLimit:'0',termDays:30,active:true}},other={id:'other',canOperate:false,data:{name:'REPORT_ONLY_BUYER',kind:'representative',province:'',city:'',creditLimit:'0',termDays:30,active:true}};
  await mount(data({staff:true,manager:false,finance:false,agent:false,leads:true},[assigned,other]));
  nav().props.onChange('profiles');const directory=nodes(tree()).find(n=>n.type===leaves.SalesBuyerDirectory);assert.ok(directory);assert.equal(directory.props.agents.length,2,'All authorized buyers, including report-only buyers');assert.equal(directory.props.createAction,false,'Expert cannot create profiles');const ownDossier=directory.props.renderDossier(assigned),readDossier=directory.props.renderDossier(other);assert.equal(ownDossier.type,leaves.SalesNetworkPanel);assert.equal(ownDossier.props.embedded,true);assert.equal(ownDossier.props.selected,'owned');assert.equal(ownDossier.props.readOnly,false);assert.equal(readDossier.props.readOnly,true);assert.ok(!text(readDossier.props.profileContent).includes('افزودن قرارداد / مدرک'),'Report-only buyer is not editable');assert.ok(!text(ownDossier.props.profileContent).includes('ویرایش پرونده'),'Expert cannot edit identity');assert.ok(text(ownDossier.props.profileContent).includes('سفارش‌های این خریدار'));
- const menu=nav().props.items;for(const key of ['new_order','new_payment','leads','orders','home'])assert.ok(menu.some(([id])=>id===key),key);
- for(const key of ['terms','bank','setup','assignments'])assert.ok(!menu.some(([id])=>id===key),'No manager/finance settings '+key);
+ const menu=nav().props.items;for(const key of ['new_order','finance','settings','leads','orders','home'])assert.ok(menu.some(([id])=>id===key),key);
+ for(const key of ['new_payment','account','targets','terms','bank','setup','assignments'])assert.ok(!menu.some(([id])=>id===key),'No manager/finance settings '+key);
  assert.equal(menu.find(([key])=>key==='new_order')[1],'ثبت فروش جدید');assert.equal(menu.find(([key])=>key==='profiles')[1],'خریداران و نمایندگان');assert.ok(!menu.some(([key])=>key==='network'),'Only one buyer icon');
  nav().props.onChange('new_order');let dialog=nodes(tree()).find(n=>n.type===leaves.Dialog);assert.equal(dialog.props.open,true,'Launcher opens actual order form');
  const form=nodes(dialog).find(n=>n.type==='form'),select=nodes(form).find(n=>n.type==='select');assert.ok(text(select).includes('Assigned buyer'));assert.ok(!text(select).includes('REPORT_ONLY_BUYER'),'Report grant is not a write grant');
  const referral=nodes(form).find(n=>n.type===leaves.SalesReferralFields);assert.equal(referral.props.kind,'representative');assert.equal(referral.props.value,undefined);assert.ok(!nodes(form).some(n=>n.type==='label'&&text(n).startsWith('عامل معرف')),'No universal referral selector on direct order form');
  referral.props.onChange('explicit-referrer');assert.equal(nodes(tree()).find(n=>n.type===leaves.SalesReferralFields).props.value,'explicit-referrer');select.props.onChange({target:{value:'other'}});assert.equal(nodes(tree()).find(n=>n.type===leaves.SalesReferralFields).props.value,undefined,'Changing buyers clears another buyer referral');
  assert.ok(nodes(form).some(n=>n.type==='button'&&text(n).includes('پیش')),'Actual quote/confirmation form');
- await mount(data({staff:true,manager:false,finance:false,agent:false,leads:true},[assigned,other]));nav().props.onChange('new_payment');dialog=nodes(tree()).find(n=>n.type===leaves.Dialog);assert.equal(dialog.props.open,true);const buyer=nodes(dialog).find(n=>n.type===leaves.BuyerSelect);assert.deepEqual(buyer.props.choices.map(c=>c.id),['owned']);
+ await mount(data({staff:true,manager:false,finance:false,agent:false,leads:true},[assigned,other]));nav().props.onChange('finance');assert.deepEqual(Array.from(nav('finance').props.items,([key])=>key),['new_payment','account']);assert.equal(nav('finance').props.onChange('bank'),false,'Staff cannot launch finance-only bank tools');nav('finance').props.onChange('new_payment');assert.equal(nav().props.value,'finance');dialog=nodes(tree()).find(n=>n.type===leaves.Dialog);assert.equal(dialog.props.open,true);const buyer=nodes(dialog).find(n=>n.type===leaves.BuyerSelect);assert.deepEqual(buyer.props.choices.map(c=>c.id),['owned']);
  await mount(data({staff:false,manager:false,finance:false,agent:false,leads:false},[other]));for(const key of ['new_order','new_payment','leads','terms','bank','setup','assignments'])assert.ok(!nav().props.items.some(([id])=>id===key),'Viewer hides '+key);assert.ok(nav().props.items.some(([id])=>id==='home'));
  await mount(data({staff:true,manager:false,finance:false,agent:false,leads:true},[other]));assert.ok(text(nodes(tree()).find(n=>n.type===leaves.ProgramWorkspace).props.status).includes('تخصیص'));assert.equal(nav().props.onChange('new_order'),false);dialog=nodes(tree()).find(n=>n.type===leaves.Dialog);assert.equal(dialog.props.open,false,'Unassigned buyer does not open a misleading empty order form');
  assert.ok(text(nodes(tree()).find(n=>n.type===leaves.ProgramWorkspace).props.status).includes('فروش ← تخصیص خریدار به کارشناس'));
  await mount(data({staff:true,manager:true,finance:false,agent:false,leads:true},[assigned,other]));assert.ok(nav().props.items.some(([id])=>id==='assignments'));nav().props.onChange('assignments');assert.ok(nodes(tree()).some(n=>n.type===leaves.SalesBuyerAssignments),'Manager opens assignment form');assert.ok(!nodes(tree()).some(n=>n.type==='select'&&text(n).includes('همه نمایندگان')),'No duplicated buyer filter on assignment page');
  nav().props.onChange('profiles');const managerDirectory=nodes(tree()).find(n=>n.type===leaves.SalesBuyerDirectory);assert.ok(text(managerDirectory.props.createAction).includes('تعریف خریدار'));const managerDossier=managerDirectory.props.renderDossier(assigned);assert.ok(text(managerDossier.props.profileContent).includes('ویرایش پرونده'),'Manager retains editing inside dossier');assert.ok(text(managerDossier.props.profileContent).includes('ساخت حساب ورود'));assert.equal(managerDossier.props.templatesOnly,undefined);const referrerDossier=managerDirectory.props.renderDossier({...assigned,data:{...assigned.data,kind:'referrer'}});assert.ok(!text(referrerDossier.props.profileContent).includes('سقف و مهلت اعتباری'));assert.ok(!text(referrerDossier.props.profileContent).includes('سفارش‌های این خریدار'));assert.ok(text(referrerDossier.props.profileContent).includes('ویرایش پرونده'));managerDossier.props.onAssign('owned');assert.equal(nav().props.value,'assignments');
- assert.equal(nav().props.items.find(([id])=>id==='terms')[1],'الگوهای فروش');nav().props.onChange('terms');const catalog=nodes(tree()).find(n=>n.type===leaves.SalesNetworkPanel);assert.ok(catalog,'Manager sales-template icon opens its independent workspace');assert.equal(catalog.props.templatesOnly,true);
- // The action must be in the compact row already visible beside order/payment,
- // independently of the workspace home menu.
+ nav().props.onChange('settings');assert.equal(nav('settings').props.items.find(([id])=>id==='terms')[1],'الگوهای فروش');nav('settings').props.onChange('terms');const catalog=nodes(tree()).find(n=>n.type===leaves.SalesNetworkPanel);assert.ok(catalog,'Manager settings icon opens the real sales-template workspace');assert.equal(catalog.props.templatesOnly,true);assert.equal(nav().props.value,'settings');
  let managerTop;
  for(const roles of [{staff:true,manager:true,finance:false,agent:false},{staff:true,manager:true,finance:true,agent:false,admin:true}]){
-  await mount(data(roles,[assigned,other]));
-  managerTop=topActions();assert.ok(topTemplate(),'Manager and admin have a sales-template action in the top icon row');
+  await mount(data(roles,[assigned,other]));managerTop=topActions();
   const topLabels=nodes(managerTop).filter(n=>n.type==='button').map(text);
-  assert.ok(topLabels.includes('سفارش جدید'));assert.ok(topLabels.includes('ثبت پرداخت'));assert.ok(topLabels.includes('تازه‌سازی'));
-  nodes(managerTop).find(n=>n.type==='button'&&text(n)==='سفارش جدید').props.onClick();
-  assert.equal(nodes(tree()).find(n=>n.type===leaves.Dialog).props.open,true);
-  const before=requests.length;topTemplate().props.onClick();
-  assert.equal(nodes(tree()).find(n=>n.type===leaves.Dialog).props.open,false,'Opening templates closes the unrelated sales draft');
-  const opened=nodes(tree()).find(n=>n.type===leaves.SalesNetworkPanel);
-  assert.ok(opened,'Top action opens the actual catalog');assert.equal(opened.props.templatesOnly,true);assert.equal(nav().props.value,'terms');
-  assert.equal(requests.length,before,'Opening the catalog is navigation and does not save an order, payment or template');
-  assert.ok(requests.every(r=>r.method==='GET'));
+  assert.deepEqual(topLabels,['سفارش جدید','تازه‌سازی'],'No duplicate payment/template icons beside the grouped launcher');
+  for(const key of ['bank','new_payment','account','terms','targets'])assert.ok(!nav().props.items.some(([id])=>id===key),'Moved leaf is absent from root '+key);
+  const before=requests.length;nav().props.onChange('finance');
+  assert.deepEqual(Array.from(nav('finance').props.items,([key])=>key),['bank','new_payment','account']);
+  let workspace=nodes(tree()).find(n=>n.type===leaves.ProgramWorkspace&&n.props.programId==='financial-tools');assert.equal(workspace.props.direct,false,'Finance opens its icon launcher');
+  assert.ok(!nodes(workspace).some(n=>n.type==='select'),'Group launcher does not render irrelevant buyer filters');
+  nav('finance').props.onChange('bank');assert.ok(nodes(tree()).some(n=>n.type===leaves.SalesBankPanel));assert.equal(nav().props.value,'finance');
+  nav('finance').props.onChange('account');workspace=nodes(tree()).find(n=>n.type===leaves.ProgramWorkspace&&n.props.programId==='financial-tools');assert.equal(workspace.props.direct,true,'Actual account leaf opens below its group');
+  nav('finance').props.onChange('new_payment');assert.equal(nodes(tree()).find(n=>n.type===leaves.Dialog).props.open,true,'Nested payment opens actual dialog');
+  nav().props.onChange('settings');assert.equal(nodes(tree()).find(n=>n.type===leaves.Dialog).props.open,false,'Changing groups closes unrelated draft');
+  workspace=nodes(tree()).find(n=>n.type===leaves.ProgramWorkspace&&n.props.programId==='sales-settings');assert.equal(workspace.props.direct,false);assert.deepEqual(Array.from(nav('settings').props.items,([key])=>key),['terms','targets']);
+  nav('settings').props.onChange('terms');const opened=nodes(tree()).find(n=>n.type===leaves.SalesNetworkPanel);assert.ok(opened);assert.equal(opened.props.templatesOnly,true);
+  assert.equal(requests.length,before,'Opening groups and forms never posts or saves business records');assert.ok(requests.every(r=>r.method==='GET'));
  }
  await mount(data({staff:true,manager:true,finance:false,agent:false},[other]));
- assert.equal(nav().props.onChange('new_order'),false);assert.ok(text(tree()).includes('یک خریدار موجود'));
- assert.ok(topTemplate(),'Template configuration is available even before buyer assignment');topTemplate().props.onClick();
- assert.ok(!text(tree()).includes('یک خریدار موجود'),'Opening templates clears the unrelated order error');
- for(const roles of [{staff:true,manager:false,finance:false,agent:false},{staff:false,manager:false,finance:true,agent:false},{staff:false,manager:false,finance:false,agent:true},{staff:false,manager:false,finance:false,agent:false}]){await mount(data(roles,[assigned]));assert.ok(!nav().props.items.some(([id])=>id==='terms'),'No sales-template management icon for staff, finance, external representative or viewer');assert.equal(topTemplate(),undefined,'No top template action for a role without template management');}
- const warehouse=data({staff:false,manager:true,finance:false,agent:false,warehouse:true},[assigned]);warehouse.warehouseOnly=true;await mount(warehouse);assert.equal(topTemplate(),undefined,'Warehouse-only return view does not expose template management');
+ assert.equal(nav().props.onChange('new_order'),false);assert.ok(text(tree()).includes('یک خریدار موجود'));nav().props.onChange('settings');nav('settings').props.onChange('terms');assert.ok(!text(tree()).includes('یک خریدار موجود'),'Manager settings remain available without writable buyers');
+ for(const roles of [{staff:true,manager:false,finance:false,agent:false},{staff:false,manager:false,finance:true,agent:false},{staff:false,manager:false,finance:false,agent:true},{staff:false,manager:false,finance:false,agent:false}]){
+  await mount(data(roles,[assigned]));nav().props.onChange('settings');assert.deepEqual(Array.from(nav('settings').props.items,([id])=>id),['targets']);assert.equal(nav('settings').props.onChange('terms'),false,'Nonmanager cannot launch template settings');assert.ok(!nodes(tree()).some(n=>n.type===leaves.SalesNetworkPanel));
+  nav().props.onChange('finance');const financialKeys=Array.from(nav('finance').props.items,([id])=>id);
+  assert.equal(financialKeys.includes('bank'),!!roles.finance&&!roles.agent);assert.equal(financialKeys.includes('new_payment'),!!(roles.staff||roles.finance||roles.agent));assert.ok(financialKeys.includes('account'));
+  if(!roles.finance)assert.equal(nav('finance').props.onChange('bank'),false);
+  if(!roles.staff&&!roles.finance&&!roles.agent){assert.equal(nav('finance').props.onChange('new_payment'),false);assert.equal(nodes(tree()).find(n=>n.type===leaves.Dialog).props.open,false);}
+ }
+ const warehouse=data({staff:false,manager:true,finance:false,agent:false,warehouse:true},[assigned]);warehouse.warehouseOnly=true;await mount(warehouse);assert.deepEqual(Array.from(nav().props.items,([id])=>id),['returns']);assert.equal(nav().props.onChange('settings'),false);assert.equal(nav().props.onChange('finance'),false);
  // Render the real home launcher so concise labels cannot overwrite workflow
  // labels like production request / shipment tracking.
  const home={},source=ts.transpileModule(fs.readFileSync(path.join(root,'components/trace/personal-home.tsx'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
@@ -64,7 +68,7 @@ async function mount(d){slots=[];effects=[];requests=[];reply={ok:true,json:asyn
  vm.runInNewContext(workspaceSource,{exports:workspace,require:n=>n==='./personal-home'?home:n==='@/lib/workspace-back'?load('lib/workspace-back.ts'):require(n),console});
  const iconMarkup=require('react-dom/server').renderToStaticMarkup(React.createElement(workspace.LayoutAccountProvider,{accountId:'sales-manager'},React.createElement(workspace.IconActions,managerTop.props)));
  assert.ok(iconMarkup.includes('personal-home-compact'),'Top tools render as compact app icons');
- for(const label of ['الگوهای فروش','سفارش جدید','ثبت پرداخت','تازه‌سازی'])assert.ok(iconMarkup.includes('title="'+label+'"'),'Visible top icon '+label);
- assert.match(iconMarkup,/<button[^>]*class="personal-app-open"[^>]*title="الگوهای فروش"[^>]*><span class="personal-app-icon /,'Templates use the same app icon control as other top sales actions');
- console.log('PASS sales launcher: real order/payment dialogs, role-specific tools, report-only buyers excluded from edits, assignment blocker, and manager/admin top app icon opening the template catalog without writes.');
+ for(const label of ['سفارش جدید','تازه‌سازی'])assert.ok(iconMarkup.includes('title="'+label+'"'),'Visible top icon '+label);
+ assert.ok(!iconMarkup.includes('title="الگوهای فروش"'));assert.ok(!iconMarkup.includes('title="ثبت پرداخت"'));
+ console.log('PASS grouped sales launcher: finance/settings nesting, no duplicate leaf icons, actual order/payment/bank/template screens, role-specific groups, report-only edits denied, assignment blocker and no navigation writes.');
 })().catch(e=>{console.error(e);process.exit(1)});
