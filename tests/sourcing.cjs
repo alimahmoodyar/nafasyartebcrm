@@ -32,7 +32,7 @@ async function detail(id,user){const go=()=>sourcing.GET(request('/api/sourcing?
  identity=owner;await auth.session();
  const today=load('lib/duties.ts').dayAt(),later=new Date(Date.now()+10*86400000).toISOString().slice(0,10),future=new Date(Date.now()+20*86400000).toISOString().slice(0,10),now=new Date().toISOString();
  for(const role of ['sales','ceo','inventory','engineering','finance','domestic','foreign']){const a=actor(role);sql.prepare("INSERT INTO app_members(id,email,name,unit,status,subject,permissions,revision,created,updated) VALUES(?,?,?,'تست','active',?,?,1,?,?)").run(a.userId,a.email,a.name,a.userId,JSON.stringify(a.permissions),now,now);}
- const p=await create('product',{code:'SUP',name:'SupplyDevice',group:'G',model:'M',productionMode:'project',warrantyMonths:'12',status:'فعال'});
+ const p=await create('product',{code:'SUP',name:'SupplyDevice',group:'سایر تجهیزات پزشکی',model:'M',productionMode:'project',warrantyMonths:'12',status:'فعال'});
  const fields=[{key:'purity',label:'Purity',type:'number',unit:'%',min:'90',max:'96',required:true}];
  await op('material',{code:'01',name:'Part',unit:'عدد',specs:'V1',defaultLocation:'A-1-1-1',reorderPoint:'0',targetStock:'0',fields,qcOwner:'',warehouseOwner:'',procurementOwner:'',revision:0});
  const bom=await operate({mode:'bom',productId:p.id,previousVersion:0,lines:[{partCode:'01',name:'Part',unit:'عدد',quantity:'2'}]});
@@ -44,7 +44,9 @@ async function detail(id,user){const go=()=>sourcing.GET(request('/api/sourcing?
  await source('calculate',{planId:pid,notes:'not approved'},400,actor('inventory'));
  await source('approve',{planId:pid,count:5,needBy:future,notes:'approved'},403,actor('sales'));
  await source('approve',{planId:pid,count:5,needBy:future,notes:'approved'},200,actor('ceo'));
- assert.equal(current(pid).data.bom.version,1);
+ assert.equal(current(pid).data.bom.version,1);assert.equal(current(pid).data.state,'sourcing');assert.equal(current(pid).data.lines[0].required,10000);assert.equal(current(pid).data.lines[0].stock,4000);assert.equal(current(pid).data.lines[0].shortage,6000);assert.ok(Array.isArray(current(pid).data.supplierTargets));
+ // CEO approval itself calculates and reserves the BOM shortage; no manual target is involved.
+
  await operate({mode:'bom',productId:p.id,previousVersion:1,lines:[{partCode:'01',name:'Part',unit:'عدد',quantity:'3'}]});assert.equal(current(pid).data.bom.lines[0].quantity,'2');
  await source('calculate',{planId:pid,notes:'stock checked'},200,actor('inventory'));
  let d=await detail(pid);assert.equal(d.lines[0].required,10000);assert.equal(d.lines[0].stock,4000);assert.equal(d.lines[0].shortage,6000);assert.equal(d.work.filter(w=>w.role==='domestic'||w.role==='foreign').length,2);
@@ -94,10 +96,10 @@ async function detail(id,user){const go=()=>sourcing.GET(request('/api/sourcing?
  assert.equal((await detail(pid)).lines[0].stock,10000);await source('ready',{planId:pid,notes:'all stock checked'},200,actor('inventory'));
  await source('release',{planId:pid,reference:'PRODUCTION-PLAN-1',notes:'handed to production'},200,actor('inventory'));assert.equal(sql.prepare('SELECT COUNT(*) n FROM sourcing_holds WHERE plan_id=?').get(pid).n,0);assert.equal(stock(stocked.id,'line'),4000);
  // Missing BOM goes to R&D and resumes only with a matching real BOM.
- const p2=await create('product',{code:'SUP2',name:'No BOM',group:'G',model:'M',warrantyMonths:'12',status:'فعال'}),missing=(await source('create',{productId:p2.id,count:1,origin:'customer',needBy:future,reference:'MISSING'})).planId;
+ const p2=await create('product',{code:'SUP2',name:'No BOM',group:'سایر تجهیزات پزشکی',model:'M',warrantyMonths:'12',status:'فعال'}),missing=(await source('create',{productId:p2.id,count:1,origin:'customer',needBy:future,reference:'MISSING'})).planId;
  await source('approve',{planId:missing,count:1,needBy:future,notes:'approved'});assert.equal(current(missing).data.state,'waiting_bom');
  await source('calculate',{planId:missing,notes:'no BOM'},400);await operate({mode:'bom',productId:p2.id,previousVersion:0,lines:[{partCode:'01',name:'Part',unit:'عدد',quantity:'1'}]});
- const bom2=sql.prepare('SELECT id FROM bom_versions WHERE product_id=?').get(p2.id).id;await source('bom',{planId:missing,bomId:bom2,notes:'released engineering BOM'},200,actor('engineering'));assert.equal(current(missing).data.state,'approved');
+ const bom2=sql.prepare('SELECT id FROM bom_versions WHERE product_id=?').get(p2.id).id;await source('bom',{planId:missing,bomId:bom2,notes:'released engineering BOM'},200,actor('engineering'));assert.equal(current(missing).data.state,'sourcing');
  const outsider={...actor('none'),permissions:{read:[],write:[],eventStages:[]}};assert.equal((await context.run(outsider,()=>sourcing.GET(request('/api/sourcing')))).status,403);
  token=(await mint('read')).token;assert.ok(!(await call('get_sourcing_plan',{planId:pid})).error);assert.ok((await call('followup_sourcing_plan',{id:crypto.randomUUID(),planId:missing,revision:current(missing).revision,notes:'MCP',confirmed:true})).error);
  token=(await mint('read_write')).token;assert.ok(!(await call('followup_sourcing_plan',{id:crypto.randomUUID(),planId:missing,revision:current(missing).revision,notes:'MCP',confirmed:true})).error);

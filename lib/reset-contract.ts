@@ -1,3 +1,4 @@
+// Physical material_warehouse definitions are catalog flow entities. Receipt warehouse snapshots and scoped slot keys use existing backup/reset/freeze tables (0016); no new table/FK/blob. Operations reset preserves definitions, full reset deletes them.
 // Compact hospital coverage dates and per-device servicePlans are embedded in operational hospital_asset/hospital_job. Contract follow-ups are derived, their duty_runs use existing backup/delete/freeze; no new table, FK, blob or persistence exemption. Legacy catalogs and snapshots retain current reset policy.
 // Contract-specific hospital warranty snapshots live in existing build_intake/build_project/hospital_asset entities; generic flow reset backup/delete/freeze covers them. Home product warranty unchanged, no new tables or FK.
 // Manual installed equipment, warranty/contract snapshots and actual installed filter batch labels live in hospital_asset; shared filter technical codes remain hospital_service_kit. Existing reset scopes and generic flow freeze cover both. No new manufacturing records or inventory batches are fabricated.
@@ -38,7 +39,7 @@ export const resetTables:Record<string,string>={
 // Member contacts are preserved account identity data, keyed by app_members.id.
 // Existing 0016 generic flow_entities freeze protects their atomic writes; no new migration.
 export const resetFlowPreserved=['hospital_center','account_profile','member_contact','position','duty_template','duty_catalog_install','transport_migration','development_request','as_agent','sales_agent'];
-export const resetFlowCatalog=['hospital_profile_template','hospital_service_kit','pricing_cost','pricing_policy','pricing_approval','qms_record','qms_file','qms_part','purchase_specification','routine_route','routine_policy','cost_material','cost_standard','sales_price','supplier_document','supplier_capa','supplier','supplier_material','supplier_review','material','capacity','party','as_tariff','transport_vehicle'];
+export const resetFlowCatalog=['material_warehouse','hospital_profile_template','hospital_service_kit','pricing_cost','pricing_policy','pricing_approval','qms_record','qms_file','qms_part','purchase_specification','routine_route','routine_policy','cost_material','cost_standard','sales_price','supplier_document','supplier_capa','supplier','supplier_material','supplier_review','material','capacity','party','as_tariff','transport_vehicle'];
 // Driver checklists, blockers and vehicle observations are embedded in operational
 // transport entities: backup, both reset scopes and 0016 freeze cover them.
 // Vehicle catalog stays preserved for operations-only reset. Browser drafts are local,

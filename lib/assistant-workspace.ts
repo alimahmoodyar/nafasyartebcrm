@@ -12,7 +12,7 @@ export function cleanFormArgs(value:any,depth=0):any{
 }
 export function operationForm(tool:any,args:any,section:string,title:string):OperationForm{
  if(!args||typeof args!=='object'||Array.isArray(args)||JSON.stringify(args).length>16000)throw new Error('اطلاعات فرم معتبر نیست.');
- if(tool.name==='save_material_master')args={revision:0,code:'',name:'',unit:'عدد',specs:'',defaultLocation:'',reorderPoint:'0',targetStock:'0',fields:[],qcOwner:'',warehouseOwner:'',procurementOwner:'',...args};
+ if(tool.name==='save_material_master'){args={revision:0,code:'',name:'',unit:'عدد',specs:'',fields:[],...args};for(const k of ['defaultLocation','reorderPoint','targetStock','qcOwner','warehouseOwner','procurementOwner'])delete args[k];}
  if(tool.name==='sales_apply'&&args.mode==='agent'&&!args.agentId&&args.active===undefined)args={...args,active:true};
  if(tool.name==='guarantee_apply'&&args.mode==='save'&&!args.guaranteeId&&args.originalLocation===undefined)args={...args,originalLocation:'زونکن اسناد مالی'};
  const schema:any={...tool.inputSchema,properties:Object.fromEntries(Object.entries(tool.inputSchema.properties||{}).filter(([k])=>!secret.test(k)&&k!=='confirmed')),required:(tool.inputSchema.required||[]).filter((k:string)=>!secret.test(k)&&!['confirmed','id','requestId'].includes(k))};

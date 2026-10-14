@@ -1328,3 +1328,7 @@ toolFieldTitles.save_hospital_service_contract={assetId:'دستگاه بیمار
 toolFieldTitles.register_hospital_installation.intervalHours='بازه سرویس، ساعت';
 
 Object.assign(toolFieldTitles,{save_material_master:{code:'کد ثابت کالا (۲ تا ۱۲ رقم)',name:'نام کالا',unit:'واحد کالا',specs:'مشخصات فنی / نقشه مرجع',fields:'فرم کنترل کیفیت ورودی',defaultLocation:'محل معمول انبار',reorderPoint:'حد سفارش',targetStock:'موجودی هدف',qcOwner:'مسئول کنترل کیفیت',warehouseOwner:'مسئول انبار',procurementOwner:'مسئول تأمین'}});
+
+Object.assign(toolFieldTitles,{save_material_warehouse:{warehouseId:'انبار برای ویرایش',name:'نام انبار',warehouseOwner:'مسئول انبار',qcOwner:'مسئول کنترل کیفیت',locations:'محل‌های نگهداری',active:'فعال',revision:'نسخه تعریف'}});Object.assign(fieldTitles,{warehouseId:'انبار مقصد'});
+
+Object.assign(fieldTitles,{sourcingPlanId:'برنامه مصوب تحویل‌شده به تولید'});

@@ -18,13 +18,14 @@ async function create(kind,data){const r=await recordsApi.POST(request('/api/rec
 async function operate(b,status=200){const r=await production.POST(request('/api/production','POST',{id:crypto.randomUUID(),...b}));const d=await r.json();assert.equal(r.status,status,JSON.stringify(d));return d;}
 
 const flow=load('app/api/flow/route.ts'),templateApi=load('app/api/quality/templates/route.ts'),qualityApi=load('app/api/quality/reports/route.ts');
-async function op(mode,b={},status=200){const r=await flow.POST(request('/api/flow','POST',{id:crypto.randomUUID(),mode,...b}));const d=await r.json();assert.equal(r.status,status,JSON.stringify(d));return d;}
+async function op(mode,b={},status=200){if(mode==='plan'&&!b.sourcingPlanId){const sid='approved:'+b.productId;const bom=sql.prepare('SELECT * FROM bom_versions WHERE product_id=? ORDER BY version DESC LIMIT 1').get(b.productId);sql.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'sourcing_plan',?,1,?,?) ON CONFLICT(id) DO NOTHING").run(sid,JSON.stringify({productId:b.productId,count:1000,state:'released',approvedBy:'owner',bom:{id:bom.id}}),new Date().toISOString(),new Date().toISOString());b={...b,sourcingPlanId:sid};}const r=await flow.POST(request('/api/flow','POST',{id:crypto.randomUUID(),mode,...b}));const d=await r.json();assert.equal(r.status,status,JSON.stringify(d));return d;}
 const entities=type=>sql.prepare('SELECT * FROM flow_entities WHERE type=? ORDER BY created,id').all(type).map(x=>({...x,data:JSON.parse(x.data)}));
 const stock=(id,wh)=>sql.prepare('SELECT quantity FROM inventory_balances WHERE item_id=? AND warehouse=?').get(id,wh)?.quantity||0;
 (async()=>{
  identity=owner;await auth.session();
  auth.checkOrigin(new Request('http://127.0.0.1:3000/api/flow',{headers:{origin:'https://company.test','x-forwarded-host':'company.test','x-forwarded-proto':'https'}}));
  assert.throws(()=>auth.checkOrigin(new Request('http://127.0.0.1:3000/api/flow',{headers:{origin:'https://evil.test','x-forwarded-host':'company.test','x-forwarded-proto':'https'}})),e=>e.status===403);
+ const noApproval=await flow.POST(request('/api/flow','POST',{id:crypto.randomUUID(),mode:'plan',productId:'unapproved',count:1,design:'test'}));assert.equal(noApproval.status,400);
 const p=await create('product',{code:'FLOW',name:'FlowDevice',group:'سایر تجهیزات پزشکی',model:'M',warrantyMonths:'12',status:'فعال'});
  const fields=[{key:'purity',label:'Purity',type:'number',unit:'%',min:'90',max:'96',required:true}];
  const tr=await templateApi.POST(request('/api/quality/templates','POST',{productId:p.id,title:'QC',fields,previousVersion:0}));assert.equal(tr.status,201);const template=(await tr.json()).template;
@@ -100,7 +101,7 @@ const p=await create('product',{code:'FLOW',name:'FlowDevice',group:'سایر ت
  token=(await mint('read_write')).token;const mcpSale=crypto.randomUUID();assert.ok(!(await call('reserve_finished_sale',{id:mcpSale,salesOrderId,productId:p.id,count:1,deviceIds:[],notes:'',confirmed:true})).error);assert.ok(!(await call('cancel_finished_sale',{id:crypto.randomUUID(),saleId:mcpSale,reason:'MCP test',confirmed:true})).error);
  const raceBodies=[1,2].map(()=>({id:crypto.randomUUID(),mode:'reserve',salesOrderId,productId:p.id,count:1,deviceIds:[builds[0].id],notes:''}));const race=await Promise.all(raceBodies.map(b=>fulfillment.POST(request('/api/fulfillment','POST',b))));assert.deepEqual(race.map(r=>r.status).sort(),[200,409]);
  console.log('Fulfillment passed: pre-QC materials, print gate, partial receipt, warehouse scope, reservation collision, serial swap, physical dispatch, idempotency, carrier-only acknowledgment, cancellation, no double consumption.');
- await op('supply',{materialId:'material:01',quantity:'5',notes:'planned need'});await op('supply',{materialId:'material:01',quantity:'5',notes:'duplicate'},409);
+ await op('supply',{materialId:'material:01',quantity:'5',notes:'planned need'},400);await op('supply',{materialId:'material:01',quantity:'5',notes:'duplicate'},400);assert.equal(entities('supply').length,0);
  assert.equal((await flow.GET()).status,200);
  const worker={userId:'worker',email:'worker@example.com',name:'Worker',isAdmin:false,permissions:{read:['batch'],write:['batch'],eventStages:[],flowRoles:['production']}};
  const denied=await load('lib/mcp/context.ts').mcpActor.run(worker,()=>flow.POST(request('/api/flow','POST',{id:crypto.randomUUID(),mode:'incoming_qc',receiptId:r1.id,accepted:'8',rejected:'2',values:{purity:'92'},notes:'not authorized'})));assert.equal(denied.status,403);
@@ -131,9 +132,9 @@ const p=await create('product',{code:'FLOW',name:'FlowDevice',group:'سایر ت
  }
  await op('material',{code:'9404',name:'Invalid',unit:'کارتن',reorderPoint:'0',targetStock:'0',fields},400);
  assert.equal(entities('material').some(m=>m.data.code==='9404'),false);
- const unitMcp=await call('save_material_master',{id:crypto.randomUUID(),code:'9405',name:'MCP pair',unit:'جفت',specs:'',defaultLocation:'',reorderPoint:'0',targetStock:'0',fields,qcOwner:'',warehouseOwner:'',procurementOwner:'',revision:0,confirmed:true});assert.ok(!unitMcp.error,JSON.stringify(unitMcp));
+ const unitMcp=await call('save_material_master',{id:crypto.randomUUID(),code:'9405',name:'MCP pair',unit:'جفت',specs:'',fields,revision:0,confirmed:true});assert.ok(!unitMcp.error,JSON.stringify(unitMcp));
  assert.equal(entities('material').find(m=>m.data.code==='9405').data.unit,'جفت');
  console.log('Set/pair units passed: HTTP and MCP master, immutable unit, receipt quantity and canonical centimetre spelling.');
  identity=null;assert.equal((await flow.GET()).status,401);
- console.log('Material flow passed: partial incoming QC, quarantine, slot conflicts, FIFO/split batches, idempotency, role checks, serial capacity, assembler, stock rollback, actual consumption, repair and retained retest, procurement deduplication.');
+ console.log('Material flow passed: partial incoming QC, quarantine, slot conflicts, FIFO/split batches, idempotency, role checks, serial capacity, assembler, stock rollback, actual consumption, repair and retained retest, independent procurement disabled.');
 })().catch(e=>{console.error(e);process.exit(1)});

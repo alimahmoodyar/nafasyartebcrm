@@ -9,6 +9,7 @@ export function scopedAssistantRecordTool<T extends {name:string;inputSchema:any
  return allowed.length?{...tool,inputSchema:{...tool.inputSchema,properties:{...tool.inputSchema.properties,kind:{...kind,enum:allowed}}}}:null;
 }
 export function assistantToolAvailable(u:Session,name:string){
+ if(name==='save_material_warehouse')return u.isAdmin;
  if(name==='save_material_master')return flowRole(u,'inventory');
  if(['get_sales_buyer_assignments','assign_sales_buyer','get_sales_template_workspace'].includes(name))return salesManager(u);
  if(name==='get_sales_monitor')return !salesRep(u)&&(salesStaff(u)||salesFinance(u)||salesViewer(u)||salesReportRead(u));
@@ -38,3 +39,6 @@ Object.assign(actionTitles,{save_hospital_profile_template:'تعریف فرم م
 Object.assign(actionTitles,{register_hospital_installation:'ثبت مرکز و دستگاه نصب‌شده بیمارستانی'});
 
 Object.assign(actionTitles,{save_hospital_service_contract:'ثبت / تمدید قرارداد خدمات بیمارستانی'});
+
+assistantWriteNames.add('save_material_warehouse');Object.assign(actionTitles,{save_material_warehouse:'تعریف یا ویرایش انبار مواد اولیه'});
+assistantWriteNames.delete('request_replenishment');

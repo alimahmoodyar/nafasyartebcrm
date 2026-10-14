@@ -1578,3 +1578,5 @@ toolOptions.get_record_schema={...toolOptions.get_record_schema,productionMode:{
 
 toolOptions.register_hospital_installation={...toolOptions.register_hospital_installation,'installation.warrantyStatus':{yes:'دارد',no:'ندارد'},'installations.*.warrantyStatus':{yes:'دارد',no:'ندارد'},'installations.*.contractStatus':{'':'نامشخص',yes:'دارد',no:'ندارد'}};
 toolOptions.save_hospital_service_contract={contractStatus:{yes:'دارد',no:'ندارد'}};
+
+toolOptions.save_material_warehouse={};
