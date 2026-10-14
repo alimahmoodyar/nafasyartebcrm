@@ -1321,3 +1321,8 @@ toolFieldTitles.build_intake_apply={...toolFieldTitles.build_intake_apply,warran
 toolFieldTitles.build_project_apply={...toolFieldTitles.build_project_apply,warrantyMonths:'گارانتی قرارداد همین پروژه، ماه'};
 toolFieldTitles.get_record_schema={...toolFieldTitles.get_record_schema,productionMode:'روش تولید محصول'};
 toolModeTitles.build_project_apply={...toolModeTitles.build_project_apply,warranty:'ثبت / اصلاح گارانتی قرارداد پروژه'};
+
+toolFieldTitles.register_hospital_installation={...toolFieldTitles.register_hospital_installation,installations:'دستگاه‌های بیمارستان',services:'بازه‌های سرویس و قطعات مصرفی',lines:'قطعات مصرفی همین سرویس',warrantyStatus:'گارانتی دارد؟',warrantyStart:'شروع گارانتی',warrantyMonths:'مدت گارانتی، ماه',contractFrom:'شروع قرارداد خدمات',contractUntil:'پایان قرارداد خدمات',baselineHours:'ساعت مبنای برنامه سرویس',baselineDay:'تاریخ مبنای برنامه سرویس'};
+toolFieldTitles.save_hospital_service_contract={assetId:'دستگاه بیمارستان',revision:'نسخه شناسنامه',contractStatus:'قرارداد خدمات دارد؟',contractFrom:'شروع قرارداد خدمات',contractUntil:'پایان قرارداد خدمات'};
+
+toolFieldTitles.register_hospital_installation.intervalHours='بازه سرویس، ساعت';

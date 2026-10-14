@@ -1575,3 +1575,6 @@ toolOptions.register_hospital_installation={'installation.contractStatus':{'':'�
 toolOptions.save_hospital_profile_template={'fields.*.type':{text:'متن',number:'عدد'}};
 toolOptions.preview_sales_bank_file={unit:{IRR:'ریال',IRT:'تومان'},profile:{auto:'تشخیص خودکار ستون‌ها',manual:'انتخاب دستی ستون‌ها'}};
 toolOptions.get_record_schema={...toolOptions.get_record_schema,productionMode:{routine:'تولید روتین خانگی',project:'ساخت سفارشی بیمارستانی'}};
+
+toolOptions.register_hospital_installation={...toolOptions.register_hospital_installation,'installation.warrantyStatus':{yes:'دارد',no:'ندارد'},'installations.*.warrantyStatus':{yes:'دارد',no:'ندارد'},'installations.*.contractStatus':{'':'نامشخص',yes:'دارد',no:'ندارد'}};
+toolOptions.save_hospital_service_contract={contractStatus:{yes:'دارد',no:'ندارد'}};

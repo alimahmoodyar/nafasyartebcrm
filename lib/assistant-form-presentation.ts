@@ -52,7 +52,7 @@ export function generalPresentation(tool:string,args:any,input:any,title:string)
    for(const key of Object.keys(value||{}))if(!['__proto__','constructor','prototype'].includes(key)&&!s.properties[key])s.properties[key]={};
    for(const [key,f] of Object.entries(s.properties) as [string,any][]){
     f.title=fieldTitle(tool,key,f);
-    if(!path.includes('values')&&(['day','date','due','expiry','startDate','needBy','availableOn','validFrom','validUntil','invoiceDay','fxDate','nextDue','sampleDue','deliveryDay','issuedOn','expiresOn','repaymentStart','installedOn','contractUntil'].includes(key)||(tool==='routine_production_apply'&&key==='effective')))f.format='date';
+    if(!path.includes('values')&&(['day','date','due','expiry','startDate','needBy','availableOn','validFrom','validUntil','invoiceDay','fxDate','nextDue','sampleDue','deliveryDay','issuedOn','expiresOn','repaymentStart','installedOn','contractUntil','contractFrom','warrantyStart','baselineDay'].includes(key)||(tool==='routine_production_apply'&&key==='effective')))f.format='date';
     if(['notes','body','description','instructions','interest','reason','nextAction','generalSpecs','supplierSpecs','discrepancyResolution'].includes(key))f.multiline=true;
     const p=[...path,key],options=optionTitles(tool,p);if(Object.keys(options).length)f.enumLabels={...options,...f.enumLabels};
     if(technical.has(key)||(!path.length&&key==='id'&&!['update_record','delete_record','update_user','delete_user'].includes(tool))||key==='previous')f.uiHidden=true;
@@ -66,6 +66,17 @@ export function generalPresentation(tool:string,args:any,input:any,title:string)
   }
  }
  decorate(schema,args);
+ if(tool==='register_hospital_installation'){
+  const multi=Array.isArray(args.installations),other=schema.properties?.[multi?'installation':'installations'];if(other)other.uiHidden=true;
+  if(args.centerId&&schema.properties.center)schema.properties.center.uiHidden=true;
+  const props=multi?schema.properties.installations?.items?.properties:schema.properties.installation?.properties;
+  const value=multi?args.installations[0]||{}:args.installation||{};
+  if(props&&!value.filters&&!value.kitId){for(const k of ['filters','serviceIntervalHours','kitId','kitRevision','installedOn','compressorModel','generatorModel','dryerModel','compressorQuantity','baselineHours','baselineDay','projectId'])if(props[k]&&(multi?args.installations:[value]).every((v:any)=>v[k]===undefined))props[k].uiHidden=true;}
+  if(props&&props.services&&!value.filters&&!value.kitId){const target=multi?schema.properties.installations.items:schema.properties.installation;target.required=[...new Set([...(target.required||[]),'services','warrantyStatus'])];if(!multi&&value.warrantyStatus==='yes')target.required=[...target.required,'warrantyStart','warrantyMonths'];if(!multi&&value.warrantyStatus==='no')target.required=[...target.required,'contractStatus'];}
+  if(props&&!multi){if(value.warrantyStatus==='no'){if(props.warrantyStart)props.warrantyStart.uiHidden=true;if(props.warrantyMonths)props.warrantyMonths.uiHidden=true;}if(value.contractStatus!=='yes'){if(props.contractFrom)props.contractFrom.uiHidden=true;if(props.contractUntil)props.contractUntil.uiHidden=true;}}
+ }
+ if(tool==='save_hospital_service_contract'&&args.contractStatus==='no'){if(schema.properties?.contractFrom)schema.properties.contractFrom.uiHidden=true;if(schema.properties?.contractUntil)schema.properties.contractUntil.uiHidden=true;}
+
  if(tool==='confirm_pricing_cost_basis'){
   for(const key of ['sourceToken',...(args.method==='standard'?['unitCost']:[])])if(schema.properties?.[key])schema.properties[key].uiHidden=true;
   if(args.method==='documented')schema.required=[...new Set([...(schema.required||[]),'unitCost'])];

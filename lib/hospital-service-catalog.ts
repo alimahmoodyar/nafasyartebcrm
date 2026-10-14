@@ -1,3 +1,4 @@
+import {hospitalPlanList} from './hospital-service-plans';
 import {storage} from './storage';
 import {AccessError} from './authorization';
 import {hreq,htext} from './hospital';
@@ -35,10 +36,21 @@ export async function hospitalPeriodicDraft(job:any,asset:any,catalog:Awaited<Re
  const blockers:string[]=[],lines:any[]=[],sources:any[]=[];
  if(job.data.kind!=='service')blockers.push('آماده‌سازی دوره‌ای فقط برای درخواست سرویس دوره‌ای است.');
  if(job.data.assetId!==asset.id||job.data.centerId!==asset.data.centerId)fail('دستگاه و مرکز پرونده منطبق نیستند.',409);
- const intervalHours=job.data.pm?job.data.pm.target-job.data.pm.baselineHours:asset.data.maintenance?.interval;
+ const plan=job.data.servicePlan,currentPlan=plan?hospitalPlanList(asset.data).find(p=>p.id===plan.planId):null;
+ const intervalHours=plan?.intervalHours||(job.data.pm?job.data.pm.target-job.data.pm.baselineHours:asset.data.maintenance?.interval);
  if(!Number.isSafeInteger(intervalHours)||intervalHours<=0)blockers.push('فاصله سرویس دستگاه در شناسنامه مشخص نشده است.');
  const template=catalog.templates.filter(t=>t.data.active&&t.data.modelKey===hospitalModelKey(asset.data.model||''));
  const profile=asset.data.technicalProfile;
+ if(plan){
+  if(!currentPlan||JSON.stringify(currentPlan.lines)!==JSON.stringify(plan.lines)||currentPlan.intervalHours!==plan.intervalHours)blockers.push('برنامه سرویس دستگاه تغییر کرده است؛ درخواست را بازبینی کنید.');
+  for(const item of plan.lines||[]){
+   const material=catalog.materials.find(m=>m.data.code===item.partCode),tariff=selectConsumerPartTariff(catalog.tariffs,item.partCode,today,'hospital');
+   if(!material||material.data.unit!=='عدد'){blockers.push('کد کالای مصرفی معتبر نیست: '+item.partCode);continue;}
+   if(!tariff){blockers.push('قیمت مصرف‌کننده بیمارستانی ثبت نشده: '+material.data.name);continue;}
+   if(!Number.isSafeInteger(item.quantity)||item.quantity<1||item.quantity>10000){blockers.push('تعداد مصرفی معتبر نیست.');continue;}
+   lines.push({kind:'part',label:material.data.name,partCode:item.partCode,technicalCode:item.technicalCode,quantity:item.quantity,unitPrice:consumerTariffValue(tariff),materialId:material.id,materialRevision:material.revision,tariffId:tariff.id,tariffRevision:tariff.revision});
+  }
+ }else{
  if(asset.data.equipment?.kind==='oxygen'&&profile?.kind==='installed_oxygen'){if(!asset.data.equipment.generatorModel||!asset.data.equipment.dryerModel)blockers.push('مدل مولد و درایر را در شناسنامه تکمیل کنید.');}
  else if(template.length!==1)blockers.push('برای مدل دستگاه یک فرم فعال مشخصات فنی تعریف کنید.');
  else if(!profile||profile.templateId!==template[0].id||profile.templateRevision!==template[0].revision)blockers.push('مشخصات فنی دستگاه با فرم فعلی مدل تکمیل یا بازبینی نشده است.');
@@ -59,10 +71,11 @@ export async function hospitalPeriodicDraft(job:any,asset:any,catalog:Awaited<Re
    else lines.push({kind:'part',label:material.data.name,partCode:item.partCode,quantity,unitPrice:consumerTariffValue(tariff),materialId:material.id,materialRevision:material.revision,tariffId:tariff.id,tariffRevision:tariff.revision});
   }
  }
+ }
  if(!lines.length&&!blockers.length)blockers.push('فهرست سرویس فاقد قطعه است.');
  if(lines.length>50)blockers.push('پیش‌فاکتور بیش از ۵۰ کد قطعه دارد.');
  const total=lines.reduce((sum,l)=>sum+BigInt(l.unitPrice)*BigInt(l.quantity),BigInt(0)).toString();if(BigInt(total)>BigInt('999999999999999999'))blockers.push('مبلغ پیش‌فاکتور خارج از محدوده است.');
- const source={jobId:job.id,jobRevision:job.revision,assetId:asset.id,assetRevision:asset.revision,centerId:asset.data.centerId,day:today,intervalHours:intervalHours||null,device:{serial:asset.data.serial,model:asset.data.model,...(asset.data.equipment?{equipment:asset.data.equipment}:{})},technicalProfile:profile||null,template:profile?.kind!=='installed_oxygen'&&template.length===1?{id:template[0].id,revision:template[0].revision}:null,kits:sources,lines,total,blockers:[...new Set(blockers)]};
+ const source={jobId:job.id,jobRevision:job.revision,assetId:asset.id,assetRevision:asset.revision,centerId:asset.data.centerId,day:today,intervalHours:intervalHours||null,device:{serial:asset.data.serial,model:asset.data.model,...(asset.data.equipment?{equipment:asset.data.equipment}:{})},servicePlan:plan||null,technicalProfile:profile||null,template:!plan&&profile?.kind!=='installed_oxygen'&&template.length===1?{id:template[0].id,revision:template[0].revision}:null,kits:sources,lines,total,blockers:[...new Set(blockers)]};
  const token=await sha256(new TextEncoder().encode(JSON.stringify(source)));return {...source,token,ready:!source.blockers.length};
 }
 export function guardHospitalPeriodicDraft(draft:Awaited<ReturnType<typeof hospitalPeriodicDraft>>,catalog:Awaited<ReturnType<typeof hospitalServiceCatalog>>,guard:(sql:string,...args:any[])=>unknown){
