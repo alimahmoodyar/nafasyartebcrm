@@ -1,6 +1,12 @@
 import {domainWriteAccess} from './service-access';
 import {salesManager,salesStaff,salesFinance,salesRep,salesWarehouse,salesViewer,salesReportRead} from './sales-access';
 import {accessPermissions,type Session} from './permissions';
+import type {Kind} from './model';
+export function scopedAssistantRecordTool<T extends {name:string;inputSchema:any}>(u:Session,tool:T):T|null{
+ if(tool.name!=='create_record')return tool;
+ const kind=tool.inputSchema.properties.kind,allowed=kind.enum.filter((k:Kind)=>u.isAdmin||u.permissions.write.includes(k));
+ return allowed.length?{...tool,inputSchema:{...tool.inputSchema,properties:{...tool.inputSchema.properties,kind:{...kind,enum:allowed}}}}:null;
+}
 export function assistantToolAvailable(u:Session,name:string){
  if(['get_sales_buyer_assignments','assign_sales_buyer','get_sales_template_workspace'].includes(name))return salesManager(u);
  if(name==='get_sales_monitor')return !salesRep(u)&&(salesStaff(u)||salesFinance(u)||salesViewer(u)||salesReportRead(u));

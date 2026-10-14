@@ -1,6 +1,6 @@
 import {requireAccess,checkOrigin,accessResponse,AccessError,can} from '@/lib/authorization';
 import {tools,validateToolArguments} from '@/lib/mcp/tools';
-import {assistantToolAvailable,assistantWriteNames,actionTitles,actionSection,canOpenSection} from '@/lib/assistant-policy';
+import {scopedAssistantRecordTool,assistantToolAvailable,assistantWriteNames,actionTitles,actionSection,canOpenSection} from '@/lib/assistant-policy';
 import {cleanFormArgs,operationChoices,operationForm} from '@/lib/assistant-workspace';
 import {boundedBody} from '@/lib/firmware-storage';
 import {storage} from '@/lib/storage';
@@ -13,7 +13,7 @@ export async function POST(request:Request){try{
  const b=JSON.parse(new TextDecoder().decode(await boundedBody(request,22000))),tool=tools.find(t=>t.name===b.tool&&t.write&&assistantWriteNames.has(t.name));
  if(!tool||!assistantToolAvailable(u,tool.name)||tool.admin&&!u.isAdmin||tool.kind&&!can(u,tool.kind,'write')||tool.finance&&!u.isAdmin&&u.permissions.finance!=='write')throw new AccessError('این فرمان برای شما مجاز نیست.',403);
  if(!/^[a-f0-9-]{36}$/i.test(b.id))throw new AccessError('شناسه فرم معتبر لازم است.',400);
- let args=cleanFormArgs(b.args);const db=storage(),prior:any=await db.prepare('SELECT * FROM assistant_actions WHERE id=?').bind(b.id).first();
+ let args=cleanFormArgs(b.args);if(tool.name==='create_record'&&!can(u,args?.kind,'write'))throw new AccessError('دسترسی ثبت این نوع اطلاعات ندارید.',403);const db=storage(),prior:any=await db.prepare('SELECT * FROM assistant_actions WHERE id=?').bind(b.id).first();
  if(prior){let saved=JSON.parse(prior.args),submitted={...args};for(const key of ['id','requestId'])if(saved[key]&&!submitted[key])delete saved[key];if(tool.name==='after_sales_apply')({saved,submitted}=comparableServiceDiagnosisRetry(saved,submitted));const stable=(v:any):string=>JSON.stringify(v&&typeof v==='object'?Array.isArray(v)?v.map(x=>JSON.parse(stable(x))):Object.fromEntries(Object.keys(v).sort().map(k=>[k,JSON.parse(stable(v[k]))])):v);if(stable(saved)!==stable(submitted))throw new AccessError('شناسه فرم با اطلاعات متفاوت تکرار شده است.',409);if(prior.owner!==u.userId||prior.tool!==b.tool)throw new AccessError('فرم متعلق به این حساب نیست.',409);return Response.json({accountId:u.userId,action:publicAction(prior)});}
  if(tool.inputSchema.properties.requestId&&!['issue_production_material','review_development_request','close_development_request','clarify_development_request','respond_development_request','acknowledge_development_request'].includes(tool.name))args.requestId=crypto.randomUUID();
  if(tool.inputSchema.properties.id&&!['update_record','delete_record','update_user','delete_user','save_material_master'].includes(tool.name))args.id=crypto.randomUUID();
@@ -31,7 +31,7 @@ export async function POST(request:Request){try{
 // Read-only opening of any assistant-supported operation. Mutations still use POST + confirmation.
 export async function GET(request:Request){try{
  const u=await requireAccess();if(request.headers.get('x-assistant-account')!==u.userId)throw new AccessError('حساب ورود تغییر کرده است.',409);
- const available=tools.filter(t=>assistantToolAvailable(u,t.name)&&t.write&&assistantWriteNames.has(t.name)&&(!t.admin||u.isAdmin)&&(!t.kind||can(u,t.kind,'write'))&&(!t.finance||u.isAdmin||u.permissions.finance==='write'));
+ const available=tools.filter(t=>assistantToolAvailable(u,t.name)&&t.write&&assistantWriteNames.has(t.name)&&(!t.admin||u.isAdmin)&&(!t.kind||can(u,t.kind,'write'))&&(!t.finance||u.isAdmin||u.permissions.finance==='write')).flatMap(t=>{const scoped=scopedAssistantRecordTool(u,t);return scoped?[scoped]:[];});
  const choices=operationChoices(available,actionSection,s=>canOpenSection(u,s),actionTitles),key=new URL(request.url).searchParams.get('choice');
  if(!key)return Response.json({accountId:u.userId,choices},{headers:{'Cache-Control':'private, no-store'}});
  const choice=choices.find(c=>c.key===key);if(!choice)throw new AccessError('این فرم برای شما مجاز نیست.',403);

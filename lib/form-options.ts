@@ -1571,3 +1571,6 @@ for(const name of ["create_user","create_password_user","update_user","update_pa
 toolOptions.apply_qms_record["data.formPurpose"]={quality:"فرم داخلی کیفیت",customer_order:"مشخصات سفارش مشتری"};
 
 for(const name of ['create_user','create_password_user','update_user','update_password_user'])if(toolOptions[name])toolOptions[name]['permissions.salesRoles.*']=salesPermissionTitles;
+toolOptions.register_hospital_installation={'installation.contractStatus':{'':'نامشخص',yes:'دارای قرارداد',no:'بدون قرارداد'}};
+toolOptions.save_hospital_profile_template={'fields.*.type':{text:'متن',number:'عدد'}};
+toolOptions.preview_sales_bank_file={unit:{IRR:'ریال',IRT:'تومان'},profile:{auto:'تشخیص خودکار ستون‌ها',manual:'انتخاب دستی ستون‌ها'}};

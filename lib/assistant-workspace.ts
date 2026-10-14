@@ -24,8 +24,24 @@ export function requestsBuyerAssignment(message:string){
  return /(خریدار|نماینده|نمایندگی|عامل|فروش)/.test(text)&&/(تخصیص|واگذاری?|ارجاع|تعیین\s+(?:کارشناس|مسئول)|(?:تغییر|عوض)\s+(?:کارشناس|مسئول)|(?:کارشناس|مسئول).*?(?:تغییر|عوض))/.test(text)&&!/(لغو|منصرف|تخصیص نده|واگذار نکن|ارجاع نده)/.test(text);
 }
 // Opening a requested draft must not depend on the model calling a display tool.
+export function requestsProductDefinitionForm(message:string){
+ const text=message.replace(/ي/g,'ی').replace(/ك/g,'ک').replace(/\u200c/g,' ');
+ return /(?:فرم|صفحه|کادر|پنجره)\s*(?:تعریف|ایجاد|ثبت)\s*(?:محصول|کالا)|(?:فرم|صفحه|کادر|پنجره)\s*(?:محصول|کالا)(?:ات)?\s*جدید/.test(text)&&!/(لغو|منصرف|نساز|ایجاد نکن|ثبت نکن|حذف)/.test(text);
+}
+export function requestsFormDisplay(message:string){
+ const text=message.replace(/\u200c/g,' ');
+ return /(فرم|صفحه|کادر|پنجره)/.test(text)&&/(بیار|بیاور|باز کن|باز بکن|باز کنید|نمایش|نشان)/.test(text)&&!/(?:ثبت|ذخیره|اجرا|تکمیل|ویرایش|حذف|تأیید|تایید)\s*(?:کن|بکن|کنید)|تأیید اجرا|تایید اجرا/.test(text);
+}
 export function requestedOperationForm(message:string,previous:any,available:any[]):OperationForm|undefined{
  const text=message.replace(/[ي]/g,'ی').replace(/[ك]/g,'ک').replace(/\u200c/g,' ');
+ if(requestsProductDefinitionForm(message)){
+  const tool=available.find(t=>t.name==='create_record'&&t.write&&t.inputSchema.properties?.kind?.enum?.includes('product'));
+  if(!tool)return;
+  const same=previous?.tool===tool.name&&previous.args?.kind==='product'&&!/(جدید|از اول|خالی)/.test(text);
+  const form=operationForm(tool,same?previous.args:{kind:'product',data:{}},'product','تعریف محصول');
+  form.schema.properties.kind={...form.schema.properties.kind,enum:['product'],readOnly:true,uiHidden:true};
+  return form;
+ }
  if(requestsBuyerAssignment(message)){const tool=available.find(t=>t.name==='assign_sales_buyer'&&t.write);return tool?operationForm(tool,previous?.tool===tool.name?previous.args:{},'sales','تخصیص خریدار به کارشناس'):undefined;}
  const cancelled=/(حذف|لغو|ثبت نکن|منصرف|نساز|ایجاد نکن)/.test(text);
  const homeProduction=/(خانگی|روتین)/.test(text)&&/(سفارش|درخواست|فرم).*(تولید|ساخت)|(تولید|ساخت).*(سفارش|درخواست|فرم)/.test(text)&&!cancelled;

@@ -7,7 +7,7 @@ import {serviceForms,visibleServiceFields} from './after-sales-contract';
 import {transportForms} from './transport-contract';
 import {qmsKinds} from './qms-contract';
 export {fieldTitles};
-const technical=new Set(['requestId','confirmed','revision','contactRevision','previousVersion','previousRevision','quoteRevision','leadRevision','quoteHash','catalogSnapshot','customerTariffId','customerTariffRevision','customerPriceSource']);
+const technical=new Set(['requestId','confirmed','revision','contactRevision','previousVersion','previousRevision','quoteRevision','leadRevision','quoteHash','catalogSnapshot','customerTariffId','customerTariffRevision','customerPriceSource','kitRevision']);
 export function fieldTitle(tool:string,key:string,schema?:any):string {
  return schema?.title||toolFieldTitles[tool]?.[key]||fieldTitles[key]||(/[^\x00-\x7F]/.test(key)?key:`فیلد تعریف‌نشده (${key})`);
 }
@@ -52,7 +52,7 @@ export function generalPresentation(tool:string,args:any,input:any,title:string)
    for(const key of Object.keys(value||{}))if(!['__proto__','constructor','prototype'].includes(key)&&!s.properties[key])s.properties[key]={};
    for(const [key,f] of Object.entries(s.properties) as [string,any][]){
     f.title=fieldTitle(tool,key,f);
-    if(!path.includes('values')&&(['day','date','due','expiry','startDate','needBy','availableOn','validFrom','validUntil','invoiceDay','fxDate','nextDue','sampleDue','deliveryDay','issuedOn','expiresOn','repaymentStart'].includes(key)||(tool==='routine_production_apply'&&key==='effective')))f.format='date';
+    if(!path.includes('values')&&(['day','date','due','expiry','startDate','needBy','availableOn','validFrom','validUntil','invoiceDay','fxDate','nextDue','sampleDue','deliveryDay','issuedOn','expiresOn','repaymentStart','installedOn','contractUntil'].includes(key)||(tool==='routine_production_apply'&&key==='effective')))f.format='date';
     if(['notes','body','description','instructions','interest','reason','nextAction','generalSpecs','supplierSpecs','discrepancyResolution'].includes(key))f.multiline=true;
     const p=[...path,key],options=optionTitles(tool,p);if(Object.keys(options).length)f.enumLabels={...options,...f.enumLabels};
     if(technical.has(key)||(!path.length&&key==='id'&&!['update_record','delete_record','update_user','delete_user'].includes(tool))||key==='previous')f.uiHidden=true;
