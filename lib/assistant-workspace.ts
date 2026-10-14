@@ -12,6 +12,7 @@ export function cleanFormArgs(value:any,depth=0):any{
 }
 export function operationForm(tool:any,args:any,section:string,title:string):OperationForm{
  if(!args||typeof args!=='object'||Array.isArray(args)||JSON.stringify(args).length>16000)throw new Error('اطلاعات فرم معتبر نیست.');
+ if(tool.name==='save_material_master')args={revision:0,code:'',name:'',unit:'عدد',specs:'',defaultLocation:'',reorderPoint:'0',targetStock:'0',fields:[],qcOwner:'',warehouseOwner:'',procurementOwner:'',...args};
  if(tool.name==='sales_apply'&&args.mode==='agent'&&!args.agentId&&args.active===undefined)args={...args,active:true};
  if(tool.name==='guarantee_apply'&&args.mode==='save'&&!args.guaranteeId&&args.originalLocation===undefined)args={...args,originalLocation:'زونکن اسناد مالی'};
  const schema:any={...tool.inputSchema,properties:Object.fromEntries(Object.entries(tool.inputSchema.properties||{}).filter(([k])=>!secret.test(k)&&k!=='confirmed')),required:(tool.inputSchema.required||[]).filter((k:string)=>!secret.test(k)&&!['confirmed','id','requestId'].includes(k))};
@@ -26,14 +27,23 @@ export function requestsBuyerAssignment(message:string){
 // Opening a requested draft must not depend on the model calling a display tool.
 export function requestsProductDefinitionForm(message:string){
  const text=message.replace(/ي/g,'ی').replace(/ك/g,'ک').replace(/\u200c/g,' ');
- return /(?:فرم|صفحه|کادر|پنجره)\s*(?:تعریف|ایجاد|ثبت)\s*(?:محصول|کالا)|(?:فرم|صفحه|کادر|پنجره)\s*(?:محصول|کالا)(?:ات)?\s*جدید/.test(text)&&!/(لغو|منصرف|نساز|ایجاد نکن|ثبت نکن|حذف)/.test(text);
+ return /(?:فرم|صفحه|کادر|پنجره)\s*(?:تعریف|ایجاد|ثبت)\s*محصول|(?:فرم|صفحه|کادر|پنجره)\s*محصول(?:ات)?\s*جدید/.test(text)&&!/(لغو|منصرف|نساز|ایجاد نکن|ثبت نکن|حذف)/.test(text);
+}
+export function requestsMaterialDefinitionForm(message:string){
+ const text=message.replace(/ي/g,'ی').replace(/ك/g,'ک').replace(/\u200c/g,' ');
+ return /(?:تعریف|ایجاد|ثبت)\s*(?:کالا|ماده\s+اولیه|مواد\s+اولیه|قطعه|قطعات\s+مصرفی)|(?:فرم|صفحه|کادر|پنجره)\s*(?:کالا|ماده\s+اولیه|مواد\s+اولیه|قطعه)\s*جدید/.test(text)&&!/(لغو|منصرف|نساز|ایجاد نکن|ثبت نکن|حذف)/.test(text);
 }
 export function requestsFormDisplay(message:string){
  const text=message.replace(/\u200c/g,' ');
- return /(فرم|صفحه|کادر|پنجره)/.test(text)&&/(بیار|بیاور|باز کن|باز بکن|باز کنید|نمایش|نشان)/.test(text)&&!/(?:ثبت|ذخیره|اجرا|تکمیل|ویرایش|حذف|تأیید|تایید)\s*(?:کن|بکن|کنید)|تأیید اجرا|تایید اجرا/.test(text);
+ return (/(فرم|صفحه|کادر|پنجره)/.test(text)||requestsMaterialDefinitionForm(message))&&/(بیار|بیاور|باز کن|باز بکن|باز کنید|نمایش|نشان)/.test(text)&&!/(?:ثبت|ذخیره|اجرا|تکمیل|ویرایش|حذف|تأیید|تایید)\s*(?:کن|بکن|کنید)|تأیید اجرا|تایید اجرا/.test(text);
 }
 export function requestedOperationForm(message:string,previous:any,available:any[]):OperationForm|undefined{
  const text=message.replace(/[ي]/g,'ی').replace(/[ك]/g,'ک').replace(/\u200c/g,' ');
+ if(requestsMaterialDefinitionForm(message)){
+  const tool=available.find(t=>t.name==='save_material_master'&&t.write);if(!tool)return;
+  const same=previous?.tool===tool.name&&!previous.actionId&&!previous.state&&!previous.args?.revision&&!/(جدید|از اول|خالی)/.test(text);
+  return operationForm(tool,same?previous.args:{revision:0},'flow','تعریف کالا');
+ }
  if(requestsProductDefinitionForm(message)){
   const tool=available.find(t=>t.name==='create_record'&&t.write&&t.inputSchema.properties?.kind?.enum?.includes('product'));
   if(!tool)return;

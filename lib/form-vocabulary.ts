@@ -1326,3 +1326,5 @@ toolFieldTitles.register_hospital_installation={...toolFieldTitles.register_hosp
 toolFieldTitles.save_hospital_service_contract={assetId:'دستگاه بیمارستان',revision:'نسخه شناسنامه',contractStatus:'قرارداد خدمات دارد؟',contractFrom:'شروع قرارداد خدمات',contractUntil:'پایان قرارداد خدمات'};
 
 toolFieldTitles.register_hospital_installation.intervalHours='بازه سرویس، ساعت';
+
+Object.assign(toolFieldTitles,{save_material_master:{code:'کد ثابت کالا (۲ تا ۱۲ رقم)',name:'نام کالا',unit:'واحد کالا',specs:'مشخصات فنی / نقشه مرجع',fields:'فرم کنترل کیفیت ورودی',defaultLocation:'محل معمول انبار',reorderPoint:'حد سفارش',targetStock:'موجودی هدف',qcOwner:'مسئول کنترل کیفیت',warehouseOwner:'مسئول انبار',procurementOwner:'مسئول تأمین'}});

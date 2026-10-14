@@ -1,3 +1,4 @@
+import {flowRole} from './material-flow';
 import {domainWriteAccess} from './service-access';
 import {salesManager,salesStaff,salesFinance,salesRep,salesWarehouse,salesViewer,salesReportRead} from './sales-access';
 import {accessPermissions,type Session} from './permissions';
@@ -8,6 +9,7 @@ export function scopedAssistantRecordTool<T extends {name:string;inputSchema:any
  return allowed.length?{...tool,inputSchema:{...tool.inputSchema,properties:{...tool.inputSchema.properties,kind:{...kind,enum:allowed}}}}:null;
 }
 export function assistantToolAvailable(u:Session,name:string){
+ if(name==='save_material_master')return flowRole(u,'inventory');
  if(['get_sales_buyer_assignments','assign_sales_buyer','get_sales_template_workspace'].includes(name))return salesManager(u);
  if(name==='get_sales_monitor')return !salesRep(u)&&(salesStaff(u)||salesFinance(u)||salesViewer(u)||salesReportRead(u));
  if(name==='sales_monitor_apply')return !salesRep(u)&&(salesStaff(u)||salesFinance(u));
