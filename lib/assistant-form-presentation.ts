@@ -6,6 +6,8 @@ import {toolOptions} from './form-options';
 import {serviceForms,visibleServiceFields} from './after-sales-contract';
 import {transportForms} from './transport-contract';
 import {qmsKinds} from './qms-contract';
+import {hospitalWarrantyActive,warrantyEnd} from './hospital-coverage';
+import {localDay} from './persian-date';
 export {fieldTitles};
 const technical=new Set(['requestId','confirmed','revision','contactRevision','previousVersion','previousRevision','quoteRevision','leadRevision','quoteHash','catalogSnapshot','customerTariffId','customerTariffRevision','customerPriceSource','kitRevision']);
 export function fieldTitle(tool:string,key:string,schema?:any):string {
@@ -72,8 +74,15 @@ export function generalPresentation(tool:string,args:any,input:any,title:string)
   const props=multi?schema.properties.installations?.items?.properties:schema.properties.installation?.properties;
   const value=multi?args.installations[0]||{}:args.installation||{};
   if(props&&!value.filters&&!value.kitId){for(const k of ['filters','serviceIntervalHours','kitId','kitRevision','installedOn','compressorModel','generatorModel','dryerModel','compressorQuantity','baselineHours','baselineDay','projectId'])if(props[k]&&(multi?args.installations:[value]).every((v:any)=>v[k]===undefined))props[k].uiHidden=true;}
-  if(props&&props.services&&!value.filters&&!value.kitId){const target=multi?schema.properties.installations.items:schema.properties.installation;target.required=[...new Set([...(target.required||[]),'services','warrantyStatus'])];if(!multi&&value.warrantyStatus==='yes')target.required=[...target.required,'warrantyStart','warrantyMonths'];if(!multi&&value.warrantyStatus==='no')target.required=[...target.required,'contractStatus'];}
-  if(props&&!multi){if(value.warrantyStatus==='no'){if(props.warrantyStart)props.warrantyStart.uiHidden=true;if(props.warrantyMonths)props.warrantyMonths.uiHidden=true;}if(value.contractStatus!=='yes'){if(props.contractFrom)props.contractFrom.uiHidden=true;if(props.contractUntil)props.contractUntil.uiHidden=true;}}
+  if(props&&props.services&&!value.filters&&!value.kitId){const target=multi?schema.properties.installations.items:schema.properties.installation;target.required=[...new Set([...(target.required||[]),'services','warrantyStatus'])];if(!multi&&value.warrantyStatus==='yes')target.required=[...target.required,'warrantyStart','warrantyMonths'];}
+  if(props&&!multi){
+   for(const key of ['warrantyStart','warrantyMonths'])if(props[key])props[key].uiHidden=value.warrantyStatus==='no';
+   const modern=props.services&&!value.filters&&!value.kitId;
+   const needsContract=!modern||value.warrantyStatus==='no'||value.warrantyStatus==='yes'&&!!warrantyEnd(value)&&!hospitalWarrantyActive(value,localDay());
+   if(props.contractStatus)props.contractStatus.uiHidden=!needsContract;
+   for(const key of ['contractFrom','contractUntil'])if(props[key])props[key].uiHidden=!needsContract||value.contractStatus!=='yes';
+   if(modern){const target=schema.properties.installation;target.required=(target.required||[]).filter((key:string)=>!['contractStatus','contractFrom','contractUntil'].includes(key));if(needsContract){target.required.push('contractStatus');if(value.contractStatus==='yes')target.required.push('contractFrom','contractUntil');}}
+  }
  }
  if(tool==='save_hospital_service_contract'&&args.contractStatus==='no'){if(schema.properties?.contractFrom)schema.properties.contractFrom.uiHidden=true;if(schema.properties?.contractUntil)schema.properties.contractUntil.uiHidden=true;}
 

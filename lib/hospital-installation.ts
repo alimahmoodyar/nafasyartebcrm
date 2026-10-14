@@ -28,7 +28,7 @@ export async function prepareHospitalInstallation(input:any,old:any,today:string
   guard('EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)',project.id,project.revision);
   warrantyBasis={kind:'project_contract',projectId:project.id,projectRevision:project.revision,contractId:p.warranty.contractId||p.contractId||'',contractNumber:p.warranty.contractNumber||p.contract||'',months:warrantyMonths};
  }else{const agreed=contractWarranty(Array.isArray(input.services)&&input.warrantyStatus==='no'?0:input.warrantyMonths);warrantyMonths=agreed??fail('مدت گارانتی توافق‌شده برای همین بیمارستان لازم است؛ از محصول گرفته نمی‌شود.');warrantyBasis={kind:'manual_contract',months:warrantyMonths};}
- const coverage=(()=>{try{return installationCoverage(input,warrantyMonths,installedOn,today);}catch(e){return fail((e as Error).message);}})();
+ const coverage=(()=>{try{return installationCoverage(input,warrantyMonths,installedOn,today,old?.data.serviceContract);}catch(e){return fail((e as Error).message);}})();
  if(installedOn&&installedOn>today)fail('تاریخ نصب دستگاه در آینده نیست.');
  if(old&&(hospitalSerialKey(old.data.serial)!==serial||old.data.productId&&old.data.productId!==productId))fail('محصول و سریال دستگاه ثبت‌شده ثابت هستند.',409);
  const candidates=(await db.prepare("SELECT id,payload FROM records WHERE kind='device'").all()).results.filter((r:any)=>hospitalSerialKey(JSON.parse(r.payload).code||'')===serial);

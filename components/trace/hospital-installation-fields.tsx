@@ -4,12 +4,13 @@ import {SolarDate} from './solar-date';
 import {addSolarMonths} from '@/lib/sales-payment-terms';
 import {formatDate,localDay,isIsoDay} from '@/lib/persian-date';
 import {hospitalModelKey} from '@/lib/hospital-service-model';
+import {hospitalWarrantyActive} from '@/lib/hospital-coverage';
 export const blankHospitalService=()=>({intervalHours:'',lines:[{partCode:'',technicalCode:'',quantity:1}]});
 export const blankHospitalInstallation=()=>({productId:'',serial:'',installedOn:'',projectId:'',warrantyStatus:'',warrantyStart:'',warrantyMonths:'',contractStatus:'',contractFrom:'',contractUntil:'',services:[blankHospitalService()]});
 export function HospitalInstallationFields({value,products,projects=[],catalog,locked,onChange}:{value:any;products:any[];projects?:any[];catalog:any;locked:boolean;onChange:(value:any)=>void}){
  const set=(k:string,v:any)=>onChange({...value,[k]:v}),parts=catalog?.parts||[],kits=catalog?.kits||[],plans=value.services||[blankHospitalService()];
  const until=value.warrantyStatus==='yes'&&isIsoDay(value.warrantyStart)&&Number(value.warrantyMonths)>0?addSolarMonths(value.warrantyStart,Number(value.warrantyMonths)):'';
- const needsContract=value.warrantyStatus==='no'||!!until&&(until<localDay()||value.warrantyStart>localDay());
+ const today=localDay(),needsContract=value.warrantyStatus==='no'||!!until&&!hospitalWarrantyActive({...value,warrantyUntil:until},today);
  function updatePlan(i:number,key:string,v:any){set('services',plans.map((p:any,j:number)=>i===j?{...p,[key]:v}:p));}
  function updatePart(i:number,j:number,key:string,v:any){updatePlan(i,'lines',plans[i].lines.map((p:any,k:number)=>j===k?{...p,[key]:v}:p));}
  function chooseProduct(productId:string){const matches=(catalog?.devicePlans||[]).filter((p:any)=>p.productId===productId&&(p.compressorQuantity||1)===(Number(value.compressorQuantity)||1)),first=matches[0];const same=first&&matches.every((p:any)=>JSON.stringify(p.services)===JSON.stringify(first.services));onChange({...value,productId,projectId:'',warrantyStatus:'',warrantyMonths:'',services:same?structuredClone(first.services):[blankHospitalService()]});}
@@ -21,8 +22,8 @@ export function HospitalInstallationFields({value,products,projects=[],catalog,l
    <label className="field">گارانتی دارد؟<select required disabled={!!value.projectId} value={value.warrantyStatus||''} onChange={e=>onChange({...value,warrantyStatus:e.target.value,warrantyMonths:e.target.value==='no'?0:''})}><option value="">انتخاب کنید</option><option value="yes">دارد</option><option value="no">ندارد</option></select></label>
    {value.warrantyStatus==='yes'&&<><SolarDate label="شروع گارانتی" value={value.warrantyStart||''} onChange={v=>set('warrantyStart',v)}/><label className="field">مدت گارانتی، ماه<NumberInput required readOnly={!!value.projectId} type="number" min={1} max={120} step={1} value={value.warrantyMonths??''} onChange={e=>set('warrantyMonths',e.target.value)}/></label></>}
   </div>
-  {until&&<p className="subtle">پایان گارانتی: {formatDate(until)}{needsContract?' — پایان یافته':''}</p>}
-  {(needsContract||value.contractStatus)&&<div className="hospital-installation-grid">
+  {until&&<p className="subtle">پایان گارانتی: {formatDate(until)}{until<today?' — پایان یافته':value.warrantyStart>today?' — هنوز شروع نشده':''}</p>}
+  {needsContract&&<div className="hospital-installation-grid">
    <label className="field">قرارداد خدمات دارد؟<select required={needsContract} value={value.contractStatus||''} onChange={e=>onChange({...value,contractStatus:e.target.value,contractFrom:e.target.value==='yes'?value.contractFrom:'',contractUntil:e.target.value==='yes'?value.contractUntil:''})}><option value="">انتخاب کنید</option><option value="yes">دارد</option><option value="no">ندارد</option></select></label>
    {value.contractStatus==='yes'&&<><SolarDate label="شروع قرارداد خدمات" value={value.contractFrom||''} onChange={v=>set('contractFrom',v)}/><SolarDate label="پایان قرارداد خدمات" value={value.contractUntil||''} onChange={v=>set('contractUntil',v)}/></>}
   </div>}
