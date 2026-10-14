@@ -1,12 +1,14 @@
+import {agreedWarrantyMonths} from './warranty-basis';
 import {storage} from './storage';
 import {AccessError} from './authorization';
-import {hreq,htext} from './hospital';
+import {hreq,htext,hrow} from './hospital';
 import {integer,sday} from './sales';
 import {productProductionMode} from './model';
 import {hospitalOxygenProduct,hospitalSerialKey,hospitalModelKey} from './hospital-service-model';
 import {hospitalServiceCatalog} from './hospital-service-catalog';
 import {addSolarMonths} from './sales-payment-terms';
 const fail=(m:string,status=400):never=>{throw new AccessError(m,status)};
+const contractWarranty=(v:unknown)=>{try{return agreedWarrantyMonths(v);}catch(e){return fail((e as Error).message);}};
 const serialSql=[...'۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩'].reduce((q,d,i)=>"replace("+q+",'"+d+"','"+(i%10)+"')","upper(trim(json_extract(data,'$.serial')))");
 /** Installed legacy equipment only; no fabricated manufacturing record or stock movement. */
 export async function prepareHospitalInstallation(input:any,old:any,today:string,guard:(sql:string,...args:any[])=>unknown){
@@ -15,7 +17,16 @@ export async function prepareHospitalInstallation(input:any,old:any,today:string
  if(!record)fail('محصول بیمارستانی را انتخاب کنید.',404);const product=JSON.parse(record.payload);
  if(productProductionMode(product)!=='project')fail('محصول باید در گروه ساخت بیمارستانی تعریف شده باشد.');
  guard("EXISTS(SELECT 1 FROM records WHERE id=? AND kind='product' AND payload=?)",productId,record.payload);
- const serial=hospitalSerialKey(hreq(input.serial,160)),installedOn=sday(input.installedOn),warrantyMonths=integer(input.warrantyMonths,0,120),warrantyUntil=addSolarMonths(installedOn,warrantyMonths),expired=warrantyMonths===0||warrantyUntil<today;
+ const serial=hospitalSerialKey(hreq(input.serial,160)),installedOn=sday(input.installedOn),projectId=htext(input.projectId||'',200);let warrantyMonths:number,warrantyBasis:any;
+ if(projectId){const project=await hrow(projectId,'build_project'),p=project.data;
+  if(p.specificationPending)fail('شرایط این پروژه در حال بازنگری است؛ ابتدا تأیید شود.',409);
+  if(p.warranty?.months===null||p.warranty?.months===undefined||p.warranty.months==='')fail('مدت گارانتی قرارداد این پروژه هنوز تعیین نشده است.');
+  warrantyMonths=integer(p.warranty.months,0,120);const supplied=contractWarranty(input.warrantyMonths);if(supplied!==null&&supplied!==warrantyMonths)fail('گارانتی دستگاه باید مطابق قرارداد پروژه انتخاب‌شده باشد.',409);
+  const productIds=[...(p.units||[]).map((u:any)=>u.productId),...(p.customerRequirements?.items||[]).map((i:any)=>i.productId)].filter(Boolean);if(productIds.length&&!productIds.includes(productId))fail('این محصول در پروژه انتخاب‌شده نیست.');
+  guard('EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)',project.id,project.revision);
+  warrantyBasis={kind:'project_contract',projectId:project.id,projectRevision:project.revision,contractId:p.warranty.contractId||p.contractId||'',contractNumber:p.warranty.contractNumber||p.contract||'',months:warrantyMonths};
+ }else{const agreed=contractWarranty(input.warrantyMonths);warrantyMonths=agreed??fail('مدت گارانتی توافق‌شده برای همین بیمارستان لازم است؛ از محصول گرفته نمی‌شود.');warrantyBasis={kind:'manual_contract',months:warrantyMonths};}
+ const warrantyUntil=addSolarMonths(installedOn,warrantyMonths),expired=warrantyMonths===0||warrantyUntil<today;
  if(installedOn>today)fail('برای دستگاه نصب‌شده، تاریخ نصب در آینده نیست.');
  if(old&&(hospitalSerialKey(old.data.serial)!==serial||old.data.productId&&old.data.productId!==productId))fail('محصول و سریال دستگاه ثبت‌شده ثابت هستند.');
  const contractStatus=input.contractStatus||'';if(!['','yes','no'].includes(contractStatus)||expired&&!contractStatus)fail('پس از پایان گارانتی، داشتن یا نداشتن قرارداد را مشخص کنید.');
@@ -50,5 +61,5 @@ export async function prepareHospitalInstallation(input:any,old:any,today:string
   equipment={kind:'oxygen',compressorModel,generatorModel,dryerModel,serviceIntervalHours:intervalHours,filters};
  }
  const components=oxygen?[{kind:'compressor',name:'کمپرسور',model:equipment.compressorModel,quantity:integer(input.compressorQuantity??1,1,10000),code:'',serial:'',notes:''},...(old?.data.components||[]).filter((c:any)=>c.kind!=='compressor')]:old?.data.components||[];
- return {kit,kitData,data:{...old?.data,deviceId:device?.id||'',source:device?{kind:'production',deviceId:device.id}:{kind:'manual_installation'},serial,serialKey:serial,model:product.model||product.name,productId,productName:product.name,design:p?.design||old?.data.design||'',firmware:p?.firmware||old?.data.firmware||'',name:product.name,department:htext(input.department??old?.data.department??'',200),location:htext(input.location??old?.data.location??'',200),installedOn,warrantyMonths,warrantyUntil,serviceContract:{status:contractStatus,until:contractUntil},equipment,components,...(oxygen?{technicalProfile:{kind:'installed_oxygen',title:'مشخصات اکسیژن‌ساز بیمارستانی',fields:[{key:'generator',label:'مدل مولد'},{key:'dryer',label:'مدل درایر'}],values:{generator:equipment.generatorModel,dryer:equipment.dryerModel}}}:{}),...(oxygen?{maintenance:{...old?.data.maintenance,enabled:old?.data.maintenance?.enabled||false,interval:equipment.serviceIntervalHours}}:{})}};
+ return {kit,kitData,data:{...old?.data,deviceId:device?.id||'',source:device?{kind:'production',deviceId:device.id}:{kind:'manual_installation'},serial,serialKey:serial,model:product.model||product.name,productId,productName:product.name,design:p?.design||old?.data.design||'',firmware:p?.firmware||old?.data.firmware||'',name:product.name,department:htext(input.department??old?.data.department??'',200),location:htext(input.location??old?.data.location??'',200),installedOn,warrantyMonths,warrantyUntil,warrantyBasis,projectId,serviceContract:{status:contractStatus,until:contractUntil},equipment,components,...(oxygen?{technicalProfile:{kind:'installed_oxygen',title:'مشخصات اکسیژن‌ساز بیمارستانی',fields:[{key:'generator',label:'مدل مولد'},{key:'dryer',label:'مدل درایر'}],values:{generator:equipment.generatorModel,dryer:equipment.dryerModel}}}:{}),...(oxygen?{maintenance:{...old?.data.maintenance,enabled:old?.data.maintenance?.enabled||false,interval:equipment.serviceIntervalHours}}:{})}};
 }

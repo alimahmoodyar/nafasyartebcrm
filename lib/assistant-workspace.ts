@@ -1,5 +1,5 @@
 import {formPresentation} from './assistant-form-presentation';
-import {fields,names,type Kind} from './model';
+import {fields,recordFields,names,type Kind} from './model';
 // Shared UI draft contract. Drafts never execute a business operation.
 export type OperationChoice={key:string;tool:string;title:string;section:string;args:Record<string,string>};
 export type OperationForm={choices?:OperationChoice[];tool:string;section:string;title:string;args:Record<string,any>;schema:any;actionId?:string;state?:string;result?:any;preview?:any;previewError?:string};
@@ -15,7 +15,7 @@ export function operationForm(tool:any,args:any,section:string,title:string):Ope
  if(tool.name==='sales_apply'&&args.mode==='agent'&&!args.agentId&&args.active===undefined)args={...args,active:true};
  if(tool.name==='guarantee_apply'&&args.mode==='save'&&!args.guaranteeId&&args.originalLocation===undefined)args={...args,originalLocation:'زونکن اسناد مالی'};
  const schema:any={...tool.inputSchema,properties:Object.fromEntries(Object.entries(tool.inputSchema.properties||{}).filter(([k])=>!secret.test(k)&&k!=='confirmed')),required:(tool.inputSchema.required||[]).filter((k:string)=>!secret.test(k)&&!['confirmed','id','requestId'].includes(k))};
- if(['create_record','update_record'].includes(tool.name)&&fields[args.kind as Kind]){const fs=fields[args.kind as Kind].filter(f=>f.type!=='snapshot');schema.properties.data={type:'object',properties:Object.fromEntries(fs.map(f=>[f.key,{type:'string',title:f.label,...(f.options?{enum:f.options,...(f.optionLabels?{enumLabels:f.optionLabels}:{})}:{})}])),required:fs.filter(f=>f.required).map(f=>f.key)};}
+ if(['create_record','update_record'].includes(tool.name)&&fields[args.kind as Kind]){const fs=recordFields(args.kind as Kind,args.data||{}).filter(f=>f.type!=='snapshot');schema.properties.data={type:'object',properties:Object.fromEntries(fs.map(f=>[f.key,{type:'string',title:f.label,...(f.options?{enum:f.options,...(f.optionLabels?{enumLabels:f.optionLabels}:{})}:{})}])),required:fs.filter(f=>f.required).map(f=>f.key)};}
  return {tool:tool.name,section,...formPresentation(tool.name,cleanFormArgs(args),schema,title),args:cleanFormArgs(args)};
 }
 

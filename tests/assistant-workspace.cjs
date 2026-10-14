@@ -43,6 +43,9 @@ const forms=load('app/api/assistant/forms/route.ts'),workspace=load('lib/assista
  assert.equal(workspace.operationForm(leadTool,{mode:'save',leadId:'existing',revision:3},'sales','Generic').title,'ویرایش سرنخ فروش');
  const activity=workspace.operationForm(leadTool,{mode:'activity'},'sales','Generic');assert.equal(activity.title,'ثبت تماس و پیگیری سرنخ');assert.equal(activity.schema.properties.company.uiHidden,true);assert.equal(activity.schema.properties.activityType.uiHidden,false);assert.equal(activity.schema.properties.activityType.enumLabels.call,'تماس تلفنی');
  const restored=load('lib/assistant-form-presentation.ts').formPresentation(leadTool.name,leadArgs,leadTool.inputSchema,'Old cached title');assert.equal(restored.title,lead.title);assert.equal(restored.schema.properties.company.title,lead.schema.properties.company.title);
+ const productTool=catalog.tools.find(t=>t.name==='create_record');
+ const projectProductForm=workspace.operationForm(productTool,{kind:'product',data:{productionMode:'project'}},'product','Product');assert.equal(projectProductForm.schema.properties.data.properties.warrantyMonths,undefined);assert.ok(!projectProductForm.schema.properties.data.required.includes('warrantyMonths'));
+ const homeProductForm=workspace.operationForm(productTool,{kind:'product',data:{productionMode:'routine'}},'product','Product');assert.ok(homeProductForm.schema.properties.data.required.includes('warrantyMonths'));
  // Every current tool schema and every mode must have named fields and translated options.
  const presentation=load('lib/assistant-form-presentation.ts');let inspected=0;
  for(const tool of catalog.tools){const original=JSON.stringify(tool.inputSchema);for(const mode of tool.inputSchema.properties?.mode?.enum||['']){

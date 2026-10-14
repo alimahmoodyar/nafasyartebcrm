@@ -1574,3 +1574,4 @@ for(const name of ['create_user','create_password_user','update_user','update_pa
 toolOptions.register_hospital_installation={'installation.contractStatus':{'':'نامشخص',yes:'دارای قرارداد',no:'بدون قرارداد'}};
 toolOptions.save_hospital_profile_template={'fields.*.type':{text:'متن',number:'عدد'}};
 toolOptions.preview_sales_bank_file={unit:{IRR:'ریال',IRT:'تومان'},profile:{auto:'تشخیص خودکار ستون‌ها',manual:'انتخاب دستی ستون‌ها'}};
+toolOptions.get_record_schema={...toolOptions.get_record_schema,productionMode:{routine:'تولید روتین خانگی',project:'ساخت سفارشی بیمارستانی'}};
