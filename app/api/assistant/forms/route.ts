@@ -4,6 +4,7 @@ import {scopedAssistantRecordTool,assistantToolAvailable,assistantWriteNames,act
 import {cleanFormArgs,operationChoices,operationForm} from '@/lib/assistant-workspace';
 import {boundedBody} from '@/lib/firmware-storage';
 import {storage} from '@/lib/storage';
+import {validateProductFamily} from '@/lib/product-family-catalog';
 import {publicAction} from '../actions/route';
 import {prepareSalesOrderArgs} from '@/lib/sales-order-draft';
 import {hydrateBuildIntakeForm} from '@/lib/build-intake-draft';
@@ -19,6 +20,7 @@ export async function POST(request:Request){try{
  if(tool.inputSchema.properties.id&&!['update_record','delete_record','update_user','delete_user','save_material_master'].includes(tool.name))args.id=crypto.randomUUID();
  if(tool.name==='save_material_master'&&args.revision===0)args.id=crypto.randomUUID();
  const section=actionSection(tool.name,args);if(!canOpenSection(u,section))throw new AccessError('دسترسی فرم مجاز نیست.',403);
+ if(tool.name==='create_record'&&args.kind==='product')await validateProductFamily(args.data?.group);
  if(tool.name==='sales_apply')args=await prepareSalesOrderArgs(u,args);
  if(tool.name==='build_intake_apply'){const draft=await hydrateBuildIntakeForm(u,operationForm(tool,args,section,actionTitles[tool.name]));if(draft.previewError)throw new AccessError(draft.previewError,400);args=draft.args;}
  if(tool.name==='after_sales_apply')args=await prepareServiceDiagnosisArgs(u,args);

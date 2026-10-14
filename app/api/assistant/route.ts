@@ -11,6 +11,7 @@ import {userActions} from '@/app/api/assistant/actions/route';
 import {scopedAssistantRecordTool,assistantToolAvailable,assistantReadNames,assistantWriteNames,sectionTitles,canOpenSection,actionTitles,actionSection} from '@/lib/assistant-policy';
 import {requireAccess,checkOrigin,accessResponse,AccessError,can} from '@/lib/authorization';
 import {storage} from '@/lib/storage';
+import {validateProductFamily} from '@/lib/product-family-catalog';
 import {decryptToken} from '@/lib/llm-secrets';
 import {tools,executeTool,validateToolArguments} from '@/lib/mcp/tools';
 import {boundedBody} from '@/lib/firmware-storage';
@@ -95,7 +96,7 @@ export async function POST(request:Request){let started=false,id='',owner='';let
  if(!matchesRequested(name,args))throw new Error(mismatchedOperationMessage);
  const section=actionSection(name,args);if(canOpenSection(u,section)){workspace=operationForm(tool,args,section,actionTitles[name]||name);navigation=section;}
  if(name.includes('development'))navigation='development';
- if(name==='create_record'){if(!can(u,args.kind,'write'))throw new Error('مجوز ثبت این نوع اطلاعات را ندارید.');validate(args.kind as Kind,args.data);}
+ if(name==='create_record'){if(!can(u,args.kind,'write'))throw new Error('مجوز ثبت این نوع اطلاعات را ندارید.');validate(args.kind as Kind,args.data);if(args.kind==='product')await validateProductFamily(args.data?.group);}
  if(name==='sales_apply')args=await prepareSalesOrderArgs(u,args);
  if(name==='after_sales_apply')args=await prepareServiceDiagnosisArgs(u,args);
  // A model never supplies approval; only the separate owner-bound confirmation endpoint can execute.

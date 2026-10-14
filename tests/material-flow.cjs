@@ -25,7 +25,7 @@ const stock=(id,wh)=>sql.prepare('SELECT quantity FROM inventory_balances WHERE 
  identity=owner;await auth.session();
  auth.checkOrigin(new Request('http://127.0.0.1:3000/api/flow',{headers:{origin:'https://company.test','x-forwarded-host':'company.test','x-forwarded-proto':'https'}}));
  assert.throws(()=>auth.checkOrigin(new Request('http://127.0.0.1:3000/api/flow',{headers:{origin:'https://evil.test','x-forwarded-host':'company.test','x-forwarded-proto':'https'}})),e=>e.status===403);
-const p=await create('product',{code:'FLOW',name:'FlowDevice',group:'G',model:'M',warrantyMonths:'12',status:'فعال'});
+const p=await create('product',{code:'FLOW',name:'FlowDevice',group:'سایر تجهیزات پزشکی',model:'M',warrantyMonths:'12',status:'فعال'});
  const fields=[{key:'purity',label:'Purity',type:'number',unit:'%',min:'90',max:'96',required:true}];
  const tr=await templateApi.POST(request('/api/quality/templates','POST',{productId:p.id,title:'QC',fields,previousVersion:0}));assert.equal(tr.status,201);const template=(await tr.json()).template;
  const bomId=crypto.randomUUID();await operate({mode:'bom',id:bomId,productId:p.id,previousVersion:0,lines:[{partCode:'01',name:'Part',unit:'عدد',quantity:'2'}]});

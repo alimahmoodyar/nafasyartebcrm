@@ -1,6 +1,7 @@
 import {materialUnits} from "./material-units";
 import {distributionFields} from "./distribution";
 import {validateBatchIdentity} from "./batch-number";
+import {defaultProductFamilies} from './product-families';
 export type Kind="product"|"batch"|"device"|"event"|"service"|"action"|"distribution"|"firmware";
 export type Row={id:string;kind:Kind;created:string;data:Record<string,string>};
 export type Field={key:string;label:string;required?:boolean;type?:string;options?:string[];optionLabels?:Record<string,string>;ref?:Kind};
@@ -10,7 +11,7 @@ export const productProductionModes:Record<string,string>={routine:'تولید �
 export function productProductionMode(data:any):'routine'|'project'|''{return data?.productionMode==='routine'||data?.productionMode==='project'?data.productionMode:'';}
 export const names:Record<Kind,string>={product:"محصول",batch:"بچ قطعات",device:"دستگاه",event:"رویداد تولید و تحویل",service:"گزارش خدمات",action:"اقدام اصلاحی",distribution:"نماینده و مشتری",firmware:"نسخه‌های نرم‌افزار"};
 export const fields:Record<Kind,Field[]>={
-product:[{key:"code",label:"کد یکتای محصول",required:true},{key:"name",label:"نام محصول",required:true},{key:"group",label:"گروه محصول",required:true},{key:"model",label:"مدل محصول",required:true},{key:"productionMode",label:"روش تولید محصول",options:Object.keys(productProductionModes),optionLabels:productProductionModes},{key:"warrantyMonths",label:"مدت گارانتی (ماه؛ صفر یعنی بدون گارانتی)",type:"number",required:true},{key:"status",label:"وضعیت محصول",options:["فعال","توقف تولید"],required:true},{key:"notes",label:"توضیحات",type:"textarea"}],
+product:[{key:"code",label:"کد یکتای محصول",required:true},{key:"name",label:"نام محصول",required:true},{key:"group",label:"خانواده محصول",required:true,options:defaultProductFamilies},{key:"model",label:"مدل محصول",required:true},{key:"productionMode",label:"روش تولید محصول",options:Object.keys(productProductionModes),optionLabels:productProductionModes},{key:"warrantyMonths",label:"مدت گارانتی (ماه؛ صفر یعنی بدون گارانتی)",type:"number",required:true},{key:"status",label:"وضعیت محصول",options:["فعال","توقف تولید"],required:true},{key:"notes",label:"توضیحات",type:"textarea"}],
 distribution:distributionFields,
 firmware:[{key:"name",label:"نام نرم‌افزار",required:true},{key:"version",label:"شماره نسخه",required:true},{key:"deviceModel",label:"مدل دستگاه"},{key:"board",label:"نسخه / مدل برد"},{key:"notes",label:"توضیحات و تغییرات این نسخه",type:"textarea"}],
 batch:[{key:"partCode",label:"کد ثابت قطعه / کد انبار (برای پیشنهاد بچ)"},{key:"part",label:"نام و مدل قطعه / ماده",required:true},{key:"date",label:"تاریخ ورود",type:"date",required:true},{key:"code",label:"کد یکتای بچ",required:true},{key:"manufacturerLot",label:"شماره لات سازنده (عین برچسب؛ در صورت وجود)"},{key:"supplier",label:"تأمین‌کننده",required:true},{key:"maker",label:"سازنده"},{key:"purchase",label:"شماره خرید در همکاران سیستم"},{key:"quantity",label:"مقدار ورودی",type:"number",required:true},{key:"unit",label:"واحد",options:materialUnits,required:true},{key:"status",label:"کنترل ورودی",options:["در انتظار بررسی","تأیید","قرنطینه","رد"],required:true},{key:"test",label:"نتیجه آزمون ورودی",type:"textarea"},{key:"notes",label:"توضیحات و تفاوت با بچ قبلی",type:"textarea"}],
@@ -21,8 +22,10 @@ action:[{key:"title",label:"موضوع مشکل",required:true},{key:"batch",lab
 export function recordFields(kind:Kind,data:any={}):Field[]{return kind==='product'&&productProductionMode(data)==='project'?fields[kind].filter(f=>f.key!=='warrantyMonths'):fields[kind];}
 export const productWarrantyMonths=(data:any)=>productProductionMode(data)==='project'?'':String(data?.warrantyMonths??'');
 export function validate(kind:Kind,d:Record<string,string>){
+ // Product families include exact legacy values; the authenticated records
+ // handler validates that augmented catalog rather than rewriting old groups.
  if(!fields[kind])throw new Error("نوع رکورد معتبر نیست.");
- for(const f of recordFields(kind,d)){const v=d[f.key];if(f.required&&!v?.trim())throw new Error(f.label+" الزامی است.");if(v&&v.length>4000)throw new Error("متن بیش از حد طولانی است.");if(v&&f.options&&!f.options.includes(v))throw new Error(f.label+" معتبر نیست.");if(v&&f.type==="number"&&(!Number.isFinite(Number(v))||Number(v)<0))throw new Error(f.label+" باید عدد نامنفی باشد.");if(v&&f.type==="date"&&(!/^\d{4}-\d{2}-\d{2}$/.test(v)||Number.isNaN(Date.parse(v))))throw new Error("تاریخ معتبر نیست.");}
+ for(const f of recordFields(kind,d)){const v=d[f.key];if(f.required&&!v?.trim())throw new Error(f.label+" الزامی است.");if(v&&v.length>4000)throw new Error("متن بیش از حد طولانی است.");if(v&&f.options&&!(kind==="product"&&f.key==="group")&&!f.options.includes(v))throw new Error(f.label+" معتبر نیست.");if(v&&f.type==="number"&&(!Number.isFinite(Number(v))||Number(v)<0))throw new Error(f.label+" باید عدد نامنفی باشد.");if(v&&f.type==="date"&&(!/^\d{4}-\d{2}-\d{2}$/.test(v)||Number.isNaN(Date.parse(v))))throw new Error("تاریخ معتبر نیست.");}
  if(kind==="product"&&(!/^[A-Z0-9][A-Z0-9._-]{0,79}$/.test(d.code)||productProductionMode(d)!=='project'&&!Number.isSafeInteger(Number(d.warrantyMonths))))throw new Error("کد محصول باید حداکثر ۸۰ نویسه و شامل حروف انگلیسی، عدد، نقطه، خط تیره یا زیرخط باشد؛ مدت گارانتی باید تعداد ماه صحیح باشد.");
  if(kind==="batch")validateBatchIdentity(d);
  if(kind==="batch"&&Number(d.quantity)<=0)throw new Error("مقدار ورودی باید مثبت باشد.");
