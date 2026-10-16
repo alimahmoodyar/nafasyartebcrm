@@ -10,7 +10,7 @@ const ordered=(rows:any[])=>rows.sort((a,b)=>a.id>b.id?1:a.id<b.id?-1:0);
 const tariffSnapshot=(rows:any[])=>JSON.stringify(ordered([...rows]).map(row=>({id:row.id,revision:row.revision,data:row.data,created:row.created})));
 export async function POST(request:Request){try{
  checkOrigin(request);const u=await requireAccess(),b=JSON.parse(new TextDecoder().decode(await boundedBody(request,250000))),domain=req(b.domain),source=req(b.source,500),validFrom=date(b.validFrom);
- need(u,domain,'manager');if(!flowRole(u,'inventory'))fail('ورود قطعات و تعرفه به مجوز مدیر خدمات و تعریف کالا در انبار نیاز دارد.',403);
+ need(u,domain,'manager');if(!(u.isAdmin||u.permissions.flowRoles?.includes('inventory')))fail('ورود قطعات و تعرفه به مجوز مدیر خدمات و تعریف کالا در انبار نیاز دارد.',403);
  if(!['preview','commit'].includes(b.mode))fail('عملیات واردسازی معتبر نیست.');
  const normalized=normalizeServicePartRows(b.rows),rows=normalized.rows.sort((a,b)=>a.code>b.code?1:a.code<b.code?-1:0),db=storage(),now=new Date().toISOString();
  const signature=JSON.stringify({domain,source,validFrom,rows,catalogSnapshot:b.catalogSnapshot});

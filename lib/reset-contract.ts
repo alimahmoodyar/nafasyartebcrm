@@ -1,3 +1,6 @@
+// warehouseResponsibilities are preserved account/profile assignments, referring to catalog warehouses.
+// Role choices are derived from material_warehouse; old hidden owners are compatibility-only until profile save.
+// Receipt QC selection/history is operational; both resets back it up/delete it. Existing generic 0016 freeze applies; no new tables/FKs.
 // Document bindings stay in catalog qms_record (operations preserved, full deleted).
 // Immutable form_record answer/code snapshots are operational in both resets;
 // existing backup and migration 0016 flow_entities/inventory_operations freeze cover them atomically. No new tables/FKs/blobs.

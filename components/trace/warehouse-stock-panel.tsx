@@ -8,7 +8,7 @@ export function WarehouseStockPanel({user,demo,onOpen}:{user:Session;demo:boolea
  async function load(){setError('');try{const r=await fetch('/api/flow',{cache:'no-store'}),v:any=await r.json();if(!r.ok){setData(null);throw Error(v.error||'دریافت موجودی انجام نشد.');}setData(v);}catch(e:any){setError(e.message);}}
  useEffect(()=>{if(!demo)void load();},[demo]);
  if(demo)return <p className="notice">برای موجودی واقعی وارد اطلاعات شرکت شوید.</p>;
- const warehouses=(data?.warehouses||[]).filter((w:any)=>user.isAdmin||w.data.warehouseOwner&&(user.userId===w.data.warehouseOwner||user.userId==='local:'+w.data.warehouseOwner)),receipts=(data?.entities||[]).filter((e:any)=>e.type==='receipt'),rows=data?.rows||[];
+ const warehouses=(data?.warehouses||[]).filter((w:any)=>user.isAdmin||(w.inventoryMembers||[]).some((m:any)=>[m.id,'local:'+m.id,m.subject].filter(Boolean).includes(user.userId))),receipts=(data?.entities||[]).filter((e:any)=>e.type==='receipt'),rows=data?.rows||[];
  const entries=(data?.balances||[]).filter((b:any)=>b.quantity>0&&(user.isAdmin||data.warehouseIds.includes(b.warehouse))).flatMap((b:any)=>{
   const row=rows.find((r:any)=>r.id===b.item_id);if(!row||row.kind!=='batch')return [];
   const receipt=receipts.find((r:any)=>r.id===row.id),stored=['raw','quarantine'].includes(b.warehouse),w=stored?warehouses.find((w:any)=>w.id===receipt?.data.warehouseId):undefined;

@@ -12,7 +12,7 @@ import {salesRead,salesWarehouse,salesStaff,salesManager,salesFinance} from './s
 import type {Kind} from './model';
 import type {Session} from './permissions';
 import {serviceRead} from './service-access';
-import {warehouseAccess} from './material-flow';
+import {warehouseAccess,flowRole} from './material-flow';
 import {serviceReadDomains} from './service-access';
 import {warehouseLegacySections,warehouseTarget,type WarehouseEntry} from './warehouse-workspace';
 
@@ -24,7 +24,7 @@ export function canOpenSection(user:Session,s:string):boolean{
  const internal=!p.hospitalCenterId&&!p.salesAgentId&&!p.serviceAgentId;
  if(s==='warehouse')return internal&&(canOpenSection(u,'flow')||canOpenSection(u,'inventory')||canOpenSection(u,'batch')||canOpenSection(u,'fulfillment')&&warehouseAccess(u,'finished')||canOpenSection(u,'after-sales')&&!!p.serviceRoles?.includes('inventory'));
  if(!u.isAdmin&&!selfServicePrograms.includes(s)){
-  if(p.roleAssignment&&!programsForRoles(p.roleAssignment.roles).includes(s))return false;
+  if(p.roleAssignment&&!programsForRoles(p.roleAssignment.roles).includes(s)&&!(s==='flow'&&p.warehouseResponsibilities?.length))return false;
   if(!p.roleAssignment&&p.manualPrograms!==undefined&&!p.manualPrograms.includes(s))return false;
  }
  if(s==='pricing')return pricingRead(u);
@@ -53,7 +53,7 @@ export function canOpenSection(user:Session,s:string):boolean{
  if(s==='sourcing')return !!p.qmsRoles?.some(r=>['qa','qc'].includes(r))||!!p.flowRoles?.includes('qc')||!!p.supplyRoles?.length||!!p.flowRoles?.some(r=>['inventory','logistics'].includes(r))||!!p.transportRoles?.includes('manager');
  if(['users','llm','finance','system-reset'].includes(s))return false;
  if(s==='fulfillment')return salesStaff(u)||!!p.salesAgentId||!!p.flowRoles?.some(r=>['inventory','production','sales','logistics'].includes(r));
- if(s==='flow')return !!p.flowRoles?.some(r=>['inventory','qc','production','procurement'].includes(r));
+ if(s==='flow')return !!p.warehouseResponsibilities?.length||!!p.flowRoles?.some(r=>['inventory','qc','production','procurement'].includes(r));
  if(s==='finance-control')return financialAccess(u,'control');
  return can(u,(s==='inventory'?'batch':['serials','analytics'].includes(s)?'device':s) as Kind,'read');
 }
@@ -73,15 +73,15 @@ export function warehouseNavigation(user:Session){
  if(!canOpenSection(u,'warehouse'))return groups;
  const add=(group:string,key:string,title:string,source:string,view:string)=>groups[group].push({key,title,source,view});
  const materialScope=['raw','semi','line','quarantine','nonconforming'].filter(warehouse=>warehouseAccess(u,warehouse));
- const flow=canOpenSection(u,'flow'),inventory=u.isAdmin||!!p.flowRoles?.includes('inventory'),production=u.isAdmin||!!p.flowRoles?.includes('production'),quality=u.isAdmin||!!p.flowRoles?.includes('qc');
+ const flow=canOpenSection(u,'flow'),inventory=flowRole(u,'inventory'),production=u.isAdmin||!!p.flowRoles?.includes('production'),quality=u.isAdmin||!!p.flowRoles?.includes('qc');
  if(flow){
-  if(quality||production||materialScope.length||p.flowRoles?.includes('procurement'))add('tasks','material-tasks','کارهای مواد و کنترل ورودی','flow','tasks');
+  if(quality||p.warehouseResponsibilities?.some(r=>r.role==='qc')||production||materialScope.length||p.flowRoles?.includes('procurement'))add('tasks','material-tasks','کارهای مواد و کنترل ورودی','flow','tasks');
   if(inventory&&materialScope.length)add('stock','material-stock','موجودی مواد، انبار و محل نگهداری','flow','stock');
-  if(quality||inventory&&warehouseAccess(u,'quarantine')){add('receive','receipts','رسید، کنترل ورودی و جانمایی','flow','receipts');}
+  if(quality||p.warehouseResponsibilities?.some(r=>r.role==='qc')||inventory&&warehouseAccess(u,'quarantine')){add('receive','receipts','رسید، کنترل ورودی و جانمایی','flow','receipts');}
   if(production||inventory&&warehouseAccess(u,'raw')){add('issue','requests','درخواست و تحویل مواد به خط','flow','requests');}
   if(production)add('returns','nonconforming','ثبت قطعه نامنطبق خط','flow','nonconforming');
   if(inventory&&materialScope.length)add('settings','materials','شناسنامه کالاها','flow','materials');
-  if(u.isAdmin)add('settings','warehouses','انبارها، محل‌ها و مسئولان','flow','warehouses');
+  if(u.isAdmin)add('settings','warehouses','انبارها و محل‌های نگهداری','flow','warehouses');
   if(production||quality){add('issue','production','پیگیری تولید و مصرف مواد','flow','builds');add('issue','plans','برنامه و سریال تولید','flow','plans');}
  }
  if(canOpenSection(u,'inventory')&&(!inventory||materialScope.length)){

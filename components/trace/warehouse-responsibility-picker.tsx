@@ -1,0 +1,8 @@
+"use client";
+import {validatePermissions,type Permissions,type WarehouseResponsibility} from '@/lib/permissions';
+export function WarehouseResponsibilityPicker({permissions,onChange,warehouses}:{permissions:Permissions;onChange:(p:Permissions)=>void;warehouses:{id:string;name:string;active:boolean}[]}){
+ const selected=permissions.roleAssignment?.warehouseResponsibilities||permissions.warehouseResponsibilities||[];
+ function toggle(warehouseId:string,role:'inventory'|'qc',checked:boolean){const next:WarehouseResponsibility[]=checked?[...selected,{warehouseId,role}]:selected.filter(r=>r.warehouseId!==warehouseId||r.role!==role),draft={...permissions,warehouseResponsibilities:next,...(permissions.manualPrograms!==undefined&&next.length?{manualPrograms:[...new Set([...permissions.manualPrograms,'flow'])]}:{}),...(permissions.roleAssignment?{roleAssignment:{...permissions.roleAssignment,warehouseResponsibilities:next}}:{})};try{onChange(validatePermissions(draft))}catch{onChange(draft)}}
+ if(!warehouses.length)return null;
+ return <fieldset className="stage-permissions" style={{marginTop:16}}><legend>مسئولیت انبارهای تعریف‌شده</legend><p className="subtle">هر انبار را می‌توان به چند همکار سپرد؛ برای کنترل کیفیت محموله، از بین همین افراد انتخاب می‌شود.</p>{warehouses.map(w=><div key={w.id} style={{display:'flex',gap:16,flexWrap:'wrap',padding:8}}><strong>{w.name}{!w.active?' (غیرفعال)':''}</strong>{([['inventory','مسئول انبار'],['qc','مسئول کنترل کیفیت']] as const).map(([role,label])=><label key={role}><input type="checkbox" aria-label={label+' '+w.name} checked={selected.some(r=>r.warehouseId===w.id&&r.role===role)} onChange={e=>toggle(w.id,role,e.target.checked)}/>{label}</label>)}</div>)}</fieldset>;
+}

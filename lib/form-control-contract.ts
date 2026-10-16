@@ -3,6 +3,7 @@ export const controlledForms:Record<string,{title:string;roles:string[]}>={
  'flow.material':{title:'تعریف کالا و معیار کنترل ورودی',roles:['inventory','qc','production']},
  'flow.warehouse':{title:'تعریف انبار',roles:['inventory','qc','production']},
  'flow.receipt':{title:'دریافت و قرنطینه کالا',roles:['inventory','qc','production']},
+ 'flow.assign_qc':{title:'ارجاع کنترل کیفیت محموله',roles:['inventory','qc','production']},
  'flow.incoming_qc':{title:'کنترل کیفیت ورودی',roles:['inventory','qc','production']},
  'flow.shelve':{title:'رسید انبار مواد تأییدشده',roles:['inventory','qc','production']},
  'flow.request':{title:'درخواست مواد تولید',roles:['inventory','qc','production']},
@@ -32,8 +33,9 @@ export type FormRecord={target:string;title:string;productId:string;control:Form
 // Ignore unsolicited request fields: an operator may only archive the form actually validated.
 export const controlledInputs:Record<string,string[]>={
  'flow.material':['code','name','unit','specs','fields'],
- 'flow.warehouse':['name','warehouseOwner','qcOwner','locations','active'],
- 'flow.receipt':['materialId','warehouseId','day','quantity','invoiceQuantity','purchaseOrderId','discrepancyNotes','supplier','maker','manufacturerLot','purchase','specs','notes','expiry'],
+ 'flow.warehouse':['name','locations','active'],
+ 'flow.assign_qc':['receiptId','qcOwner'],
+ 'flow.receipt':['qcOwner','materialId','warehouseId','day','quantity','invoiceQuantity','purchaseOrderId','discrepancyNotes','supplier','maker','manufacturerLot','purchase','specs','notes','expiry'],
  'flow.incoming_qc':['receiptId','accepted','values','notes'],
  'flow.shelve':['receiptId','location'],
  'flow.request':['materialId','warehouseId','quantity','planId','notes'],

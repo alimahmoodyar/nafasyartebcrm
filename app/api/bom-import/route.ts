@@ -7,7 +7,7 @@ const json=(v:unknown)=>Response.json(v,{headers:{'Cache-Control':'private, no-s
 const fail=(m:string,s=400):never=>{throw new AccessError(m,s)};
 export async function POST(request:Request){try{
  checkOrigin(request);const u=await requireAccess();
- if(!can(u,'product','write')||!flowRole(u,'inventory'))fail('ورود BOM به مجوز ویرایش محصول و تعریف مواد انبار نیاز دارد.',403);
+ if(!can(u,'product','write')||!(u.isAdmin||u.permissions.flowRoles?.includes('inventory')))fail('ورود BOM به مجوز ویرایش محصول و تعریف مواد انبار نیاز دارد.',403);
  const b=JSON.parse(new TextDecoder().decode(await boundedBody(request,180000)));
  if(b.mode==='parse'){
   if(!Array.isArray(b.grid)||b.grid.some((r:unknown)=>!Array.isArray(r))||!b.mapping||typeof b.mapping!=='object')fail('ساختار ردیف‌ها و ستون‌ها معتبر نیست.');
