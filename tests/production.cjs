@@ -18,7 +18,7 @@ async function create(kind,data){const r=await recordsApi.POST(request('/api/rec
 async function operate(b,status=200){const r=await production.POST(request('/api/production','POST',{id:crypto.randomUUID(),...b}));const d=await r.json();assert.equal(r.status,status,JSON.stringify(d));return d;}
 (async()=>{
  identity=owner;await auth.session();
- const p=await create('product',{code:'P1',name:'Device',group:'G',model:'M',warrantyMonths:'12',status:'فعال'});
+ const p=await create('product',{code:'P1',name:'Device',group:'اکسیژن‌ساز',model:'M',warrantyMonths:'12',status:'فعال'});
  const devices=[];for(let n=0;n<3;n++)devices.push(await create('device',{code:'D'+n,product:p.id,model:'M',design:'1',date:'2026-10-01'}));
  const batches=[];for(let n=1;n<=2;n++)batches.push(await create('batch',{code:'B'+n,partCode:'0'+n,part:'Part'+n,date:'2026-10-01',supplier:'S',quantity:'10',unit:'عدد',status:'تأیید'}));
  const bomId=crypto.randomUUID(),lines=[{partCode:'01',name:'Part1',unit:'عدد',quantity:'2'},{partCode:'02',name:'Part2',unit:'عدد',quantity:'3'}];

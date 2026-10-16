@@ -60,6 +60,7 @@ export function MaterialFlow({demo,onSaved,onOpen,initialTab='tasks',targetId=''
  const mode=draft?.mode;
  return <ProgramWorkspace programId={'material-flow:'+initialTab} direct={!!targetId||initialTab!=='tasks'} title="گردش مواد و تولید"><section className="flow-panel"><div className="panelhead"><div><h2>گردش مواد و تولید</h2><p className="subtle">دریافت ← قرنطینه ← کنترل ورودی ← انبار ← خط تولید ← کنترل نهایی</p></div><button className="btn" disabled={loading||busy} onClick={()=>void load()}>تازه‌سازی</button></div>
  {focusId&&<p className="notice">پرونده مرتبط با پیام کارتابل · {focusId}<button className="btn" onClick={()=>setFocusId('')}>نمایش همه پرونده‌ها</button></p>}
+ <a className="link" href="/api/form-controls?view=records&format=print" target="_blank" rel="noopener noreferrer">سوابق فرم‌ها / چاپ</a>
  <SubprogramNavigation items={(Object.entries({tasks:'کارتابل',warehouses:'انبارها',materials:'کالاها',receipts:'دریافت و قرنطینه',requests:'درخواست مواد',plans:'برنامه و سریال',builds:'مونتاژ و آزمون',supply:'تأمین',analysis:'گزارش کیفیت'}).filter(([k])=>!['plans','builds','analysis'].includes(k)||has('production')||has('qc'))).map(([key,title])=>[String(key),String(title)] as [string,string])} value={tab} onChange={setTab}/>
  {error&&!draft&&<p className="notice error" role="alert">{error}</p>}{message&&<p className="notice">{message}</p>}{loading&&<p role="status">در حال دریافت…</p>}
  {state&&<>

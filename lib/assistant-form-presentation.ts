@@ -1,3 +1,4 @@
+import {controlledForms} from './form-control-contract';
 import {partRepairForms,partRepairActions,visiblePartRepairFields} from './part-repair-contract';
 import {personnelKinds} from './personnel-contract';
 import {operationDataSchema,visiblePersonnelFields} from './operation-form-fields';
@@ -47,6 +48,7 @@ export function generalPresentation(tool:string,args:any,input:any,title:string)
  if(tool==='apply_qms_record'&&qmsKinds[args.data?.kind]&&args.mode==='save'){
   schema.properties??={};schema.properties.data??={type:'object'};
   schema.properties.data.properties={...schema.properties.data.properties,values:contractSchema(qmsKinds[args.data.kind].fields.map(f=>({...f,type:f.type==='number'?'text':f.type==='boolean'?'choice':f.type,options:f.type==='boolean'?[['yes','بله'],['no','خیر']]:f.options,optional:!f.required})))};
+  if(args.data.kind==='document')Object.assign(schema.properties.data.properties,{formTarget:{type:'string',title:'فرم مرتبط (اختیاری)',enum:['',...Object.keys(controlledForms)],enumLabels:{'':'بدون اتصال',...Object.fromEntries(Object.entries(controlledForms).map(([k,v])=>[k,v.title]))}},formRevision:{type:'string',title:'شماره بازنگری فرم',maxLength:40}});
  }
  function decorate(s:any,value:any,path:string[]=[]){
   if(s.type==='object'||s.properties||value&&typeof value==='object'&&!Array.isArray(value)){

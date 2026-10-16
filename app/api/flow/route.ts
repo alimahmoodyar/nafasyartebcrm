@@ -1,3 +1,4 @@
+import {captureForm} from '@/lib/form-control';
 import {materialWarehouses,receiptWarehouse,warehousePerson,canReceiveWarehouse,storageLocation,displayLocation} from '@/lib/material-warehouses';
 import {productWarrantyMonths,productProductionMode} from '@/lib/model';
 import {storedAccessPermissions} from '@/lib/permissions';
@@ -20,7 +21,7 @@ const arr=(a:any,max=80)=>{if(!Array.isArray(a)||!a.length||a.length>max)fail('�
 const json=(data:unknown)=>Response.json(data,{headers:{'Cache-Control':'no-store'}});
 export async function GET(){try{
  const u=await requireAccess();if(!['inventory','qc','production','procurement'].some(r=>flowRole(u,r)))fail('دسترسی گردش مواد ندارید.',403);const db=storage();
- const all=(await db.prepare("SELECT * FROM flow_entities WHERE type NOT GLOB 'qms_*' ORDER BY created DESC,id").all()).results.map(entity);
+ const all=(await db.prepare("SELECT * FROM flow_entities WHERE type NOT GLOB 'qms_*' AND type<>'form_record' ORDER BY created DESC,id").all()).results.map(entity);
  const rows=(await db.prepare("SELECT * FROM records WHERE kind IN ('batch','product','device')").all()).results.map((r:any)=>({...r,data:JSON.parse(r.payload),payload:undefined}));
  const balances=(await db.prepare('SELECT * FROM inventory_balances').all()).results;
  const boms=(await db.prepare('SELECT * FROM bom_versions ORDER BY version DESC').all()).results;
@@ -42,8 +43,9 @@ export async function POST(request:Request){try{
  const flush=()=>{if(guards.length){checks.push(db.prepare('UPDATE inventory_operations SET guard=CASE WHEN '+guards.join(' AND ')+' THEN 1 ELSE 0 END WHERE id=?').bind(...params,id));guards.length=0;params.length=0;}};
  const guard=(s:string,...p:any[])=>{if(params.length+p.length>75)flush();guards.push(s);params.push(...p)};
  async function get(eid:string,type:string){const r:any=await db.prepare('SELECT * FROM flow_entities WHERE id=? AND type=?').bind(eid,type).first();if(!r)fail('رکورد گردش کار پیدا نشد.');guard('EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)',r.id,r.revision);return entity(r)}
- async function record(eid:string,kind:string){const r:any=await db.prepare('SELECT * FROM records WHERE id=? AND kind=?').bind(eid,kind).first();if(!r)fail('کالا یا دستگاه پیدا نشد.');guard('EXISTS(SELECT 1 FROM records WHERE id=? AND payload=?)',r.id,r.payload);return {...r,data:JSON.parse(r.payload)}}
+ async function record(eid:string,kind:string){const r:any=await db.prepare('SELECT * FROM records WHERE id=? AND kind=?').bind(eid,kind).first();if(!r)fail('کالا یا دستگاه پیدا نشد.');guard('EXISTS(SELECT 1 FROM records WHERE id=? AND payload=?)',r.id,r.payload);const data=JSON.parse(r.payload);if(kind==='product')reportProduct=eid;if(kind==='device')reportProduct=data.product||'';return {...r,data}}
  const put=(eid:string,type:string,data:any,old?:any)=>{if(old)stmts.push(db.prepare('UPDATE flow_entities SET data=?,revision=revision+1,updated=? WHERE id=? AND revision=?').bind(JSON.stringify(data),now,eid,old.revision));else stmts.push(db.prepare('INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?)').bind(eid,type,JSON.stringify(data),now,now));};
+ let reportProduct='',reportCriteria:any[]=[],reportBody={...b},reportExtra:{label:string;value:string}[]=[];
  const touchedStock:string[]=[];
  const entry=(item:string,warehouse:string,delta:number)=>{touchedStock.push(item);const bid=item+'@'+warehouse;stmts.push(db.prepare('INSERT INTO inventory_balances(id,item_id,warehouse,quantity) VALUES(?,?,?,0) ON CONFLICT(id) DO NOTHING').bind(bid,item,warehouse),db.prepare('UPDATE inventory_balances SET quantity=quantity+? WHERE id=?').bind(delta,bid),db.prepare('INSERT INTO inventory_entries(id,operation_id,item_id,warehouse,delta) VALUES(?,?,?,?,?)').bind(crypto.randomUUID(),id,item,warehouse,delta));};
  const event=(device:string,stage:string,data:any)=>stmts.push(db.prepare("INSERT INTO records(id,kind,payload,created) VALUES(?,'event',?,?)").bind(crypto.randomUUID(),JSON.stringify({device,stage,date:tehranDay(),operator:u.name,...data}),now));
@@ -71,10 +73,12 @@ export async function POST(request:Request){try{
  const existing=(await db.prepare("SELECT json_extract(payload,'$.code') AS code FROM records WHERE kind='batch'").all()).results.map((r:any)=>r.code);const code=suggestBatchNumber(m.data.code,day,existing).code,batchId='batch:'+code;
  const data={partCode:m.data.code,part:m.data.name,date:day,code,quantity:String(quantity/1000),unit:m.data.unit,status:'قرنطینه',supplier:needed(b.supplier),maker:text(b.maker||'',200),manufacturerLot:text(b.manufacturerLot||'',200),purchase:text(b.purchase||'',200),notes:text(b.notes||''),specs:text(b.specs??m.data.specs),batchScheme:'part-jalali-v1',expiry};
  stmts.push(db.prepare("INSERT INTO records(id,kind,payload,created) VALUES(?,'batch',?,?)").bind(batchId,JSON.stringify(data),now),db.prepare('INSERT INTO inventory_batches(batch_id,part_code,unit,created) VALUES(?,?,?,?)').bind(batchId,m.data.code,m.data.unit,now));entry(batchId,'quarantine',quantity);
+ reportBody={...b,specs:data.specs,warehouseId:placement.warehouseId||''};reportExtra=[{label:'شماره بچ ثبت‌شده',value:code},{label:'واحد کالا',value:m.data.unit},{label:'نسخه معیارهای کالا',value:String(m.revision)}];
  put(batchId,'receipt',{batchId,materialId:m.id,materialRevision:m.revision,fields:m.data.fields,specs:data.specs,quantity,quantityCheck,accepted:0,rejected:0,state:'pending_qc',purchaseOrderId,...placement,expiry,day,actor:u.userId});
  }else if(mode==='incoming_qc'){
- const r=await get(needed(b.receiptId),'receipt');await warehouseAssignment(r,'qcOwner');if(r.data.state!=='pending_qc')fail('کنترل ورودی قبلاً ثبت شده است.',409);
+ const r=await get(needed(b.receiptId),'receipt');reportCriteria=r.data.fields||[];await warehouseAssignment(r,'qcOwner');if(r.data.state!=='pending_qc')fail('کنترل ورودی قبلاً ثبت شده است.',409);
  const accepted=zero(b.accepted);if(accepted>r.data.quantity)fail('مقدار تأییدشده نمی‌تواند بیشتر از مقدار واقعی دریافت‌شده باشد.');const rejected=r.data.quantity-accepted;if(!r.data.fields?.length)fail('فرم کنترل کیفیت این محموله تعریف نشده است؛ مسئول کیفیت باید مشخصات فرم را بررسی کند.');const checked=qualityValues(r.data.fields,b.values);const notes=needed(b.notes,4000);if(checked.failed&&accepted===r.data.quantity)fail('با معیار مردود، تأیید کامل مجاز نیست.');
+ reportExtra=[{label:'شماره بچ',value:r.data.batchId},{label:'مقدار واقعی دریافت‌شده',value:String(r.data.quantity/1000)},{label:'مقدار مردود',value:String(rejected/1000)},{label:'نسخه معیارهای کالا',value:String(r.data.materialRevision)}];
  put(r.id,'receipt',{...r.data,accepted,rejected,state:accepted?'awaiting_warehouse':'rejected',qc:{values:checked.values,failed:checked.failed,notes,by:u.name,actor:u.userId,at:now}},r);
  const batch=await record(r.data.batchId,'batch');stmts.push(db.prepare('UPDATE records SET payload=? WHERE id=?').bind(JSON.stringify({...batch.data,status:accepted?'تأیید':'رد',test:notes}),batch.id));
  }else if(mode==='shelve'){
@@ -107,6 +111,7 @@ export async function POST(request:Request){try{
  const booked:any=await db.prepare("SELECT COALESCE(SUM(json_extract(data,'$.count')),0) AS n FROM flow_entities WHERE type='plan' AND json_extract(data,'$.productId')=? AND json_extract(data,'$.day')=?").bind(product.id,day).first();const reason=text(b.reason||'');if(booked.n+count>capacity.data.capacity&&!reason)fail('تعداد بیش از ظرفیت روز است؛ دلیل ثبت کنید.');
  guard("(SELECT COALESCE(SUM(json_extract(data,'$.count')),0) FROM flow_entities WHERE type='plan' AND json_extract(data,'$.productId')=? AND json_extract(data,'$.day')=?)=?",product.id,day,booked.n);
  const design=needed(b.design),runData={name:product.data.name,model:product.data.model,code:product.data.code,count,operator:u.name,jalaliDate:receiptDay(day).display,smallLabels:capacity.data.smallLabels};stmts.push(db.prepare('INSERT INTO serial_runs(id,product_id,actor,day,payload,created) VALUES(?,?,?,?,?,?)').bind(id,product.id,u.userId,day,JSON.stringify(runData),now));
+ reportExtra=[{label:'سریال‌های تخصیص‌یافته',value:serials.join('، ')},{label:'نسخه BOM',value:String(bom.version)}];
  put(id,'plan',{sourcingPlanId:approved.id,productId:product.id,count,day,bomId:bom.id,templateId:form.id,smallLabels:capacity.data.smallLabels,reason,by:u.name});
  for(const serial of serials){const did='device:'+serial;stmts.push(db.prepare('INSERT INTO serial_reservations(serial,run_id,product_id) VALUES(?,?,?)').bind(serial,id,product.id),db.prepare("INSERT INTO records(id,kind,payload,created) VALUES(?,'device',?,?)").bind(did,JSON.stringify({product:product.id,productName:product.data.name,productCode:product.data.code,warrantyMonths:productWarrantyMonths(product.data),warrantyBasis:productProductionMode(product.data)==='project'?'project':'product',code:serial,model:product.data.model,design,firmware:text(b.firmware||'',200),date:day}),now));put(did,'build',{deviceId:did,planId:id,bomId:bom.id,templateId:form.id,state:'planned',assembler:'',materials:[],workflowVersion:2});}
  }else if(mode==='assign'){
@@ -129,7 +134,8 @@ export async function POST(request:Request){try{
  }else if(mode==='print'){
  const p=await get(needed(b.planId),'plan');put(id,'print',{planId:p.id,by:u.name,notes:text(b.notes||'')});
  }
- flush();await db.batch([db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(id,'flow_'+mode,signature,u.userId,now),...checks,...stmts,...holdChecks(db,id,touchedStock),db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,id,'flow_'+mode,signature,now)]);
- try{await syncMaterialTasks();}catch{return json({saved:true,followupPending:true});}
- return json({saved:true});
+ const formStatements=await captureForm(id,'flow.'+mode,reportBody,u,reportProduct,reportCriteria,reportExtra);
+ flush();await db.batch([db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(id,'flow_'+mode,signature,u.userId,now),...checks,...stmts,...holdChecks(db,id,touchedStock),...formStatements,db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,id,'flow_'+mode,signature,now)]);
+ try{await syncMaterialTasks();}catch{return json({saved:true,reportId:formStatements.length?id:undefined,followupPending:true});}
+ return json({saved:true,reportId:formStatements.length?id:undefined});
  }catch(e){const denial=accessResponse(e);if(denial)return denial;const s=String(e);return Response.json({error:/constraint|SQLITE|D1|Database/i.test(s)?'اطلاعات هم‌زمان تغییر کرده، محل اشغال است یا موجودی کافی نیست؛ هیچ تغییری ثبت نشد. تازه‌سازی کنید.':e instanceof Error?e.message:'ثبت انجام نشد.'},{status:/constraint|SQLITE/i.test(s)?409:400});}}

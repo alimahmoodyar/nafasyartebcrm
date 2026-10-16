@@ -1,3 +1,6 @@
+// Document bindings stay in catalog qms_record (operations preserved, full deleted).
+// Immutable form_record answer/code snapshots are operational in both resets;
+// existing backup and migration 0016 flow_entities/inventory_operations freeze cover them atomically. No new tables/FKs/blobs.
 // Physical material_warehouse definitions are catalog flow entities. Receipt warehouse snapshots and scoped slot keys use existing backup/reset/freeze tables (0016); no new table/FK/blob. Operations reset preserves definitions, full reset deletes them.
 // Compact hospital coverage dates and per-device servicePlans are embedded in operational hospital_asset/hospital_job. Contract follow-ups are derived, their duty_runs use existing backup/delete/freeze; no new table, FK, blob or persistence exemption. Legacy catalogs and snapshots retain current reset policy.
 // Contract-specific hospital warranty snapshots live in existing build_intake/build_project/hospital_asset entities; generic flow reset backup/delete/freeze covers them. Home product warranty unchanged, no new tables or FK.
