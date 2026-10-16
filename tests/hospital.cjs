@@ -21,6 +21,16 @@ async function call(name,path,body){const role=roles.find(r=>r.name===name);cons
  assert.equal((await call(center,'hospital?center=training-hospital-2')).status,404);
  for(const p of ['records','inbox','tasks','sales','flow'])assert.equal((await call(center,p)).status,403,p);
  await act(center,'request',{assetId:'training-hospital-asset-2',kind:'fault',urgency:'normal',description:'test',contact:'test'},404);
+ assert.deepEqual(Object.keys(view.d.requestKinds).sort(),['fault','service']);assert.equal(view.d.requestKinds.service,'سرویس دوره‌ای');
+ for(const kind of ['general','other','repair','periodic','toString'])await act(center,'request',{assetId:'training-hospital-asset-1',kind,urgency:'normal',description:'Invalid category',contact:'Synthetic contact'},400);
+ const manualPeriodic=await act(center,'request',{assetId:'training-hospital-asset-1',kind:'service',urgency:'normal',description:'سرویس دوره‌ای آزمایشی',contact:'مرکز فرضی'});assert.equal(entity(manualPeriodic.id).data.kind,'service','Periodic requests retain the established storage key and do not require a fabricated meter reading');
+ const replayPeriodic=await call(center,'hospital',manualPeriodic.body);assert.equal(replayPeriodic.status,200);assert.equal(sql.prepare("SELECT count(*) n FROM training_flow_entities WHERE id=? AND type='hospital_job'").get(manualPeriodic.id).n,1);
+ const kindsContext=load('lib/training-context.ts'),kindsCatalog=load('lib/mcp/tools.ts'),kindsPrincipal={user:roles.find(r=>r.name===center).session,scope:'read_write',tokenId:null};
+ const kindsWorkspace=await kindsContext.trainingContext.run({actor:'test',role:'test'},()=>kindsCatalog.executeTool('hospital_get_workspace',{},base,kindsPrincipal));assert.equal(kindsWorkspace.requestKinds.service,'سرویس دوره‌ای');
+ await assert.rejects(()=>kindsContext.trainingContext.run({actor:'test',role:'test'},()=>kindsCatalog.executeTool('hospital_apply',{confirmed:true,body:JSON.stringify({id:crypto.randomUUID(),mode:'request',assetId:'training-hospital-asset-1',kind:'general',urgency:'normal',description:'Invalid MCP request',contact:'Synthetic contact'})},base,kindsPrincipal)),/نوع درخواست/);
+ if(process.argv.includes('--request-kinds-only')){console.log('PASS hospital request types: only fault and periodic service, center scope, invalid/third categories rejected, no observed meter prerequisite, idempotent replay and HTTP/MCP parity');return;}
+ // End the request-type fixture before independently testing forecast generation.
+ sql.prepare("UPDATE training_flow_entities SET data=json_set(data,'$.state','confirmed') WHERE type='hospital_job' AND json_extract(data,'$.assetId')='training-hospital-asset-1' AND json_extract(data,'$.kind')='service'").run();
  const contacts=[{id:'contact-test',name:'مسئول تست',role:'تجهیزات پزشکی',mobile:'۰۹۱۲۱۲۳۴۵۶۷',landline:'02112345678',extension:'123',assetId:'training-hospital-asset-1',active:true,notes:'تماس هماهنگی'}];
  const cb=()=>({centerId:'training-hospital-1',revision:entity('training-hospital-1').revision,contacts});
  await act(center,'contacts',cb(),403);
@@ -58,7 +68,15 @@ async function call(name,path,body){const role=roles.find(r=>r.name===name);cons
  await act(manager,'pm_scan');await act(manager,'pm_scan');assert.equal(allPm().filter(r=>r.type==='hospital_job'&&r.data.pm).length,1);
  await act(center,'pm_scan',{},403);
  await act(manager,'maintenance',{assetId:aid,revision:entity(aid).revision,...config},400);
- await act(manager,'quote',{jobId:pm.id,revision:entity(pm.id).revision,lines:[{kind:'labor',label:'Periodic maintenance',quantity:1,unitPrice:'500',partCode:''}],validUntil:today,notes:'Service scope'});
+ const pf='PMF01',fixtureNow=new Date().toISOString();
+ sql.prepare("INSERT INTO training_flow_entities(id,type,data,revision,created,updated) VALUES(?,'material',?,1,?,?)").run('material:'+pf,JSON.stringify({code:pf,name:'Synthetic periodic filter',unit:'عدد'}),fixtureNow,fixtureNow);
+ sql.prepare("INSERT INTO training_flow_entities(id,type,data,revision,created,updated) VALUES(?,'as_tariff',?,1,?,?)").run('pm-price',JSON.stringify({domain:'hospital',kind:'part',partCode:pf,consumerPriceRial:'500',active:true,validFrom:today}),fixtureNow,fixtureNow);
+ const modelForm=await act(manager,'profile_template',{revision:0,model:entity(aid).data.model,title:'Synthetic device form',active:true,fields:[{key:'test_spec',label:'Synthetic specification',type:'text',unit:'',min:'',max:'',required:true}]});
+ await act(manager,'technical_profile',{assetId:aid,revision:entity(aid).revision,templateId:modelForm.id,values:{test_spec:'Test only'}});
+ await act(manager,'service_kit',{revision:0,componentModel:'M',intervalHours:2000,active:true,lines:[{partCode:pf,quantity:1}]});
+ await act(manager,'components',{assetId:aid,revision:entity(aid).revision,components:[{kind:'compressor',name:'Compressor',code:'P1',model:'M',serial:'S',quantity:1,notes:'Synthetic installed component'}]});
+ const pmDraft=(await call(manager,'hospital?quotePreview='+pm.id)).d;assert.equal(pmDraft.ready,true);assert.equal(pmDraft.total,'500');
+ await act(manager,'quote',{jobId:pm.id,revision:entity(pm.id).revision,preparationToken:pmDraft.token,lines:pmDraft.lines,validUntil:today,notes:'Service scope'});
  assert.ok((await call(center,'hospital')).d.myTasks.some(t=>t.sourceId===pm.id));
  await act(center,'consent',{jobId:pm.id,revision:entity(pm.id).revision,quoteVersion:1,approved:true,notes:'Approved'});
  const pmtech=roles.find(r=>r.name===tech).memberId;

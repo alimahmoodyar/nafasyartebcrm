@@ -197,7 +197,8 @@ const legacyPrice = (id, productId, unitPrice, agentId = '') => seed(id, 'sales_
   }
   const report = await get();
   for (const user of [manager, admin]) assert.equal(assistantPolicy.assistantToolAvailable(user, 'get_sales_template_workspace'), true);
-  for (const user of [manager, staff, finance, viewer, flowExpert, external]) assert.equal(assistantPolicy.assistantToolAvailable(user, 'preview_sales_order'), true, 'Manager-only report policy must not suppress the existing quote tool');
+  for (const user of [manager, staff, finance, flowExpert, external]) assert.equal(assistantPolicy.assistantToolAvailable(user, 'preview_sales_order'), true, 'Manager-only catalog must not suppress quotes for operational roles');
+  assert.equal(assistantPolicy.assistantToolAvailable(viewer, 'preview_sales_order'), false, 'Report-only access does not authorize an operational sales quote');
   const adminReport = await get(admin);
   assert.deepEqual(adminReport, report, 'Administrator and sales manager use the same catalog');
   assert.equal(report.today, '2026-10-10');

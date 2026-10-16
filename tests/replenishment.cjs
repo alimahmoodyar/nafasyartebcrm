@@ -29,61 +29,13 @@ const actor=role=>({userId:role+'User',email:role+'@test.local',name:role,isAdmi
 async function source(mode,b={},status=200,user){const body={id:crypto.randomUUID(),mode,...(b.planId?{revision:current(b.planId).revision}:{}),...b};const go=()=>sourcing.POST(request('/api/sourcing','POST',body));const r=user?await context.run(user,go):await go(),d=await r.json();assert.equal(r.status,status,mode+': '+JSON.stringify(d));return {...d,operationId:body.id};}
 async function detail(id,user){const go=()=>sourcing.GET(request('/api/sourcing?id='+id));const r=user?await context.run(user,go):await go();assert.equal(r.status,200);return r.json();}
 (async()=>{
- identity=owner;await auth.session();
- const repl=load('lib/replenishment.ts'),api=load('app/api/replenishment/route.ts'),cal=load('lib/workflow-calendar.ts'),sync=load('lib/sourcing.ts').syncSourcingFollowups;
- const today=load('lib/duties.ts').dayAt(),later=new Date(Date.now()+2*86400000).toISOString().slice(0,10),future=new Date(Date.now()+20*86400000).toISOString().slice(0,10),now=new Date().toISOString();
- const c={...cal.defaultCalendar,holidays:['2026-10-03']};
- assert.equal(cal.addWorkingMinutes(new Date('2026-09-30T13:00:00Z'),120,c),'2026-10-04T06:00:00.000Z');
- assert.equal(cal.workingMinutes(new Date('2026-09-30T13:00:00Z'),new Date('2026-10-04T06:00:00Z'),c),120);
- assert.equal(cal.workingNow(new Date('2026-10-02T08:00:00Z'),c),false);
- assert.equal(cal.validCalendar({...c,holidays:['2026-02-30']}),false);
- assert.equal((await repl.scanReplenishment()).enabled,false);
- for(const role of Object.keys(repl.replenishmentRoles)){const a=actor(role);if(role==='qc')a.permissions.flowRoles=['qc'];sql.prepare("INSERT INTO app_members(id,email,name,unit,status,subject,permissions,revision,created,updated) VALUES(?,?,?,'test','active',?,?,1,?,?)").run(a.userId,a.email,a.name,a.userId,JSON.stringify(a.permissions),now,now);}
- async function config(policy,revision,status=200,user){const fn=()=>api.POST(request('/api/replenishment','POST',{mode:'policy',confirmed:true,revision,policy}));const r=user?await context.run(user,fn):await fn();assert.equal(r.status,status,await r.text());}
- const policy={...repl.defaultPolicy,enabled:true,owners:Object.fromEntries(Object.keys(repl.replenishmentRoles).map(r=>[r,r+'User'])),supervisor:'ceoUser'};
- await config(policy,0,403,actor('inventory'));await config({...policy,owners:{}},0,400);await config(policy,0);await config(policy,0,409);
- await op('material',{code:'91',name:'Auto part',unit:'عدد',specs:'V1',defaultLocation:'A-1-1-1',reorderPoint:'4',targetStock:'6',fields:[{key:'purity',label:'Purity',type:'number',min:'90',max:'96',unit:'%',required:true}],qcOwner:'qcUser',warehouseOwner:'inventoryUser',procurementOwner:'',revision:0});
- let material=entities('material')[0];await source('routes',{materialId:material.id,revision:material.revision,routes:['domestic','foreign']});material=entities('material')[0];
- assert.equal((await repl.shortageSnapshot(material)).proposed,6000);
- await Promise.all([repl.scanReplenishment(),repl.scanReplenishment()]);await sync();
- assert.equal(entities('sourcing_plan').length,1);const pid=entities('sourcing_plan')[0].id;
- let tasks=sql.prepare("SELECT * FROM duty_runs WHERE state='open'").all();assert.equal(tasks.length,1);assert.equal(tasks[0].assignee,'inventoryUser');
- const tasksApi=load('app/api/tasks/route.ts');const manual=await tasksApi.POST(request('/api/tasks','POST',{id:crypto.randomUUID(),mode:'submit',taskId:tasks[0].id,revision:tasks[0].revision,note:'pretend complete'}));assert.equal(manual.status,400);
- await assert.rejects(()=>load('lib/duties.ts').taskAccess(tasks[0].id,{...actor('inventory'),permissions:{supplyRoles:[],flowRoles:[],warehouses:[]}}),/دسترسی/);
- await source('stock_confirm',{planId:pid,quantity:'6',needBy:future,notes:'confirmed'},403,actor('sales'));
- await source('stock_reject',{planId:pid,notes:'Count not reliable yet'},200,actor('inventory'));await repl.scanReplenishment();assert.equal(current(pid).data.state,'stock_rejected');
- // Changed reorder target is a fresh inventory snapshot, so rejected need is revisited.
- sql.prepare("UPDATE flow_entities SET data=json_set(data,'$.targetStock',7000),revision=revision+1 WHERE id=?").run(material.id);
- await repl.scanReplenishment();assert.equal(current(pid).data.state,'stock_check');
- await source('stock_confirm',{planId:pid,quantity:'6',needBy:future,notes:'physical count checked'},200,actor('inventory'));assert.equal(current(pid).data.lines[0].required,6000);
- await source('finish_replenishment',{planId:pid,notes:'too early'},400,actor('inventory'));
- const quote={planId:pid,partCode:'91',supplier:'Domestic',unitPrice:'10',currency:'IRR',fxRate:'1',fxDate:today,fxSource:'rate',extrasRial:'0',costNotes:'included',eta:later,validUntil:future,paymentTerms:'cash',specs:'V1',reference:'Q1',unavailable:false};
- const qd=(await source('quote',{...quote,route:'domestic'},200,actor('domestic'))).operationId;
- await source('award',{planId:pid,partCode:'91',quoteId:qd,notes:'only one quote'},400,actor('ceo'));
- await source('quote',{...quote,route:'foreign',unavailable:true,reason:'not available'},200,actor('foreign'));
- await source('technical',{planId:pid,quoteId:qd,quoteRevision:entities('sourcing_quote')[0].revision,result:'pass',notes:'matches spec'},200,actor('engineering'));
- const order=(await source('award',{planId:pid,partCode:'91',quoteId:qd,notes:'only available approved route'},200,actor('ceo'))).operationId;
- await source('finance',{planId:pid,status:'approved',budgetRial:'100',availableOn:today,notes:'budget'},200,actor('finance'));
- await source('issue_order',{planId:pid,orderId:order,reference:'F1'},200,actor('finance'));
- await repl.scanReplenishment();assert.equal(entities('sourcing_plan').length,1);
- await source('receive',{planId:pid,orderId:order,day:today,quantity:'6',notes:'arrived'},200,actor('inventory'));
- let arrival=entities('receipt')[0];await sync();assert.ok(sql.prepare("SELECT 1 FROM duty_runs WHERE assignee='qcUser' AND state='open'").get());
- await source('finish_replenishment',{planId:pid,notes:'quarantine is not stock'},400,actor('inventory'));
- await op('incoming_qc',{receiptId:arrival.id,accepted:'5',rejected:'1',values:{purity:'93'},notes:'one failure'});await sync();assert.ok(sql.prepare("SELECT 1 FROM duty_runs WHERE assignee='inventoryUser' AND template_id LIKE '%shelve:%' AND state='open'").get());
- await source('finish_replenishment',{planId:pid,notes:'not shelved'},400,actor('inventory'));await op('shelve',{receiptId:arrival.id,location:'A-1-1-1'});
- await source('close_order',{planId:pid,orderId:order,notes:'partial'},400,actor('inventory'));
- await source('receive',{planId:pid,orderId:order,day:today,quantity:'1',notes:'replacement'},200,actor('inventory'));
- arrival=entities('receipt').find(r=>r.data.state==='pending_qc');await op('incoming_qc',{receiptId:arrival.id,accepted:'1',rejected:'0',values:{purity:'93'},notes:'pass'});await op('shelve',{receiptId:arrival.id,location:'A-1-1-2'});
- await source('close_order',{planId:pid,orderId:order,notes:'complete'},200,actor('inventory'));
- const before=sql.prepare("SELECT SUM(quantity) n FROM inventory_balances WHERE warehouse='raw'").get().n;
- await source('finish_replenishment',{planId:pid,notes:'all received and accepted'},200,actor('inventory'));
- assert.equal(current(pid).data.state,'completed');assert.equal(sql.prepare('SELECT COUNT(*) n FROM sourcing_holds WHERE plan_id=?').get(pid).n,0);assert.equal(sql.prepare("SELECT SUM(quantity) n FROM inventory_balances WHERE warehouse='raw'").get().n,before);
- await repl.scanReplenishment();assert.equal(entities('sourcing_plan').length,1);
- // Work-hour reminders deduplicate and never send on weekends.
- const task=tasks[0],due='2026-10-03T05:30:00.000Z';task.due=due;task.data=JSON.stringify({...JSON.parse(task.data),calendar:cal.defaultCalendar});
- assert.equal(repl.replenishmentNotices(task,new Date('2026-10-02T08:00:00Z')).length,0);
- const at=new Date('2026-10-03T08:00:00Z');await db.batch(repl.replenishmentNotices(task,at));const count=sql.prepare('SELECT COUNT(*) n FROM duty_notices').get().n;await db.batch(repl.replenishmentNotices(task,at));assert.equal(sql.prepare('SELECT COUNT(*) n FROM duty_notices').get().n,count);
- const reset=load('lib/reset-contract.ts');for(const scope of ['operations','full']){const where=reset.resetWhere('flow_entities',scope);assert.ok(sql.prepare('SELECT 1 FROM flow_entities WHERE id=? AND '+where).get('replenishment-policy'));}
- // Existing generic freeze trigger also protects new policy entities.
- console.log('Replenishment passed: work calendar, policy authorization/CAS, concurrent deduplication, rejection/reopen, single accountable owner, dual RFQ, partial QC and replacement, completion releases holds without double stock, quiet hours and reminder deduplication, reset scope.');
-})().catch(e=>{console.error(e);process.exit(1)});
+ identity=owner;await auth.session();const repl=load('lib/replenishment.ts'),api=load('app/api/replenishment/route.ts'),cal=load('lib/workflow-calendar.ts'),now=new Date().toISOString();
+ const seed=(id,type,data)=>sql.prepare('INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?)').run(id,type,JSON.stringify(data),now,now);
+ seed('material:91','material',{code:'91',name:'Historical target',unit:'عدد',targetStock:999999,reorderPoint:999999,fields:[]});seed('replenishment-policy','replenishment_policy',{...repl.defaultPolicy,enabled:true});
+ assert.deepEqual(JSON.parse(JSON.stringify(await repl.scanReplenishment())).created,0);assert.equal((await repl.scanReplenishment()).enabled,false);assert.equal((await repl.shortageSnapshot({id:'material:91',data:{code:'91',unit:'عدد',targetStock:999999,reorderPoint:999999}})).proposed,0);assert.equal(entities('sourcing_plan').length,0);
+ const denied=await api.POST(request('/api/replenishment','POST',{mode:'policy',confirmed:true,revision:1,policy:{...repl.defaultPolicy,enabled:true}}));assert.equal(denied.status,400);
+ seed('historical-case','sourcing_plan',{origin:'replenishment',state:'stock_rejected',materialId:'material:91',lines:[],history:[]});await repl.scanReplenishment();assert.equal(entities('sourcing_plan').length,1);assert.equal(current('historical-case').data.state,'stock_rejected');
+ const scan=await api.POST(request('/api/replenishment','POST',{mode:'scan'}));assert.equal(scan.status,200);assert.equal((await scan.json()).created,0);
+ const reset=load('lib/reset-contract.ts');assert.ok(sql.prepare("SELECT 1 FROM flow_entities WHERE id='historical-case' AND "+reset.resetWhere('flow_entities','operations')).get());
+ console.log('PASS retired target-stock procurement: old large targets and enabled policy create no cases, no suggested independent quantity, enabling denied, existing cases retained, reset coverage.');
+})().catch(e=>{console.error(e);process.exitCode=1});

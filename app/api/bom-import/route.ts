@@ -50,7 +50,7 @@ export async function POST(request:Request){try{
  for(let i=0;i<lines.length;i++){
   const l=lines[i],m=materials[i],mid='material:'+l.partCode;
   checks.push(m?db.prepare('UPDATE inventory_operations SET guard=CASE WHEN EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=? AND data=?) THEN 1 ELSE 0 END WHERE id=?').bind(mid,m.revision,m.data,b.id):db.prepare('UPDATE inventory_operations SET guard=CASE WHEN NOT EXISTS(SELECT 1 FROM flow_entities WHERE id=?) THEN 1 ELSE 0 END WHERE id=?').bind(mid,b.id));
-  if(!m)writes.push(db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'material',?,1,?,?)").bind(mid,JSON.stringify({code:l.partCode,name:l.name,unit:l.unit,specs:'',defaultLocation:'',reorderPoint:0,targetStock:0,fields:[],qcOwner:'',warehouseOwner:'',procurementOwner:'',importSource:source,qcSetupRequired:true}),now,now));
+  if(!m)writes.push(db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'material',?,1,?,?)").bind(mid,JSON.stringify({code:l.partCode,name:l.name,unit:l.unit,specs:'',fields:[],importSource:source,qcSetupRequired:true}),now,now));
  }
  writes.push(db.prepare('INSERT INTO bom_versions(id,product_id,version,lines,created,actor) VALUES(?,?,?,?,?,?)').bind(b.id,product.id,b.previousVersion+1,JSON.stringify(lines),now,u.userId),db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,product.id,'bom_import',JSON.stringify({source,version:b.previousVersion+1,lines,newCodes}),now));
  await db.batch([...checks,...writes]);return json({saved:true,version:b.previousVersion+1,createdMaterials:newCodes.length});

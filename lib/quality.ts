@@ -9,6 +9,17 @@ export function qualityFields(input:unknown):QField[]{
  const min=asciiDigits(f.min).trim(),max=asciiDigits(f.max).trim();if(f.type==='number'&&[min,max].some(v=>v!==''&&!Number.isFinite(Number(v))))throw new Error('حدود پذیرش باید عدد باشند.');if(f.type==='number'&&min!==''&&max!==''&&Number(min)>Number(max))throw new Error('حد پایین نمی‌تواند از حد بالا بیشتر باشد.');
  return {key,label,type:f.type,unit:f.type==='number'?f.unit.trim():'',min:f.type==='number'?min:'',max:f.type==='number'?max:'',required:f.required};});
 }
+/** Only material criteria allow omitted identities; old receipt snapshots keep their own keys. */
+export function materialQualityFields(input:unknown):QField[]{
+ if(!Array.isArray(input))return qualityFields(input);
+ const reserved=new Set(input.filter(f=>f&&typeof f.key==='string').map(f=>f.key.trim()));
+ return qualityFields(input.map(f=>{
+  if(!f||typeof f!=='object'||Array.isArray(f))return f;
+  if(f.key!==undefined&&(typeof f.key!=='string'||f.key.trim()))return f;
+  let key:string;do{key='check_'+crypto.randomUUID().replace(/-/g,'');}while(reserved.has(key));reserved.add(key);
+  return {...f,key};
+ }));
+}
 export function qualityValues(fields:QField[],input:unknown){if(!input||typeof input!=='object'||Array.isArray(input))throw new Error('مقادیر فرم معتبر نیست.');const raw=input as Record<string,unknown>,values:Record<string,string>={};let failed=false;
  if(Object.keys(raw).some(k=>!fields.some(f=>f.key===k)))throw new Error('معیار خارج از فرم ارسال شده است.');
  for(const f of fields){const v=raw[f.key]??'';if(typeof v!=='string'||v.length>2000)throw new Error('مقدار معیار معتبر نیست.');let value=v.trim();if(f.required&&!value)throw new Error(f.label+' الزامی است.');

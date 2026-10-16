@@ -1,5 +1,5 @@
 "use client";
-import {Fragment,isValidElement,createContext,useCallback,useContext,useEffect,useLayoutEffect,useMemo,useRef,useState,type ReactNode,type ReactElement,type CSSProperties} from 'react';
+import {Fragment,isValidElement,cloneElement,createContext,useCallback,useContext,useEffect,useLayoutEffect,useMemo,useRef,useState,type ReactNode,type ReactElement,type CSSProperties} from 'react';
 import {ArrowRight,Boxes,ClipboardList,FileText,Users,Settings2,ChartNoAxesCombined,Wallet,Truck,Wrench,Factory,CalendarDays,BookOpen,Mail,ShieldCheck,type LucideIcon} from 'lucide-react';
 import {PersonalHome} from './personal-home';
 import {createPortal} from 'react-dom';
@@ -94,12 +94,21 @@ export function IconSections({scope,title='برنامه‌های این بخش',
 
 function menuText(value:ReactNode):string{if(typeof value==='string'||typeof value==='number')return String(value);if(Array.isArray(value))return value.map(menuText).join('');if(isValidElement<{children?:ReactNode}>(value))return menuText(value.props.children);return '';}
 function menuChildren(value:ReactNode):ReactNode[]{return (Array.isArray(value)?value:[value]).flatMap(child=>Array.isArray(child)?menuChildren(child):isValidElement<{children?:ReactNode}>(child)&&child.type===Fragment?menuChildren(child.props.children):[child]);}
-export function IconActions({scope,children,className='tools'}:{scope:string;children:ReactNode;className?:string}){
+export function IconActions({scope,children,className='tools',inline=false}:{scope:string;children:ReactNode;className?:string;inline?:boolean}){
  const accountId=useContext(AccountContext),path=useContext(ProgramPathContext),nodes=menuChildren(children);
+ if(inline){
+  const visible=nodes.filter(node=>node!==null&&node!==undefined&&node!==false);
+  if(!visible.length)return null;
+  return <div className={className+' inline-icon-actions'}>{visible.map((node,index)=>{
+   if(!isValidElement<any>(node)||node.type!=='button')return node;
+   const control=node as ReactElement<any>,Icon=subprogramIcon(String(control.key||''),menuText(control.props.children));
+   return cloneElement(control,{key:control.key??index,type:control.props.type||'button',title:control.props.title||menuText(control.props.children)},<><Icon size={18} aria-hidden="true"/><span>{control.props.children}</span></>);
+  })}</div>;
+ }
  const actions=nodes.filter((n):n is ReactElement<any>=>isValidElement(n)&&n.type==='button');
  if(!accountId||!actions.length)return <div className={className}>{children}</div>;
  const extra=nodes.filter(n=>n!==null&&n!==undefined&&n!==false&&(!isValidElement(n)||n.type!=='button'));
  const counts=new Map<string,number>();const apps=actions.map(control=>{const title=menuText(control.props.children).trim()||control.props['aria-label']||'باز کردن',base=String(control.key||title),index=counts.get(base)||0;counts.set(base,index+1);return {key:base+':'+index,title,icon:subprogramIcon(base,title),control}});
  return <div className="icon-actions">{extra.length>0&&<div className={className}>{extra}</div>}<PersonalHome key={accountId+path+scope} accountId={accountId} name="" scope={path+'/'+scope} title="ابزارهای این بخش" greeting={false} shortTitles={false} compact apps={apps} onNavigate={()=>{}}/></div>;
 }
-export function IconDisclosure({scope,title,children,className,style}:{scope:string;title:ReactNode;children:ReactNode;className?:string;style?:CSSProperties}){return <div className={className} style={style}><IconSections scope={scope} title={menuText(title).trim()} items={[{key:'content',title:menuText(title).trim(),content:<>{children}</>}]}/></div>;}
+export function IconDisclosure({scope,title,children,className,style,inline=false}:{scope:string;title:ReactNode;children:ReactNode;className?:string;style?:CSSProperties;inline?:boolean}){if(inline)return <details className={'inline-icon-disclosure '+(className||'')} style={style}><summary>{title}</summary>{children}</details>;return <div className={className} style={style}><IconSections scope={scope} title={menuText(title).trim()} items={[{key:'content',title:menuText(title).trim(),content:<>{children}</>}]}/></div>;}
