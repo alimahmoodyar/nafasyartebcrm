@@ -1,3 +1,4 @@
+import {salesRoles as salesPermissionTitles} from './sales-contract';
 import {materialUnitLabels} from './material-units';
 import {jobRoles} from './permissions';
 import {supplyRoles} from './sourcing-labels';
@@ -1568,3 +1569,14 @@ toolOptions.sales_apply.serviceDomain={home:'خدمات خانگی',hospital:'خ
 toolOptions.get_representative_locations={workspace:{sales:'نمایندگی فروش',home:'خدمات خانگی',hospital:'خدمات بیمارستانی'},domain:{home:'خدمات خانگی',hospital:'خدمات بیمارستانی'}};
 for(const name of ["create_user","create_password_user","update_user","update_password_user"])toolOptions[name]["permissions.manualPrograms.*"]["build-intake"]="مشخصات سفارش ساخت";
 toolOptions.apply_qms_record["data.formPurpose"]={quality:"فرم داخلی کیفیت",customer_order:"مشخصات سفارش مشتری"};
+
+for(const name of ['create_user','create_password_user','update_user','update_password_user'])if(toolOptions[name])toolOptions[name]['permissions.salesRoles.*']=salesPermissionTitles;
+toolOptions.register_hospital_installation={'installation.contractStatus':{'':'نامشخص',yes:'دارای قرارداد',no:'بدون قرارداد'}};
+toolOptions.save_hospital_profile_template={'fields.*.type':{text:'متن',number:'عدد'}};
+toolOptions.preview_sales_bank_file={unit:{IRR:'ریال',IRT:'تومان'},profile:{auto:'تشخیص خودکار ستون‌ها',manual:'انتخاب دستی ستون‌ها'}};
+toolOptions.get_record_schema={...toolOptions.get_record_schema,productionMode:{routine:'تولید روتین خانگی',project:'ساخت سفارشی بیمارستانی'}};
+
+toolOptions.register_hospital_installation={...toolOptions.register_hospital_installation,'installation.warrantyStatus':{yes:'دارد',no:'ندارد'},'installations.*.warrantyStatus':{yes:'دارد',no:'ندارد'},'installations.*.contractStatus':{'':'نامشخص',yes:'دارد',no:'ندارد'}};
+toolOptions.save_hospital_service_contract={contractStatus:{yes:'دارد',no:'ندارد'}};
+
+toolOptions.save_material_warehouse={};

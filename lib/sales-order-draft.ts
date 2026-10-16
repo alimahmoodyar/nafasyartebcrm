@@ -20,7 +20,7 @@ export async function prepareSalesOrderArgs(u:Session,args:any){
  if(args.mode!=='order')return args;
  const quote=await salesOrderDraft(u,args);
  if(args.quoteHash&&args.quoteHash!==quote.quoteHash)salesFail('قیمت یا شرایط فروش تغییر کرده است؛ خلاصه جدید را بررسی و دوباره آماده کنید.',409);
- salesSubmission(u,args.agentId,args.requestSource,new Date().toISOString());
+ salesSubmission(u,args.agentId,args.requestSource,new Date().toISOString(),false);
  return {...args,quoteHash:quote.quoteHash};
 }
 

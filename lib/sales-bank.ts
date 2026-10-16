@@ -12,6 +12,7 @@ import {dayAt} from './duties';
 import {allocationPlan} from './sales-network-contract';
 import {salesBankModes,MAX_SALES_BANK_BYTES,bankCode,normalizeBankRows,bankRowIdentity,bankMatch} from './sales-bank-contract';
 import {parseSalesBankRows} from './sales-bank-import';
+import {bankWorkbookFormat,readBankWorkbook,detectBankReport,extractBankReport} from './sales-bank-workbook';
 
 export async function salesBankRoles(actor:Session){
  if(trainingContext.getStore())fail('تطبیق بانکی فقط در اطلاعات شرکت اجرا می‌شود.',403);
@@ -32,11 +33,28 @@ export async function readSalesBank(actor:Session){
  return {today:dayAt(),roles:{manage:roles.manage,bank:roles.bank},agents:all.filter(a=>a.type==='sales_agent'&&a.data.kind!=='referrer').map(minimalAgent),accounts:all.filter(approvedAccount).map(a=>accountPublic(a,roles.bank)),terminals:all.filter(r=>r.type==='sales_bank_terminal'),...(roles.bank?{statements:all.filter(r=>r.type==='sales_bank_statement').map(statementPublic),rows:all.filter(r=>r.type==='sales_bank_row').map(r=>({...r,assessment:bankMatch(r,all)})),payments:all.filter(r=>r.type==='sales_payment'&&r.data.method==='bank'&&r.data.state==='pending').map(r=>({id:r.id,revision:r.revision,data:{agentId:r.data.agentId,day:r.data.day,amount:r.data.amount,reference:r.data.reference,receivingAccountId:r.data.receivingAccountId||'',state:r.data.state}}))}: {})};
 }
 function originalBytes(b:any){
- const filename=sreq(b.filename,180);if(!/\.xlsx$/i.test(filename)||/[\x00-\x1f\x7f/\\]/.test(filename))fail('فایل اصلی اکسل با پسوند XLSX انتخاب کنید.');
+ const filename=sreq(b.filename,180);
  if(typeof b.contentBase64!=='string'||!b.contentBase64.length||b.contentBase64.length>Math.ceil(MAX_SALES_BANK_BYTES/3)*4||! /^[A-Za-z0-9+/]*={0,2}$/.test(b.contentBase64))fail('فایل اصلی اکسل باید غیرخالی و حداکثر ۱۰ مگابایت باشد.');
  let binary:string;try{binary=atob(b.contentBase64);}catch{return fail('فایل اکسل قابل خواندن نیست.');}
- const bytes=Uint8Array.from(binary,c=>c.charCodeAt(0));if(!bytes.length||bytes.length>MAX_SALES_BANK_BYTES||bytes[0]!==80||bytes[1]!==75||bytes[2]!==3||bytes[3]!==4)fail('فایل اصلی XLSX معتبر لازم است.');
- return {filename,bytes};
+ const bytes=Uint8Array.from(binary,c=>c.charCodeAt(0));let format:'xls'|'xlsx';try{format=bankWorkbookFormat(filename,bytes);}catch(e){return fail((e as Error).message);}
+ return {filename,bytes,format};
+}
+async function parseOriginal(b:any){
+ const file=originalBytes(b);
+ try{
+  const sheets=await readBankWorkbook(file.filename,file.bytes),sheet=b.sheet==null?sheets[0]:typeof b.sheet==='number'?sheets[b.sheet-1]:sheets.find(s=>s.sheet===b.sheet);
+  if(!sheet)throw Error('برگه انتخاب‌شده در فایل وجود ندارد.');
+  const detection=detectBankReport(sheet.data);
+  if(b.profile!=null&&!['auto','manual'].includes(b.profile))throw Error('روش خواندن فایل معتبر نیست.');
+  const report=detection.kind==='pos'||b.profile==='auto'?await extractBankReport(sheet.data,b.unit,detection,b.range):{kind:'statement' as const,...parseSalesBankRows(sheet.data,b.mapping),excluded:[],summary:null,headerRow:0};
+  if(report.kind==='pos'&&report.rows.some(r=>r.day>dayAt()||r.financialDay>dayAt()))throw Error('تاریخ تراکنش یا تسویه پوز در آینده نباشد.');
+  return {file,sheet:sheet.sheet,report};
+ }catch(e){fail('خواندن ردیف‌های فایل اصلی اکسل انجام نشد: '+stxt(e instanceof Error?e.message:'قالب فایل معتبر نیست.',500));}
+}
+/** Preview never saves files, clears claims, allocates debt or changes permissions. */
+export async function previewSalesBank(actor:Session,b:any){
+ const roles=await salesBankRoles(actor);if(!roles.bank)fail('مجوز خواندن گردش بانک لازم است.',403);
+ const parsed=await parseOriginal(b);if(parsed!.report.kind==='statement')parsed!.report.rows=normalizeBankRows(parsed!.report.rows);return {...parsed!.report,filename:parsed!.file.filename,sheet:parsed!.sheet,sha256:await sha256(parsed!.file.bytes)};
 }
 export async function applySalesBank(actor:Session,b:any){
  const roles=await salesBankRoles(actor),{u,members}=roles,db=storage(),now=new Date().toISOString(),today=dayAt();
@@ -67,18 +85,18 @@ export async function applySalesBank(actor:Session,b:any){
   if(b.active&&all.some(r=>r.type==='sales_bank_terminal'&&r.id!==old?.id&&r.data.active&&r.data.accountId===a.id&&bankCode(r.data.terminalCode)===bankCode(terminalCode)&&bankCode(r.data.provider)===bankCode(provider)&&r.data.validFrom<=(validTo||'9999-12-31')&&(!r.data.validTo||r.data.validTo>=validFrom)))fail('این ترمینال در بازه انتخاب‌شده اتصال فعال دیگری دارد.',409);
   target=old?.id||b.id;put(target,'sales_bank_terminal',{terminalCode,provider,accountId:a.id,agentId,validFrom,validTo,active:b.active,notes:stxt(b.notes??'',2000)},old);
  }else if(b.mode==='import'){
-  const a=account(sreq(b.accountId)),file=originalBytes(b);let parsed:any[];
-  try{const {readSheet}=await import('read-excel-file/universal');const grid=await readSheet(file.bytes.buffer,b.sheet||1,{parseNumber:value=>({excelNumber:value})});parsed=parseSalesBankRows(grid,b.mapping).rows;}catch(e){fail('خواندن ردیف‌های فایل اصلی اکسل انجام نشد: '+stxt(e instanceof Error?e.message:'قالب فایل معتبر نیست.',500));}
-  const entries=normalizeBankRows(parsed!),preview=normalizeBankRows(b.rows);
+  const a=account(sreq(b.accountId)),parsed=await parseOriginal(b),file=parsed!.file;
+  if(parsed!.report.kind!=='statement')fail('گزارش تراکنش پوز گردش حساب بانک نیست؛ فقط پیش‌نمایش آن مجاز است و وصول ایجاد نمی‌کند.');
+  const entries=normalizeBankRows(parsed!.report.rows),preview=normalizeBankRows(b.rows);
   if(JSON.stringify(entries)!==JSON.stringify(preview))fail('پیش‌نمایش با ردیف‌های فایل اصلی یکسان نیست؛ فایل را دوباره بخوانید و تأیید کنید.',409);
   const hash=await sha256(file.bytes),ids=new Set(all.filter(r=>r.type==='sales_bank_row'&&r.data.accountId===a.id).map(r=>r.data.bankId));
   for(const [i,d] of entries.entries()){
    if(ids.has(d.bankId)){const existing=all.find(r=>r.type==='sales_bank_row'&&r.data.accountId===a.id&&r.data.bankId===d.bankId)!;if(bankRowIdentity(existing.data)!==bankRowIdentity(d))fail('ردیف بانک با همین شناسه قبلاً با اطلاعات متفاوت وارد شده است: '+d.bankId,409);skipped++;continue;}
    const row=put(b.id+':row:'+i,'sales_bank_row',{...d,accountId:a.id,statementId:b.id,status:d.direction==='in'?'pending':'ignored'});importedIds.push(row.id);imported++;
   }
-  objectKey='private/sales-bank/'+b.id+'/'+crypto.randomUUID()+'/'+hash+'.xlsx';
-  put(b.id,'sales_bank_statement',{accountId:a.id,currency:'IRR',filename:file.filename,sha256:hash,byteSize:file.bytes.byteLength,objectKey,rowCount:entries.length,imported,skipped,from:entries.map(r=>r.day).sort()[0],to:entries.map(r=>r.day).sort().at(-1),actor:u.userId,mapping:b.mapping});
-  await firmwareBucket().put(objectKey,file.bytes.buffer,{httpMetadata:{contentType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'},customMetadata:{sha256:hash,filename:file.filename}});
+  objectKey='private/sales-bank/'+b.id+'/'+crypto.randomUUID()+'/'+hash+'.'+file.format;
+  put(b.id,'sales_bank_statement',{accountId:a.id,currency:'IRR',filename:file.filename,sha256:hash,byteSize:file.bytes.byteLength,objectKey,rowCount:entries.length,imported,skipped,from:entries.map(r=>r.day).sort()[0],to:entries.map(r=>r.day).sort().at(-1),actor:u.userId,mapping:b.mapping,profile:b.profile||'manual',unit:b.unit||b.mapping?.unit,range:b.range});
+  await firmwareBucket().put(objectKey,file.bytes.buffer,{httpMetadata:{contentType:file.format==='xls'?'application/vnd.ms-excel':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'},customMetadata:{sha256:hash,filename:file.filename}});
  }else if(b.mode==='reverse'){
   const row=all.find(r=>r.type==='sales_bank_row'&&r.id===b.rowId);if(!row)fail('ردیف بانک پیدا نشد.',404);if(row.revision!==b.revision)fail('نسخه ردیف تغییر کرده؛ تازه‌سازی کنید.',409);
   if(row.data.status!=='matched')fail('فقط ردیف تطبیق‌شده قابل برگشت است.');

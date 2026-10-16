@@ -1,5 +1,5 @@
 import {formPresentation} from './assistant-form-presentation';
-import {fields,names,type Kind} from './model';
+import {fields,recordFields,names,type Kind} from './model';
 // Shared UI draft contract. Drafts never execute a business operation.
 export type OperationChoice={key:string;tool:string;title:string;section:string;args:Record<string,string>};
 export type OperationForm={choices?:OperationChoice[];tool:string;section:string;title:string;args:Record<string,any>;schema:any;actionId?:string;state?:string;result?:any;preview?:any;previewError?:string};
@@ -12,10 +12,11 @@ export function cleanFormArgs(value:any,depth=0):any{
 }
 export function operationForm(tool:any,args:any,section:string,title:string):OperationForm{
  if(!args||typeof args!=='object'||Array.isArray(args)||JSON.stringify(args).length>16000)throw new Error('اطلاعات فرم معتبر نیست.');
+ if(tool.name==='save_material_master'){args={revision:0,code:'',name:'',unit:'عدد',specs:'',fields:[],...args};for(const k of ['defaultLocation','reorderPoint','targetStock','qcOwner','warehouseOwner','procurementOwner'])delete args[k];}
  if(tool.name==='sales_apply'&&args.mode==='agent'&&!args.agentId&&args.active===undefined)args={...args,active:true};
  if(tool.name==='guarantee_apply'&&args.mode==='save'&&!args.guaranteeId&&args.originalLocation===undefined)args={...args,originalLocation:'زونکن اسناد مالی'};
  const schema:any={...tool.inputSchema,properties:Object.fromEntries(Object.entries(tool.inputSchema.properties||{}).filter(([k])=>!secret.test(k)&&k!=='confirmed')),required:(tool.inputSchema.required||[]).filter((k:string)=>!secret.test(k)&&!['confirmed','id','requestId'].includes(k))};
- if(['create_record','update_record'].includes(tool.name)&&fields[args.kind as Kind]){const fs=fields[args.kind as Kind].filter(f=>f.type!=='snapshot');schema.properties.data={type:'object',properties:Object.fromEntries(fs.map(f=>[f.key,{type:'string',title:f.label,...(f.options?{enum:f.options,...(f.optionLabels?{enumLabels:f.optionLabels}:{})}:{})}])),required:fs.filter(f=>f.required).map(f=>f.key)};}
+ if(['create_record','update_record'].includes(tool.name)&&fields[args.kind as Kind]){const fs=recordFields(args.kind as Kind,args.data||{}).filter(f=>f.type!=='snapshot');schema.properties.data={type:'object',properties:Object.fromEntries(fs.map(f=>[f.key,{type:'string',title:f.label,...(f.options?{enum:f.options,...(f.optionLabels?{enumLabels:f.optionLabels}:{})}:{})}])),required:fs.filter(f=>f.required).map(f=>f.key)};}
  return {tool:tool.name,section,...formPresentation(tool.name,cleanFormArgs(args),schema,title),args:cleanFormArgs(args)};
 }
 
@@ -24,8 +25,33 @@ export function requestsBuyerAssignment(message:string){
  return /(خریدار|نماینده|نمایندگی|عامل|فروش)/.test(text)&&/(تخصیص|واگذاری?|ارجاع|تعیین\s+(?:کارشناس|مسئول)|(?:تغییر|عوض)\s+(?:کارشناس|مسئول)|(?:کارشناس|مسئول).*?(?:تغییر|عوض))/.test(text)&&!/(لغو|منصرف|تخصیص نده|واگذار نکن|ارجاع نده)/.test(text);
 }
 // Opening a requested draft must not depend on the model calling a display tool.
+export function requestsProductDefinitionForm(message:string){
+ const text=message.replace(/ي/g,'ی').replace(/ك/g,'ک').replace(/\u200c/g,' ');
+ return /(?:فرم|صفحه|کادر|پنجره)\s*(?:تعریف|ایجاد|ثبت)\s*محصول|(?:فرم|صفحه|کادر|پنجره)\s*محصول(?:ات)?\s*جدید/.test(text)&&!/(لغو|منصرف|نساز|ایجاد نکن|ثبت نکن|حذف)/.test(text);
+}
+export function requestsMaterialDefinitionForm(message:string){
+ const text=message.replace(/ي/g,'ی').replace(/ك/g,'ک').replace(/\u200c/g,' ');
+ return /(?:تعریف|ایجاد|ثبت)\s*(?:کالا|ماده\s+اولیه|مواد\s+اولیه|قطعه|قطعات\s+مصرفی)|(?:فرم|صفحه|کادر|پنجره)\s*(?:کالا|ماده\s+اولیه|مواد\s+اولیه|قطعه)\s*جدید/.test(text)&&!/(لغو|منصرف|نساز|ایجاد نکن|ثبت نکن|حذف)/.test(text);
+}
+export function requestsFormDisplay(message:string){
+ const text=message.replace(/\u200c/g,' ');
+ return (/(فرم|صفحه|کادر|پنجره)/.test(text)||requestsMaterialDefinitionForm(message))&&/(بیار|بیاور|باز کن|باز بکن|باز کنید|نمایش|نشان)/.test(text)&&!/(?:ثبت|ذخیره|اجرا|تکمیل|ویرایش|حذف|تأیید|تایید)\s*(?:کن|بکن|کنید)|تأیید اجرا|تایید اجرا/.test(text);
+}
 export function requestedOperationForm(message:string,previous:any,available:any[]):OperationForm|undefined{
  const text=message.replace(/[ي]/g,'ی').replace(/[ك]/g,'ک').replace(/\u200c/g,' ');
+ if(requestsMaterialDefinitionForm(message)){
+  const tool=available.find(t=>t.name==='save_material_master'&&t.write);if(!tool)return;
+  const same=previous?.tool===tool.name&&!previous.actionId&&!previous.state&&!previous.args?.revision&&!/(جدید|از اول|خالی)/.test(text);
+  return operationForm(tool,same?previous.args:{revision:0},'flow','تعریف کالا');
+ }
+ if(requestsProductDefinitionForm(message)){
+  const tool=available.find(t=>t.name==='create_record'&&t.write&&t.inputSchema.properties?.kind?.enum?.includes('product'));
+  if(!tool)return;
+  const same=previous?.tool===tool.name&&previous.args?.kind==='product'&&!/(جدید|از اول|خالی)/.test(text);
+  const form=operationForm(tool,same?previous.args:{kind:'product',data:{}},'product','تعریف محصول');
+  form.schema.properties.kind={...form.schema.properties.kind,enum:['product'],readOnly:true,uiHidden:true};
+  return form;
+ }
  if(requestsBuyerAssignment(message)){const tool=available.find(t=>t.name==='assign_sales_buyer'&&t.write);return tool?operationForm(tool,previous?.tool===tool.name?previous.args:{},'sales','تخصیص خریدار به کارشناس'):undefined;}
  const cancelled=/(حذف|لغو|ثبت نکن|منصرف|نساز|ایجاد نکن)/.test(text);
  const homeProduction=/(خانگی|روتین)/.test(text)&&/(سفارش|درخواست|فرم).*(تولید|ساخت)|(تولید|ساخت).*(سفارش|درخواست|فرم)/.test(text)&&!cancelled;

@@ -32,7 +32,7 @@ async function mint(scope='read'){return (await (await tokens.POST(request('/api
  const mobileGuide=await call('get_mobile_install_guide');assert.equal(mobileGuide.section,'mobile-install');assert.equal(mobileGuide.internetRequired,true);assert.equal(mobileGuide.canInstallFromChat,false);
  assert.equal((await call('get_session')).userId,'owner');assert.ok((await call('list_llm_configs')).profiles[0].hasToken);assert.ok((await call('delete_llm_config',{id,revision:2,confirmed:true})).error);
  const cal=await call('get_calendar_context',{dates:['۱۴۰۵/۰۷/۱۱','۱۴۰۴/۱۲/۳۰']});assert.equal(cal.timeZone,'Asia/Tehran');assert.equal(cal.dates[0].iso,'2026-10-03');assert.equal(cal.dates[0].persian,'1405/07/11');assert.ok(cal.dates[1].error);
- const product={code:'TEST1',name:'Test',group:'Oxygen',model:'M1',warrantyMonths:'12',status:'فعال'};
+ const product={code:'TEST1',name:'Test',group:'اکسیژن‌ساز',model:'M1',warrantyMonths:'12',status:'فعال'};
  assert.ok((await call('create_record',{kind:'product',data:product,confirmed:true})).error);assert.equal(sql.prepare('SELECT count(*) AS n FROM records').get().n,0);
  identity=owner;const write=await mint('read_write');token=write.token;identity=null;
  let made=await call('create_record',{kind:'product',data:product,confirmed:true});assert.ok(made.record?.id);const prod=made.record;

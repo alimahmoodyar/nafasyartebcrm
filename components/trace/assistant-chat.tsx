@@ -54,7 +54,7 @@ export function AssistantChat({admin,onSettings,accountId,accountName,onAccountC
  if(r.status===401||r.status===409&&d.error?.includes('حساب ورود')){setMessages([]);changed.current();return;}if(!r.ok)throw new Error(d.error);
  const check=await fetch('/api/session',{cache:'no-store'}),current=await check.json() as any;if(generation!==epoch.current)return;
  if(!check.ok||current.userId!==accountId||d.accountId!==accountId){setMessages([]);changed.current();return;}
- if(d.workspace===null)onWorkspace(null);else if(d.workspace)onWorkspace(d.workspace);else if(workspace?.actionId){const a=d.actions?.find((a:AssistantAction)=>a.id===workspace.actionId);if(a)onWorkspace({...workspace,state:a.state,result:a.result});}setActions(d.actions||[]);if(d.navigation){setCompact(true);onNavigate(d.navigation);}setMessages(m=>[...m,{role:'user',text:question},{role:'assistant',text:d.answer}]);setInput('');pending.current=null;
+ if(d.workspace===null)onWorkspace(null);else if(d.workspace)onWorkspace(d.workspace);else onWorkspace(null);setActions(d.actions||[]);if(d.navigation){setCompact(true);onNavigate(d.navigation);}setMessages(m=>[...m,{role:'user',text:question},{role:'assistant',text:d.answer}]);setInput('');pending.current=null;
  }catch(e){if(generation===epoch.current)setError(e instanceof Error?e.message:'ارسال انجام نشد.')}finally{if(generation===epoch.current)setBusy(false)}}
  async function decide(id:string,decision:'confirm'|'cancel',password?:string){
  if(busy||loading)return false;const generation=epoch.current;setBusy(true);setError('');if(decision==='confirm'){const action=actions.find(a=>a.id===id);if(action){setCompact(true);onNavigate(action.section);}}try{

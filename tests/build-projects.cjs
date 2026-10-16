@@ -21,6 +21,13 @@ member('engineer',{supplyRoles:['engineering']});member('store',{flowRoles:['inv
 entity('m1','material',{code:'11',name:'Pipe',unit:'متر'});record('prod','product',{name:'Vacuum'});record('b1','batch',{partCode:'11',unit:'متر',status:'تأیید'});entity('r1','receipt',{batchId:'b1',materialId:'m1',state:'stored',quantity:20000,accepted:20000,expiry:'',day:'2026-10-01'});stock(20000);
 sql.prepare("INSERT INTO bom_versions(id,product_id,version,lines,actor,created) VALUES('bom','prod',1,?,'owner','2026-10-01')").run(JSON.stringify([{partCode:'11',name:'Pipe',unit:'متر',quantity:'10'}]));
 const create=body('create',{title:'Hospital A',customer:'Hospital A',contract:'C1',ownerId:'engineer',due:'2026-12-01'});pid=(await post(create)).id;await post(create);await post({...create,title:'other'},409);
+// Warranty belongs to this contract; unknown is distinct from an explicit zero.
+assert.equal((await current()).data.warranty.months,null);
+await action('warranty',{warrantyMonths:''},400);await action('warranty',{warrantyMonths:false},400);
+await action('warranty',{warrantyMonths:'18'});assert.equal((await current()).data.warranty.months,18);assert.equal((await current()).data.warranty.contractNumber,'C1');
+const warrantyAdmin=user;user={userId:'engineer',name:'Engineer',isAdmin:false,permissions:{supplyRoles:['engineering']}};await action('warranty',{warrantyMonths:'24'},403);user=warrantyAdmin;
+await action('warranty',{warrantyMonths:'0'});assert.equal((await current()).data.warranty.months,0);await action('warranty',{warrantyMonths:'18'});
+const linkedData=JSON.parse(sql.prepare('SELECT data FROM flow_entities WHERE id=?').get(pid).data);sql.prepare('UPDATE flow_entities SET data=? WHERE id=?').run(JSON.stringify({...linkedData,buildIntakeId:'approved-intake'}),pid);await action('warranty',{warrantyMonths:'24'},400);sql.prepare('UPDATE flow_entities SET data=? WHERE id=?').run(JSON.stringify(linkedData),pid);
 await action('unit',{title:'Vacuum 1',bomId:'bom'});let p=await current(),u1=p.data.units[0].id,l1=p.data.units[0].lines[0].id;
 await action('request',{unitId:u1,lineId:l1,quantity:'10'},400);await action('approve_bom',{unitId:u1});await action('request',{unitId:u1,lineId:l1,quantity:'11'},400);await action('request',{unitId:u1,lineId:l1,quantity:'10'});p=await current();let req=p.data.requests[0].id;
 await action('reserve',{itemId:req,allocations:[{batchId:'b1',location:'A-B-C-D',quantity:'10'}]});assert.equal(sql.prepare("SELECT quantity FROM sourcing_holds WHERE plan_id=?").get(pid).quantity,10000);

@@ -68,14 +68,14 @@ const nw=(mode,extra={},u=manager,status=200)=>post(network,'/api/sales/network'
  assert.equal(entity(a).data.history.at(-1).actor,manager.userId);
  await get(staff,a,404);await quote(1,staff).then(()=>assert.fail('Old owner cannot quote'),e=>assert.match(e.message,/404|دسترسی/));
  const after=await get(second);assert.equal(after.agents.find(v=>v.id===a).canOperate,true);const ownedQuote=await quote(1,second);const newSale=await op('order',{agentId:a,items:[{productId:'product',quantity:1}],quoteHash:ownedQuote.quoteHash,requestSource:{channel:'phone',contactName:'Actual buyer',day:today,reference:'TEST-CALL'}},second);assert.equal(entity(newSale.body.id).data.agentId,a,'New owner registers an actual sale');
- const readonly=await get(viewer);assert.equal(readonly.agents.find(v=>v.id===a).canOperate,false);
+ const readonly=await get(viewer);assert.ok(!readonly.agents.some(v=>v.id===a),'A viewer must not see a buyer assigned to someone else');
  await assign(manager,{revision:1},409);
  // An assignee disabled after validation must roll back the ownership change.
  const oldBatch=db.batch;db.batch=async stmts=>{db.batch=oldBatch;sql.prepare("UPDATE app_members SET status='disabled' WHERE id='staff'").run();return oldBatch(stmts);};
  const raceId=crypto.randomUUID();await assign(manager,{id:raceId,ownerId:'staff'},409);assert.equal(entity(a).data.ownerId,'second');assert.equal(sql.prepare('SELECT id FROM inventory_operations WHERE id=?').get(raceId),undefined);
  sql.prepare("UPDATE app_members SET status='active' WHERE id='staff'").run();await assign(manager,{ownerId:'staff'});assert.equal(entity(a).data.ownerId,'staff');
  list=await assignmentGet(manager);assert.equal(list.buyers.filter(b=>b.ownerId==='second').length,0);assert.equal(list.buyers.filter(b=>b.ownerId==='staff').length,1,'Directory moves the buyer between owners without duplicate assignment rows');
- assert.equal((await get(second)).agents.find(v=>v.id===a).canOperate,false,'Report viewer remains read-only after ownership removal');
+ assert.ok(!(await get(second)).agents.some(v=>v.id===a),'Report-viewer role does not bypass removed ownership');
  await get(staff,a);await quote(1,staff);assert.deepEqual(plain(entity('snapshot')),snapshot);
  // Cached session permissions cannot override a manager's revoked stored role.
  sql.prepare("UPDATE app_members SET permissions=? WHERE id='manager'").run(JSON.stringify(viewer.permissions));await assignmentGet(manager,403);await assign(manager,{},403);

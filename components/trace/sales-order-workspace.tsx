@@ -71,7 +71,7 @@ export function SalesOrderWorkspace({form,accountId,locked,onChange,onPrepare,on
  function change(patch:any){const previous=latest.current.args,productsChanged=patch.items&&JSON.stringify((previous.items||[]).map((i:any)=>i.productId))!==JSON.stringify(patch.items.map((i:any)=>i.productId)),buyerChanged=Object.hasOwn(patch,'agentId')&&patch.agentId!==previous.agentId;const next={...latest.current,args:{...previous,...patch,...(productsChanged||buyerChanged?{salesTerms:undefined}:{}),quoteHash:undefined},preview:undefined,previewError:undefined};onChange(next);}
  const source=args.requestSource||{},needsSource=currentCatalog&&!currentCatalog.roles.agent;
  function sourceChange(patch:any){change({requestSource:{...source,...patch}});}
- const sourceComplete=!needsSource||source.channel&&source.contactName?.trim()&&source.day;
+ const sourceComplete=!needsSource||source.channel&&source.day;
  function prepare(){
   if(!quote||loading)return;
   const allowed=['mode','agentId','items','salesTerms','referrerId','customerReference','requestSource','notes','leadId','leadRevision'];
@@ -99,7 +99,6 @@ export function SalesOrderWorkspace({form,accountId,locked,onChange,onPrepare,on
    {previewError&&<p role="alert">{previewError}</p>}
    {needsSource&&<details style={{marginBlock:12}} open={!sourceComplete}><summary>نحوه دریافت سفارش مشتری{sourceComplete?' ✓':''}</summary><div className="formgrid">
     <label className="field">روش دریافت<select value={source.channel||''} onChange={e=>sourceChange({channel:e.target.value})}><option value="">انتخاب کنید</option>{Object.entries(salesRequestChannels).map(([v,label])=><option key={v} value={v}>{label}</option>)}</select></label>
-    <label className="field">نام درخواست‌دهنده<NumberInput fieldKey="contactName" value={source.contactName||''} onChange={e=>sourceChange({contactName:e.target.value})}/></label>
     <SolarDate label="تاریخ دریافت درخواست" value={source.day||''} onChange={day=>sourceChange({day})}/>
     <label className="field">خلاصه تماس یا مرجع پیام (اختیاری)<NumberInput maxLength={1000} fieldKey="reference" value={source.reference||''} onChange={e=>sourceChange({reference:e.target.value})}/></label>
    </div></details>}

@@ -7,6 +7,7 @@ const staff=(u:Session)=>!u.permissions.hospitalCenterId&&!u.permissions.service
 export const hospitalManager=(u:Session)=>staff(u)&&(u.isAdmin||domainWriteAccess(u,'hospital')&&u.permissions.serviceRoles?.some(r=>['manager','coordinator'].includes(r)));
 export const hospitalFinance=(u:Session)=>staff(u)&&(u.isAdmin||financialAccess(u,'hospital',true)||domainWriteAccess(u,'hospital')&&u.permissions.serviceRoles?.includes('finance'));
 export const hospitalTech=(u:Session)=>hospitalManager(u)||staff(u)&&domainWriteAccess(u,'hospital')&&u.permissions.serviceRoles?.includes('technician');
+export const hospitalQuoteWriter=(u:Session)=>hospitalTech(u)||staff(u)&&domainWriteAccess(u,'hospital')&&!!u.permissions.serviceRoles?.includes('support');
 export const hospitalInventory=(u:Session)=>staff(u)&&(u.isAdmin||domainWriteAccess(u,'hospital')&&u.permissions.serviceRoles?.includes('inventory'));
 export const hospitalLogistics=(u:Session)=>staff(u)&&(u.isAdmin||domainWriteAccess(u,'hospital')&&u.permissions.serviceRoles?.includes('logistics'));
 export const hospitalRead=(u:Session)=>!!u.permissions.hospitalCenterId||serviceSupervisor(u)||hospitalManager(u)||hospitalFinance(u)||!!(staff(u)&&domainWriteAccess(u,'hospital')&&u.permissions.serviceRoles?.some(r=>['support','intake','technician','inventory','logistics'].includes(r)));

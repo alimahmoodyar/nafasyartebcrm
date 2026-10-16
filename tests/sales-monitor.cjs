@@ -17,7 +17,8 @@ const entity=id=>{const r=sql.prepare('SELECT * FROM flow_entities WHERE id=?').
 const all=type=>sql.prepare('SELECT * FROM flow_entities WHERE type=?').all(type).map(r=>({...r,data:JSON.parse(r.data)}));
 async function post(api,path,body,u=admin,status=200){const r=await context.run(u,()=>api.POST(request(path,body)));const d=await r.json();assert.equal(r.status,status,body.mode+': '+JSON.stringify(d));return {...d,body};}
 let a,b,rep,other;
-const op=(mode,extra={},u=finance,status=200)=>post(sales,'/api/sales',{id:crypto.randomUUID(),mode,agentId:a,confirmed:true,notes:'Verified source',...extra},u,status);
+let representativeSequence=1234500000;
+const op=(mode,extra={},u=finance,status=200)=>post(sales,'/api/sales',{id:crypto.randomUUID(),mode,...(mode==='agent'&&!extra.agentId?{nationalId:String(++representativeSequence),mobile:'09123456789'}:{}),agentId:a,confirmed:true,notes:'Verified source',...extra},u,status);
 const get=async(u=rep,agent='',status=200)=>{const r=await context.run(u,()=>sales.GET(request('/api/sales'+(agent?'?agent='+agent:''))));assert.equal(r.status,status);return r.json();};
 const balance=async()=>((await get()).accounts[0]);
 const quote=(qty=3,u=rep)=>post(quoteApi,'/api/sales/quote',{agentId:a,items:[{productId:'product',quantity:qty}]},u);
@@ -45,7 +46,7 @@ async function view(u=manager,query='',status=200){const r=await context.run(u,(
  await monitor.scanSalesMonitor({now:nowClock,source:'background'});
  let data=await view();assert.equal(data.health.backgroundStale,false);assert.ok(data.alerts.some(a=>a.data.kind==='overdue'));assert.ok(data.alerts.some(a=>a.data.kind==='bounced_check'));assert.ok(data.alerts.some(a=>a.data.kind==='goal_gap'));assert.ok(data.alerts.some(a=>a.data.kind==='pending_payment'));assert.ok(data.reports.some(r=>r.kind==='daily'));
  const overdueId='sales-alert:overdue:'+a,checkId='sales-alert:bounced_check:bouncedA',goalId='sales-alert:goal_gap:'+goal.id;
- assert.ok((await view(staff)).alerts.every(a=>a.data.ownerId==='staff'));assert.ok((await view(finance)).alerts.every(a=>a.data.ownerId==='finance'));await view(rep,'',403);await view(viewer,'',403);await view(staff,'?preview=daily',403);
+ assert.ok((await view(staff)).alerts.every(a=>a.data.ownerId==='staff'));assert.ok((await view(finance)).alerts.every(a=>a.data.ownerId==='finance'));await view(rep,'',403);assert.equal((await view(viewer)).alerts.length,0);await view(staff,'?preview=daily',403);
  const archived=data.reports[0],archiveBefore=JSON.stringify(entity(archived.id).data);await view(staff,'?report='+encodeURIComponent(archived.id),403);assert.ok((await view(manager,'?report='+encodeURIComponent(archived.id))).report.data.summary.length);
  const noticeCount=sql.prepare('SELECT count(*) n FROM duty_notices').get().n,reportCount=all('sales_report').length;
  await monitor.scanSalesMonitor({now:nowClock,source:'background'});assert.equal(all('sales_report').length,reportCount);assert.equal(sql.prepare('SELECT count(*) n FROM duty_notices').get().n,noticeCount);

@@ -70,7 +70,7 @@ if(qa&&!qa.design)assert.equal(qms.qvisible({type:'qms_record',data:{private:tru
  }
  const forged=policy.validatePermissions({roleAssignment:validAssignment(id),read:policy.modules,write:policy.modules,eventStages:policy.stages,finance:'write',salesRoles:['manager'],supplyRoles:['ceo'],treasuryWorkflowRoles:['ceo'],qmsRoles:['qa']});assert.deepEqual(JSON.parse(JSON.stringify(forged)),JSON.parse(JSON.stringify(u.permissions)),id+': extra grants merged');assertions++;
  check(nav.canOpenSection(u,'qms'),!!u.permissions.qmsRoles?.length||has(expected.design,id),'QMS navigation',id);
- check(nav.canOpenSection(u,'sales'),has(expected.salesStaff,id)||has(expected.salesManager,id)||has(expected.salesFinance,id)||id==='sales_viewer'||id==='sales_agent','sales navigation',id);
+ check(nav.canOpenSection(u,'sales'),has(expected.salesStaff,id)||has(expected.salesManager,id)||has(expected.salesFinance,id)||['sales_viewer','sales_report_viewer','ceo','sales_agent'].includes(id),'sales navigation',id);
  check(nav.canOpenSection(u,'routine-production'),['production','engineering','qc','ceo'].includes(id),'routine production navigation',id);
  check(nav.canOpenSection(u,'assets'),id==='custodian','assets navigation',id);
  check(nav.canOpenSection(u,'personnel'),!['sales_agent','service_agent'].includes(id),'personnel navigation',id);

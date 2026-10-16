@@ -1,5 +1,7 @@
 // Shared presentation vocabulary. Values/identifiers sent to domain APIs remain unchanged.
 export const fieldTitles:Record<string,string>={
+ installedOn:'تاریخ نصب',
+ contractStatus:'وضعیت قرارداد',contractUntil:'تاریخ پایان قرارداد',compressorModel:'مدل کمپرسور',generatorModel:'مدل مولد',dryerModel:'مدل خشک‌کن',compressorQuantity:'تعداد کمپرسور',serviceIntervalHours:'فاصله سرویس، ساعت',kitId:'فهرست فیلتر کمپرسور',kitRevision:'نسخه فهرست فیلتر',filters:'فیلترهای نصب‌شده',technicalCode:'کد فنی قطعه',batchCode:'شماره بچ نصب‌شده',sheet:'برگه فایل',profile:'روش انتخاب ستون‌ها',firstRow:'اولین ردیف داده',lastRow:'آخرین ردیف داده',
  contactEmail:'ایمیل تماس (اختیاری)',contactRevision:'نسخه اطلاعات تماس',
  productPrices:'کالاها و قیمت پایه الگو',priceSource:'منبع قیمت پایه',priceTemplateId:'الگوی قیمت پایه',priceTemplateRevision:'نسخه الگوی قیمت پایه',
  receivingAccountId:'حساب مقصد شرکت',terminalCode:'کد ترمینال پوز',provider:'شرکت پرداخت / بانک پذیرنده',validTo:'تا تاریخ',bankId:'شناسه یکتای تراکنش بانک',
@@ -1310,3 +1312,23 @@ toolFieldTitles.assign_sales_buyer={agentId:'خریدار موجود',ownerId:'�
 Object.assign(fieldTitles,{formPurpose:"کاربرد فرم",intakeId:"فرم مشخصات سفارش",fileIds:"مدارک مشتری",lineIndex:"ردیف سفارش فروش",templateId:"فرم مصوب محصول",values:"مشخصات موردنیاز مشتری"});
 toolFieldTitles.build_intake_apply={title:"عنوان پروژه ساخت",orderId:"پیش‌فاکتور مشتری",contractId:"قرارداد مشتری",due:"موعد تحویل موردنیاز",items:"محصولات و مشخصات سفارش",productId:"محصول",quantity:"تعداد",templateId:"فرم مشخصات محصول",values:"نیاز فنی مشتری",notes:"توضیح یا نتیجه بررسی"};
 toolModeTitles.build_intake_apply={save:"ذخیره پیش‌نویس سفارش ساخت",submit:"ارسال برای بررسی فنی",technical_accept:"تأیید بررسی فنی",return:"برگشت برای اصلاح",approve:"تأیید و اتصال به پروژه ساخت",revise:"بازنگری مشخصات سفارش"};
+
+Object.assign(toolFieldTitles,{save_hospital_profile_template:{definitionId:'فرم برای ویرایش',revision:'نسخه فرم',model:'مدل دستگاه',title:'نام فرم مشخصات',fields:'مشخصه‌های فنی',active:'فعال'},save_hospital_service_kit:{definitionId:'فهرست برای ویرایش',revision:'نسخه فهرست',componentModel:'مدل کمپرسور',intervalHours:'فاصله سرویس، ساعت',lines:'کد و تعداد فیلترها برای هر کمپرسور',active:'فعال'},save_hospital_technical_profile:{assetId:'دستگاه بیمارستان',revision:'نسخه شناسنامه',templateId:'فرم مشخصات همین مدل',values:'مشخصات فنی واقعی'},preview_hospital_periodic_quote:{jobId:'درخواست سرویس دوره‌ای'}});
+
+Object.assign(toolFieldTitles,{register_hospital_installation:{centerId:'بیمارستان موجود',assetId:'دستگاه برای ویرایش',revision:'نسخه شناسنامه',center:'اطلاعات مرکز جدید',installation:'محصول و مشخصات دستگاه نصب‌شده'}});
+
+toolFieldTitles.build_intake_apply={...toolFieldTitles.build_intake_apply,warrantyMonths:'گارانتی توافق‌شدهٔ قرارداد، ماه'};
+toolFieldTitles.build_project_apply={...toolFieldTitles.build_project_apply,warrantyMonths:'گارانتی قرارداد همین پروژه، ماه'};
+toolFieldTitles.get_record_schema={...toolFieldTitles.get_record_schema,productionMode:'روش تولید محصول'};
+toolModeTitles.build_project_apply={...toolModeTitles.build_project_apply,warranty:'ثبت / اصلاح گارانتی قرارداد پروژه'};
+
+toolFieldTitles.register_hospital_installation={...toolFieldTitles.register_hospital_installation,installations:'دستگاه‌های بیمارستان',services:'بازه‌های سرویس و قطعات مصرفی',lines:'قطعات مصرفی همین سرویس',warrantyStatus:'گارانتی دارد؟',warrantyStart:'شروع گارانتی',warrantyMonths:'مدت گارانتی، ماه',contractFrom:'شروع قرارداد خدمات',contractUntil:'پایان قرارداد خدمات',baselineHours:'ساعت مبنای برنامه سرویس',baselineDay:'تاریخ مبنای برنامه سرویس'};
+toolFieldTitles.save_hospital_service_contract={assetId:'دستگاه بیمارستان',revision:'نسخه شناسنامه',contractStatus:'قرارداد خدمات دارد؟',contractFrom:'شروع قرارداد خدمات',contractUntil:'پایان قرارداد خدمات'};
+
+toolFieldTitles.register_hospital_installation.intervalHours='بازه سرویس، ساعت';
+
+Object.assign(toolFieldTitles,{save_material_master:{code:'کد ثابت کالا (۲ تا ۱۲ رقم)',name:'نام کالا',unit:'واحد کالا',specs:'مشخصات فنی / نقشه مرجع',fields:'فرم کنترل کیفیت ورودی',defaultLocation:'محل معمول انبار',reorderPoint:'حد سفارش',targetStock:'موجودی هدف',qcOwner:'مسئول کنترل کیفیت',warehouseOwner:'مسئول انبار',procurementOwner:'مسئول تأمین'}});
+
+Object.assign(toolFieldTitles,{save_material_warehouse:{warehouseId:'انبار برای ویرایش',name:'نام انبار',warehouseOwner:'مسئول انبار',qcOwner:'مسئول کنترل کیفیت',locations:'محل‌های نگهداری',active:'فعال',revision:'نسخه تعریف'}});Object.assign(fieldTitles,{warehouseId:'انبار مقصد'});
+
+Object.assign(fieldTitles,{sourcingPlanId:'برنامه مصوب تحویل‌شده به تولید'});

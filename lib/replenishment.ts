@@ -20,26 +20,12 @@ export async function shortageSnapshot(m:any,leadDays=7){
  }
  // Accepted but not yet shelved is still unavailable; pending receipts are shown separately.
  const quarantine=receipts.filter(r=>r.data.materialId===m.id&&r.data.state!=='stored').reduce((n,r)=>n+(r.data.state==='pending_qc'?r.data.quantity:r.data.accepted),0);
- const reorder=Number(m.data.reorderPoint)||0,target=Number(m.data.targetStock)||0,projected=free+incoming,proposed=Math.max(0,target-projected);
+ const reorder=0,target=0,projected=free+incoming,proposed=0;
  if(![stock,reserved,production,incoming,quarantine,proposed].every(Number.isSafeInteger))throw new AccessError('مقدار موجودی از محدوده محاسبه خارج است.',400);
  return {stock,reserved,production,free,incoming,quarantine,projected,reorder,target,low:projected<reorder,proposed,needBy:due,fingerprint:JSON.stringify([stock,reserved,production,incoming,quarantine,reorder,target])};
 }
 const closed=['completed','cancelled','released','rejected'];
-export async function scanReplenishment(){
- const policy=await replenishmentPolicy();if(!policy.data.enabled)return {created:0,enabled:false};const db=storage(),materials=await supplyEntities('material');let created=0;
- for(const m of materials){
-  const id=crypto.randomUUID(),checks=await supplyLock(db,id);
-  const snap=await shortageSnapshot(m,policy.data.leadDays),plans=(await supplyEntities('sourcing_plan')).filter(p=>p.data.origin==='replenishment'&&p.data.materialId===m.id&&!closed.includes(p.data.state));
-  if(plans.length){const p=plans[0];if(p.data.state==='stock_rejected'&&p.data.stockSnapshot.fingerprint!==snap.fingerprint){await db.prepare("UPDATE flow_entities SET data=?,revision=revision+1,updated=? WHERE id=? AND revision=?").bind(JSON.stringify({...p.data,state:'stock_check',stockSnapshot:snap,history:[...p.data.history,{mode:'stock_changed',name:'پایش موجودی',at:new Date().toISOString(),notes:'موجودی تغییر کرد؛ بررسی دوباره لازم است.'}]}),new Date().toISOString(),p.id,p.revision).run();}continue;}
-  if(!snap.low||snap.proposed<=0)continue;
-  if((await supplyEntities('supply')).some(r=>r.data.materialId===m.id&&r.data.state==='open'))continue;
-  // Other active sourcing cases already seeking this material prevent a second autonomous procurement.
-  if((await supplyEntities('sourcing_plan')).some(p=>p.data.origin!=='replenishment'&&!closed.includes(p.data.state)&&(p.data.lines||[]).some((l:any)=>l.partCode===m.data.code)))continue;
-  const now=new Date().toISOString(),data={origin:'replenishment',materialId:m.id,materialRevision:m.revision,productId:'',productName:m.data.name,count:0,state:'stock_check',reference:'پایش خودکار حد سفارش '+m.data.code,needBy:snap.needBy,stockSnapshot:snap,critical:snap.free===0,finance:{status:'pending',budgetRial:'0'},lines:[],history:[{mode:'detected',actor:'scheduler',name:'پایش موجودی',at:now,notes:'کسری تشخیص داده شد؛ هیچ خریدی صادر نشده است.'}]};
-  try{await db.batch([db.prepare("INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,'auto_replenishment',?,'scheduler',?,1)").bind(id,JSON.stringify(snap),now),...checks,db.prepare("UPDATE inventory_operations SET guard=CASE WHEN NOT EXISTS(SELECT 1 FROM flow_entities WHERE type='sourcing_plan' AND json_extract(data,'$.origin')='replenishment' AND json_extract(data,'$.materialId')=? AND json_extract(data,'$.state') NOT IN ('completed','cancelled','released','rejected')) AND EXISTS(SELECT 1 FROM flow_entities WHERE id='replenishment-policy' AND revision=?) AND EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?) THEN guard ELSE 0 END WHERE id=?").bind(m.id,policy.revision,m.id,m.revision,id),db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'sourcing_plan',?,1,?,?)").bind(id,JSON.stringify(data),now,now)]);created++;}catch(e){if(!/constraint|guard/i.test(String(e)))throw e;}
- }
- return {created,enabled:true};
-}
+export async function scanReplenishment(){return {created:0,enabled:false,basis:'approved_production',notice:'تأمین فقط از کسری برنامه تولید تأییدشده محاسبه می‌شود؛ پایش موجودی هدف کنار گذاشته شده است.'};}
 export async function replenishSteps(p:any,steps:any[]){if(p.data.origin!=='replenishment')return steps;if(p.data.state==='stock_check')return [{key:'stock_check',role:'inventory',title:'بررسی موجودی واقعی و تأیید مقدار تأمین'}];if(['stock_rejected',...closed].includes(p.data.state))return [];
  const orders=(await supplyEntities('purchase_order')).filter(o=>o.data.planId===p.id),receipts=(await supplyEntities('receipt')).filter(r=>orders.some(o=>o.id===r.data.purchaseOrderId)),next=steps.filter(s=>s.key!=='ready');
  for(const r of receipts){if(r.data.state==='pending_qc')next.push({key:'qc:'+r.id,role:'qc',title:'کنترل کیفیت ورودی '+p.data.productName,sourceSection:'flow',ownerId:r.data.qcOwner||''});if(r.data.state==='awaiting_warehouse')next.push({key:'shelve:'+r.id,role:'inventory',title:'جانمایی و پذیرش مواد اولیه',sourceSection:'flow',ownerId:r.data.warehouseOwner||''});}
