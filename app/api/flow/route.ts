@@ -6,7 +6,7 @@ import {storage} from '@/lib/storage';
 import {holdChecks,supplyLock,allocateAcceptedPurchase} from '@/lib/sourcing';
 import {requireAccess,checkOrigin,AccessError,accessResponse} from '@/lib/authorization';
 import {flowRole,flowRoles,entity,suggestion,warehouseAccess} from '@/lib/material-flow';
-import {qualityFields,qualityValues} from '@/lib/quality';
+import {materialQualityFields,qualityValues} from '@/lib/quality';
 import {scaled} from '@/lib/production';
 import {normalizeMaterialUnit} from '@/lib/material-units';
 import {normalizePartCode,receiptDay,suggestBatchNumber} from '@/lib/batch-number';
@@ -62,7 +62,7 @@ export async function POST(request:Request){try{
  const unit=normalizeMaterialUnit(needed(b.unit,20));if(!unit)fail('واحد معتبر نیست.');if(old&&old.data.unit!==unit)fail('واحد کالای تعریف‌شده ثابت است.');
  if(old&&text(b.specs||'')!==(old.data.specs||'')&&(!u.isAdmin&&!u.permissions.supplyRoles?.includes('engineering')||Object.values(old.data.technicalControls||{}).some((v:any)=>v.held)))fail('تغییر طراحی موجود از کنترل فنی تحقیق‌وتوسعه یا تضمین کیفیت انجام شود.',403);
  const previous={...(old?.data||{})};for(const key of ['qcOwner','warehouseOwner','procurementOwner','targetStock','reorderPoint','defaultLocation'])delete previous[key];
- put(eid,'material',{...previous,code,name:needed(b.name),unit,specs:text(b.specs||''),designVersion:(old?.data.designVersion||0)+(old&&text(b.specs||'')!==(old.data.specs||'')?1:0),fields:qualityFields(b.fields)},old);
+ put(eid,'material',{...previous,code,name:needed(b.name),unit,specs:text(b.specs||''),designVersion:(old?.data.designVersion||0)+(old&&text(b.specs||'')!==(old.data.specs||'')?1:0),fields:materialQualityFields(b.fields)},old);
  }else if(mode==='receipt'){
  const placement=await receiptWarehouse(u,b.warehouseId);if(placement.warehouseId){await get(placement.warehouseId,'material_warehouse');await assignee(placement.warehouseOwner,'inventory');await assignee(placement.qcOwner,'qc');}
  const m=await get(needed(b.materialId),'material');if(!m.data.fields?.length)fail('ابتدا فرم کنترل کیفیت ماده اولیه واردشده از اکسل را تکمیل کنید.');const day=needed(b.day,10);receiptDay(day);const quantity=scaled(b.quantity),expiry=text(b.expiry||'',10);if(expiry){receiptDay(expiry);if(expiry<day)fail('تاریخ انقضا قبل از ورود است.');}

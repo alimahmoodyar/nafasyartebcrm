@@ -68,7 +68,7 @@ export function generalPresentation(tool:string,args:any,input:any,title:string)
   }
  }
  decorate(schema,args);
- if(tool==='save_material_master'){for(const key of ['defaultLocation','reorderPoint','targetStock','qcOwner','warehouseOwner','procurementOwner']){if(schema.properties?.[key])schema.properties[key].uiHidden=true;}schema.required=(schema.required||[]).filter((k:string)=>!['defaultLocation','reorderPoint','targetStock','qcOwner','warehouseOwner','procurementOwner'].includes(k));}
+ if(tool==='save_material_master'){const item=schema.properties?.fields?.items;if(item?.properties?.key){item.properties.key.uiHidden=true;item.required=(item.required||[]).filter((k:string)=>k!=='key');}for(const key of ['defaultLocation','reorderPoint','targetStock','qcOwner','warehouseOwner','procurementOwner']){if(schema.properties?.[key])schema.properties[key].uiHidden=true;}schema.required=(schema.required||[]).filter((k:string)=>!['defaultLocation','reorderPoint','targetStock','qcOwner','warehouseOwner','procurementOwner'].includes(k));}
  if(tool==='register_hospital_installation'){
   const multi=Array.isArray(args.installations),other=schema.properties?.[multi?'installation':'installations'];if(other)other.uiHidden=true;
   if(args.centerId&&schema.properties.center)schema.properties.center.uiHidden=true;
