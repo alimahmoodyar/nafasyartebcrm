@@ -48,7 +48,7 @@ export const resetTables:Record<string,string>={
 // Existing 0016 generic flow_entities freeze protects their atomic writes; no new migration.
 export const resetFlowPreserved=['hospital_center','account_profile','member_contact','position','duty_template','duty_catalog_install','transport_migration','development_request','as_agent','sales_agent'];
 // material_photo is catalog data: active and removed originals/thumbnails survive operations reset with material; full reset backs up both object keys and deletes all photo rows. Generic 0016 flow/inventory freeze protects upload/removal; no new table/FK. Training uses existing flow and bucket isolation.
-export const resetFlowCatalog=['material_photo','material_warehouse','hospital_profile_template','hospital_service_kit','pricing_cost','pricing_policy','pricing_approval','qms_record','qms_file','qms_part','purchase_specification','routine_route','routine_policy','cost_material','cost_standard','sales_price','supplier_document','supplier_capa','supplier','supplier_material','supplier_review','material','capacity','party','as_tariff','transport_vehicle'];
+export const resetFlowCatalog=['material_file','material_photo','material_warehouse','hospital_profile_template','hospital_service_kit','pricing_cost','pricing_policy','pricing_approval','qms_record','qms_file','qms_part','purchase_specification','routine_route','routine_policy','cost_material','cost_standard','sales_price','supplier_document','supplier_capa','supplier','supplier_material','supplier_review','material','capacity','party','as_tariff','transport_vehicle'];
 // Driver checklists, blockers and vehicle observations are embedded in operational
 // transport entities: backup, both reset scopes and 0016 freeze cover them.
 // Vehicle catalog stays preserved for operations-only reset. Browser drafts are local,
@@ -174,3 +174,5 @@ resetHelp.push('نوع رسمی یا غیررسمی، سند متصل و ساب�
 
 resetHelp.push("فرم‌های مشخصات سفارش مشتری، نسخه‌های تأیید و اتصال قرارداد و پروژه در هر دو محدوده پشتیبان‌گیری و حذف می‌شوند؛ الگوهای مصوب محصول در پاک‌سازی عملیات حفظ می‌شوند. پیوست‌های سفارش از مدارک خصوصی فروش در پشتیبان هستند.");
 resetHelp.push('راهنماهای عیب‌یابی محصول، تاریخچه تأیید و دفترچه‌های پیوست‌شده بخشی از پرونده‌های کیفیت‌اند؛ در پاک‌سازی عملیات حفظ و در پاک‌سازی کامل با فهرست قطعه‌های فایل پشتیبان‌گیری و حذف می‌شوند.');
+
+// material_file technical drawings/documents share material catalog preservation with material_photo. Full reset includes active/removed private objects; generic 0016 flow/inventory freeze and existing training wrappers apply. No new tables/FKs.

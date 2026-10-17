@@ -28,7 +28,7 @@ export async function GET(){try{
  const boms=(await db.prepare('SELECT * FROM bom_versions ORDER BY version DESC').all()).results;
  const builds=all.filter(r=>r.type==='build'),receipts=all.filter(r=>r.type==='receipt'),materials=all.filter(r=>r.type==='material');
  const lowStock=materials.map(m=>({materialId:m.id,...suggestion(m,balances,receipts,builds,boms)}));
- const allowed=u.isAdmin?all.filter(e=>e.type!=='material_photo'):all.filter(e=>e.type==='material'||e.type==='capacity'||e.type==='supply'&&flowRole(u,'procurement')||['receipt','request'].includes(e.type)&&['inventory','qc','production'].some(r=>flowRole(u,r))||['plan','build','repair','finaltest','assignment'].includes(e.type)&&['production','qc'].some(r=>flowRole(u,r)));
+ const allowed=u.isAdmin?all.filter(e=>!['material_photo','material_file'].includes(e.type)):all.filter(e=>e.type==='material'||e.type==='capacity'||e.type==='supply'&&flowRole(u,'procurement')||['receipt','request'].includes(e.type)&&['inventory','qc','production'].some(r=>flowRole(u,r))||['plan','build','repair','finaltest','assignment'].includes(e.type)&&['production','qc'].some(r=>flowRole(u,r)));
  const members=(await db.prepare("SELECT id,name,subject,permissions FROM app_members WHERE status='active'").all()).results.map((m:any)=>({id:m.id,name:m.name,roles:storedAccessPermissions(m.permissions).flowRoles||[]}));
  const purchaseOrders=flowRole(u,'inventory')?all.filter(e=>e.type==='purchase_order'&&['issued','paid','preparing','shipped'].includes(e.data.state)).map(o=>({id:o.id,materialId:o.data.materialId,supplier:o.data.supplier,quantity:o.data.quantity,unit:o.data.unit,received:receipts.filter(r=>r.data.purchaseOrderId===o.id).reduce((n,r)=>n+r.data.quantity,0)})):[];
  const physicalSlots=(await db.prepare('SELECT * FROM flow_slots WHERE quantity>0').all()).results as any[];
@@ -43,7 +43,7 @@ export async function POST(request:Request){try{
  if(mode==='material'&&!u.isAdmin&&!u.permissions.flowRoles?.includes('inventory'))fail('تعریف کالا به نقش عمومی انبار نیاز دارد.',403);
  if(mode==='receipt'&&!warehouseAccess(u,'quarantine')||mode==='shelve'&&(!warehouseAccess(u,'quarantine')||!warehouseAccess(u,'raw'))||mode==='issue'&&!warehouseAccess(u,'raw'))fail('این انبار در مسئولیت شما نیست.',403);
  const signature=JSON.stringify(b),prior:any=await db.prepare('SELECT payload,actor FROM inventory_operations WHERE id=?').bind(id).first();if(prior){if(prior.payload!==signature||prior.actor!==u.userId)fail('شناسه درخواست تکراری است.',409);return json({saved:true,repeated:true});}
- const stmts:D1PreparedStatement[]=[],guards:string[]=[],params:any[]=[],checks:D1PreparedStatement[]=await supplyLock(db,id);
+ let materialResult:Record<string,unknown>={};const stmts:D1PreparedStatement[]=[],guards:string[]=[],params:any[]=[],checks:D1PreparedStatement[]=await supplyLock(db,id);
  const flush=()=>{if(guards.length){checks.push(db.prepare('UPDATE inventory_operations SET guard=CASE WHEN '+guards.join(' AND ')+' THEN 1 ELSE 0 END WHERE id=?').bind(...params,id));guards.length=0;params.length=0;}};
  const guard=(s:string,...p:any[])=>{if(params.length+p.length>75)flush();guards.push(s);params.push(...p)};
  async function get(eid:string,type:string){const r:any=await db.prepare('SELECT * FROM flow_entities WHERE id=? AND type=?').bind(eid,type).first();if(!r)fail('رکورد گردش کار پیدا نشد.');guard('EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)',r.id,r.revision);return entity(r)}
@@ -68,7 +68,7 @@ export async function POST(request:Request){try{
  const unit=normalizeMaterialUnit(needed(b.unit,20));if(!unit)fail('واحد معتبر نیست.');if(old&&old.data.unit!==unit)fail('واحد کالای تعریف‌شده ثابت است.');
  if(old&&text(b.specs||'')!==(old.data.specs||'')&&(!u.isAdmin&&!u.permissions.supplyRoles?.includes('engineering')||Object.values(old.data.technicalControls||{}).some((v:any)=>v.held)))fail('تغییر طراحی موجود از کنترل فنی تحقیق‌وتوسعه یا تضمین کیفیت انجام شود.',403);
  const previous={...(old?.data||{})};for(const key of ['qcOwner','warehouseOwner','procurementOwner','targetStock','reorderPoint','defaultLocation'])delete previous[key];
- put(eid,'material',{...previous,code,name:needed(b.name),unit,specs:text(b.specs||''),designVersion:(old?.data.designVersion||0)+(old&&text(b.specs||'')!==(old.data.specs||'')?1:0),fields:materialQualityFields(b.fields)},old);
+ put(eid,'material',{...previous,code,name:needed(b.name),unit,specs:text(b.specs||''),designVersion:(old?.data.designVersion||0)+(old&&text(b.specs||'')!==(old.data.specs||'')?1:0),fields:materialQualityFields(b.fields)},old);materialResult={materialId:eid,revision:(old?.revision||0)+1};
  }else if(mode==='receipt'){
  const placement=await receiptWarehouse(u,b.warehouseId,b.qcOwner);if(placement.warehouseId){await warehouseAssignment({data:{warehouseId:placement.warehouseId}},'warehouseOwner');if(placement.qcOwner)await assignee(placement.qcOwner,'qc',placement.warehouseId);}
  const m=await get(needed(b.materialId),'material');if(!m.data.fields?.length)fail('ابتدا فرم کنترل کیفیت ماده اولیه واردشده از اکسل را تکمیل کنید.');const day=needed(b.day,10);receiptDay(day);const quantity=scaled(b.quantity),expiry=text(b.expiry||'',10);if(expiry){receiptDay(expiry);if(expiry<day)fail('تاریخ انقضا قبل از ورود است.');}
@@ -142,6 +142,6 @@ export async function POST(request:Request){try{
  }
  const formStatements=await captureForm(id,'flow.'+mode,reportBody,u,reportProduct,reportCriteria,reportExtra);
  flush();await db.batch([db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(id,'flow_'+mode,signature,u.userId,now),...checks,...stmts,...holdChecks(db,id,touchedStock),...formStatements,db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,id,'flow_'+mode,signature,now)]);
- try{await syncMaterialTasks();}catch{return json({saved:true,reportId:formStatements.length?id:undefined,followupPending:true});}
- return json({saved:true,reportId:formStatements.length?id:undefined});
+ try{await syncMaterialTasks();}catch{return json({saved:true,...materialResult,reportId:formStatements.length?id:undefined,followupPending:true});}
+ return json({saved:true,...materialResult,reportId:formStatements.length?id:undefined});
  }catch(e){const denial=accessResponse(e);if(denial)return denial;const s=String(e);return Response.json({error:/constraint|SQLITE|D1|Database/i.test(s)?'اطلاعات هم‌زمان تغییر کرده، محل اشغال است یا موجودی کافی نیست؛ هیچ تغییری ثبت نشد. تازه‌سازی کنید.':e instanceof Error?e.message:'ثبت انجام نشد.'},{status:/constraint|SQLITE/i.test(s)?409:400});}}

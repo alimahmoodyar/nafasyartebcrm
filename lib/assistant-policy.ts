@@ -9,7 +9,7 @@ export function scopedAssistantRecordTool<T extends {name:string;inputSchema:any
  return allowed.length?{...tool,inputSchema:{...tool.inputSchema,properties:{...tool.inputSchema.properties,kind:{...kind,enum:allowed}}}}:null;
 }
 export function assistantToolAvailable(u:Session,name:string){
- if(['list_material_photos','get_material_visual_candidates','get_material_photo'].includes(name))return ['inventory','qc','production','procurement'].some(r=>flowRole(u,r));
+ if(['list_material_files','list_material_photos','get_material_visual_candidates','get_material_photo'].includes(name))return ['inventory','qc','production','procurement'].some(r=>flowRole(u,r));
  if(name==='warehouse_movement_apply'||name==='get_warehouse_movements')return flowRole(u,'inventory');
  if(name==='get_product_troubleshooting'){const p=accessPermissions(u.permissions),internal=!p.hospitalCenterId&&!p.salesAgentId&&!p.serviceAgentId&&!p.salesRoles?.includes('agent')&&!p.serviceRoles?.includes('agent');return internal&&(u.isAdmin||serviceReadDomains({...u,permissions:p}).length>0&&p.serviceRoles?.some(r=>['manager','coordinator','technician','support'].includes(r)));}
  if(name==='save_material_warehouse')return u.isAdmin;
@@ -50,4 +50,4 @@ Object.assign(actionTitles,{save_hospital_service_contract:'ثبت / تمدید 
 assistantWriteNames.add('save_material_warehouse');Object.assign(actionTitles,{save_material_warehouse:'تعریف یا ویرایش انبار مواد اولیه'});
 assistantWriteNames.delete('request_replenishment');
 
-for(const name of ['list_material_photos','get_material_visual_candidates','get_material_photo'])assistantReadNames.add(name);
+for(const name of ['list_material_files','list_material_photos','get_material_visual_candidates','get_material_photo'])assistantReadNames.add(name);
