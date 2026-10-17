@@ -1,3 +1,4 @@
+import {isMaterialVisualResult} from '@/lib/material-photos';
 import {AccessError} from '@/lib/authorization';
 import {boundedBody} from '@/lib/firmware-storage';
 import {discoverTools,executeTool} from './tools';
@@ -16,7 +17,7 @@ export async function dispatchRpc(message:any,origin:string,p?:McpPrincipal):Pro
  if(message.method!=='tools/call')return rpcError(id,-32601,'Method not found.');
  if(typeof message.params?.name!=='string')return rpcError(id,-32602,'Tool name is required.');
  if(!p)throw new AccessError("Authentication required.",401);
- try{const result=await executeTool(message.params.name,message.params.arguments||{},origin,p);const text=JSON.stringify(result);if(new TextEncoder().encode(text).length>700000)return reply({isError:true,content:[{type:'text',text:'Result exceeds transport limit. Use list_records pagination or file chunk downloads. The operation may already have completed; check records before retrying a write.'}]});return reply({content:[{type:'text',text}]});}
+ try{const result=await executeTool(message.params.name,message.params.arguments||{},origin,p);const text=JSON.stringify(result);if(new TextEncoder().encode(text).length>700000)return reply({isError:true,content:[{type:'text',text:'Result exceeds transport limit. Use list_records pagination or file chunk downloads. The operation may already have completed; check records before retrying a write.'}]});return reply(isMaterialVisualResult(message.params.name,result)?{content:result.content,structuredContent:result.summary}:{content:[{type:'text',text}]});}
  catch(e){return reply({isError:true,content:[{type:'text',text:e instanceof AccessError?e.message:'Operation failed. Check the current records before retrying.'}]});}
 }
 export function transportFailure(error:unknown){return Response.json({error:error instanceof AccessError?error.message:'MCP is temporarily unavailable.'},{status:error instanceof AccessError?error.status:503,headers:{'Cache-Control':'no-store','Referrer-Policy':'no-referrer'}});}

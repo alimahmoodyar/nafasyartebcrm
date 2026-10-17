@@ -20,8 +20,8 @@ export function resetFiles(tables:Record<string,any[]>){
  const files=new Map<string,{key:string;filename:string;size:number;sha256:string}>();
  for(const [table,rows] of Object.entries(tables))for(const r of rows){let f:any=null;
   if(['batch_files','quality_files','firmware_files','finance_files','duty_files','service_files'].includes(table))f={key:r.object_key,filename:r.filename,size:r.byte_size,sha256:r.sha256};
-  if(table==='flow_entities'&&['sales_bank_statement','treasury_file','asset_file','qms_part','foreign_file','shipment_file','hr_file','guarantee_file','payable_file','settlement_file','expense_file','hospital_file','sales_file','supplier_document','transport_file','inbox_file'].includes(r.type)){const d=JSON.parse(r.data);f={key:d.objectKey,filename:d.filename,size:d.byteSize||d.size,sha256:d.sha256};}
-  if(f?.key)files.set(f.key,f);
+  if(table==='flow_entities'&&['material_photo','sales_bank_statement','treasury_file','asset_file','qms_part','foreign_file','shipment_file','hr_file','guarantee_file','payable_file','settlement_file','expense_file','hospital_file','sales_file','supplier_document','transport_file','inbox_file'].includes(r.type)){const d=JSON.parse(r.data);f={key:d.objectKey,filename:d.filename,size:d.byteSize||d.size,sha256:d.sha256};}
+  if(f?.key)files.set(f.key,f);if(table==='flow_entities'&&r.type==='material_photo'){const d=JSON.parse(r.data);if(d.thumbObjectKey)files.set(d.thumbObjectKey,{key:d.thumbObjectKey,filename:'preview-'+d.filename,size:d.thumbSize,sha256:d.thumbSha256});}
  }return [...files.values()];
 }
 export async function readResetBackup(job:any){if(!job.backup_key||!job.backup_hash)resetFail('نسخه پشتیبان آماده نیست.',409);const obj=await firmwareBucket().get(job.backup_key);if(!obj)resetFail('فایل پشتیبان در دسترس نیست؛ حذف انجام نمی‌شود.',503);const raw=await obj!.text();if(await digest(raw)!==job.backup_hash)resetFail('صحت فایل پشتیبان تأیید نشد؛ حذف انجام نمی‌شود.',503);return {raw,data:JSON.parse(raw)};}

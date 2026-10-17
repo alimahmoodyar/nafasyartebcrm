@@ -9,6 +9,7 @@ export function scopedAssistantRecordTool<T extends {name:string;inputSchema:any
  return allowed.length?{...tool,inputSchema:{...tool.inputSchema,properties:{...tool.inputSchema.properties,kind:{...kind,enum:allowed}}}}:null;
 }
 export function assistantToolAvailable(u:Session,name:string){
+ if(['list_material_photos','get_material_visual_candidates','get_material_photo'].includes(name))return ['inventory','qc','production','procurement'].some(r=>flowRole(u,r));
  if(name==='save_material_warehouse')return u.isAdmin;
  if(['receive_material_batch','assign_receipt_quality','shelve_approved_batch','issue_production_material'].includes(name))return flowRole(u,'inventory');
  if(name==='inspect_incoming_batch')return flowRole(u,'qc');
@@ -44,3 +45,5 @@ Object.assign(actionTitles,{save_hospital_service_contract:'ثبت / تمدید 
 
 assistantWriteNames.add('save_material_warehouse');Object.assign(actionTitles,{save_material_warehouse:'تعریف یا ویرایش انبار مواد اولیه'});
 assistantWriteNames.delete('request_replenishment');
+
+for(const name of ['list_material_photos','get_material_visual_candidates','get_material_photo'])assistantReadNames.add(name);
