@@ -2,7 +2,7 @@ import {tehranDay} from './serials';
 import type {Session} from './permissions';
 export const flowRoles=['inventory','qc','production','procurement','sales','logistics'] as const;
 export const roleNames:Record<string,string>={inventory:'انبار',qc:'کنترل کیفیت',production:'تولید',procurement:'تأمین',sales:'فروش',logistics:'تدارکات'};
-export function flowRole(u:Session,role:string){return u.isAdmin||u.permissions.flowRoles?.includes(role)||role==='logistics'&&!!u.permissions.transportRoles?.includes('driver')||false;}
+export function flowRole(u:Session,role:string){return u.isAdmin||u.permissions.flowRoles?.includes(role)||!!u.permissions.warehouseResponsibilities?.some(r=>r.role===role)||role==='logistics'&&!!u.permissions.transportRoles?.includes('driver')||false;}
 export const entity=(r:any)=>({...r,data:JSON.parse(r.data)});
 export const qty=(n:number)=>String(n/1000);
 export function suggestion(material:any,balances:any[],receipts:any[],builds:any[],boms:any[]){
@@ -15,5 +15,5 @@ export function suggestion(material:any,balances:any[],receipts:any[],builds:any
 
 // Old accounts retain material-warehouse rights until the admin explicitly scopes them.
 // Finished-goods custody always requires explicit assignment for non-admin users.
-export function warehouseAccess(u:Session,warehouse:string){return u.isAdmin||!!(u.permissions.flowRoles?.includes('inventory')&&(u.permissions.warehouses??['raw','line','quarantine','nonconforming']).includes(warehouse));}
+export function warehouseAccess(u:Session,warehouse:string){return u.isAdmin||!!((u.permissions.flowRoles?.includes('inventory')||u.permissions.warehouseResponsibilities?.some(r=>r.role==='inventory'))&&(u.permissions.warehouses??['raw','line','quarantine','nonconforming']).includes(warehouse));}
 export function passedQC(build:any){return build.data.latestQc?.verdict==='pass';}

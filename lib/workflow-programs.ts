@@ -36,6 +36,8 @@ export const roleWorkflowPrograms:Record<string,string[]>={
 };
 for(const role of ['hr','payroll','approver','finance','treasury','executive_viewer','reporter'])roleWorkflowPrograms['personnel_'+role]=[];
 for(const role of Object.keys(qmsRoles))if(role!=='qc')roleWorkflowPrograms['quality_'+role]=['qms'];
+// A derived launcher groups only the domains already listed for this role.
+for(const [role,programs] of Object.entries(roleWorkflowPrograms))if(programs.some(program=>['flow','inventory','batch'].includes(program))||role==='service_inventory')programs.push('warehouse');
 
 export const selfServicePrograms=['tasks','personnel','development','reminders','mobile-install'];
 export function programsForRoles(roles:string[]){return [...new Set(roles.flatMap(role=>roleWorkflowPrograms[role]||[]))];}

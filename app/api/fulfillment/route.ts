@@ -1,3 +1,4 @@
+import {captureForm} from '@/lib/form-control';
 import {storedAccessPermissions} from '@/lib/permissions';
 import {qmsDispatchGuard} from '@/lib/qms-release';
 import {scanSalesMonitor} from '@/lib/sales-monitor';
@@ -88,6 +89,7 @@ export async function POST(request:Request){try{
  const sale=await get(needed(b.saleId),'sale');if(sale.data.transportId)fail('تأیید دریافت را در مأموریت تدارکات انجام دهید.');if(sale.data.state!=='in_transit'||sale.data.acknowledgedAt)fail('این حواله در انتظار تأیید تدارکات نیست.',409);if(!u.isAdmin&&!['local:'+sale.data.carrierId,sale.data.carrierSubject].includes(u.userId))fail('فقط تحویل‌گیرنده تعیین‌شده می‌تواند تأیید کند.',403);
  put(sale.id,'sale',{...sale.data,acknowledgedAt:now,acknowledgedBy:u.name,acknowledgedActor:u.userId,carrierNotes:text(b.notes||'',4000)},sale);for(const did of sale.data.deviceIds)event(did,'تأیید دریافت تدارکات',{notes:text(b.notes||'',4000)});
  }
- await db.batch([db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(id,'fulfillment_'+mode,signature,u.userId,now),...checks,...statements,db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,id,'fulfillment_'+mode,signature,now)]);
+ const formStatements=await captureForm(id,'fulfillment.'+mode,b,u);
+ await db.batch([db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(id,'fulfillment_'+mode,signature,u.userId,now),...checks,...statements,...formStatements,db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,id,'fulfillment_'+mode,signature,now)]);
  let followup=true;try{await syncSalesTasks();await scanSalesMonitor({reports:false,source:'event'});}catch{followup=false;}return json({saved:true,followupPending:!followup});
  }catch(e){return accessResponse(e)||Response.json({error:/constraint|SQLITE|D1|Database/i.test(String(e))?'موجودی یا وضعیت هم‌زمان تغییر کرده است؛ هیچ تغییری ثبت نشد. تازه‌سازی کنید.':'ثبت انجام نشد؛ ورودی‌ها را بررسی کنید.'},{status:409})}}

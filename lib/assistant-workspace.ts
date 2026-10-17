@@ -12,6 +12,7 @@ export function cleanFormArgs(value:any,depth=0):any{
 }
 export function operationForm(tool:any,args:any,section:string,title:string):OperationForm{
  if(!args||typeof args!=='object'||Array.isArray(args)||JSON.stringify(args).length>16000)throw new Error('اطلاعات فرم معتبر نیست.');
+ if(tool.name==='save_material_warehouse'){args={revision:0,warehouseId:'',name:'',locations:[],active:true,...args};delete args.warehouseOwner;delete args.qcOwner;}
  if(tool.name==='save_material_master'){args={revision:0,code:'',name:'',unit:'عدد',specs:'',fields:[],...args};for(const k of ['defaultLocation','reorderPoint','targetStock','qcOwner','warehouseOwner','procurementOwner'])delete args[k];}
  if(tool.name==='sales_apply'&&args.mode==='agent'&&!args.agentId&&args.active===undefined)args={...args,active:true};
  if(tool.name==='guarantee_apply'&&args.mode==='save'&&!args.guaranteeId&&args.originalLocation===undefined)args={...args,originalLocation:'زونکن اسناد مالی'};

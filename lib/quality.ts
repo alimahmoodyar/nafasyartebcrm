@@ -1,7 +1,8 @@
+import type {FormControl} from './form-control-contract';
 import {asciiDigits} from './batch-number';
 export type QField={key:string;label:string;type:'number'|'text'|'result';unit:string;min:string;max:string;required:boolean};
 export type QTemplate={id:string;product_id:string;version:number;title:string;fields:QField[];created:string;created_by:string};
-export type QReport={id:string;device_id:string;template_id:string;values:Record<string,string>;verdict:'pass'|'fail';notes:string;created:string;created_by:string;template:QTemplate};
+export type QReport={id:string;device_id:string;template_id:string;values:Record<string,string>;verdict:'pass'|'fail';notes:string;created:string;created_by:string;template:QTemplate;documentControl?:FormControl|null;hasFormRecord?:boolean};
 export function qualityFields(input:unknown):QField[]{
  if(!Array.isArray(input)||input.length<1||input.length>40)throw new Error('فرم باید ۱ تا ۴۰ معیار داشته باشد.');
  const keys=new Set<string>();return input.map(f=>{if(!f||typeof f!=='object'||['key','label','type','unit','min','max'].some(k=>typeof f[k]!=='string')||typeof f.required!=='boolean')throw new Error('مشخصات معیار معتبر نیست.');

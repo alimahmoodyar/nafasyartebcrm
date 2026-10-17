@@ -279,7 +279,7 @@ export const toolOptions:Record<string,Record<string,Record<string,string>>>={
   },
   "permissions.warehouses.*": {
    "raw": "مواد اولیه",
-   "semi": "نیمه‌ساخته",
+   "semi": "موجودی قدیمیِ بدون انبار تعیین‌شده",
    "line": "خط تولید",
    "quarantine": "قرنطینه",
    "nonconforming": "نامنطبق",
@@ -386,7 +386,7 @@ export const toolOptions:Record<string,Record<string,Record<string,string>>>={
   },
   "permissions.warehouses.*": {
    "raw": "مواد اولیه",
-   "semi": "نیمه‌ساخته",
+   "semi": "موجودی قدیمیِ بدون انبار تعیین‌شده",
    "line": "خط تولید",
    "quarantine": "قرنطینه",
    "nonconforming": "نامنطبق",
@@ -621,7 +621,7 @@ export const toolOptions:Record<string,Record<string,Record<string,string>>>={
  "initialize_batch_stock": {
   "to": {
    "raw": "مواد اولیه",
-   "semi": "نیمه‌ساخته",
+   "semi": "موجودی قدیمیِ بدون انبار تعیین‌شده",
    "line": "خط تولید",
    "quarantine": "قرنطینه",
    "nonconforming": "نامنطبق"
@@ -630,14 +630,14 @@ export const toolOptions:Record<string,Record<string,Record<string,string>>>={
  "move_batch_stock": {
   "from": {
    "raw": "مواد اولیه",
-   "semi": "نیمه‌ساخته",
+   "semi": "موجودی قدیمیِ بدون انبار تعیین‌شده",
    "line": "خط تولید",
    "quarantine": "قرنطینه",
    "nonconforming": "نامنطبق"
   },
   "to": {
    "raw": "مواد اولیه",
-   "semi": "نیمه‌ساخته",
+   "semi": "موجودی قدیمیِ بدون انبار تعیین‌شده",
    "line": "خط تولید",
    "quarantine": "قرنطینه",
    "nonconforming": "نامنطبق"
@@ -709,7 +709,7 @@ export const toolOptions:Record<string,Record<string,Record<string,string>>>={
   },
   "permissions.warehouses.*": {
    "raw": "مواد اولیه",
-   "semi": "نیمه‌ساخته",
+   "semi": "موجودی قدیمیِ بدون انبار تعیین‌شده",
    "line": "خط تولید",
    "quarantine": "قرنطینه",
    "nonconforming": "نامنطبق",
@@ -816,7 +816,7 @@ export const toolOptions:Record<string,Record<string,Record<string,string>>>={
   },
   "permissions.warehouses.*": {
    "raw": "مواد اولیه",
-   "semi": "نیمه‌ساخته",
+   "semi": "موجودی قدیمیِ بدون انبار تعیین‌شده",
    "line": "خط تولید",
    "quarantine": "قرنطینه",
    "nonconforming": "نامنطبق",

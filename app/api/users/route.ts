@@ -1,3 +1,5 @@
+import {materialWarehouses,warehouseProfilePermissions,warehouseResponsibilityGuards} from '@/lib/material-warehouses';
+import {syncMaterialTasks} from '@/lib/material-tasks';
 import {storedAccessPermissions} from '@/lib/permissions';
 import {username,password,hashPassword} from "@/lib/password-auth";
 import {env} from "cloudflare:workers";
@@ -45,9 +47,10 @@ export async function GET() {
     const actor=await requireAdmin();
     await memberContactAdminContext(actor);
     const result=await storage().prepare("SELECT m.*,a.username FROM app_members m LEFT JOIN password_accounts a ON a.member_id=m.id WHERE m.status!='deleted' ORDER BY m.created DESC").all();
+    const warehouses=await materialWarehouses();
     const contacts=await memberContactsForAccounts(result.results.map((row:any)=>row.id));
-    const members=await Promise.all(result.results.map(async (row:any)=>{const c=contacts.find(c=>c.memberId===row.id)!;return present({...row,mobile:c.mobile,contactEmail:c.contactEmail,contactRevision:c.revision,protected:await protectedAccount(row,actor)})}));
-    return Response.json({members,accountId:actor.userId},{headers:{'Cache-Control':'no-store'}});
+    const members=await Promise.all(result.results.map(async (row:any)=>{const c=contacts.find(c=>c.memberId===row.id)!;return present({...row,permissions:JSON.stringify(warehouseProfilePermissions(row,warehouses)),mobile:c.mobile,contactEmail:c.contactEmail,contactRevision:c.revision,protected:await protectedAccount(row,actor)})}));
+    return Response.json({members,accountId:actor.userId,warehouses:warehouses.map(w=>({id:w.id,name:w.data.name,active:w.data.active}))},{headers:{'Cache-Control':'no-store'}});
   } catch(error) {return failure(error);}
 }
 export async function POST(request: Request) {
@@ -57,10 +60,12 @@ export async function POST(request: Request) {
     await checkServiceAgent(data.permissions);
     const contact=contactPatch(body),scope=await memberContactAdminContext(actor);
     const id = crypto.randomUUID(), now = new Date().toISOString(),operationId=crypto.randomUUID();
+    const warehouseGuards=await warehouseResponsibilityGuards(data.permissions,operationId);
     const row = {id, ...data, subject: null, username:login||undefined, revision: 1, created: now, updated: now};
     const db = storage();
     await db.batch([
       db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(operationId,'create_member',JSON.stringify({memberId:id}),actor.userId,now),
+      ...warehouseGuards,
       ...memberContactGuards(db,operationId,scope),
       db.prepare("INSERT INTO app_members (id,email,name,unit,status,permissions,revision,created,updated) VALUES(?,?,?,?,?,?,1,?,?)").bind(id, data.email, data.name, data.unit, data.status, data.permissions, now, now),
       ...(login?[db.prepare("INSERT INTO password_accounts(member_id,username,password_hash,version) VALUES(?,?,?,1)").bind(id,login,passwordHash)]:[]),
@@ -69,6 +74,7 @@ export async function POST(request: Request) {
       contactRevisionGuard(db,operationId,id,0),memberContactWrite(db,id,contact,now),
       db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),actor.userId,id,'member_contact_create',JSON.stringify({memberId:id,...contact,revision:1}),now),
     ]);
+    try{await syncMaterialTasks()}catch{}
     return Response.json({member: present({...row,...contact,contactRevision:1})}, {status: 201});
   } catch (error) {return failure(error, localAccount ? 'username' : 'email');}
 }
@@ -84,7 +90,8 @@ export async function PATCH(request: Request) {
     if(protectedUser&&body.status!=='active')throw new AccessError('حساب مدیر اصلی یا حساب جاری را نمی‌توان غیرفعال کرد.',403);
     const credential:any=await db.prepare('SELECT username FROM password_accounts WHERE member_id=?').bind(old.id).first(); localAccount=!!credential;
     const login=credential?username(body.username===undefined?credential.username:body.username):null;
-    const data=payload({...body,unit:body.unit===undefined?old.unit:body.unit,email:credential?old.email:body.email});
+    const oldWarehousePermissions=warehouseProfilePermissions(old,await materialWarehouses()),submitted=body.permissions?.roleAssignment?{...body.permissions,roleAssignment:{...body.permissions.roleAssignment,warehouseResponsibilities:body.permissions.roleAssignment.warehouseResponsibilities??oldWarehousePermissions.warehouseResponsibilities}}:{...body.permissions,warehouseResponsibilities:body.permissions?.warehouseResponsibilities??oldWarehousePermissions.warehouseResponsibilities};
+    const data=payload({...body,permissions:submitted,unit:body.unit===undefined?old.unit:body.unit,email:credential?old.email:body.email});
     const newHash=credential&&body.password?await hashPassword(password(body.password)):null;
     await checkServiceAgent(data.permissions);
     if(old.email!==data.email)throw new Error('ایمیل ورود قبلی ثابت است؛ برای ایمیل دیگر حساب جدا تعریف کنید.');
@@ -94,6 +101,7 @@ export async function PATCH(request: Request) {
     if(contactSupplied&&body.contactRevision!==oldContact.revision)throw new AccessError('اطلاعات تماس تغییر کرده است؛ فهرست را تازه کنید.',409);
     const revoke=!!(newHash||credential&&login!==credential.username||data.status==='disabled');
     const now=new Date().toISOString(),auditId=crypto.randomUUID(),operationId=crypto.randomUUID();
+    const warehouseGuards=await warehouseResponsibilityGuards(data.permissions,operationId);
     const next={...old,...data,username:login||undefined,updated:now,revision:old.revision+1};
     // All statements are gated by the audit claim in the same transaction. A stale update changes nothing.
     const gate='EXISTS(SELECT 1 FROM access_audit WHERE id=?)';
@@ -110,10 +118,12 @@ export async function PATCH(request: Request) {
         db.prepare('UPDATE mcp_tokens SET revoked=1 WHERE (subject=? OR subject=?) AND '+gate).bind('local:'+old.id,old.subject||'local:'+old.id,auditId),
         db.prepare('DELETE FROM mcp_streams WHERE token_id IN (SELECT id FROM mcp_tokens WHERE subject=? OR subject=?) AND '+gate).bind('local:'+old.id,old.subject||'local:'+old.id,auditId)
       ]:[]),
+      ...warehouseGuards,
       ...(contactSupplied?[memberContactWrite(db,old.id,contact,now),db.prepare('INSERT INTO access_audit(id,actor,target,action,before,after,at) VALUES(?,?,?,?,?,?,?)').bind(crypto.randomUUID(),actor.userId,old.id,'member_contact_update',JSON.stringify(oldContact),JSON.stringify({memberId:old.id,...contact,revision:oldContact.revision+1}),now)]:[]),
     ]);
     if(!results[contactSupplied?5:4].meta.changes)return conflict();
     const latestContact=contactSupplied?{...contact,revision:oldContact.revision+1}:(await memberContactsForAccounts([old.id]))[0];
+    try{await syncMaterialTasks()}catch{}
     return Response.json({member:present({...next,mobile:latestContact.mobile,contactEmail:latestContact.contactEmail,contactRevision:latestContact.revision,protected:protectedUser}),reauthenticate:revoke&&actor.userId==='local:'+old.id});
   }catch(error){return failure(error, localAccount ? 'username' : 'email');}
 }
@@ -142,6 +152,7 @@ export async function DELETE(request:Request) {
       db.prepare('DELETE FROM mcp_streams WHERE token_id IN (SELECT id FROM mcp_tokens WHERE subject=? OR subject=?) AND '+gate).bind('local:'+old.id,old.subject||'local:'+old.id,auditId),
     ]);
     if(!results[0].meta.changes)return conflict();
+    try{await syncMaterialTasks()}catch{}
     return Response.json({deleted:true,id:old.id});
   }catch(error){return failure(error);}
 }

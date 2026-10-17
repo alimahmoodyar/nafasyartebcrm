@@ -6,12 +6,13 @@ import './personal-home.css';
 
 type App={key:string;title:string;shortTitle?:string;icon:LucideIcon;control?:ReactElement<any>};
 const labels:Record<string,string>={assets:'اموال',tasks:'کارهای من',personnel:'پرسنلی',sales:'فروش',hospital:'بیمارستان',transport:'حمل‌ونقل','after-sales':'خدمات پس از فروش',sourcing:'تأمین',fulfillment:'ارسال',flow:'گردش مواد',overview:'گزارش کلی',inventory:'انبار',event:'ثبت تولید',serials:'سریال‌ها',device:'دستگاه‌ها',batch:'قطعات',product:'محصولات',action:'اقدامات کیفیت',service:'سوابق خدمات قبلی',firmware:'نرم‌افزار دستگاه',development:'پیشنهادها','routine-production':'کار تولید','build-intake':'سفارش ساخت','build-projects':'پروژه‌ها','mobile-install':'نصب روی گوشی','llm-usage':'مصرف هوش مصنوعی',llm:'تنظیمات دستیار','finance-control':'کنترل مالی',finance:'حسابداری',guarantees:'ضمانت‌نامه‌ها',costing:'بهای تمام‌شده',users:'کاربران','system-reset':'پاک‌سازی آزمایشی',analytics:'گزارش تولید'};
-export function PersonalHome({accountId,name,apps,onNavigate,scope='',title='خانهٔ من',greeting=true,shortTitles=true,compact=false}:{accountId:string;name:string;apps:App[];onNavigate:(key:string)=>void;scope?:string;title?:string;greeting?:boolean;shortTitles?:boolean;compact?:boolean}){
+export function PersonalHome({accountId,name,apps,onNavigate,scope='',title='خانهٔ من',greeting=true,shortTitles=true,compact=false,aliases={}}:{aliases?:Record<string,string>;accountId:string;name:string;apps:App[];onNavigate:(key:string)=>void;scope?:string;title?:string;greeting?:boolean;shortTitles?:boolean;compact?:boolean}){
  const storageKey='nafasyar-home:v1:'+accountId+(scope?':program:'+scope:'');
  const [order,setOrder]=useState<string[]>([]),[editing,setEditing]=useState(false),[search,setSearch]=useState(''),[dragged,setDragged]=useState<string|null>(null),[notice,setNotice]=useState('');
  useEffect(()=>{try{const saved=JSON.parse(localStorage.getItem(storageKey)||'[]');setOrder(Array.isArray(saved)?saved.filter((k:unknown):k is string=>typeof k==='string'):[])}catch{setOrder([])}},[storageKey]);
- const defaults=shortTitles?[...apps].sort((a,b)=>{const priorities=['tasks','sales','hospital','routine-production','flow','inventory','after-sales','sourcing','personnel'];const rank=(key:string)=>{const i=priorities.indexOf(key);return i<0?100:i};return rank(a.key)-rank(b.key)}):apps;
- const keys=[...new Set([...order,...defaults.map(a=>a.key)])].filter(k=>apps.some(a=>a.key===k));
+ const defaults=shortTitles?[...apps].sort((a,b)=>{const priorities=['tasks','sales','hospital','routine-production','warehouse','flow','inventory','after-sales','sourcing','personnel'];const rank=(key:string)=>{const i=priorities.indexOf(key);return i<0?100:i};return rank(a.key)-rank(b.key)}):apps;
+ const normalizedOrder=order.map(key=>aliases[key]&&apps.some(app=>app.key===aliases[key])?aliases[key]:key);
+ const keys=[...new Set([...normalizedOrder,...defaults.map(a=>a.key)])].filter(k=>apps.some(a=>a.key===k));
  const ordered=keys.flatMap(k=>apps.filter(a=>a.key===k));
  const appTitle=(a:App)=>shortTitles?(a.shortTitle||labels[a.key]||a.title):a.title;
  const filtered=ordered.filter(a=>(a.title+' '+appTitle(a)).includes(search.trim()));

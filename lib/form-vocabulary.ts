@@ -1,5 +1,6 @@
 // Shared presentation vocabulary. Values/identifiers sent to domain APIs remain unchanged.
 export const fieldTitles:Record<string,string>={
+ warehouseResponsibilities:'مسئولیت انبارها',warehouseId:'انبار مربوط',
  installedOn:'تاریخ نصب',
  contractStatus:'وضعیت قرارداد',contractUntil:'تاریخ پایان قرارداد',compressorModel:'مدل کمپرسور',generatorModel:'مدل مولد',dryerModel:'مدل خشک‌کن',compressorQuantity:'تعداد کمپرسور',serviceIntervalHours:'فاصله سرویس، ساعت',kitId:'فهرست فیلتر کمپرسور',kitRevision:'نسخه فهرست فیلتر',filters:'فیلترهای نصب‌شده',technicalCode:'کد فنی قطعه',batchCode:'شماره بچ نصب‌شده',sheet:'برگه فایل',profile:'روش انتخاب ستون‌ها',firstRow:'اولین ردیف داده',lastRow:'آخرین ردیف داده',
  contactEmail:'ایمیل تماس (اختیاری)',contactRevision:'نسخه اطلاعات تماس',
