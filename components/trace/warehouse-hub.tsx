@@ -28,10 +28,10 @@ export function WarehouseHub({user,records,demo,onSaved,onOpen,onNavigate,render
  },[targetId]);
  const choices=groups[group]||[],active=choices.find(item=>item.key===leaf),taskOverview=group==='tasks'&&!leaf;
  const openGroup=(key:string)=>{if(!groups[key]?.length)return false;setGroup(key);setFocus('');setQuery('');setLeaf(key!=='tasks'&&groups[key].length===1?groups[key][0].key:'');};
- function render(item:WarehouseEntry){
+ function render(item:WarehouseEntry,receiptLaunch?:number){
   const key=item.key+focus;
   if(item.source==='flow'&&item.view==='stock')return <WarehouseStockPanel key={key} user={user} demo={demo} onOpen={onOpen}/>;
-  if(item.source==='flow')return <MaterialFlow key={key} initialTab={item.view==='nonconforming'?'requests':item.view} initialAction={item.view==='nonconforming'?'reject':undefined} embedded onWarehouseReceipt={item.view==='materials'?(mid=>onNavigate('warehouse',warehouseTarget('flow','new-receipt:'+mid,'receipts'))):undefined} targetId={focus} demo={demo} onSaved={onSaved} onOpen={onOpen}/>;
+  if(item.source==='flow')return <MaterialFlow key={key} receiptLaunch={receiptLaunch} initialTab={item.view==='nonconforming'?'requests':item.view} initialAction={item.view==='nonconforming'?'reject':undefined} embedded onWarehouseReceipt={item.view==='materials'?(mid=>onNavigate('warehouse',warehouseTarget('flow','new-receipt:'+mid,'receipts'))):undefined} targetId={focus} demo={demo} onSaved={onSaved} onOpen={onOpen}/>;
   if(item.source==='inventory')return <ProductionPanel key={key} embedded stockMode={item.view as 'report'|'transfer'|'opening'} view="stock" records={records} user={user} demo={demo} onSaved={onSaved}/>;
   if(item.source==='fulfillment')return <FulfillmentPanel key={key} embedded initialTab={item.view} demo={demo} onSaved={onSaved}/>;
   if(item.source==='batch')return <section className="panel"><div className="inside"><label className="field">جست‌وجوی نام قطعه، کد بچ یا تأمین‌کننده<input type="search" value={query} onChange={e=>setQuery(e.target.value)}/></label>{renderBatches(query)}</div></section>;
