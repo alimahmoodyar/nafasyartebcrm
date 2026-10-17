@@ -37,22 +37,40 @@ const rw=(await change('assign',lot.id,{...assign(),start:'10:00',end:'10:30',co
 assert.equal(row(rw).data.policy.restMinutes,10);await change('output',rw,{good:1,scrap:0,reworkCount:0,overtime:false,allocations:[]});await change('close',rw,{actualMinutes:10,overtimeMinutes:0});assert.equal(row(lot.id).data.ready[1],9);
 const second=(await change('assign',lot.id,{...assign(),memberId:'worker2',stage:1,count:9})).id;const report=(await get()).jobs.find(j=>j.id===second).data.report;assert.equal(report.usefulMinutes,115);assert.equal(report.provisional,false);
 await change('output',second,{good:9,scrap:0,reworkCount:0,overtime:false,allocations:[]});await change('close',second,{actualMinutes:60,overtimeMinutes:0});
-const qc=body('quality',{lotId:lot.id,revision:row(lot.id).revision,good:8,scrap:0,reworkCount:1,reference:'QC1'});await post(qc);await post(qc);assert.equal(sql.prepare("SELECT quantity FROM inventory_balances WHERE item_id=?").get('routine-batch:'+lot.id).quantity,8000);
-const rework=(await change('assign',lot.id,{...assign(),memberId:'worker2',start:'10:00',end:'10:30',stage:1,count:1,rework:true})).id;await change('output',rework,{good:1,scrap:0,reworkCount:0,overtime:false,allocations:[]});await change('close',rework,{actualMinutes:10,overtimeMinutes:0});await change('quality',lot.id,{good:1,scrap:0,reworkCount:0,reference:'QC2'});assert.equal(row(lot.id).data.received,9);assert.equal(row(lot.id).data.scrap,1);
-// A quality receipt is held separately until the warehouse moves it to the line.
+const withoutWarehouse=body('quality',{lotId:lot.id,revision:row(lot.id).revision,good:8,scrap:0,reworkCount:1,reference:'QC1'});await post(withoutWarehouse,400);assert.equal(row(lot.id).data.pending,9);
+entity('warehouse:user','material_warehouse',{name:'My workshop store',active:true,locations:['A-1-1-1']});
+await post({...withoutWarehouse,warehouseId:'semi'},404);
+entity('warehouse:inactive','material_warehouse',{name:'Disabled',active:false,locations:[]});await post({...withoutWarehouse,warehouseId:'warehouse:inactive'},400);
+beforeBatch=()=>sql.prepare('UPDATE flow_entities SET revision=revision+1 WHERE id=?').run('warehouse:user');await post({...withoutWarehouse,warehouseId:'warehouse:user'},409);assert.equal(row(lot.id).data.pending,9);assert.equal(sql.prepare("SELECT COUNT(*) n FROM inventory_balances WHERE warehouse='semi'").get().n,0);
+const qc=body('quality',{warehouseId:'warehouse:user',lotId:lot.id,revision:row(lot.id).revision,good:8,scrap:0,reworkCount:1,reference:'QC1'});await post(qc);await post(qc);assert.equal(sql.prepare("SELECT quantity FROM inventory_balances WHERE item_id=?").get('routine-batch:'+lot.id).quantity,8000);
+const flow=load('app/api/flow/route.ts');
+async function flowPost(mode,x){const r=await ctx.run(user,()=>flow.POST(new Request('https://test.local/api/flow',{method:'POST',headers:{origin:'https://test.local'},body:JSON.stringify(body(mode,x))})));const d=await r.json();assert.equal(r.status,200,JSON.stringify(d));return d;}
+assert.equal(row('routine-batch:'+lot.id).data.state,'awaiting_warehouse');
+await flowPost('shelve',{receiptId:'routine-batch:'+lot.id,location:'A-1-1-1'});
+const rework=(await change('assign',lot.id,{...assign(),memberId:'worker2',start:'10:00',end:'10:30',stage:1,count:1,rework:true})).id;await change('output',rework,{good:1,scrap:0,reworkCount:0,overtime:false,allocations:[]});await change('close',rework,{actualMinutes:10,overtimeMinutes:0});await change('quality',lot.id,{good:1,scrap:0,reworkCount:0,reference:'QC2',warehouseId:'warehouse:user'});assert.equal(row(lot.id).data.received,9);assert.equal(row(lot.id).data.scrap,1);
+// Quality uses the user warehouse and requires shelving before issue to the line.
 const bid='routine-batch:'+lot.id;
 const balance=wh=>sql.prepare('SELECT quantity FROM inventory_balances WHERE item_id=? AND warehouse=?').get(bid,wh)?.quantity||0;
-assert.equal(balance('semi'),9000);assert.equal(balance('line'),0);
+assert.equal(balance('semi'),0);assert.equal(balance('raw'),8000);assert.equal(balance('quarantine'),1000);assert.equal(balance('line'),0);
+assert.equal(row(bid).data.warehouseId,'warehouse:user');
+await flowPost('shelve',{receiptId:bid,location:'A-1-1-1'});
+assert.equal(balance('raw'),9000);assert.equal(balance('quarantine'),0);
+const request=await flowPost('request',{materialId:'part',warehouseId:'warehouse:user',quantity:'3',planId:'',notes:'Line requirement'});
+const requestId=sql.prepare("SELECT id FROM flow_entities WHERE type='request' ORDER BY created DESC").get().id;
+await flowPost('issue',{requestId,allocations:[{batchId:bid,location:'warehouse:user|A-1-1-1',quantity:'3'}],reason:''});
+assert.equal(balance('raw'),6000);assert.equal(balance('line'),3000);
 const prod=load('app/api/production/route.ts');
-async function move(x={},status=200){const r=await ctx.run(user,()=>prod.POST(new Request('https://test.local/api/production',{method:'POST',headers:{origin:'https://test.local'},body:JSON.stringify({id:crypto.randomUUID(),mode:'move',batchId:bid,from:'semi',to:'line',quantity:'3',...x})})));const d=await r.json();assert.equal(r.status,status,JSON.stringify(d));return d;}
-user={userId:'warehouse',isAdmin:false,permissions:{read:['batch'],write:['batch'],eventStages:[],flowRoles:['inventory'],warehouses:['line']}};await move({},403);
+async function move(x={},status=200){const r=await ctx.run(user,()=>prod.POST(new Request('https://test.local/api/production',{method:'POST',headers:{origin:'https://test.local'},body:JSON.stringify({id:crypto.randomUUID(),mode:'move',batchId:bid,from:'raw',to:'semi',quantity:'1',...x})})));const d=await r.json();assert.equal(r.status,status,JSON.stringify(d));return d;}
+await move({},400);assert.equal(balance('semi'),0);
+// Existing historical stock is neither deleted nor allowed to receive more.
+sql.prepare("UPDATE inventory_balances SET warehouse='semi',id=? WHERE item_id=? AND warehouse='raw'").run(bid+'@semi',bid);
+const oldReceipt=row(bid);sql.prepare('UPDATE flow_entities SET data=? WHERE id=?').run(JSON.stringify({...oldReceipt.data,warehouseId:''}),bid);
+user={userId:'warehouse',isAdmin:false,permissions:{read:['batch'],write:['batch'],eventStages:[],flowRoles:['inventory'],warehouses:['line']}};await move({from:'semi',to:'line'},403);
 user={...user,permissions:{...user.permissions,warehouses:['semi','line']}};
-const transferId=crypto.randomUUID();await move({id:transferId});await move({id:transferId});assert.equal(balance('semi'),6000);assert.equal(balance('line'),3000);
-await move({quantity:'7'},409);assert.equal(balance('semi'),6000);assert.equal(balance('line'),3000);
-await move({from:'line',to:'semi',quantity:'1'});assert.equal(balance('semi'),7000);assert.equal(balance('line'),2000);
-user=admin;await move({to:'raw'},400);
 const moveTool=load('lib/mcp/tools.ts').tools.find(t=>t.name==='move_batch_stock');
-await ctx.run(user,()=>moveTool.run({id:crypto.randomUUID(),confirmed:true,batchId:bid,from:'semi',to:'line',quantity:'1'},'https://test.local',{}));assert.equal(balance('semi'),6000);assert.equal(balance('line'),3000);
+await ctx.run(user,()=>moveTool.run({id:crypto.randomUUID(),confirmed:true,batchId:bid,from:'semi',to:'line',quantity:'1'},'https://test.local',{}));assert.equal(balance('semi'),5000);assert.equal(balance('line'),4000);
+await move({from:'line',to:'semi'},400);assert.equal(balance('semi'),5000);
+user=admin;
 const rates=[a.id,rw,second,rework].map(jobId=>({jobId,hourly:'60',overtimeHourly:'90'}));await change('cost',lot.id,{rates,overhead:'40',basis:'approved hours',reference:'C1'});assert.equal(row(lot.id).data.cost.total,'1180');assert.equal(row('cost-price:routine-batch:'+lot.id).data.unitCost,'131.111111');
 const priced=load('lib/costing.ts').calculateCosts({entities:sql.prepare('SELECT * FROM flow_entities').all(),records:sql.prepare('SELECT * FROM records').all(),entries:sql.prepare('SELECT * FROM inventory_entries').all(),operations:sql.prepare('SELECT rowid AS sequence,* FROM inventory_operations ORDER BY created,rowid').all(),boms:[],orders:[]});assert.equal(priced.pools.find(p=>p.partCode==='22').quantity,9);assert.equal(priced.pools.find(p=>p.partCode==='22').unitCost,'131.111111');
 user={userId:'worker',name:'Worker',isAdmin:false,permissions:{read:[],write:[],eventStages:[]}};let data=await get();assert.equal(data.jobs.length,2);assert.equal(data.lots.length,0);await change('reason',a.id,{notes:'machine stopped'});await change('reason',second,{notes:'not my work'},403);await change('output',a.id,{good:1},403);user={userId:'foreman',isAdmin:false,permissions:{flowRoles:['production']}};data=await get();assert.equal(data.lots[0].data.cost,undefined);await change('cost',lot.id,{rates,overhead:'1'},403);await change('review',a.id,{notes:'Delay reviewed; no payroll mutation'});user=admin;

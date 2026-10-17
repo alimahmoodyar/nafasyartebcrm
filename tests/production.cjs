@@ -15,15 +15,20 @@ async function mint(scope='read'){return (await (await tokens.POST(request('/api
 
 const production=load('app/api/production/route.ts'),recordsApi=load('app/api/records/route.ts');
 async function create(kind,data){const r=await recordsApi.POST(request('/api/records','POST',{kind,data}));const d=await r.json();assert.equal(r.status,201,JSON.stringify(d));return d.record;}
-async function operate(b,status=200){const r=await production.POST(request('/api/production','POST',{id:crypto.randomUUID(),...b}));const d=await r.json();assert.equal(r.status,status,JSON.stringify(d));return d;}
+async function operate(b,status=200){const r=await production.POST(request('/api/production','POST',{id:crypto.randomUUID(),warehouseId:'warehouse:user',...b}));const d=await r.json();assert.equal(r.status,status,JSON.stringify(d));return d;}
 (async()=>{
  identity=owner;await auth.session();
+ await operate({mode:'opening',batchId:'missing',to:'raw',quantity:'1'},400);
+ sql.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'material_warehouse',?,1,'2026-10-17','2026-10-17')").run('warehouse:user',JSON.stringify({name:'User-defined store',active:true,locations:[]}));
  const p=await create('product',{code:'P1',name:'Device',group:'اکسیژن‌ساز',model:'M',warrantyMonths:'12',status:'فعال'});
  const devices=[];for(let n=0;n<3;n++)devices.push(await create('device',{code:'D'+n,product:p.id,model:'M',design:'1',date:'2026-10-01'}));
  const batches=[];for(let n=1;n<=2;n++)batches.push(await create('batch',{code:'B'+n,partCode:'0'+n,part:'Part'+n,date:'2026-10-01',supplier:'S',quantity:'10',unit:'عدد',status:'تأیید'}));
  const bomId=crypto.randomUUID(),lines=[{partCode:'01',name:'Part1',unit:'عدد',quantity:'2'},{partCode:'02',name:'Part2',unit:'عدد',quantity:'3'}];
  await operate({mode:'bom',id:bomId,productId:p.id,previousVersion:0,lines});
+ await operate({mode:'opening',batchId:batches[0].id,to:'line',quantity:'10',warehouseId:''},400);
+ await operate({mode:'opening',batchId:batches[0].id,to:'semi',quantity:'10'},400);
  await operate({mode:'opening',batchId:batches[0].id,to:'line',quantity:'10'});
+ assert.equal(JSON.parse(sql.prepare('SELECT payload FROM records WHERE id=?').get(batches[0].id).payload).warehouseId,'warehouse:user');
  await operate({mode:'opening',batchId:batches[1].id,to:'raw',quantity:'10'});
  await operate({mode:'move',batchId:batches[1].id,from:'raw',to:'line',quantity:'2'});
  const orderId=crypto.randomUUID(),allocations=batches.map((b,n)=>({partCode:'0'+(n+1),batchId:b.id,warehouse:'line'}));

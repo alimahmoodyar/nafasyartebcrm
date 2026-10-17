@@ -12,8 +12,8 @@ export function WarehouseStockPanel({user,demo,onOpen}:{user:Session;demo:boolea
  const warehouses=(data?.warehouses||[]).filter((w:any)=>user.isAdmin||(w.inventoryMembers||[]).some((m:any)=>[m.id,'local:'+m.id,m.subject].filter(Boolean).includes(user.userId))),receipts=(data?.entities||[]).filter((e:any)=>e.type==='receipt'),rows=data?.rows||[];
  const entries=(data?.balances||[]).filter((b:any)=>b.quantity>0&&(user.isAdmin||data.warehouseIds.includes(b.warehouse))).flatMap((b:any)=>{
   const row=rows.find((r:any)=>r.id===b.item_id);if(!row||row.kind!=='batch')return [];
-  const receipt=receipts.find((r:any)=>r.id===row.id),stored=['raw','quarantine'].includes(b.warehouse),w=stored?warehouses.find((w:any)=>w.id===receipt?.data.warehouseId):undefined;
-  if(stored&&receipt?.data.warehouseId&&!w)return [];
+  const receipt=receipts.find((r:any)=>r.id===row.id),stored=['raw','quarantine'].includes(b.warehouse),w=stored?warehouses.find((w:any)=>w.id===(receipt?.data.warehouseId||row.data.warehouseId)):undefined;
+  if(stored&&(receipt?.data.warehouseId||row.data.warehouseId)&&!w)return [];
   const locations=b.warehouse==='raw'?(data.slots||[]).filter((s:any)=>s.batch_id===row.id).map((s:any)=>s.location.includes('|')?s.location.slice(s.location.indexOf('|')+1):s.location).join('، '):'';
   return [{...b,row,warehouseId:w?.id||'',warehouseName:w?.data.name||(stored?'سوابق بدون انبار فیزیکی':'محل فیزیکی جداگانه ثبت نشده'),locations}];
  });
