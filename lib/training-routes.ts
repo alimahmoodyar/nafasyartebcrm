@@ -1,3 +1,4 @@
+import * as warehouseMovements from '@/app/api/warehouse/movements/route';
 import * as buildProjects from '@/app/api/build-projects/route';
 import * as expenseRegister from '@/app/api/expense-register/route';
 import * as purchaseSettlement from '@/app/api/purchase-settlement/route';
@@ -76,6 +77,7 @@ export const trainingRoutes:Record<string,Record<string,any>>={
  'production':route13,
  'transport':route14,
  'bom-import':route15,
+ 'warehouse/movements':warehouseMovements,
  'fulfillment':route16,
  'after-sales':route17,
  'distribution':route18,

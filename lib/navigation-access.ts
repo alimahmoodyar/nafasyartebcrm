@@ -52,7 +52,7 @@ export function canOpenSection(user:Session,s:string):boolean{
  if(s==='after-sales')return serviceRead(u);
  if(s==='sourcing')return !!p.qmsRoles?.some(r=>['qa','qc'].includes(r))||!!p.flowRoles?.includes('qc')||!!p.supplyRoles?.length||!!p.flowRoles?.some(r=>['inventory','logistics'].includes(r))||!!p.transportRoles?.includes('manager');
  if(['users','llm','finance','system-reset'].includes(s))return false;
- if(s==='fulfillment')return salesStaff(u)||!!p.salesAgentId||!!p.flowRoles?.some(r=>['inventory','production','sales','logistics'].includes(r));
+ if(s==='fulfillment')return warehouseAccess(u,'finished')||salesStaff(u)||!!p.salesAgentId||!!p.flowRoles?.some(r=>['inventory','production','sales','logistics'].includes(r));
  if(s==='flow')return !!p.warehouseResponsibilities?.length||!!p.flowRoles?.some(r=>['inventory','qc','production','procurement'].includes(r));
  if(s==='finance-control')return financialAccess(u,'control');
  return can(u,(s==='inventory'?'batch':['serials','analytics'].includes(s)?'device':s) as Kind,'read');
@@ -69,7 +69,7 @@ export function sectionDestination(user:Session,section:string,target=''){
 /** The hub groups existing grants; it never assigns a domain or warehouse. */
 export function warehouseNavigation(user:Session){
  const p=accessPermissions(user.permissions),u={...user,permissions:p};
- const groups:Record<string,WarehouseEntry[]>={tasks:[],stock:[],receive:[],issue:[],dispatch:[],returns:[],settings:[]};
+ const groups:Record<string,WarehouseEntry[]>={tasks:[],stock:[],receive:[],issue:[],operations:[],dispatch:[],returns:[],settings:[]};
  if(!canOpenSection(u,'warehouse'))return groups;
  const add=(group:string,key:string,title:string,source:string,view:string)=>groups[group].push({key,title,source,view});
  const materialScope=['raw','semi','line','quarantine','nonconforming'].filter(warehouse=>warehouseAccess(u,warehouse));
@@ -82,7 +82,6 @@ export function warehouseNavigation(user:Session){
   if(production)add('returns','nonconforming','ثبت قطعه نامنطبق خط','flow','nonconforming');
   if(inventory&&materialScope.length)add('settings','materials','شناسنامه کالاها','flow','materials');
   if(u.isAdmin)add('settings','warehouses','انبارها و محل‌های نگهداری','flow','warehouses');
-  if(production||quality){add('issue','production','پیگیری تولید و مصرف مواد','flow','builds');add('issue','plans','برنامه و سریال تولید','flow','plans');}
  }
  if(canOpenSection(u,'inventory')&&(!inventory||materialScope.length)){
   if(!flow||!inventory)add('stock','material-stock','موجودی مواد و گردش بین انبارها','inventory','report');
@@ -92,7 +91,7 @@ export function warehouseNavigation(user:Session){
  if(canOpenSection(u,'batch')&&(!inventory||materialScope.length))add('stock','batches','جست‌وجوی قطعات و بچ‌ها','batch','batches');
  if(canOpenSection(u,'fulfillment')){
   const finished=warehouseAccess(u,'finished'),sales=u.isAdmin||!!p.salesRoles?.some(r=>['staff','manager'].includes(r))||!!p.flowRoles?.includes('sales'),logistics=u.isAdmin||!!p.flowRoles?.includes('logistics')||!!p.transportRoles?.includes('driver');
-  if(finished){add('tasks','finished-tasks','دریافت‌های محصول نهایی','fulfillment','receive');add('receive','finished-receive','دریافت محصول از تولید','fulfillment','receive');}
+  if(finished){add('receive','finished-receive','دریافت محصول از تولید','fulfillment','receive');}
   if(production)add('receive','production-handoff','تحویل محصول تولیدشده به انبار','fulfillment','handoff');
   if(finished||sales)add('stock','finished-stock','موجودی و رزرو محصول نهایی','fulfillment','sales');
   if(finished||sales||logistics)add('dispatch','dispatch','آماده‌سازی و تحویل سفارش','fulfillment',finished||logistics?'dispatch':'sales');
@@ -107,6 +106,7 @@ export function warehouseNavigation(user:Session){
   }
  }
  if(canOpenSection(u,'build-projects')&&(inventory&&warehouseAccess(u,'raw')||p.serviceRoles?.includes('technician')))add('issue','project-materials','درخواست‌های قطعات پروژه','build-projects','materials');
+ groups.operations=[...groups.receive,...groups.issue];delete groups.receive;delete groups.issue;
  return groups;
 }
 export function warehouseHomeAliases(user:Session){return canOpenSection(user,'warehouse')?Object.fromEntries(warehouseLegacySections.map(key=>[key,'warehouse'])):{};}

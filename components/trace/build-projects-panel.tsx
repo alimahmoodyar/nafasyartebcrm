@@ -1,4 +1,5 @@
 'use client';
+import {warehouseTarget} from '@/lib/warehouse-workspace';
 import {NumberInput} from '@/components/trace/number-input';
 import {BuildIntakeSpecification} from './build-intake-panel';
 import {IconDisclosure,IconActions} from "./program-workspace";
@@ -16,7 +17,7 @@ export function BuildProjectsPanel({demo=false,targetId='',onNavigate=()=>{},ini
  useEffect(()=>{if(!demo)void load().catch(e=>setError(e.message));},[demo]);useEffect(()=>{if(targetId)setSelected(targetId)},[targetId]);
  const project=data?.projects.find((x:any)=>x.id===selected),p=project?.data,roles=data?.roles||{},report=project?.report;
  const begin=(mode:string,extra:any={})=>{setError('');setDraft({mode,id:crypto.randomUUID(),confirmed:true,revision:project?.revision||0,projectId:project?.id,notes:'',day:localDay(),...extra});};
- const btn=(mode:string,label:string,extra:any={},disabled=false)=><button className="btn" disabled={busy||disabled||p?.state==='closed'&&mode!=='reopen'&&mode!=='create'} onClick={()=>begin(mode,extra)}>{label}</button>;
+ const btn=(mode:string,label:string,extra:any={},disabled=false)=><button className="btn" disabled={busy||disabled||p?.state==='closed'&&mode!=='reopen'&&mode!=='create'} onClick={()=>!warehouseOnly&&['reserve','issue','return','cancel_request','shortage'].includes(mode)?onNavigate('warehouse',warehouseTarget('build-projects',project.id,'operation:materials')):begin(mode,extra)}>{label}</button>;
  const field=(k:string,value:any)=>setDraft((x:any)=>({...x,[k]:value}));
  const input=(k:string,label:string,numeric=false,required=true)=><label className="field">{label}<NumberInput fieldKey={k} required={required} value={draft[k]??''} inputMode={numeric?'decimal':undefined} onChange={e=>field(k,numeric?latinDigits(e.target.value):e.target.value)}/></label>;
  const pick=(k:string,label:string,items:any[],required=true)=><label className="field">{label}<select required={required} value={draft[k]||''} onChange={e=>field(k,e.target.value)}><option value="">انتخاب کنید</option>{items.map((x:any)=><option key={x[0]} value={x[0]}>{x[1]}</option>)}</select></label>;

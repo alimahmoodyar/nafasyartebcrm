@@ -1,5 +1,8 @@
 /** Document bindings are configured once by document control, never by form operators. */
 export const controlledForms:Record<string,{title:string;roles:string[]}>={
+ 'warehouse.send':{title:'حواله انتقال بین انبارها',roles:['inventory']},
+ 'warehouse.receive':{title:'رسید انتقال بین انبارها',roles:['inventory']},
+ 'warehouse.cancel':{title:'لغو انتقال بین انبارها',roles:['inventory']},
  'flow.material':{title:'تعریف کالا و معیار کنترل ورودی',roles:['inventory','qc','production']},
  'flow.warehouse':{title:'تعریف انبار',roles:['inventory','qc','production']},
  'flow.receipt':{title:'دریافت و قرنطینه کالا',roles:['inventory','qc','production']},
@@ -32,6 +35,9 @@ export type FormRecord={target:string;title:string;productId:string;control:Form
 
 // Ignore unsolicited request fields: an operator may only archive the form actually validated.
 export const controlledInputs:Record<string,string[]>={
+ 'warehouse.send':['itemId','fromWarehouseId','toWarehouseId','sourceLocation','quantity','notes'],
+ 'warehouse.receive':['transferId','location'],
+ 'warehouse.cancel':['transferId'],
  'flow.material':['code','name','unit','specs','fields'],
  'flow.warehouse':['name','locations','active'],
  'flow.assign_qc':['receiptId','qcOwner'],
@@ -48,8 +54,8 @@ export const controlledInputs:Record<string,string[]>={
  'flow.reject':['batchId','quantity','reason'],
  'flow.repair':['deviceId','oldBatchId','newBatchId','quantity','cause','reason'],
  'flow.print':['planId','notes'],
- 'fulfillment.handoff':['deviceIds','packaged','notes'],
- 'fulfillment.receive':['handoffId','deviceIds','notes'],
+ 'fulfillment.handoff':['warehouseId','deviceIds','packaged','notes'],
+ 'fulfillment.receive':['warehouseId','handoffId','deviceIds','notes'],
  'fulfillment.cancel_handoff':['handoffId','deviceIds','notes'],
  'fulfillment.dispatch':['saleId','deviceIds','carrierId','reason','handedOver','receiptReference'],
  'quality.final':['deviceId','templateId','title','values','verdict','notes'],

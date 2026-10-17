@@ -1,3 +1,4 @@
+import {warehouseDirectory,warehouseMember} from '@/lib/material-warehouses';
 import {captureForm} from '@/lib/form-control';
 import {storedAccessPermissions} from '@/lib/permissions';
 import {qmsDispatchGuard} from '@/lib/qms-release';
@@ -17,17 +18,17 @@ const json=(v:unknown)=>Response.json(v,{headers:{'Cache-Control':'no-store'}});
 export async function GET(){try{
  const u=await requireAccess(),production=flowRole(u,'production'),inventory=warehouseAccess(u,'finished'),sales=salesStaff(u)||salesRep(u),logistics=flowRole(u,'logistics');
  if(!production&&!inventory&&!sales&&!logistics)fail('دسترسی محصول نهایی ندارید.',403);
- const db=storage(),all=(await db.prepare("SELECT * FROM flow_entities WHERE type IN ('build','handoff','sale','sales_order','print','finaltest') ORDER BY created DESC,id DESC").all()).results.map(entity);
+ const db=storage(),physical=await warehouseDirectory(),ownIds=new Set(physical.filter(w=>w.data.active&&warehouseMember(u,w,'inventory')).map(w=>w.id)),all=(await db.prepare("SELECT * FROM flow_entities WHERE type IN ('build','handoff','sale','sales_order','print','finaltest') ORDER BY created DESC,id DESC").all()).results.map(entity);
  const records=(await db.prepare("SELECT id,kind,payload FROM records WHERE kind IN ('device','product')").all()).results.map((r:any)=>({id:r.id,kind:r.kind,data:JSON.parse(r.payload)}));
  const rows=records.filter((r:any)=>r.kind==='product'||production||inventory||sales||all.some(e=>e.type==='sale'&&e.data.deviceIds?.includes(r.id)&&['local:'+e.data.carrierId,e.data.carrierSubject].includes(u.userId)));
  const prints=new Set(all.filter(e=>e.type==='print').map(e=>e.data.planId));
- const builds=all.filter(e=>e.type==='build').filter(e=>production||inventory||sales&&['finished','reserved','in_transit','consigned','delivered'].includes(e.data.state)).map(e=>{
+ const builds=all.filter(e=>e.type==='build').filter(e=>production||inventory&&(!e.data.warehouseId||ownIds.has(e.data.warehouseId))||sales&&['finished','reserved','in_transit','consigned','delivered'].includes(e.data.state)).map(e=>{
  const legacy=all.find(t=>t.type==='finaltest'&&t.data.deviceId===e.id&&t.data.buildRevision===e.revision);
  return {id:e.id,revision:e.revision,created:e.created,data:{...e.data,latestQc:e.data.latestQc===undefined&&legacy?{verdict:legacy.data.verdict,by:legacy.data.by,reportId:legacy.data.reportId}:e.data.latestQc},printRecorded:prints.has(e.data.planId)};});
  const members=(await db.prepare("SELECT id,name,subject,permissions FROM app_members WHERE status='active'").all()).results.map((m:any)=>({id:m.id,name:m.name,subject:m.subject,permissions:storedAccessPermissions(m.permissions)}));
  const salesVisible=all.filter(e=>e.type==='sale'&&(inventory||salesStaff(u)||salesRep(u)&&e.data.salesAgentId===u.permissions.salesAgentId||logistics&&['local:'+e.data.carrierId,e.data.carrierSubject].includes(u.userId)));
  const orderVisible=all.filter(e=>e.type==='sales_order'&&e.data.state==='approved'&&(inventory||salesStaff(u)||salesRep(u)&&e.data.agentId===u.permissions.salesAgentId));
- return json({builds,rows,handoffs:production||inventory?all.filter(e=>e.type==='handoff'):[],sales:salesVisible,orders:orderVisible.map(e=>({id:e.id,data:{agentId:e.data.agentId,recipient:e.data.recipient,lines:e.data.lines,deliveryMode:e.data.deliveryMode}})),carriers:inventory?members.filter(m=>(m.permissions.flowRoles?.includes('logistics')||m.permissions.transportRoles?.includes('driver'))).map(m=>({id:m.id,name:m.name})):[],roles:{production,inventory,sales,logistics}});
+ return json({warehouses:physical.filter(w=>w.data.active&&(production||warehouseMember(u,w,'inventory'))).map(w=>({id:w.id,name:w.data.name,canReceive:warehouseMember(u,w,'inventory')})),builds,rows,handoffs:production||inventory?all.filter(e=>e.type==='handoff'&&(production||!e.data.warehouseId||ownIds.has(e.data.warehouseId))):[],sales:salesVisible,orders:orderVisible.map(e=>({id:e.id,data:{agentId:e.data.agentId,recipient:e.data.recipient,lines:e.data.lines,deliveryMode:e.data.deliveryMode}})),carriers:inventory?members.filter(m=>(m.permissions.flowRoles?.includes('logistics')||m.permissions.transportRoles?.includes('driver'))).map(m=>({id:m.id,name:m.name})):[],roles:{production,inventory,sales,logistics}});
  }catch(e){return accessResponse(e)||Response.json({error:'دریافت کارتابل محصول نهایی انجام نشد.'},{status:503})}}
 export async function POST(request:Request){try{
  checkOrigin(request);const u=await requireAccess(),b=JSON.parse(new TextDecoder().decode(await boundedBody(request,128000))),id=needed(b.id),mode=needed(b.mode),db=storage(),now=new Date().toISOString();
@@ -45,16 +46,18 @@ export async function POST(request:Request){try{
  async function passed(build:any){if(build.data.latestQc!==undefined){if(build.data.latestQc?.verdict!=='pass')fail('کنترل کیفیت معتبر و قبول‌شده لازم است.');return build.data.latestQc;}
  const tests=(await db.prepare("SELECT * FROM flow_entities WHERE type='finaltest' AND json_extract(data,'$.deviceId')=? ORDER BY created DESC,id DESC").bind(build.id).all()).results.map(entity),test=tests[0];if(!test||test.data.buildRevision!==build.revision||test.data.verdict!=='pass')fail('کنترل کیفیت معتبر و قبول‌شده لازم است.');return {reportId:test.data.reportId,verdict:'pass',by:test.data.by};}
  if(mode==='handoff'){
+ const directory=await warehouseDirectory(),destination=directory.find(w=>w.id===b.warehouseId&&w.data.active);if(directory.length&&!destination)fail('انبار مقصد محصول را انتخاب کنید.');if(destination)guard('EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)',destination.id,destination.revision);
  const deviceIds=ids(b.deviceIds);if(b.packaged!==true)fail('بسته‌بندی و نصب برچسب دستگاه‌ها را تأیید کنید.');
  for(const did of deviceIds){const build=await get(did,'build');if(build.data.state!=='assembled')fail('سریال آماده تحویل نیست یا قبلاً ارجاع شده است.');const qc=await passed(build);
  if(!await db.prepare("SELECT id FROM flow_entities WHERE type='print' AND json_extract(data,'$.planId')=? LIMIT 1").bind(build.data.planId).first())fail('ابتدا چاپ برچسب این برنامه را ثبت کنید.');
  put(did,'build',{...build.data,latestQc:qc,state:'awaiting_receipt',handoffId:id,packagedAt:now},build);event(did,'ارجاع به انبار محصول نهایی',{notes:text(b.notes||'',4000)});}
- put(id,'handoff',{deviceIds,pending:deviceIds,received:[],state:'pending',by:u.name,actor:u.userId,notes:text(b.notes||'',4000),history:[]});
+ put(id,'handoff',{warehouseId:destination?.id||'',deviceIds,pending:deviceIds,received:[],state:'pending',by:u.name,actor:u.userId,notes:text(b.notes||'',4000),history:[]});
  }else if(mode==='receive'||mode==='cancel_handoff'){
  const h=await get(needed(b.handoffId),'handoff'),selected=ids(b.deviceIds);if(h.data.state!=='pending'||selected.some(d=>!h.data.pending.includes(d)))fail('سریال انتخاب‌شده در انتظار این تحویل نیست.',409);
+ if(mode==='receive'&&h.data.warehouseId&&b.warehouseId&&h.data.warehouseId!==b.warehouseId)fail('انبار دریافت باید همان مقصد ثبت‌شدهٔ تحویل باشد.');let physical:any;const wid=h.data.warehouseId||b.warehouseId||'';if(mode==='receive'){const ws=await warehouseDirectory();physical=ws.find(w=>w.id===wid&&w.data.active);if(ws.length&&!physical)fail('انبار دریافت محصول را انتخاب کنید.');if(physical&&!warehouseMember(u,physical,'inventory'))fail('دریافت این انبار در مسئولیت شما نیست.',403);if(physical)guard('EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)',physical.id,physical.revision);}
  const notes=text(b.notes||'',4000);if(mode==='cancel_handoff'&&!notes)fail('علت بازگرداندن به خط تولید لازم است.');if(mode==='receive'&&selected.length<h.data.pending.length&&!notes)fail('علت تحویل جزئی را بنویسید.');
  for(const did of selected){const build=await get(did,'build');if(build.data.state!=='awaiting_receipt'||build.data.handoffId!==h.id)fail('وضعیت سریال تغییر کرده است.',409);
- put(did,'build',{...build.data,state:mode==='receive'?'finished':'assembled',...(mode==='receive'?{receivedAt:now,receivedBy:u.name}:{handoffId:null})},build);
+ put(did,'build',{...build.data,state:mode==='receive'?'finished':'assembled',...(mode==='receive'?{receivedAt:now,receivedBy:u.name,warehouseId:physical?.id||''}:{handoffId:null})},build);
  if(mode==='receive')entry(did,'finished',1000);event(did,mode==='receive'?'دریافت انبار محصول نهایی':'بازگشت درخواست تحویل به خط',{notes});}
  const pending=h.data.pending.filter((d:string)=>!selected.includes(d));put(h.id,'handoff',{...h.data,pending,received:mode==='receive'?[...h.data.received,...selected]:h.data.received,state:pending.length?'pending':'closed',history:[...h.data.history,{mode,deviceIds:selected,by:u.name,actor:u.userId,at:now,notes}]},h);
  }else if(mode==='reserve'){
@@ -79,6 +82,7 @@ export async function POST(request:Request){try{
  const changed=JSON.stringify([...selected].sort())!==JSON.stringify([...sale.data.deviceIds].sort());const reason=text(b.reason||'',4000);if(changed&&!reason)fail('علت تغییر سریال‌های پیشنهادی را بنویسید.');if(b.handedOver!==true)fail('تحویل فیزیکی به تدارکات را تأیید کنید.');
  for(const did of sale.data.deviceIds.filter((d:string)=>!selected.includes(d))){const build=await get(did,'build');if(build.data.state!=='reserved'||build.data.saleId!==sale.id)fail('رزرو تغییر کرده است.',409);put(did,'build',{...build.data,state:'finished',saleId:null},build);event(did,'آزادسازی سریال رزرو',{notes:reason});}
  for(const did of selected){checks.push(await qmsDispatchGuard(did,id));const build=await get(did,'build'),d=await device(did);if(d.product!==sale.data.productId||!(build.data.state==='finished'||build.data.state==='reserved'&&build.data.saleId===sale.id))fail('سریال خروج موجود نیست یا برای حواله دیگری رزرو شده است.',409);
+ if(build.data.warehouseId){const w=(await warehouseDirectory()).find(w=>w.id===build.data.warehouseId&&w.data.active);if(!w||!warehouseMember(u,w,'inventory'))fail('خروج این محصول در مسئولیت انبار شما نیست.',403);guard('EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)',w.id,w.revision);}
  entry(did,'finished',-1000);entry(did,'in_transit',1000);put(did,'build',{...build.data,state:'in_transit',saleId:sale.id,dispatchedAt:now,carrierId:carrier.id,recipient:sale.data.recipient},build);event(did,'خروج انبار ـ تحویل تدارکات',{notes:'مقصد: '+sale.data.recipient.name+' · تحویل‌گیرنده: '+carrier.name,recipient:sale.data.recipient.name,carrier:carrier.name});}
  put(sale.id,'sale',{...sale.data,originalDeviceIds:sale.data.deviceIds,deviceIds:selected,state:'in_transit',carrierId:carrier.id,carrierSubject:carrier.subject||'',carrierName:carrier.name,dispatchedBy:u.name,dispatchedActor:u.userId,dispatchedAt:now,reason,receiptReference:text(b.receiptReference||'',300)},sale);
  }else if(mode==='handover'){

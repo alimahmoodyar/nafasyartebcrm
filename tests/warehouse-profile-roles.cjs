@@ -28,7 +28,7 @@ async function profile(admin,id,roles,status='active'){const row=userRow(id),per
  assert.equal(a.data.qcOwner,undefined);assert.equal(a.data.warehouseOwner,undefined);
  await profile(admin,'i1',[{warehouseId:a.id,role:'inventory'}]);await profile(admin,'i2',[{warehouseId:b.id,role:'inventory'}]);
  await profile(admin,'q1',[{warehouseId:a.id,role:'qc'}]);await profile(admin,'q3',[{warehouseId:b.id,role:'qc'}]);
- assert.ok(navigation.canOpenSection(current('q1'),'warehouse'));assert.ok(navigation.warehouseNavigation(current('q1')).receive.some(r=>r.view==='receipts'));assert.ok(!navigation.canOpenSection(current('q1'),'qms'));assert.equal(current('q1').permissions.flowRoles.includes('qc'),false);
+ assert.ok(navigation.canOpenSection(current('q1'),'warehouse'));assert.ok(navigation.warehouseNavigation(current('q1')).operations.some(r=>r.view==='receipts'));assert.ok(!navigation.canOpenSection(current('q1'),'qms'));assert.equal(current('q1').permissions.flowRoles.includes('qc'),false);
  assert.throws(()=>permission.validatePermissions({read:[],write:[],eventStages:[],salesAgentId:'outside',salesRoles:['agent'],warehouseResponsibilities:[{warehouseId:a.id,role:'qc'}]}));
  const fields=[{key:'quality',label:'Actual quality',type:'result',unit:'',min:'',max:'',required:true}];await op(admin,'material',{revision:0,code:'11',name:'Shared filter',unit:'عدد',specs:'',fields});
  const receipt=(warehouseId,extra={})=>({warehouseId,materialId:'material:11',day:'2026-10-01',quantity:'5',supplier:'Synthetic',...extra});

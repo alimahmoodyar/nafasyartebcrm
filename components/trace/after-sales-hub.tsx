@@ -7,7 +7,7 @@ import {AfterSalesPanel} from './after-sales-panel';
 import {HospitalPanel} from './hospital-panel';
 import {ProgramWorkspace,SubprogramNavigation} from './program-workspace';
 
-type Props={demo:boolean;user:Session;onNavigate:(section:string)=>void;transportAvailable?:boolean};
+type Props={demo:boolean;user:Session;onNavigate:(section:string,target?:string)=>void;transportAvailable?:boolean};
 
 function HospitalServicesWorkspace({demo,user,onNavigate,transportAvailable}:Props){
  const [view,setView]=useState('');
