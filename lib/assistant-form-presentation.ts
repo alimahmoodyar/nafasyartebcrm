@@ -6,7 +6,7 @@ import {fieldTitles,toolFieldTitles,toolModeTitles,baseModeTitles} from './form-
 import {toolOptions} from './form-options';
 import {serviceForms,visibleServiceFields} from './after-sales-contract';
 import {transportForms} from './transport-contract';
-import {qmsKinds} from './qms-contract';
+import {qmsKinds,qmsRoles} from './qms-contract';
 import {hospitalWarrantyActive,warrantyEnd} from './hospital-coverage';
 import {localDay} from './persian-date';
 export {fieldTitles};
@@ -16,6 +16,8 @@ export function fieldTitle(tool:string,key:string,schema?:any):string {
 }
 export function optionTitles(tool:string,path:string[]):Record<string,string> {
  const exact=toolOptions[tool]?.[path.join('.')];
+ if(path.includes('qmsRoles'))return {...exact,...qmsRoles};
+ if(tool==='get_product_troubleshooting'&&path.at(-1)==='domain')return {home:'خانگی',hospital:'بیمارستانی'};
  if(path.at(-1)==='mode')return {...baseModeTitles,...exact,...toolModeTitles[tool]};
  if(exact)return exact;
  return {};
