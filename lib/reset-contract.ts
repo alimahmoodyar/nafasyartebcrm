@@ -1,3 +1,4 @@
+// Batch barcode/QR labels render existing records on demand. No saved image, print job, identity, balance, table or blob; reset/backup/freeze coverage is unchanged.
 // warehouseResponsibilities are preserved account/profile assignments, referring to catalog warehouses.
 // Role choices are derived from material_warehouse; old hidden owners are compatibility-only until profile save.
 // Receipt QC selection/history is operational; both resets back it up/delete it. Existing generic 0016 freeze applies; no new tables/FKs.

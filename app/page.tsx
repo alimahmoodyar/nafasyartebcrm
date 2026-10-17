@@ -67,6 +67,7 @@ import {SerialsPanel} from "@/components/trace/serials-panel";
 import {SerialSearch} from "@/components/trace/serial-search";
 import type {Session} from "@/lib/permissions";
 import {QualityPanel} from "@/components/trace/quality-panel";
+import {BatchLabelLink} from '@/components/trace/batch-label-link';
 import {BatchFilesPanel} from "@/components/trace/batch-files-panel";
 import {BatchNumberHelper} from "@/components/trace/batch-number-helper";
 import {demo as examples} from "@/lib/demo";
@@ -168,6 +169,7 @@ function Workspace({trainingRole}:{trainingRole:string}){
  {detail.kind==="product"&&<ProductionPanel view="bom" productId={detail.id} records={rows} user={identity} demo={demo} onSaved={()=>void reload()}/>}{detail.kind==="product"&&<QualityPanel key={detail.id+String(demo)} id={detail.id} mode="product" demo={demo} write={canWrite("product")}/> }
  {detail.kind==="device"&&!demo&&(identity.isAdmin||!!identity.permissions.serviceRoles?.length)&&<ServicePassport serial={detail.data.code} domains={identity.isAdmin?["home","hospital"]:identity.permissions.serviceDomains||[]} onOpen={()=>{setSelected(null);navigate("after-sales")}}/>}
  {detail.kind==="device"&&canRead("event")&&<QualityPanel key={detail.id+String(demo)} id={detail.id} mode="device" demo={demo} write={canWrite("event")&&identity.permissions.eventStages.includes("آزمون نهایی")} onSaved={()=>void reload()}/> }
+ {detail.kind==="batch"&&!demo&&<BatchLabelLink batchId={detail.id}/>}
  {detail.kind==="batch"&&<BatchFilesPanel key={detail.id+String(demo)} batchId={detail.id} demo={demo} write={canWrite("batch")}/> }
  {detail.kind==="batch"&&canRead("device")&&canRead("event")&&<div className="detailsection"><h2>دستگاه‌های مرتبط با این بچ</h2><p className="subtle">مصرف اولیه یا نصب در خدمات پس از فروش</p>{recordTable(devices.filter(d=>events(d.id).some(e=>e.data.batch===detail.id)||services.some(s=>s.data.device===d.id&&s.data.replacement===detail.id)),"device")}{canWrite("action")&&<button className="btn" style={{marginTop:14}} onClick={()=>start("action",{batch:detail.id})}>ثبت اقدام اصلاحی برای این بچ</button>}</div>}
  {detail.kind==="service"&&canWrite("action")&&<button className="btn primary" onClick={()=>start("action",{device:detail.data.device,batch:detail.data.batch||"",title:detail.data.complaint})}>ایجاد اقدام اصلاحی</button>}
