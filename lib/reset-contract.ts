@@ -1,3 +1,4 @@
+// Compact receipt details and batch-filtered form archives are read-only views of existing records/snapshots. No new persistent data, files, tables or reset exemptions.
 // warehouse_transfer, physical slot moves and build.warehouseId use existing flow_entities, flow_slots and inventory_* tables. Both reset scopes back up/delete transfers, in-transit balances and locations; generic 0016 freeze covers atomic writes. No new table/FK/blob. Catalog warehouses remain preserved in operations reset.
 // Batch barcode/QR labels render existing records on demand. No saved image, print job, identity, balance, table or blob; reset/backup/freeze coverage is unchanged.
 // warehouseResponsibilities are preserved account/profile assignments, referring to catalog warehouses.

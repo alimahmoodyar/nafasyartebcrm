@@ -1,3 +1,5 @@
+import {warehouseDirectory,warehouseMember} from './material-warehouses';
+import {slotWarehouse} from './warehouse-custody';
 import {storage} from './storage';
 import {AccessError,can} from './authorization';
 import {flowRole,warehouseAccess} from './material-flow';
@@ -53,4 +55,19 @@ export async function captureForm(op:string,target:string,body:any,u:Session,pro
  const guardId='form-control:'+op;
  return [db.prepare("INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,'form_control','{}',?,?,CASE WHEN (SELECT COUNT(*) FROM flow_entities WHERE type='qms_record' AND json_extract(data,'$.kind')='document')=? AND (SELECT COALESCE(SUM(revision),0) FROM flow_entities WHERE type='qms_record' AND json_extract(data,'$.kind')='document')=? THEN 1 ELSE 0 END)").bind(guardId,u.userId,at,docs.length,docs.reduce((n,r)=>n+r.revision,0)),db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'form_record',?,1,?,?)").bind('form-report:'+op,JSON.stringify(data),at,at)];
 }
-export async function readFormRecord(u:Session,id:string){const r:any=await storage().prepare("SELECT data FROM flow_entities WHERE id=? AND type='form_record'").bind('form-report:'+id).first();if(!r)throw new AccessError('این ثبت گزارش کدگذاری‌شده ندارد؛ برای سوابق قدیمی کد امروز جایگزین نمی‌شود.',404);const d=JSON.parse(r.data) as FormRecord;if(!formRecordAccess(u,d.target))throw new AccessError('دسترسی مشاهده این فرم را ندارید.',403);if(d.target==='quality.final')await qualityAccess();return d;}
+export const receiptFormTargets=['flow.receipt','flow.assign_qc','flow.incoming_qc','flow.shelve'];
+/** Narrow receipt context lets scoped warehouse staff print their own receipts without granting the global archive. */
+export async function receiptFormScope(u:Session,batchId:string){
+ if(!u.isAdmin&&!['inventory','qc','production'].some(r=>flowRole(u,r)))throw new AccessError('دسترسی سوابق رسید ندارید.',403);
+ if(!batchId||batchId.length>200)throw new AccessError('رسید معتبر انتخاب کنید.',400);
+ const db=storage(),batch:any=await db.prepare("SELECT payload FROM records WHERE kind='batch' AND id=?").bind(batchId).first(),receipt:any=await db.prepare("SELECT data FROM flow_entities WHERE id=? AND type='receipt'").bind(batchId).first();
+ if(!batch||!receipt)throw new AccessError('رسید پیدا نشد.',404);
+ if(u.permissions.hospitalCenterId||u.permissions.salesAgentId||u.permissions.serviceAgentId)throw new AccessError('دسترسی سوابق رسید ندارید.',403);
+ if(!u.isAdmin&&!u.permissions.flowRoles?.some(r=>['inventory','qc','production','procurement'].includes(r))){const wid=JSON.parse(receipt.data).warehouseId,slots=(await db.prepare('SELECT location FROM flow_slots WHERE batch_id=? AND quantity>0').bind(batchId).all()).results as any[],ws=await warehouseDirectory();if(!ws.some(w=>w.data.active&&(warehouseMember(u,w,'inventory')||warehouseMember(u,w,'qc'))&&(w.id===wid||slots.some(s=>slotWarehouse(s.location,wid)===w.id))))throw new AccessError('این رسید در دسترسی انبار شما نیست.',403);}
+ return JSON.parse(batch.payload).code as string;
+}
+export async function readFormRecord(u:Session,id:string,batchId=''){
+ const r:any=await storage().prepare("SELECT data FROM flow_entities WHERE id=? AND type='form_record'").bind('form-report:'+id).first();if(!r)throw new AccessError('این ثبت گزارش کدگذاری‌شده ندارد؛ برای سوابق قدیمی کد امروز جایگزین نمی‌شود.',404);const d=JSON.parse(r.data) as FormRecord;
+ let scoped=false;if(batchId){const code=await receiptFormScope(u,batchId),op:any=await storage().prepare('SELECT payload FROM inventory_operations WHERE id=?').bind(id).first();scoped=receiptFormTargets.includes(d.target)&&(d.target==='flow.receipt'?d.rows.some(row=>row.label==='شماره بچ ثبت‌شده'&&row.value===code):op&&JSON.parse(op.payload).receiptId===batchId);if(!scoped)throw new AccessError('این فرم مربوط به رسید انتخاب‌شده نیست.',403);}
+ if(!scoped&&!formRecordAccess(u,d.target))throw new AccessError('دسترسی مشاهده این فرم را ندارید.',403);if(d.target==='quality.final')await qualityAccess();return d;
+}

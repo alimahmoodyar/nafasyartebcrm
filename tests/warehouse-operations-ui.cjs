@@ -13,7 +13,7 @@ function tree(){cursor=0;return WarehouseOperations({entries,initial:selected,re
 const button=t=>nodes(tree()).find(n=>n.type==='button'&&text(n)===t),select=t=>nodes(tree()).find(n=>n.type==='label'&&text(n).startsWith(t)).props.children.find(n=>n?.type==='select');
 async function mount(){slots=[];effects=[];calls=[];reply={ok:true,json:async()=>fixture};tree();effects.splice(0).forEach(f=>f());await new Promise(r=>setImmediate(r));tree()}
 (async()=>{
- await mount();assert.ok(calls.every(c=>!c.method));assert.ok(text(tree()).includes('EXISTING:receipts'));assert.equal(button('ورود').props.className,'btn primary');
+ await mount();assert.ok(calls.every(c=>!c.method));assert.ok(text(tree()).includes('EXISTING:receipts'));assert.equal(button('ورود').props.className,'btn primary');assert.ok(!text(tree()).includes('انتقال‌های منتظر دریافت'));assert.ok(!text(tree()).includes('انتقال بازی در دسترسی شما نیست.'));
  button('انتقال').props.onClick();assert.ok(nodes(tree()).some(n=>n.type==='form'));assert.ok(!text(tree()).includes('EXISTING:receipts'));
  select('کالا / محصول').props.onChange({target:{value:fixture.stock[0].key}});select('انبار مقصد').props.onChange({target:{value:'b'}});
  nodes(tree()).find(n=>n.props.fieldKey==='quantity').props.onChange({target:{value:'2'}});let form=nodes(tree()).find(n=>n.type==='form');reply={ok:false,json:async()=>({error:'Changed concurrently'})};form.props.onSubmit({preventDefault(){}});await new Promise(r=>setImmediate(r));
