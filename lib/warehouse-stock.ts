@@ -1,0 +1,19 @@
+import type {Session} from './permissions';
+export const normalizeStockSearch=(s:string)=>String(s||'').toLowerCase().replace(/[يى]/g,'ی').replace(/ك/g,'ک').replace(/[۰-۹]/g,c=>String(c.charCodeAt(0)-1776)).replace(/[٠-٩]/g,c=>String(c.charCodeAt(0)-1632)).replace(/\u200c/g,' ').trim();
+export function filterWarehouseStock(entries:any[],filters:{kind?:string;query?:string;warehouse?:string;stage?:string}){
+ const words=normalizeStockSearch(filters.query||'').split(/\s+/).filter(Boolean);
+ return entries.filter(e=>(!filters.kind||e.kind===filters.kind)&&(!filters.warehouse||e.warehouseId===filters.warehouse)&&(!filters.stage||e.warehouse===filters.stage)&&words.every(word=>normalizeStockSearch([e.name,e.itemCode,e.row.data.code,e.row.data.model,e.locations].join(' ')).includes(word)));
+}
+// Material visibility follows the existing flow snapshot and physical slot custody.
+export function materialStockEntries(data:any,user:Session){
+ const warehouses=(data.warehouses||[]).filter((w:any)=>user.isAdmin||(w.inventoryMembers||[]).some((m:any)=>[m.id,'local:'+m.id,m.subject].filter(Boolean).includes(user.userId))),receipts=(data.entities||[]).filter((e:any)=>e.type==='receipt'),materials=(data.entities||[]).filter((e:any)=>e.type==='material'),rows=data.rows||[];
+ return (data.balances||[]).filter((b:any)=>b.quantity>0&&(user.isAdmin||(data.warehouseIds||[]).includes(b.warehouse))).flatMap((b:any)=>{
+  const row=rows.find((r:any)=>r.id===b.item_id);if(!row||row.kind!=='batch')return [];
+  const receipt=receipts.find((r:any)=>r.id===row.id),material=materials.find((m:any)=>m.id===receipt?.data.materialId||m.data.code===row.data.partCode);
+  const common={...b,row,kind:'material',name:material?.data.name||row.data.part||'',itemCode:material?.data.code||row.data.partCode||'',unit:row.data.unit};
+  if(b.warehouse==='raw'&&(data.slots||[]).some((s:any)=>s.batch_id===row.id))return data.slots.filter((s:any)=>s.batch_id===row.id&&s.quantity>0).flatMap((s:any)=>{const wid=s.location.includes('|')?s.location.slice(0,s.location.indexOf('|')):receipt?.data.warehouseId||row.data.warehouseId||'',w=warehouses.find((w:any)=>w.id===wid);if(wid&&!w)return [];return [{...common,quantity:s.quantity,warehouseId:wid,warehouseName:w?.data.name||'سوابق بدون انبار فیزیکی',locations:s.location.includes('|')?s.location.slice(s.location.indexOf('|')+1):s.location}];});
+  const stored=['raw','quarantine'].includes(b.warehouse),w=stored?warehouses.find((w:any)=>w.id===(receipt?.data.warehouseId||row.data.warehouseId)):undefined;
+  if(stored&&(receipt?.data.warehouseId||row.data.warehouseId)&&!w)return [];
+  return [{...common,warehouseId:w?.id||'',warehouseName:w?.data.name||(stored?'سوابق بدون انبار فیزیکی':'محل فیزیکی جداگانه ثبت نشده'),locations:''}];
+ });
+}
