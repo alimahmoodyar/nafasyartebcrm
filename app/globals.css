@@ -362,6 +362,7 @@ html,button,input,textarea,select,option,svg text{font-family:"Vazirmatn",sans-s
 .receipt-purchases__clear:hover { text-decoration:underline; }
 
 /* Scoped layout for daily work and intermediate production. */
+.routine-production{overflow:visible}
 .routine-production__body{padding:22px;display:grid;gap:18px;min-width:0}
 .routine-production__card{display:grid;gap:16px;min-width:0;border:1px solid var(--border);border-radius:14px;background:#fff;padding:20px}
 .routine-production__body>.tools,.routine-production__card>.tools{flex-wrap:wrap;gap:10px}
