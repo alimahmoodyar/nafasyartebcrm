@@ -94,7 +94,7 @@ export function warehouseNavigation(user:Session){
   if(finished){add('receive','finished-receive','دریافت محصول از تولید','fulfillment','receive');}
   if(production)add('receive','production-handoff','تحویل محصول تولیدشده به انبار','fulfillment','handoff');
   if(finished||sales)add('stock','finished-stock','موجودی و رزرو محصول نهایی','fulfillment','sales');
-  if(finished||sales||logistics)add('dispatch','dispatch','آماده‌سازی و تحویل سفارش','fulfillment',finished||logistics?'dispatch':'sales');
+  if(finished||sales||logistics)add('dispatch','dispatch','سفارش‌های ارسال','fulfillment',finished||logistics?'dispatch':'sales');
   if(finished&&canOpenSection(u,'sales'))add('returns','sales-returns','دریافت برگشتی مشتری','sales','returns');
  }
  if(canOpenSection(u,'after-sales')&&(u.isAdmin||p.serviceRoles?.includes('inventory'))){
