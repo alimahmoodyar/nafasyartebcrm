@@ -1,3 +1,5 @@
+// sale.sourceWarehouses is the dispatch-time origin snapshot in existing operational sale JSON;
+// both reset scopes, backups and 0016 freeze already cover it, with no new table/FK.
 // build_project request.planningClaims references the same project receipt/stock holds; existing operational JSON backup/reset/freeze and sourcing_holds child-first deletion cover both.
 // Pending-QC receipt claims reuse sourcing_holds (source_type=receipt); existing backup, FK-safe deletion and real/training freeze triggers cover them in both reset scopes.
 // Warehouse parentId/serviceDomain/serviceOwner live inside material_warehouse JSON.
