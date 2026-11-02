@@ -76,7 +76,7 @@ export function warehouseNavigation(user:Session){
  const flow=canOpenSection(u,'flow'),inventory=flowRole(u,'inventory'),production=u.isAdmin||!!p.flowRoles?.includes('production'),quality=u.isAdmin||!!p.flowRoles?.includes('qc');
  if(flow){
   if(quality||p.warehouseResponsibilities?.some(r=>r.role==='qc')||production||materialScope.length||p.flowRoles?.includes('procurement'))add('tasks','material-tasks','کارهای مواد و کنترل ورودی','flow','tasks');
-  if(inventory&&materialScope.length)add('stock','material-stock','موجودی مواد، انبار و محل نگهداری','flow','stock');
+  if(inventory&&materialScope.length)add('stock','material-stock','موجودی','flow','stock');
   if(quality||p.warehouseResponsibilities?.some(r=>r.role==='qc')||inventory&&warehouseAccess(u,'quarantine')){add('receive','receipts','رسید، کنترل ورودی و جانمایی','flow','receipts');}
   if(production||inventory&&warehouseAccess(u,'raw')){add('issue','requests','درخواست و تحویل مواد به خط','flow','requests');}
   if(production)add('returns','nonconforming','ثبت قطعه نامنطبق خط','flow','nonconforming');
@@ -84,7 +84,7 @@ export function warehouseNavigation(user:Session){
   if(u.isAdmin)add('settings','warehouses','انبارها و محل‌های نگهداری','flow','warehouses');
  }
  if(canOpenSection(u,'inventory')&&(!inventory||materialScope.length)){
-  if(!flow||!inventory)add('stock','material-stock','موجودی مواد و گردش بین انبارها','inventory','report');
+  if(!flow||!inventory)add('stock','material-stock','موجودی','inventory','report');
   if(inventory&&materialScope.length>1)add('issue','move','انتقال بین انبارها','inventory','transfer');
   if(u.isAdmin)add('settings','opening','موجودی آغازین و سوابق قبلی','inventory','opening');
  }
