@@ -96,13 +96,14 @@ presets['بازرگانی خارجی']={read:[],write:[],eventStages:[],supplyRo
 
 // Versioned, explicit workflow dependencies. Assignments store both intent and the
 // validated effective snapshot; editing unrelated account fields never infers roles.
-export const rolePolicyVersion=8;
+export const rolePolicyVersion=9;
 export type JobRole={id:string;label:string;group:string;actions:string;programs:string[];grants:Permissions;scope?:'warehouses'|'services'|'salesAgent'|'serviceAgent'};
 const emptyGrants=():Permissions=>({read:[],write:[],eventStages:[]});
 const job=(id:string,label:string,group:string,actions:string,grants:Partial<Permissions>,scope?:JobRole['scope']):JobRole=>({id,label,group,actions,programs:roleWorkflowPrograms[id]||[],grants:{...emptyGrants(),...grants},scope});
 export const jobRoles:JobRole[]=[
  job('inventory','انباردار','انبار و تولید','بررسی کسری، دریافت کالا، جانمایی، تحویل مواد و بستن سفارش پذیرفته‌شده',{...presets['انبار'],supplyRoles:['inventory']},'warehouses'),
  job('production','مسئول تولید','انبار و تولید','برنامه روزانه، درخواست تولید داخلی، مونتاژ، ثبت مصرف مواد و بسته‌بندی',{...presets['تولید'],supplyRoles:['production_planning']}),
+ job('production_worker','کارگر تولید','انبار و تولید','مشاهده و ثبت خروجی کارهای تخصیص‌یافته خود؛ کنترل کیفیت فقط برای برنامه‌ای که مسئول آن شده است',{}),
  job('planning','برنامه‌ریزی تولید','انبار و تولید','ثبت و پیگیری برنامه تولید و نیاز تأمین',presets['برنامه‌ریزی تولید']),
  job('engineering','تحقیق و توسعه','انبار و تولید','مشخصات و BOM، مسیر تأمین، بررسی فنی پیشنهاد و تغییر طراحی',presets['تحقیق‌وتوسعه و مهندسی طراحی']),
  job('qc','کنترل کیفیت','کیفیت','کنترل ورودی و نهایی، صلاحیت منبع و ثبت عدم انطباق',{...presets['کنترل کیفیت'],qmsRoles:['qc']}),

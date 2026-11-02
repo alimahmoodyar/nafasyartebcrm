@@ -1,3 +1,4 @@
+// routine_plan and scheduled/cancelled routine_job live in operational flow_entities. Both reset scopes back up/delete them with routine_lot; generic 0016 freeze covers atomic plans, worker/QC audit and line inventory writes. No new table/FK/blob or preservation exemption.
 // sale.sourceWarehouses is the dispatch-time origin snapshot in existing operational sale JSON;
 // both reset scopes, backups and 0016 freeze already cover it, with no new table/FK.
 // build_project request.planningClaims references the same project receipt/stock holds; existing operational JSON backup/reset/freeze and sourcing_holds child-first deletion cover both.

@@ -9,7 +9,7 @@ export function searchMaterials(choices:Choice[],query:string){
  return choices.filter(c=>words.every(word=>normalize(c.code+' '+c.name).includes(word)));
 }
 
-export function MaterialSelect({value,onChange,choices,title='کالا',placeholder='جست‌وجو با نام یا کد کالا',required=true,disabled=false,className=''}:{value:string;onChange:(id:string)=>void;choices:Choice[];title?:string;placeholder?:string;required?:boolean;disabled?:boolean;className?:string}){
+export function MaterialSelect({value,onChange,choices,title='کالا',placeholder='جست‌وجو با نام یا کد کالا',required=true,disabled=false,className='',emptyMessage='کالایی با این نام یا کد پیدا نشد.',listLabel='کالاها'}:{value:string;onChange:(id:string)=>void;choices:Choice[];title?:string;placeholder?:string;required?:boolean;disabled?:boolean;className?:string;emptyMessage?:string;listLabel?:string}){
  const id=useId(),input=useRef<HTMLInputElement>(null),[open,setOpen]=useState(false),[query,setQuery]=useState(''),[active,setActive]=useState(0);
  const selected=choices.find(c=>c.id===value),matches=searchMaterials(choices,query),shown=matches.slice(0,100),index=Math.min(active,Math.max(0,shown.length-1));
  const label=(c:Choice)=>[c.code,c.name].filter(Boolean).join(' · ');
@@ -27,8 +27,8 @@ export function MaterialSelect({value,onChange,choices,title='کالا',placehol
    }} style={{paddingInlineEnd:36}}/>
    <ChevronDown size={18} aria-hidden style={{position:'absolute',insetInlineEnd:12,top:'50%',transform:'translateY(-50%)',pointerEvents:'none'}}/>
   </div>
-  {open&&<div id={id+'-list'} role="listbox" aria-label="کالاها" style={{position:'absolute',top:'100%',insetInline:0,zIndex:80,maxHeight:260,overflowY:'auto',background:'var(--background,#fff)',border:'1px solid #d6deec',borderRadius:10,boxShadow:'0 8px 24px #0002'}}>
-   {!shown.length?<p role="status" style={{padding:12}}>کالایی با این نام یا کد پیدا نشد.</p>:shown.map((c,i)=><button key={c.id} id={id+'-option-'+i} type="button" role="option" tabIndex={-1} aria-selected={value===c.id} onMouseDown={e=>e.preventDefault()} onMouseEnter={()=>setActive(i)} onClick={()=>choose(c)} style={{display:'flex',alignItems:'center',gap:8,width:'100%',textAlign:'right',padding:'10px 12px',border:0,color:'inherit',background:i===index?'#eef2fb':'transparent'}}><span style={{flex:1}}><bdi dir="ltr">{c.code}</bdi>{c.code&&' · '}{c.name}</span>{value===c.id&&<Check size={16} aria-hidden/>}</button>)}
+  {open&&<div id={id+'-list'} role="listbox" aria-label={listLabel} style={{position:'absolute',top:'100%',insetInline:0,zIndex:80,maxHeight:260,overflowY:'auto',background:'var(--background,#fff)',border:'1px solid #d6deec',borderRadius:10,boxShadow:'0 8px 24px #0002'}}>
+   {!shown.length?<p role="status" style={{padding:12}}>{emptyMessage}</p>:shown.map((c,i)=><button key={c.id} id={id+'-option-'+i} type="button" role="option" tabIndex={-1} aria-selected={value===c.id} onMouseDown={e=>e.preventDefault()} onMouseEnter={()=>setActive(i)} onClick={()=>choose(c)} style={{display:'flex',alignItems:'center',gap:8,width:'100%',textAlign:'right',padding:'10px 12px',border:0,color:'inherit',background:i===index?'#eef2fb':'transparent'}}><span style={{flex:1}}><bdi dir="ltr">{c.code}</bdi>{c.code&&' · '}{c.name}</span>{value===c.id&&<Check size={16} aria-hidden/>}</button>)}
    {matches.length>shown.length&&<p role="status" style={{padding:12}}>برای دیدن نتیجهٔ موردنظر نام یا کد را دقیق‌تر وارد کنید.</p>}
   </div>}
  </div>;

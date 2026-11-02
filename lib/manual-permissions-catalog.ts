@@ -11,7 +11,7 @@ export const manualPermissionSections = [
  {key:'qms',title:'کیفیت و تحقیق‌وتوسعه',icon:ShieldCheck,group:'qms'},
  {key:'personnel',title:'پرتال پرسنلی و حقوق',icon:Users,group:'personnel'},
  {key:'llm-usage',title:'گزارش مصرف هوش مصنوعی',icon:Activity,ownerOnly:true},
- {key:'routine-production',title:'کار روزانه و قطعات واسط',icon:Factory,group:'flow'},
+ {key:'routine-production',title:'تولید',icon:Factory,group:'flow'},
  {key:'build-projects',title:'پروژه‌های ساخت بیمارستانی',icon:Factory,group:'flow'},
  {key:'build-intake',title:'مشخصات سفارش ساخت',icon:ClipboardCheck,group:'sales'},
  {key:'costing',title:'بهای تمام‌شده',icon:ClipboardCheck,group:'financial-costing'},

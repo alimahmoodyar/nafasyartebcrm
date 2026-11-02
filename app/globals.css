@@ -380,3 +380,16 @@ html,button,input,textarea,select,option,svg text{font-family:"Vazirmatn",sans-s
 .routine-production__table-wrap>.empty{padding:24px 16px;border-top:1px solid var(--border);font-size:14px}
 .routine-production .panelhead{flex-wrap:wrap}
 @media(max-width:640px){.routine-production__body{padding:14px;gap:14px}.routine-production__card{padding:14px;gap:12px}.routine-production .form-grid,.routine-production-dialog .form-grid{grid-template-columns:minmax(0,1fr)}.routine-production__table th,.routine-production__table td{padding:10px 12px}.routine-production .btn{max-width:100%;white-space:normal}.routine-production__table{min-width:440px}}
+
+/* Compact daily capacity proposal and execution list. */
+.routine-plans__toolbar,.routine-plans__heading{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.routine-plans__list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:12px}
+.routine-plans__selected{border-color:var(--primary,#43519c);box-shadow:0 0 0 1px var(--primary,#43519c)}
+.routine-plans__fields{border:0;padding:0;display:grid;gap:16px;min-width:0}
+.routine-plan-dialog form{display:grid;gap:18px}
+.routine-plans__members{display:grid;gap:10px}
+.routine-plan-dialog .tools{flex-wrap:wrap;gap:8px}
+
+.routine-plan-dialog .routine-plans__fields{border:0;padding:0;margin:0}
+.routine-plan-dialog .routine-plans__fields[hidden]{display:none}
+.routine-plans__review{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding-block:12px}

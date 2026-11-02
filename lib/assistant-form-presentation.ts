@@ -10,7 +10,7 @@ import {qmsKinds,qmsRoles} from './qms-contract';
 import {hospitalWarrantyActive,warrantyEnd} from './hospital-coverage';
 import {localDay} from './persian-date';
 export {fieldTitles};
-const technical=new Set(['requestId','confirmed','revision','contactRevision','previousVersion','previousRevision','quoteRevision','leadRevision','quoteHash','catalogSnapshot','customerTariffId','customerTariffRevision','customerPriceSource','kitRevision']);
+const technical=new Set(['previewKey','requestId','confirmed','revision','contactRevision','previousVersion','previousRevision','quoteRevision','leadRevision','quoteHash','catalogSnapshot','customerTariffId','customerTariffRevision','customerPriceSource','kitRevision']);
 export function fieldTitle(tool:string,key:string,schema?:any):string {
  return schema?.title||toolFieldTitles[tool]?.[key]||fieldTitles[key]||(/[^\x00-\x7F]/.test(key)?key:`فیلد تعریف‌نشده (${key})`);
 }

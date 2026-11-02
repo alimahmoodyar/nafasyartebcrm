@@ -1580,3 +1580,5 @@ toolOptions.register_hospital_installation={...toolOptions.register_hospital_ins
 toolOptions.save_hospital_service_contract={contractStatus:{yes:'دارد',no:'ندارد'}};
 
 toolOptions.save_material_warehouse={};
+
+toolOptions.estimate_routine_production={method:{quantity:'بر اساس تعداد موردنیاز',people:'بر اساس افراد و زمان'}};

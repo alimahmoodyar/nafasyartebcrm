@@ -1334,3 +1334,7 @@ Object.assign(toolFieldTitles,{save_material_master:{code:'کد ثابت کال�
 Object.assign(toolFieldTitles,{save_material_warehouse:{warehouseId:'انبار برای ویرایش',name:'نام انبار',warehouseOwner:'مسئول انبار',qcOwner:'مسئول کنترل کیفیت',locations:'محل‌های نگهداری',active:'فعال',revision:'نسخه تعریف'}});Object.assign(fieldTitles,{warehouseId:'انبار مقصد'});
 
 Object.assign(fieldTitles,{sourcingPlanId:'برنامه مصوب تحویل‌شده به تولید'});
+
+Object.assign(toolModeTitles.routine_production_apply,{plan:'ثبت برنامه تولید روزانه و تخصیص‌ها',start:'شروع عملیات برنامه',cancel_job:'لغو عملیات شروع‌نشده'});
+Object.assign(toolFieldTitles.routine_production_apply,{method:'روش برنامه‌ریزی',count:'تعداد موردنیاز تولید / تخصیص',memberIds:'افراد قابل تخصیص',qcMemberId:'مسئول کیفیت همین برنامه',previewKey:'کلید محاسبه تأییدشده',days:'تعداد روز تقویمی'});
+toolFieldTitles.estimate_routine_production={routeId:'قطعه نیمه‌آماده / مسیر ساخت',method:'روش برنامه‌ریزی',count:'تعداد موردنیاز تولید',memberIds:'افراد قابل تخصیص',day:'روز شروع',days:'تعداد روز تقویمی',start:'شروع کار روزانه',end:'پایان کار روزانه'};

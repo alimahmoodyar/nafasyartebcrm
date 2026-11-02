@@ -7,6 +7,7 @@ export const roleWorkflowPrograms:Record<string,string[]>={
  warehouse_supervisor:['build-projects','flow','inventory','sourcing','fulfillment','sales'],
  production_store_assistant:['flow','inventory'],
  production:['build-intake','build-projects','routine-production','sourcing','flow','fulfillment','event','device','serials','analytics'],
+ production_worker:['routine-production'],
  planning:['sourcing'],
  engineering:['build-intake','qms','sourcing','routine-production','build-projects'],
  qc:['qms','sourcing','flow','routine-production','build-projects','action'],
