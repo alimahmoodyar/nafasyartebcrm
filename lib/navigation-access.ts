@@ -88,7 +88,7 @@ export function warehouseNavigation(user:Session){
   if(inventory&&materialScope.length>1)add('issue','move','انتقال بین انبارها','inventory','transfer');
   if(u.isAdmin)add('settings','opening','موجودی آغازین و سوابق قبلی','inventory','opening');
  }
- if(canOpenSection(u,'batch')&&(!inventory||materialScope.length))add('stock','batches','جست‌وجوی قطعات و بچ‌ها','batch','batches');
+ if(canOpenSection(u,'batch')&&(!inventory||materialScope.length)||inventory&&(materialScope.length||warehouseAccess(u,'finished')))add('stock','batches','گردش کالا','batch','batches');
  if(canOpenSection(u,'fulfillment')){
   const finished=warehouseAccess(u,'finished'),sales=u.isAdmin||!!p.salesRoles?.some(r=>['staff','manager'].includes(r))||!!p.flowRoles?.includes('sales'),logistics=u.isAdmin||!!p.flowRoles?.includes('logistics')||!!p.transportRoles?.includes('driver');
   if(finished){add('receive','finished-receive','دریافت محصول از تولید','fulfillment','receive');}

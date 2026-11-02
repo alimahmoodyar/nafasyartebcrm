@@ -32,7 +32,7 @@ export const manualPermissionSections = [
  {key:'serials',title:'تولید و چاپ سریال',icon:PackageCheck,group:'trace-device'},
  {key:'product',title:'تعریف محصولات',icon:Box,group:'trace-product'},
  {key:'device',title:'شناسنامه دستگاه‌ها',icon:PackageCheck,group:'trace-device'},
- {key:'batch',title:'قطعات و بچ‌ها',icon:Boxes,group:'trace-batch'},
+ {key:'batch',title:'گردش کالا',icon:Boxes,group:'trace-batch'},
  {key:'event',title:'ثبت تولید',icon:Factory,group:'trace-event'},
  {key:'inventory',title:'انبارها و موجودی',icon:Boxes,group:'trace-batch'},
  {key:'service',title:'سوابق خدمات قبلی',icon:Wrench,group:'trace-service'},

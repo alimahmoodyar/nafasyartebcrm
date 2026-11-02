@@ -8,3 +8,12 @@ export function parseWarehouseTarget(value:string){
  try{const v=JSON.parse(value.slice('warehouse:'.length));if(value.startsWith('warehouse:')&&typeof v.source==='string'&&typeof v.target==='string'&&typeof v.view==='string')return v as {source:string;target:string;view:string};}catch{}
  return null;
 }
+
+export function stockHistoryTarget(item:{kind:string;itemCode?:string;entries?:any[]}){
+ const filter=item.itemCode?.trim()?{kind:item.kind,code:item.itemCode}:{itemId:item.entries?.[0]?.item_id||''};
+ return warehouseTarget('batch','history:'+JSON.stringify(filter),'batches');
+}
+export function parseStockHistory(value:string){
+ if(!value.startsWith('history:'))return {};
+ try{const v=JSON.parse(value.slice(8));if(!v||typeof v!=='object'||Array.isArray(v))return {};const out:Record<string,string>={};for(const key of ['kind','code','itemId'])if(typeof v[key]==='string'&&v[key].length<=200)out[key]=v[key];return out;}catch{return {};}
+}
