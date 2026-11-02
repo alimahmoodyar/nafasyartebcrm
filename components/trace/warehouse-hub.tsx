@@ -22,7 +22,7 @@ export function WarehouseHub({user,records,demo,onSaved,onOpen,onNavigate,target
   const target=parseWarehouseTarget(targetId);setFocus('');
   if(!target){setGroup('');setLeaf('');return;}
   const entries=available.flatMap(([group,items])=>items.map(item=>({group,item})));
-  const preferred=!target.view&&(target.source==='flow'&&target.target?(records.some(r=>r.id===target.target&&r.kind==='device')?'production':'receipts'):target.source==='inventory'?'material-stock':target.source==='fulfillment'?'dispatch':'');
+  const preferred=target.source==='after-sales'&&['home:stock','hospital:stock'].includes(target.view)?'material-stock':!target.view&&(target.source==='flow'&&target.target?(records.some(r=>r.id===target.target&&r.kind==='device')?'production':'receipts'):target.source==='inventory'?'material-stock':target.source==='fulfillment'?'dispatch':'');
   const match=(preferred?entries.find(({item})=>item.key===preferred):undefined)||entries.find(({group,item})=>(!target.view.startsWith('operation:')||group==='operations')&&item.source===target.source&&(!target.view||item.view===target.view.replace(/^operation:/,'')));
   if(match){setGroup(match.group);setLeaf(match.item.key);setFocus(target.target);if(target.source==='batch'&&target.target){const row=records.find(row=>row.id===target.target&&row.kind==='batch');if(row)onOpen(row);}}else{setGroup('');setLeaf('');}
  },[targetId]);
@@ -30,7 +30,7 @@ export function WarehouseHub({user,records,demo,onSaved,onOpen,onNavigate,target
  const openGroup=(key:string)=>{if(!groups[key]?.length)return false;setGroup(key);setFocus('');setLeaf(key!=='tasks'&&groups[key].length===1?groups[key][0].key:'');};
  function render(item:WarehouseEntry,receiptLaunch?:number){
   const key=item.key+focus;
-  if(item.source==='flow'&&item.view==='stock')return <WarehouseStockPanel key={key} user={user} demo={demo} onOpen={onOpen} onHistory={g=>onNavigate('warehouse',stockHistoryTarget(g))}/>;
+  if((item.source==='flow'||item.source==='warehouse')&&item.view==='stock')return <WarehouseStockPanel key={key} user={user} demo={demo} onOpen={onOpen} onHistory={g=>onNavigate('warehouse',stockHistoryTarget(g))}/>;
   if(item.source==='flow')return <MaterialFlow key={key} receiptLaunch={receiptLaunch} initialTab={item.view==='nonconforming'?'requests':item.view} initialAction={item.view==='nonconforming'?'reject':undefined} embedded onWarehouseReceipt={item.view==='materials'?(mid=>onNavigate('warehouse',warehouseTarget('flow','new-receipt:'+mid,'receipts'))):undefined} targetId={focus} demo={demo} onSaved={onSaved} onOpen={onOpen}/>;
   if(item.source==='inventory')return <ProductionPanel key={key} embedded stockMode={item.view as 'report'|'transfer'|'opening'} view="stock" records={records} user={user} demo={demo} onSaved={onSaved}/>;
   if(item.source==='fulfillment')return <FulfillmentPanel key={key} embedded initialTab={item.view} demo={demo} onSaved={onSaved}/>;

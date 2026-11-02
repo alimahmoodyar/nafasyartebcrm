@@ -1,8 +1,10 @@
+import {warehouseDescendants} from './warehouse-tree';
 import type {Session} from './permissions';
 export const normalizeStockSearch=(s:string)=>String(s||'').toLowerCase().replace(/[يى]/g,'ی').replace(/ك/g,'ک').replace(/[۰-۹]/g,c=>String(c.charCodeAt(0)-1776)).replace(/[٠-٩]/g,c=>String(c.charCodeAt(0)-1632)).replace(/\u200c/g,' ').trim();
-export function filterWarehouseStock(entries:any[],filters:{kind?:string;query?:string;warehouse?:string;stage?:string}){
+export function filterWarehouseStock(entries:any[],filters:{kind?:string;query?:string;warehouse?:string;stage?:string;includeChildren?:boolean},warehouses:any[]=[]){
+ const scope=filters.warehouse?filters.includeChildren===false?new Set([filters.warehouse]):warehouseDescendants(warehouses,filters.warehouse):null;
  const words=normalizeStockSearch(filters.query||'').split(/\s+/).filter(Boolean);
- return entries.filter(e=>(!filters.kind||e.kind===filters.kind)&&(!filters.warehouse||e.warehouseId===filters.warehouse)&&(!filters.stage||e.warehouse===filters.stage)&&words.every(word=>normalizeStockSearch([e.name,e.itemCode,e.row.data.code,e.row.data.model,e.locations].join(' ')).includes(word)));
+ return entries.filter(e=>(!filters.kind||e.kind===filters.kind)&&(!scope||scope.has(e.warehouseId))&&(!filters.stage||e.warehouse===filters.stage)&&words.every(word=>normalizeStockSearch([e.name,e.itemCode,e.row.data.code,e.row.data.model,e.locations].join(' ')).includes(word)));
 }
 // Group only already-authorized and filtered entries. Never add unlike units or
 // merge unidentified items by their display name.
@@ -12,8 +14,8 @@ export function groupWarehouseStock(entries:any[]){
   const identity=e.itemCode?.trim()?['code',normalizeStockSearch(e.itemCode)]:['item',e.item_id];
   const key=JSON.stringify([e.kind,...identity,e.unit||'']);
   let group=groups.get(key);
-  if(!group){group={key,grouped:true,kind:e.kind,name:e.name,itemCode:e.itemCode,unit:e.unit,passport:e.passport?{...e.passport,lot:[]}:undefined,quantity:0,entries:[],lotCount:0};groups.set(key,group);}
-  group.quantity+=e.quantity;group.entries.push(e);
+  if(!group){group={key,grouped:true,kind:e.kind,name:e.name,itemCode:e.itemCode,unit:e.unit,passport:e.passport?{...e.passport,lot:[]}:undefined,quantity:0,reserved:0,available:0,entries:[],lotCount:0};groups.set(key,group);}
+  group.quantity+=e.quantity;group.reserved+=e.reserved||0;group.available+=e.quantity-(e.reserved||0);group.entries.push(e);
  }
  for(const group of groups.values())group.lotCount=new Set(group.entries.map((e:any)=>e.row.id)).size;
  return [...groups.values()];
@@ -21,7 +23,7 @@ export function groupWarehouseStock(entries:any[]){
 // Material visibility follows the existing flow snapshot and physical slot custody.
 export function materialStockEntries(data:any,user:Session){
  const warehouses=(data.warehouses||[]).filter((w:any)=>user.isAdmin||(w.inventoryMembers||[]).some((m:any)=>[m.id,'local:'+m.id,m.subject].filter(Boolean).includes(user.userId))),receipts=(data.entities||[]).filter((e:any)=>e.type==='receipt'),materials=(data.entities||[]).filter((e:any)=>e.type==='material'),rows=data.rows||[];
- return (data.balances||[]).filter((b:any)=>b.quantity>0&&(user.isAdmin||(data.warehouseIds||[]).includes(b.warehouse))).flatMap((b:any)=>{
+ return (data.balances||[]).filter((b:any)=>b.quantity>0&&!String(b.warehouse).startsWith('service:')&&(user.isAdmin||(data.warehouseIds||[]).includes(b.warehouse))).flatMap((b:any)=>{
   const row=rows.find((r:any)=>r.id===b.item_id);if(!row||row.kind!=='batch')return [];
   const receipt=receipts.find((r:any)=>r.id===row.id),material=receipt?.data.materialId?materials.find((m:any)=>m.id===receipt.data.materialId):materials.find((m:any)=>m.data.code===row.data.partCode);
   const passport={title:'شناسنامه کالا',materialId:material?.id||'',historical:!material,details:[{label:'نام کالا',value:material?.data.name||row.data.part},{label:'کد کالا',value:material?.data.code||row.data.partCode},{label:'واحد',value:material?.data.unit||row.data.unit},{label:'مشخصات فنی / نقشه مرجع',value:material?.data.specs}],lot:[{label:'کد بچ',value:row.data.code},{label:'مشخصات این بچ',value:row.data.specs||receipt?.data.specs},{label:'تأمین‌کننده',value:row.data.supplier},{label:'سازنده',value:row.data.maker},{label:'لات سازنده',value:row.data.manufacturerLot}]};

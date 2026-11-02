@@ -100,7 +100,7 @@ export function warehouseNavigation(user:Session){
  if(canOpenSection(u,'after-sales')&&(u.isAdmin||p.serviceRoles?.includes('inventory'))){
   for(const domain of serviceReadDomains(u)){
    const title=domain==='home'?'خدمات خانگی':'خدمات بیمارستانی';
-   add('stock','service-stock-'+domain,'موجودی '+title,'after-sales',domain+':stock');
+   if(!groups.stock.some(e=>e.key==='material-stock'))add('stock','material-stock','موجودی','warehouse','stock');
    add('issue','service-issue-'+domain,'تحویل قطعه به '+title,'after-sales',domain+':stock');
    add('returns','service-return-'+domain,'قطعات، داغی و برگشتی '+title,'after-sales',domain+':orders');
   }

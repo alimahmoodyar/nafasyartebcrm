@@ -1,3 +1,5 @@
+import {materialWarehouses} from '@/lib/material-warehouses';
+import {serviceWarehouseStock,stockServiceDomains} from '@/lib/service-warehouse-stock';
 import {recordFields} from '@/lib/model';
 import {GET as flowSnapshot} from '@/app/api/flow/route';
 import {requireAccess,AccessError,accessResponse} from '@/lib/authorization';
@@ -10,8 +12,14 @@ export async function GET(request:Request){try{
  const u=await requireAccess();if(!internalWarehouseUser(u))throw new AccessError('دسترسی موجودی انبار ندارید.',403);
  const params=new URL(request.url).searchParams,kind=params.get('kind')||'',query=params.get('query')||'',warehouse=params.get('warehouse')||'',stage=params.get('stage')||'';
  if(!['','material','product'].includes(kind)||query.length>200||warehouse.length>200||stage.length>200)throw new AccessError('فیلتر موجودی معتبر نیست.',400);
- const snapshot=await flowSnapshot();if(!snapshot.ok)return snapshot;
- const data:any=await snapshot.json(),warehouses=(data.warehouses||[]).filter((w:any)=>u.isAdmin||warehouseMember(u,w,'inventory')),entries=materialStockEntries(data,u);
+ const includeChildren=params.get('includeChildren')!=='false';if(params.has('includeChildren')&&!['true','false'].includes(params.get('includeChildren')!))throw new AccessError('فیلتر زیرانبار معتبر نیست.',400);
+ const snapshot=await flowSnapshot();if(!snapshot.ok&&(snapshot.status!==403||!stockServiceDomains(u).length))return snapshot;
+ const data:any=snapshot.ok?await snapshot.json():{},allWarehouses=await materialWarehouses(),warehouses=(data.warehouses||[]).filter((w:any)=>u.isAdmin||warehouseMember(u,w,'inventory')),entries=materialStockEntries(data,u);
+ const service=await serviceWarehouseStock(u,allWarehouses);entries.push(...service.entries);
+ const visibleIds=new Set<string>([...warehouses.map((w:any)=>w.id),...service.warehouseIds]);
+ // Add only ancestor labels for grouping; parent visibility grants no child stock.
+ for(const id of [...visibleIds]){let w=allWarehouses.find(w=>w.id===id);const seen=new Set<string>();while(w?.data.parentId&&!seen.has(w.id)){seen.add(w.id);const parent=allWarehouses.find(v=>v.id===w.data.parentId);if(!parent)break;visibleIds.add(parent.id);w=parent;}}
+ const directory=allWarehouses.filter(w=>visibleIds.has(w.id)).map(w=>({id:w.id,data:{name:w.data.name,parentId:w.data.parentId||'',active:w.data.active}}));
  if(warehouseAccess(u,'finished')){
   const db=storage(),builds=(await db.prepare("SELECT * FROM flow_entities WHERE type='build'").all()).results.map(entity),products=(data.rows||[]).filter((r:any)=>r.kind==='product');
   const finished=(await db.prepare("SELECT r.id,r.kind,r.payload,r.created,b.quantity FROM records r JOIN inventory_balances b ON b.item_id=r.id WHERE r.kind='device' AND b.warehouse='finished' AND b.quantity>0").all()).results;
@@ -24,6 +32,6 @@ export async function GET(request:Request){try{
    entries.push({passport,item_id:r.id,warehouse:'finished',quantity:r.quantity,row,kind:'product',name,itemCode,unit:'دستگاه',warehouseId:wid,warehouseName:w?.data.name||'سوابق بدون انبار فیزیکی',locations:''});
   }
  }
- const filtered=filterWarehouseStock(entries,{kind,query,warehouse,stage});
- return Response.json({warehouses,entries:filtered,groups:groupWarehouseStock(filtered)},{headers:{'Cache-Control':'private, no-store',Vary:'Cookie, Authorization'}});
+ const filtered=filterWarehouseStock(entries,{kind,query,warehouse,stage,includeChildren},directory);
+ return Response.json({warehouses:directory,entries:filtered,groups:groupWarehouseStock(filtered)},{headers:{'Cache-Control':'private, no-store',Vary:'Cookie, Authorization'}});
  }catch(e){return accessResponse(e)||Response.json({error:'دریافت موجودی ممکن نشد.'},{status:503});}}

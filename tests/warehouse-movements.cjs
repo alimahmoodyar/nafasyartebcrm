@@ -60,6 +60,27 @@ const body=(mode,args={})=>({id:crypto.randomUUID(),confirmed:true,mode,...args}
  assert.equal(JSON.stringify(viaMcp.groups),JSON.stringify((await report(a,'?kind=product&query=SERIAL-1')).groups));
  const hospitalOutsider={...a,permissions:{...a.permissions,hospitalCenterId:'external-center'}};assert.equal((await context.run(hospitalOutsider,()=>stockReport.GET(request('/api/warehouse/stock')))).status,403);
  const invalid=await context.run(a,()=>stockReport.GET(request('/api/warehouse/stock?kind=unknown')));assert.equal(invalid.status,400);
+ // Parent filters aggregate only already-authorized rows, not other custodians' stock.
+ insert('parent','material_warehouse',{name:'Service parent',locations:[],active:true});
+ for(const wid of ['a','b'])sql.prepare("UPDATE flow_entities SET data=json_set(data,'$.parentId','parent') WHERE id=?").run(wid);
+ assert.equal(JSON.stringify((await report(a,'?warehouse=parent')).entries),JSON.stringify((await report(a)).entries.filter(e=>['a','b'].includes(e.warehouseId))));
+ assert.equal((await report(a,'?warehouse=parent&includeChildren=false')).entries.length,0);
+ assert.ok(!(await report(a,'?warehouse=parent')).entries.some(e=>e.warehouseId==='b'));
+ // Real service lots (not mirrored balance buckets) retain reservations and domain scope.
+ insert('service-child','material_warehouse',{name:'Home office',parentId:'parent',serviceDomain:'home',serviceOwner:'office',locations:[],active:true});
+ insert('repair-fixture','as_case',{domain:'home'});
+ sql.prepare("INSERT INTO service_lots(id,owner,domain,batch_id,quantity,unit_rial,created) VALUES('home-lot','office','home','batch',3000,'900',?),('hospital-lot','office','hospital','batch',7000,'500',?)").run(now,now);
+ sql.prepare("INSERT INTO service_reservations(id,case_id,line_id,lot_id,quantity) VALUES('reserve-fixture','repair-fixture','line','home-lot',1000)").run();
+ sql.prepare("INSERT INTO inventory_balances(id,item_id,warehouse,quantity) VALUES('mirror-home','batch','service:home:office',3000),('mirror-hospital','batch','service:hospital:office',7000)").run();
+ const serviceUser={userId:'service-reader',name:'Service inventory',isAdmin:false,permissions:{read:[],write:[],eventStages:[],serviceRoles:['inventory'],serviceDomains:['home']}};
+ const svc=await report(serviceUser,'?warehouse=parent');assert.equal(svc.entries.length,1);assert.equal(svc.groups[0].quantity,3000);assert.equal(svc.groups[0].reserved,1000);assert.equal(svc.groups[0].available,2000);assert.equal(svc.entries[0].serviceLotId,'home-lot');assert.ok(!JSON.stringify(svc).includes('unit_rial'));assert.ok(!JSON.stringify(svc).includes('hospital-lot'));
+ const svcExact=await report(serviceUser,'?warehouse=parent&includeChildren=false');assert.equal(svcExact.entries.length,0);
+ const adminStock=await report(admin);assert.equal(adminStock.entries.filter(e=>e.serviceLotId).reduce((n,e)=>n+e.quantity,0),10000);assert.equal(adminStock.entries.filter(e=>e.warehouse.startsWith('service:')).length,2,'Mirror balances never counted twice');
+ assert.ok(!(await report(a)).entries.some(e=>e.serviceLotId),'Material custody does not grant service stock');
+ const svcMcp=await catalog.executeTool('get_warehouse_stock',{warehouse:'parent',includeChildren:false},base,{user:serviceUser,scope:'read',tokenId:null});assert.equal(svcMcp.entries.length,0);
+ const svcMcpChildren=await catalog.executeTool('get_warehouse_stock',{warehouse:'parent'},base,{user:serviceUser,scope:'read',tokenId:null});assert.equal(svcMcpChildren.groups[0].quantity,3000);
+ const supervisor={...serviceUser,permissions:{...serviceUser.permissions,serviceRoles:['inventory','manager']}};assert.equal((await report(supervisor)).entries.filter(e=>e.serviceLotId).length,2,'Existing supervisory read domains remain readable without granting stock writes');
+ const externalService={...serviceUser,permissions:{...serviceUser.permissions,serviceAgentId:'external'}};assert.equal((await context.run(externalService,()=>stockReport.GET(request('/api/warehouse/stock')))).status,403);
  const dev=body('send',{itemId:'device',fromWarehouseId:'a',toWarehouseId:'b'});await send(a,dev);assert.equal(stock('device','finished'),0);assert.ok(!(await report(a)).entries.some(e=>e.row.id==='device'),'In-transit product is not listed as finished stock');assert.equal(entities('build')[0].data.state,'warehouse_transit');await send(b,body('receive',{transferId:dev.id}));assert.equal(stock('device','finished'),1000);assert.equal(entities('build')[0].data.warehouseId,'b');await send(a,body('send',{itemId:'device',fromWarehouseId:'a',toWarehouseId:'c'}),400);
 
  assert.ok(!(await report(a)).entries.some(e=>e.row.id==='device'));assert.ok((await report(b)).entries.some(e=>e.row.id==='device'),'Stock follows destination after confirmed physical receipt');

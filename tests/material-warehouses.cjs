@@ -38,6 +38,25 @@ async function op(u,mode,args,status=200){const body={id:crypto.randomUUID(),con
  await op(admin,'supply',{materialId:m.id,quantity:'1',notes:'Manual target request'},400);const scan=await load('lib/replenishment.ts').scanReplenishment();assert.equal(scan.created,0);assert.equal(scan.enabled,false);
  token=(await mint('read_write')).token;const mc=await call('save_material_warehouse',{id:crypto.randomUUID(),confirmed:true,...wargs('MCP','i1','q1')});assert.ok(!mc.error,JSON.stringify(mc));const readToken=(await mint('read')).token;assert.ok((await call('save_material_warehouse',{id:crypto.randomUUID(),confirmed:true,...wargs('Denied read','i1','q1')},readToken)).error);
  const reset=load('lib/reset-contract.ts');for(const scope of ['operations','full']){sql.exec('BEGIN');for(const table of Object.keys(reset.resetTables))sql.exec('DELETE FROM '+table+' WHERE '+reset.resetWhere(table,scope));assert.equal(sql.prepare("SELECT count(*) n FROM flow_entities WHERE type='material_warehouse'").get().n,scope==='operations'?3:0);assert.equal(sql.prepare('PRAGMA foreign_key_check').all().length,0);sql.exec('ROLLBACK');}
+ // Hierarchy changes are metadata-only, revision checked, retry-safe, and cannot cycle.
+ const stockBefore=JSON.stringify(sql.prepare('SELECT * FROM inventory_balances').all());
+ const latest=id=>entities('material_warehouse').find(w=>w.id===id);
+ const update=(w,extra={})=>({...w.data,warehouseId:w.id,revision:w.revision,...extra});
+ await op(admin,'warehouse',update(latest(b.id),{parentId:a.id,serviceDomain:'home',serviceOwner:'office'}));
+ await op(admin,'warehouse',update(latest(a.id),{parentId:b.id}),400);
+ await op(admin,'warehouse',update(latest(a.id),{parentId:a.id}),400);
+ await op(admin,'warehouse',update(latest(a.id),{parentId:'missing'}),400);
+ await op(admin,'warehouse',update(latest(a.id),{serviceDomain:'home',serviceOwner:'office'}),400);
+ await op(admin,'warehouse',update(latest(a.id),{serviceDomain:'hospital',serviceOwner:'missing-agent'}),400);
+ await op(admin,'warehouse',update(latest(b.id),{revision:1}),409);
+ const mcParent=await call('save_material_warehouse',{id:crypto.randomUUID(),confirmed:true,warehouseId:a.id,revision:latest(a.id).revision,name:latest(a.id).data.name,locations:latest(a.id).data.locations,active:true,parentId:'',serviceDomain:'',serviceOwner:''});assert.ok(!mcParent.error,JSON.stringify(mcParent));
+ sql.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES('home-agent','as_agent',?,1,?,?)").run(JSON.stringify({domain:'home',name:'Representative',active:true}),now,now);
+ await op(admin,'warehouse',update(latest(b.id),{serviceDomain:'hospital',serviceOwner:'home-agent'}),400);
+ await op(admin,'warehouse',update(latest(b.id),{serviceDomain:'home',serviceOwner:'home-agent'}));
+ await op(admin,'warehouse',update(latest(b.id),{serviceDomain:'home',serviceOwner:'office'}));
+ const saved=await op(admin,'warehouse',update(latest(b.id)));const retry=await context.run(admin,()=>flow.POST(request('/api/flow','POST',saved.body)));assert.equal(retry.status,200);assert.equal((await retry.json()).repeated,true);
+ assert.equal(latest(b.id).data.parentId,a.id);assert.equal(latest(b.id).data.serviceOwner,'office');assert.equal(JSON.stringify(sql.prepare('SELECT * FROM inventory_balances').all()),stockBefore);
+ for(const scope of ['operations','full']){sql.exec('BEGIN');for(const table of Object.keys(reset.resetTables))sql.exec('DELETE FROM '+table+' WHERE '+reset.resetWhere(table,scope));assert.equal(entities('material_warehouse').some(w=>w.data.parentId===a.id),scope==='operations');assert.equal(sql.prepare('PRAGMA foreign_key_check').all().length,0);sql.exec('ROLLBACK');}
  sql.exec("UPDATE reset_control SET phase='maintenance',internal=0");await op(admin,'warehouse',wargs('Frozen','i1','q1'),423);assert.equal(entities('material_warehouse').length,3);
  console.log('PASS physical warehouses: shared material, own QC/inventory staff and slots, role denial, configured destination, current assignment, occupied-location protection, MCP, no target procurement, reset/FK/freeze.');
 })().catch(e=>{console.error(e);process.exitCode=1});
