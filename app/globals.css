@@ -340,3 +340,23 @@ html,button,input,textarea,select,option,svg text{font-family:"Vazirmatn",sans-s
 .warehouse-stock button:focus-visible,.warehouse-stock__scroll:focus-visible { outline: 2px solid #6784bb; outline-offset: 3px; border-radius: 6px; }
 @media(max-width:1000px) { .warehouse-stock__filters { grid-template-columns: 1fr 1fr; } .warehouse-stock__search { grid-column: 1 / -1; } }
 @media(max-width:600px) { .warehouse-stock>.inside { padding: 14px; } .warehouse-stock__filters { grid-template-columns: minmax(0,1fr); gap: 12px; } .warehouse-stock__search { grid-column: auto; } .warehouse-stock__toolbar { margin: 14px 0; } }
+
+/* Purchase choices stay inside the existing receipt form. */
+.receipt-purchases { grid-column:1 / -1; min-width:0; border:1px solid #dce4ef; border-radius:12px; overflow:hidden; margin:4px 0; }
+.receipt-purchases__heading { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:6px 16px; padding:12px 14px; background:#f3f6fb; font-size:14px; color:#354b6c; }
+.receipt-purchases__heading span { font-size:12px; color:#6e7c92; }
+.receipt-purchases__scroll { max-width:100%; overflow-x:auto; }
+.receipt-purchases table { width:100%; min-width:540px; border-collapse:collapse; text-align:right; font-size:13px; }
+.receipt-purchases th,.receipt-purchases td { padding:10px 12px; border-bottom:1px solid #e8edf4; vertical-align:middle; }
+.receipt-purchases th { background:#fafbfd; font-weight:500; color:#718098; white-space:nowrap; font-size:12px; }
+.receipt-purchases th:nth-child(n+3),.receipt-purchases td:nth-child(n+3) { text-align:center; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.receipt-purchases td small { display:block; color:#8290a3; font-size:11px; }
+.receipt-purchases tbody tr { background:#fff; }
+.receipt-purchases tbody tr.is-selected { background:#edf6f2; }
+.receipt-purchases tbody tr:last-child td { border-bottom:0; }
+.receipt-purchases input[type=radio] { width:16px; height:16px; margin:0; padding:0; accent-color:#187b5a; cursor:pointer; }
+.receipt-purchases__identity { display:block; max-width:100%; border:0; background:none; color:#354b6c; text-align:right; font:inherit; padding:0; }
+.receipt-purchases__identity strong { display:block; font-weight:500; }
+.receipt-purchases__identity bdi { display:block; font-size:10px; color:#7b899c; overflow-wrap:anywhere; margin-top:3px; }
+.receipt-purchases__clear { border:0; background:transparent; color:#61728e; font:inherit; font-size:12px; margin:0; padding:10px 14px; text-align:right; }
+.receipt-purchases__clear:hover { text-decoration:underline; }
