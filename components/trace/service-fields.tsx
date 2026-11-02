@@ -1,4 +1,5 @@
 'use client';
+import {MaterialSelect} from './material-select';
 import {Plus} from 'lucide-react';
 import {NumberInput} from './number-input';
 import {MoneyInput} from './money-input';
@@ -11,6 +12,7 @@ type Pricing={tariffs:any[];day:string;domain:string};
 export function ServiceFields({fields,value,onChange,options,pricing,disabled=false}:{fields:ServiceField[];value:any;onChange:(v:any)=>void;options:(s:string)=>string[][];pricing?:Pricing;disabled?:boolean}){
  return <>{fields.map(f=>{const v=value[f.key],set=(x:any)=>onChange({...value,[f.key]:x});
   if(f.type==='rows')return <fieldset className="wide as-rows" key={f.key}><legend>{f.label}</legend>{(v||[]).map((rawRow:any,i:number)=>{const row=f.key==='lines'&&pricing?consumerDraftLine(rawRow,rawRow,pricing.tariffs,pricing.day,pricing.domain):rawRow;const total=f.key==='lines'?consumerRowTotal(row):null;return <div className="as-row" key={i}><strong>ردیف {Number(i+1).toLocaleString('fa-IR')}</strong><div className="formgrid"><ServiceFields fields={f.fields!} value={row} options={options} pricing={pricing} disabled={disabled} onChange={x=>set(v.map((a:any,n:number)=>n===i?(f.key==='lines'&&pricing?consumerDraftLine(x,row,pricing.tariffs,pricing.day,pricing.domain):x):a))}/></div>{total!==null&&<p aria-live="polite">هزینه این قطعه برای مشتری: {BigInt(total).toLocaleString('fa-IR')} ریال</p>}<button type="button" className="link" disabled={disabled} onClick={()=>set(v.filter((_:any,n:number)=>n!==i))}>حذف ردیف {Number(i+1).toLocaleString('fa-IR')}</button></div>})}<button type="button" className="btn" disabled={disabled||(v||[]).length>=40} onClick={()=>set([...(v||[]),seedServiceFields(f.fields!)])}><Plus size={16}/>افزودن ردیف</button></fieldset>;
+  if(f.type==='select'&&f.source==='raw')return <MaterialSelect key={f.key} title={f.label+(f.optional?' (اختیاری)':'')} value={v||''} onChange={set} disabled={disabled} required={!f.optional} choices={(f.options||options(f.source||'')).map(([id,name])=>({id,code:'',name}))}/>;
   if(f.type==='date')return <SolarDate key={f.key} label={f.label} value={v||''} required={!f.optional} disabled={disabled} onChange={set}/>;
   if(f.type==='boolean')return <label className="field as-check" key={f.key}><input type="checkbox" disabled={disabled} checked={v===true} onChange={e=>set(e.target.checked)}/>{f.label}</label>;
   if(f.type==='money'){
