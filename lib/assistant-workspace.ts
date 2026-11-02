@@ -40,6 +40,9 @@ export function requestsFormDisplay(message:string){
  return (/(فرم|صفحه|کادر|پنجره)/.test(text)||requestsMaterialDefinitionForm(message))&&/(بیار|بیاور|باز کن|باز بکن|باز کنید|نمایش|نشان)/.test(text)&&!/(?:ثبت|ذخیره|اجرا|تکمیل|ویرایش|حذف|تأیید|تایید)\s*(?:کن|بکن|کنید)|تأیید اجرا|تایید اجرا/.test(text);
 }
 export function requestedOperationForm(message:string,previous:any,available:any[]):OperationForm|undefined{
+ if(requestsAssistantClose(message))return;
+ if(!retainAssistantWorkspace(message,previous))previous=null;
+ if(requestsAssistantRead(message))return;
  const text=message.replace(/[ي]/g,'ی').replace(/[ك]/g,'ک').replace(/\u200c/g,' ');
  if(requestsMaterialDefinitionForm(message)){
   const tool=available.find(t=>t.name==='save_material_master'&&t.write);if(!tool)return;
@@ -76,7 +79,21 @@ export function requestedOperationForm(message:string,previous:any,available:any
  return operationForm(tool,args,createUser?'users':previous.section||'',createUser?'ایجاد کاربر جدید':'فرم عملیات');
 }
 
+// Read/navigation questions start a new task; a short field value continues a draft.
+export function requestsAssistantClose(message:string){return /(?:فرم|عملیات|برنامه).*(?:ببند|لغو کن)|(?:لغو|بستن)\s+(?:فرم|عملیات|برنامه)|منصرف شدم|بیخیال|بی خیال/.test(message);}
+export function requestsAssistantRead(message:string){
+ if(requestsFormDisplay(message))return false;
+ const text=message.replace(/ي/g,'ی').replace(/ك/g,'ک').replace(/\u200c/g,' ');
+ if(/(?:فرم).*(?:باز|بیار|بیاور|نمایش|نشان|نشون)|(?:ثبت کن|ایجاد کن|بساز|تعریف کن|ویرایش کن|اصلاح کن|حذف کن|تخصیص بده)/.test(text))return false;
+ return /از کجا|کجا.*(?:ببین|مشاهده|پیدا)|ببینم|ببینیم|مشاهده کنم|نشان بده|نشون بده|نمایش بده|^(?:لطفا\s+)?(?:فهرست|لیست|گزارش|جستجو|جست وجو|سرچ)|(?:آمار|گزارش|فهرست|لیست).*(?:بده|بگیر|نمایش|نشان|میخوام|می خواهم)|موجودی.*(?:بده|ببین|بررسی|چقدر|چند)|چقدر|چند تا|چه تعداد|چیست|چیه|چه کار میکند/.test(text);
+}
+export function retainAssistantWorkspace(message:string,previous:any){
+ if(requestsAssistantClose(message))return false;
+ if(!previous?.tool||['succeeded','cancelled','failed','expired'].includes(previous.state)||requestsAssistantRead(message))return false;
+ return !/(?:فرم|عملیات|برنامه).*(?:ببند|لغو کن)|منصرف شدم|بیخیال|بی خیال|موضوع دیگر|عملیات دیگر|فرم دیگر/.test(message);
+}
 export function requestsOperation(message:string){
+ if(requestsAssistantRead(message)||requestsAssistantClose(message))return false;
  const text=message.replace(/ي/g,'ی').replace(/ك/g,'ک');
  return /فرم|ثبت|ایجاد|بساز|تعریف|ویرایش|اصلاح|حذف|تنظیم|ارجاع|تحویل|درخواست|تأیید|تایید|تمدید|بستن|تخصیص|رزرو|انتقال|تولید|صدور|پرداخت|مرخصی|مساعده|یادآور|یاداوری|یادآوری|ریمایندر|مأموریت|ماموریت|پذیرش|بفروش|سفارش/.test(text)&&!/(ثبت نکن|ایجاد نکن|نساز|حذف نکن|لغو کن|منصرف شدم)/.test(text);
 }

@@ -78,10 +78,11 @@ export function ProgramWorkspace({programId,title,direct=false,children,status}:
 }
 export function SubprogramNavigation({items,value,onChange}:{items:[string,string][];value:string;onChange:(key:string)=>void|boolean}){
  const context=useContext(NavigationContext),change=useRef(onChange),previous=useRef(value);change.current=onChange;
+ const accountId=useContext(AccountContext);const select=useCallback((key:string)=>{const result=change.current(key);if(result!==false)window.dispatchEvent(new CustomEvent('nafasyar-program-navigation',{detail:{accountId}}));return result;},[accountId]);
  const signature=JSON.stringify(items),register=context?.register;
- useLayoutEffect(()=>{if(!register)return;register({items:JSON.parse(signature),value,onChange:key=>change.current(key)});return()=>register(null)},[register,signature,value]);
+ useLayoutEffect(()=>{if(!register)return;register({items:JSON.parse(signature),value,onChange:select});return()=>register(null)},[register,signature,value,select]);
  useEffect(()=>{if(previous.current!==value){previous.current=value;context?.reveal()}},[value,context?.reveal]);
- if(!context)return <nav className="tools" aria-label="زیر‌برنامه‌ها">{items.map(([key,title])=><button className={'btn '+(value===key?'primary':'')} key={key} onClick={()=>onChange(key)}>{title}</button>)}</nav>;
+ if(!context)return <nav className="tools" aria-label="زیر‌برنامه‌ها">{items.map(([key,title])=><button className={'btn '+(value===key?'primary':'')} key={key} onClick={()=>select(key)}>{title}</button>)}</nav>;
  const title=items.find(([key])=>key===value)?.[1];return title?<p className="subtle" aria-label="مسیر زیر‌برنامه">{title}</p>:null;
 }
 

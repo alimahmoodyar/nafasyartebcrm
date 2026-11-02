@@ -1,6 +1,6 @@
 'use client';
 import {prepareMaterialPhoto,materialPhotoDataUrl} from '@/lib/prepare-material-photo';
-import type {OperationForm} from '@/lib/assistant-workspace';
+import {retainAssistantWorkspace,type OperationForm} from '@/lib/assistant-workspace';
 import {selectAssistantProfile} from '@/lib/assistant-profile-selection';
 import {useEffect,useRef,useState} from 'react';
 import {useAssistantPosition} from './use-assistant-position';
@@ -50,8 +50,8 @@ export function AssistantChat({admin,onSettings,accountId,accountName,onAccountC
  useEffect(()=>{const receive=(e:Event)=>{const text=(e as CustomEvent).detail?.text;if(typeof text!=='string')return;taskPrompt.current=text.slice(0,4000);setOpen(true);if(open&&!loading){setInput(taskPrompt.current);taskPrompt.current='';}};window.addEventListener('nafasyar-duty-prompt',receive);return()=>window.removeEventListener('nafasyar-duty-prompt',receive)},[open,loading,accountId]);
  useEffect(()=>{if(open&&!loading&&taskPrompt.current){setInput(taskPrompt.current);taskPrompt.current=''}},[open,loading]);
  function close(){epoch.current++;setMessages([]);setActions([]);setInput('');setPhoto('');pending.current=null;setBusy(false);setOpen(false);launcher.current?.focus();}
- async function send(){const question=input.trim()||(photo?'این عکس ممکن است مربوط به کدام کد کالاهای ثبت‌شده باشد؟ با عکس‌های مرجع مقایسه کن.':'');const normalized=question.replace(/[ي]/g,'ی').replace(/[أإآ]/g,'ا').replace(/[‌\s.!؟،]/g,'');const proposed=actions.filter(a=>a.state==='pending');if(!photo&&proposed.length===1&&['تاییداجرا','تأییداجرا','لغوفرمان'].includes(normalized)){await decide(proposed[0].id,normalized==='لغوفرمان'?'cancel':'confirm');return;}if(!question||busy||photoBusy||!profile||loading)return;const generation=epoch.current;setBusy(true);setError('');if(pending.current?.text!==question||pending.current.image!==photo)pending.current={id:crypto.randomUUID(),text:question,image:photo};try{
- const r=await fetch('/api/assistant',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json','x-assistant-account':accountId},body:JSON.stringify({requestId:pending.current.id,profileId:profile,message:question,...(photo?{image:photo}:{}),workspace:workspace?{tool:workspace.tool,args:workspace.args,actionId:workspace.actionId,state:workspace.state}:null})});const d=await r.json() as any;
+ async function send(){const question=input.trim()||(photo?'این عکس ممکن است مربوط به کدام کد کالاهای ثبت‌شده باشد؟ با عکس‌های مرجع مقایسه کن.':'');const normalized=question.replace(/[ي]/g,'ی').replace(/[أإآ]/g,'ا').replace(/[‌\s.!؟،]/g,'');const proposed=actions.filter(a=>a.state==='pending');if(!photo&&proposed.length===1&&['تاییداجرا','تأییداجرا','لغوفرمان'].includes(normalized)){await decide(proposed[0].id,normalized==='لغوفرمان'?'cancel':'confirm');return;}if(!question||busy||photoBusy||!profile||loading)return;const activeWorkspace=retainAssistantWorkspace(question,workspace)?workspace:null;if(workspace&&!activeWorkspace)onWorkspace(null);const generation=epoch.current;setBusy(true);setError('');if(pending.current?.text!==question||pending.current.image!==photo)pending.current={id:crypto.randomUUID(),text:question,image:photo};try{
+ const r=await fetch('/api/assistant',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json','x-assistant-account':accountId},body:JSON.stringify({requestId:pending.current.id,profileId:profile,message:question,...(photo?{image:photo}:{}),workspace:activeWorkspace?{tool:activeWorkspace.tool,section:activeWorkspace.section,args:activeWorkspace.args,actionId:activeWorkspace.actionId,state:activeWorkspace.state}:null})});const d=await r.json() as any;
  if(generation!==epoch.current)return;
  if(r.status===401||r.status===409&&d.error?.includes('حساب ورود')){setMessages([]);changed.current();return;}if(!r.ok)throw new Error(d.error);
  const check=await fetch('/api/session',{cache:'no-store'}),current=await check.json() as any;if(generation!==epoch.current)return;
@@ -65,7 +65,7 @@ export function AssistantChat({admin,onSettings,accountId,accountName,onAccountC
  const check=await fetch('/api/session',{cache:'no-store'}),current=await check.json() as any;if(generation!==epoch.current)return;
  if(!check.ok||current.userId!==accountId||d.accountId!==accountId){changed.current();return;}
  setActions(old=>old.map(a=>a.id===id?d.action:a));setInput('');setPhoto('');pending.current=null;
- if(workspace?.actionId===id)onWorkspace({...workspace,state:d.action.state,result:d.action.result,args:d.action.args});
+ if(workspace?.actionId===id)onWorkspace(d.action.state==='cancelled'||d.action.state==='succeeded'&&workspace.tool!=='save_material_master'?null:{...workspace,state:d.action.state,result:d.action.result,args:d.action.args});
  if(d.action.state==='succeeded'){setCompact(true);onMutation();window.dispatchEvent(new Event('nafasyar-inbox-changed'));window.dispatchEvent(new Event('nafasyar-tasks-changed'));onNavigate(d.action.section);}
  return true;
  }catch(e){if(generation===epoch.current)setError(e instanceof Error?e.message:'نتیجه اجرا دریافت نشد؛ گفتگو را دوباره باز کنید و وضعیت را بررسی کنید.')}finally{if(generation===epoch.current)setBusy(false)}
