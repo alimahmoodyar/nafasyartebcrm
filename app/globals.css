@@ -285,3 +285,58 @@ html,button,input,textarea,select,option,svg text{font-family:"Vazirmatn",sans-s
 .hospital-installation{gap:12px;min-width:0}.hospital-installation-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));gap:10px;min-width:0}.hospital-installation select,.hospital-filter-row select{width:100%;min-width:0;font:inherit;padding:9px;border:1px solid var(--input);border-radius:8px;background:white}.hospital-filter-list{display:grid;gap:8px}.hospital-filter-row{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1.4fr) 75px auto;gap:6px;align-items:center;min-width:0}.hospital-filter-row input{min-width:0}.hospital-filter-row .btn{padding:6px 10px}@media(max-width:640px){.hospital-filter-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.hospital-filter-row>select{grid-column:1/-1}}
 
 .hospital-plan{border:1px solid var(--border);border-radius:10px;padding:12px;display:grid;gap:10px;min-width:0}.hospital-plan-heading{display:flex;align-items:center;gap:10px;justify-content:space-between}.hospital-plan-heading .field{max-width:250px}.hospital-consumable-row{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) 75px auto;gap:6px;align-items:center;min-width:0}.hospital-consumable-row input{min-width:0}.hospital-installation details>summary{cursor:pointer;color:var(--muted-foreground);padding-block:8px}@media(max-width:640px){.hospital-consumable-row{grid-template-columns:minmax(0,1fr) 75px auto}.hospital-consumable-row>select{grid-column:1/-1}}
+
+/* Stock report: scoped native-table styling, including the nested lot report. */
+.warehouse-stock { min-width: 0; }
+.warehouse-stock__filters { display: grid; grid-template-columns: minmax(260px,1.5fr) minmax(160px,.8fr) minmax(230px,1.15fr); gap: 16px; align-items: end; }
+.warehouse-stock__filters .field { display: grid; min-width: 0; gap: 7px; margin: 0; font-size: 14px; color: #4b5c78; }
+.warehouse-stock__filters input,.warehouse-stock__filters select { box-sizing: border-box; width: 100%; min-width: 0; height: 46px; font: inherit; padding: 9px 12px; border: 1px solid #d7dfeb; border-radius: 10px; background: #fff; color: #293a55; }
+.warehouse-stock__toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 16px 0; }
+.warehouse-stock__toolbar .flow-check { padding: 0; font-size: 13px; color: #61718b; }
+.warehouse-stock__toolbar .btn { padding: 7px 14px; font-size: 13px; }
+.warehouse-stock__scroll { max-width: 100%; overflow-x: auto; border: 1px solid #e0e6ef; border-radius: 12px; }
+.warehouse-stock__table { width: 100%; min-width: 850px; border-collapse: collapse; border-spacing: 0; text-align: right; font-size: 14px; line-height: 1.7; background: #fff; }
+.warehouse-stock .warehouse-stock__table th,.warehouse-stock .warehouse-stock__table td { padding: 16px; border: 0; border-bottom: 1px solid #e8edf4; vertical-align: middle; }
+.warehouse-stock .warehouse-stock__table th { height: 66px; box-sizing: border-box; background: #f5f7fb; color: #50617b; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.warehouse-stock__table th small { display: block; font-size: 11px; font-weight: 400; color: #76849a; }
+.warehouse-stock .warehouse-stock__table>tbody>tr { background: #fff; }
+.warehouse-stock .warehouse-stock__table>tbody>.warehouse-stock__row:nth-child(even) { background: #fcfdff; }
+.warehouse-stock .warehouse-stock__table>tbody>.warehouse-stock__row:hover,.warehouse-stock .warehouse-stock__table>tbody>.warehouse-stock__row.is-expanded { background: #f7f9fd; }
+.warehouse-stock .warehouse-stock__table>tbody>tr:last-child>td { border-bottom: 0; }
+.warehouse-stock__item { min-width: 210px; width: 30%; }
+.warehouse-stock .warehouse-stock__table .warehouse-stock__unit { width: 65px; min-width: 55px; text-align: center; color: #66758b; white-space: nowrap; font-size: 13px; }
+.warehouse-stock .warehouse-stock__table .warehouse-stock__quantity,.warehouse-stock .warehouse-stock__table .warehouse-stock__number { text-align: center; min-width: 92px; }
+.warehouse-stock__number { font-variant-numeric: tabular-nums; font-size: 16px; font-weight: 600; white-space: nowrap; }
+.warehouse-stock .warehouse-stock__table .warehouse-stock__usable { color: #187356; }
+.warehouse-stock .warehouse-stock__table .warehouse-stock__pending { color: #916719; }
+.warehouse-stock .warehouse-stock__table .warehouse-stock__rejected { color: #ac4a53; }
+.warehouse-stock .warehouse-stock__table .is-zero { color: #9aa6b7; font-weight: 400; }
+.warehouse-stock__name,.warehouse-stock__code,.warehouse-stock__lot,.warehouse-stock__action { appearance: none; border: 0; box-shadow: none; background: transparent; font: inherit; padding: 0; margin: 0; color: #344b73; cursor: pointer; }
+.warehouse-stock__name { display: block; text-align: right; font-weight: 600; line-height: 1.8; overflow-wrap: anywhere; }
+.warehouse-stock__code { display: block; text-align: right; font-size: 12px; color: #73829a; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.warehouse-stock__name:hover,.warehouse-stock__code:hover,.warehouse-stock__lot:hover { text-decoration: underline; text-underline-offset: 4px; }
+.warehouse-stock__action-heading { min-width: 180px; }
+.warehouse-stock__actions { display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; }
+.warehouse-stock__action { white-space: nowrap; font-size: 12px; border: 1px solid #dce3ef; border-radius: 8px; padding: 7px 10px; background: #fff; line-height: 1.6; }
+.warehouse-stock__action:hover { border-color: #a9b9d5; background: #eef3fc; }
+.warehouse-stock__disclosure { display: inline-flex; align-items: center; gap: 9px; }
+.warehouse-stock__chevron { width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg) translateY(-2px); transition: transform .15s; }
+.warehouse-stock__disclosure[aria-expanded=true] .warehouse-stock__chevron { transform: rotate(225deg) translate(-1px,-1px); }
+.warehouse-stock .warehouse-stock__table>tbody>.warehouse-stock__detail-row>td { padding: 0 14px 16px; background: #f7f9fd; }
+.warehouse-stock__detail { border: 1px solid #dfe6f0; border-radius: 10px; overflow: hidden; background: #fff; }
+.warehouse-stock__detail-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 16px; border-bottom: 1px solid #e3e9f2; background: #eef2f8; font-size: 13px; color: #50617b; }
+.warehouse-stock__detail-heading span { font-size: 12px; white-space: nowrap; color: #73829a; }
+.warehouse-stock__detail-scroll { max-width: 100%; overflow-x: auto; }
+.warehouse-stock .warehouse-stock__table--detail { min-width: 790px; font-size: 13px; }
+.warehouse-stock .warehouse-stock__table--detail th,.warehouse-stock .warehouse-stock__table--detail td { padding: 12px 14px; }
+.warehouse-stock .warehouse-stock__table--detail th { height: 58px; background: #fafbfd; font-size: 12px; }
+.warehouse-stock .warehouse-stock__table--detail .warehouse-stock__number { font-size: 14px; }
+.warehouse-stock__lot { white-space: nowrap; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.warehouse-stock__location { min-width: 170px; }
+.warehouse-stock__location>span { display: block; line-height: 1.8; }
+.warehouse-stock__location small { display: block; font-size: 11px; color: #7b879a; margin-top: 3px; }
+.warehouse-stock__table--detail .btn { font-size: 11px; padding: 6px 9px; white-space: nowrap; gap: 6px; border-radius: 8px; }
+.warehouse-stock__note { margin-top: 14px; color: #78859a; font-size: 12px; line-height: 1.9; }
+.warehouse-stock button:focus-visible,.warehouse-stock__scroll:focus-visible { outline: 2px solid #6784bb; outline-offset: 3px; border-radius: 6px; }
+@media(max-width:1000px) { .warehouse-stock__filters { grid-template-columns: 1fr 1fr; } .warehouse-stock__search { grid-column: 1 / -1; } }
+@media(max-width:600px) { .warehouse-stock>.inside { padding: 14px; } .warehouse-stock__filters { grid-template-columns: minmax(0,1fr); gap: 12px; } .warehouse-stock__search { grid-column: auto; } .warehouse-stock__toolbar { margin: 14px 0; } }
