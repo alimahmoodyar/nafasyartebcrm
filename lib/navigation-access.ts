@@ -91,8 +91,7 @@ export function warehouseNavigation(user:Session){
  if(canOpenSection(u,'batch')&&(!inventory||materialScope.length)||inventory&&(materialScope.length||warehouseAccess(u,'finished')))add('stock','batches','گردش کالا','batch','batches');
  if(canOpenSection(u,'fulfillment')){
   const finished=warehouseAccess(u,'finished'),sales=u.isAdmin||!!p.salesRoles?.some(r=>['staff','manager'].includes(r))||!!p.flowRoles?.includes('sales'),logistics=u.isAdmin||!!p.flowRoles?.includes('logistics')||!!p.transportRoles?.includes('driver');
-  if(finished){add('receive','finished-receive','دریافت محصول از تولید','fulfillment','receive');}
-  if(production)add('receive','production-handoff','تحویل محصول تولیدشده به انبار','fulfillment','handoff');
+  if(finished||production)add('receive','finished-receive','تحویل و دریافت محصول نهایی','fulfillment','handoff-receive');
   if(finished||sales)add('stock','finished-stock','موجودی و رزرو محصول نهایی','fulfillment','sales');
   if(finished||sales||logistics)add('dispatch','dispatch','سفارش‌های باز','fulfillment',finished||logistics?'dispatch':'sales');
   if(finished&&canOpenSection(u,'sales'))add('returns','sales-returns','دریافت برگشتی مشتری','sales','returns');

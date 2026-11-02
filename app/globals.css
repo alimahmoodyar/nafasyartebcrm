@@ -393,3 +393,7 @@ html,button,input,textarea,select,option,svg text{font-family:"Vazirmatn",sans-s
 .routine-plan-dialog .routine-plans__fields{border:0;padding:0;margin:0}
 .routine-plan-dialog .routine-plans__fields[hidden]{display:none}
 .routine-plans__review{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding-block:12px}
+
+.finished-product-handoff{margin-bottom:18px;padding:14px 16px;border:1px solid var(--border);border-radius:12px}
+.finished-product-handoff>summary{cursor:pointer;font-weight:600}
+.finished-product-handoff[open]>summary{margin-bottom:14px}
