@@ -1,4 +1,5 @@
 'use client';
+import {WarehouseDispatchPanel} from './warehouse-dispatch-panel';
 import {WarehouseHistoryPanel} from './warehouse-history-panel';
 import {WarehouseOperations} from './warehouse-operations';
 import {useEffect,useState} from 'react';
@@ -43,10 +44,11 @@ export function WarehouseHub({user,records,demo,onSaved,onOpen,onNavigate,target
  return <ProgramWorkspace programId="warehouse" title="انبار" direct={!!active&&!!targetId}>
   <SubprogramNavigation items={available.map(([key])=>[key,warehouseGroupTitles[key]])} value={group} onChange={openGroup}/>
   {group&&<ProgramWorkspace key={group+(active||taskOverview?'leaf':'menu')} programId={'warehouse-'+group} title={warehouseGroupTitles[group]} direct={group==='operations'||!!active||taskOverview}>
-   {group!=='operations'&&!taskOverview&&<SubprogramNavigation items={choices.map(item=>[item.key,item.title])} value={leaf} onChange={key=>{if(!choices.some(item=>item.key===key))return false;setLeaf(key);setFocus('');}}/>}
+   {group!=='operations'&&group!=='dispatch'&&!taskOverview&&<SubprogramNavigation items={choices.map(item=>[item.key,item.title])} value={leaf} onChange={key=>{if(!choices.some(item=>item.key===key))return false;setLeaf(key);setFocus('');}}/>}
    {taskOverview&&<><h2>کارتابل انبار</h2>{choices.map(item=><div key={item.key}>{render(item)}</div>)}</>}
    {group==='operations'&&<WarehouseOperations key={leaf+focus} entries={choices} initial={active} renderSource={render} demo={demo} onSaved={onSaved}/>}
-   {group!=='operations'&&active&&<><h2 className="warehouse-leaf-title">{active.title}</h2>{render(active)}</>}
+   {group==='dispatch'&&<WarehouseDispatchPanel demo={demo} user={user} onSaved={onSaved} onNavigate={onNavigate}/>}
+   {group!=='operations'&&group!=='dispatch'&&active&&<><h2 className="warehouse-leaf-title">{active.title}</h2>{render(active)}</>}
   </ProgramWorkspace>}
   {!available.length&&<p className="notice">برای این حساب کار مجازی در انبار تعریف نشده است.</p>}
  </ProgramWorkspace>;

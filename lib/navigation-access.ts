@@ -94,7 +94,7 @@ export function warehouseNavigation(user:Session){
   if(finished){add('receive','finished-receive','دریافت محصول از تولید','fulfillment','receive');}
   if(production)add('receive','production-handoff','تحویل محصول تولیدشده به انبار','fulfillment','handoff');
   if(finished||sales)add('stock','finished-stock','موجودی و رزرو محصول نهایی','fulfillment','sales');
-  if(finished||sales||logistics)add('dispatch','dispatch','سفارش‌های ارسال','fulfillment',finished||logistics?'dispatch':'sales');
+  if(finished||sales||logistics)add('dispatch','dispatch','سفارش‌های باز','fulfillment',finished||logistics?'dispatch':'sales');
   if(finished&&canOpenSection(u,'sales'))add('returns','sales-returns','دریافت برگشتی مشتری','sales','returns');
  }
  if(canOpenSection(u,'after-sales')&&(u.isAdmin||p.serviceRoles?.includes('inventory'))){
@@ -105,6 +105,7 @@ export function warehouseNavigation(user:Session){
    add('returns','service-return-'+domain,'قطعات، داغی و برگشتی '+title,'after-sales',domain+':orders');
   }
  }
+ if(!groups.dispatch.length&&canOpenSection(u,'warehouse')&&canOpenSection(u,'after-sales')&&serviceReadDomains(u).length&&(u.isAdmin||p.serviceRoles?.some(r=>['inventory','logistics','manager','coordinator'].includes(r))))add('dispatch','dispatch','سفارش‌های باز','warehouse','dispatch');
  if(canOpenSection(u,'build-projects')&&(inventory&&warehouseAccess(u,'raw')||p.serviceRoles?.includes('technician')))add('issue','project-materials','درخواست‌های قطعات پروژه','build-projects','materials');
  groups.operations=[...groups.receive,...groups.issue];delete groups.receive;delete groups.issue;
  return groups;
