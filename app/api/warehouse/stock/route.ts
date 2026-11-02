@@ -1,3 +1,4 @@
+import {recordFields} from '@/lib/model';
 import {GET as flowSnapshot} from '@/app/api/flow/route';
 import {requireAccess,AccessError,accessResponse} from '@/lib/authorization';
 import {storage} from '@/lib/storage';
@@ -19,7 +20,8 @@ export async function GET(request:Request){try{
    if(wid&&!w||!wid&&!u.isAdmin)continue;
    const p=products.find((p:any)=>p.id===d.product),name=d.productName||p?.data.name||d.model||'',itemCode=d.productCode||p?.data.code||'';
    const row={id:r.id,kind:'device',created:r.created,data:{code:d.code,product:d.product||'',productName:name,productCode:itemCode,model:d.model||''}};
-   entries.push({item_id:r.id,warehouse:'finished',quantity:r.quantity,row,kind:'product',name,itemCode,unit:'دستگاه',warehouseId:wid,warehouseName:w?.data.name||'سوابق بدون انبار فیزیکی',locations:''});
+   const passport={title:'شناسنامه محصول',historical:!p,details:p?recordFields('product',p.data).map(f=>({label:f.label,value:f.optionLabels?.[p.data[f.key]]||p.data[f.key]})):[{label:'نام محصول هنگام تولید',value:name},{label:'کد محصول هنگام تولید',value:itemCode}],lot:[{label:'سریال دستگاه',value:d.code},{label:'مدل دستگاه هنگام تولید',value:d.model},{label:'نسخه طراحی',value:d.design},{label:'نسخه نرم‌افزار',value:d.firmware}]};
+   entries.push({passport,item_id:r.id,warehouse:'finished',quantity:r.quantity,row,kind:'product',name,itemCode,unit:'دستگاه',warehouseId:wid,warehouseName:w?.data.name||'سوابق بدون انبار فیزیکی',locations:''});
   }
  }
  return Response.json({warehouses,entries:filterWarehouseStock(entries,{kind,query,warehouse,stage})},{headers:{'Cache-Control':'private, no-store',Vary:'Cookie, Authorization'}});
