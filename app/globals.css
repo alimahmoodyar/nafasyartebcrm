@@ -360,3 +360,22 @@ html,button,input,textarea,select,option,svg text{font-family:"Vazirmatn",sans-s
 .receipt-purchases__identity bdi { display:block; font-size:10px; color:#7b899c; overflow-wrap:anywhere; margin-top:3px; }
 .receipt-purchases__clear { border:0; background:transparent; color:#61728e; font:inherit; font-size:12px; margin:0; padding:10px 14px; text-align:right; }
 .receipt-purchases__clear:hover { text-decoration:underline; }
+
+/* Scoped layout for daily work and intermediate production. */
+.routine-production__body{padding:22px;display:grid;gap:18px;min-width:0}
+.routine-production__card{display:grid;gap:16px;min-width:0;border:1px solid var(--border);border-radius:14px;background:#fff;padding:20px}
+.routine-production__body>.tools,.routine-production__card>.tools{flex-wrap:wrap;gap:10px}
+.routine-production .field,.routine-production-dialog .field{min-width:0}
+.routine-production select,.routine-production-dialog select{width:100%;min-width:0;max-width:100%;font:inherit;border:1px solid var(--border);border-radius:8px;padding:10px 12px;background:#fff}
+.routine-production .form-grid,.routine-production-dialog .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:end}
+.routine-production-dialog .form-grid{margin-block:16px}
+.routine-production-dialog fieldset{min-width:0;padding:16px;border:1px solid var(--border);border-radius:12px;margin-block:16px}
+.routine-production__table-wrap{min-width:0;max-width:100%;overflow-x:auto;border:1px solid var(--border);border-radius:12px}
+.routine-production__table{width:100%;border-collapse:collapse;text-align:right;font-size:14px}
+.routine-production__table th,.routine-production__table td{padding:12px 16px;border-bottom:1px solid var(--border);vertical-align:top;line-height:1.8}
+.routine-production__table th{background:#f1f4fa;font-weight:700;white-space:nowrap}
+.routine-production__table tbody tr:last-child td{border-bottom:0}
+.routine-production__table tbody tr:nth-child(even){background:#fafbfe}
+.routine-production__table-wrap>.empty{padding:24px 16px;border-top:1px solid var(--border);font-size:14px}
+.routine-production .panelhead{flex-wrap:wrap}
+@media(max-width:640px){.routine-production__body{padding:14px;gap:14px}.routine-production__card{padding:14px;gap:12px}.routine-production .form-grid,.routine-production-dialog .form-grid{grid-template-columns:minmax(0,1fr)}.routine-production__table th,.routine-production__table td{padding:10px 12px}.routine-production .btn{max-width:100%;white-space:normal}.routine-production__table{min-width:440px}}
