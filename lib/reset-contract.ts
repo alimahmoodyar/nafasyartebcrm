@@ -1,3 +1,5 @@
+// build_project request.planningClaims references the same project receipt/stock holds; existing operational JSON backup/reset/freeze and sourcing_holds child-first deletion cover both.
+// Pending-QC receipt claims reuse sourcing_holds (source_type=receipt); existing backup, FK-safe deletion and real/training freeze triggers cover them in both reset scopes.
 // Warehouse parentId/serviceDomain/serviceOwner live inside material_warehouse JSON.
 // Existing catalog backup/preservation/full deletion and 0016 freeze cover them; no new table or FK.
 // Compact receipt details and batch-filtered form archives are read-only views of existing records/snapshots. No new persistent data, files, tables or reset exemptions.
@@ -42,7 +44,7 @@ export const resetCatalog=['قیمت‌های فروش نمایندگان','پر
 // Ordered children before parents. SQL identifiers and predicates are constant, never caller input.
 export const resetTables:Record<string,string>={
  personal_reminders:'یادآورهای شخصی و اعلان‌های آن‌ها',llm_usage:'مصرف درخواست‌های مدل',assistant_actions:'فرمان‌های دستیار',assistant_turns:'گفت‌وگوهای دستیار',duty_files:'پیوست‌های وظایف',duty_notices:'اعلان‌های وظایف',duty_runs:'سوابق انجام وظایف',
- service_offsets:'تهاتر خدمات',service_reservations:'رزرو قطعات خدمات',service_files:'پیوست‌های خدمات',service_ledger:'گردش مالی خدمات',service_lots:'موجودی قطعات خدمات',service_activations:'فعال‌سازی گارانتی',sourcing_holds:'تخصیص‌های تأمین',
+ service_offsets:'تهاتر خدمات',service_reservations:'رزرو قطعات خدمات',service_files:'پیوست‌های خدمات',service_ledger:'گردش مالی خدمات',service_lots:'موجودی قطعات خدمات',service_activations:'فعال‌سازی گارانتی',sourcing_holds:'تخصیص‌های تأمین؛ قابل مصرف، منتظر کنترل و خرید باز',
  quality_files:'پیوست‌های کنترل کیفیت',quality_reports:'نتایج کنترل کیفیت',batch_files:'پیوست‌های بچ',finance_files:'فایل‌های کنترل مالی',finance_notes:'بررسی‌های مالی',
  production_materials:'مصرف مواد تولید',production_receipts:'رسید محصول',production_orders:'برگ‌های تولید',inventory_entries:'گردش انبار',inventory_balances:'موجودی انبار',inventory_batches:'بچ‌های انبار',flow_slots:'محل‌های دارای موجودی',
  serial_reservations:'سریال‌های رزروشده',serial_runs:'نوبت‌های چاپ سریال',inventory_operations:'عملیات کاری ثبت‌شده',quality_templates:'فرم‌های کنترل کیفیت',bom_versions:'نسخه‌های BOM',firmware_files:'فایل‌های نرم‌افزار دستگاه',flow_entities:'گردش‌های کاری و اطلاعات پایه',records:'سوابق دستگاه، کالا، بچ و خدمات'

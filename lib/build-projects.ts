@@ -11,6 +11,7 @@ export const projectHelp=[
  'گارانتی محصولات بیمارستانی متعلق به قرارداد همین پروژه است؛ مدت محصول مبنا نیست. ماه‌های توافق‌شده در سفارش ساخت و پروژه ثبت می‌شوند؛ مقدار نامشخص صفر نیست. شناسنامه نصب‌شده از همین توافق استفاده می‌کند.',
  'هر پروژه ساخت بیمارستانی یک کد، مشتری، قرارداد، مسئول و تجهیزات تحویلی دارد. هر تجهیز یک BOM مستقل دارد؛ کپی BOM پایه، نسخه اصلی را تغییر نمی‌دهد. نسخه اولیه و همه اصلاحات حفظ می‌شوند.',
  'مهندسی اقلام را آماده و مدیریت نسخه را تأیید می‌کند. درخواست مواد فقط از BOM تأییدشده است؛ افزایش یا جایگزینی نیازمند نسخه جدید و دلیل است. زیرمجموعه را به صورت کالای کامل یا اجزای آن وارد کنید؛ هر دو هم‌زمان هزینه نشوند.',
+ 'کسری خرید پروژه از قابل مصرف و منتظر کنترل محاسبه می‌شود. منتظر کنترل برای خرید تخصیص می‌یابد؛ تحویل فقط از بچ تأییدشده و جانمایی‌شده است.',
  'انبار درخواست را از بچ پذیرفته و غیرمنقضی رزرو و سپس تحویل می‌دهد. تحویل به محل پروژه مصرف نیست. مصرف، برگشت سالم به محل انبار و خرابی هر کدام جدا ثبت می‌شوند. موجودی تحویلی و رزروشده پروژه نباید در پایان بلاتکلیف بماند.',
  'بهای مواد از میانگین متحرک همان گردش موجودی محاسبه می‌شود؛ قیمت ناقص صفر فرض نمی‌شود. انتقال raw به project و برگشت، هزینه مصرف ایجاد نمی‌کند. هزینه زیرمجموعه آماده از ارزش موجودی آن می‌آید.',
  'ساعت واقعی با تاریخ و فرد ثبت می‌شود و مالی نرخ را تأیید می‌کند. هزینه مستقیم به تجهیز و هزینه مشترک با سهم دستی یا ساعت کار تأییدشده تخصیص می‌یابد. سربار نیازمند مبلغ و مبنای مصوب مالی است؛ برآورد با واقعی مخلوط نمی‌شود.',
@@ -30,4 +31,21 @@ export function projectReport(p:any,costs:any,sources:any[]=[],projectId=''){
  const result=units.map((u:any)=>{const material=moneyMicro(u.knownMaterial),manufacturing=material+moneyMicro(u.labor)+u.manufacturing,execution=manufacturing+u.execution+u.loss;return {...u,manufacturing:moneyText(manufacturing),execution:moneyText(execution),loss:moneyText(u.loss),complete:u.material!==null};});
  const purchasedServices=serviceCosts(sources,'project',projectId);for(const service of sources.filter(r=>r.type==='purchase_service'&&(r.data.costs||[]).some((a:any)=>a.kind==='project'&&a.targetId===projectId))){if(!serviceSummary(service,sources).complete)problems.push('تعهد خدمت خریداری‌شده کامل نیست: '+service.data.title);}const serviceTotal=purchasedServices.reduce((n:bigint,x:any)=>n+moneyMicro(x.amount),BigInt(0));const actual=total(result,'execution')+serviceTotal,budget=p.budgets.at(-1)?.amount||null,initial=p.budgets[0]?.amount||null;
  return {purchasedServices,serviceTotal:moneyText(serviceTotal),units:result,knownActual:moneyText(actual),actual:result.every((u:any)=>u.complete)&&!expenses.some((e:any)=>!e.approved)&&!p.times.some((t:any)=>!t.voided&&!t.approved)?moneyText(actual):null,manufacturing:moneyText(total(result,'manufacturing')),openCommitments:moneyText(total(p.commitments.filter((c:any)=>!c.closed),'amount')),remaining:p.remaining,forecast:p.remaining===null?null:moneyText(actual+moneyMicro(p.remaining)),initialBudget:initial,budget,variance:budget===null?null:moneyText(actual-moneyMicro(budget)),problems:[...new Set(problems)],complete:!problems.length};
+}
+
+// Pending purchase coverage follows each request through QC and shelving. A
+// project-level hold can serve several requests, so apportion its current amount
+// once, in request order; reservations already assigned to lots are excluded.
+export function projectPlanningClaims(project:any,request:any,holds:any[]){
+ const capacities=new Map<string,{hold:any;quantity:number}>();
+ for(const h of holds.filter(h=>h.plan_id===project.id)){
+  if(!['stock','receipt'].includes(h.source_type))continue;
+  const assigned=h.source_type==='stock'?(project.requests||[]).filter((r:any)=>r.state==='reserved').flatMap((r:any)=>r.lots||[]).filter((l:any)=>l.batchId===h.source_id).reduce((n:number,l:any)=>n+l.quantity,0):0;
+  capacities.set(h.source_type+':'+h.source_id,{hold:h,quantity:Math.max(0,h.quantity-assigned)});
+ }
+ const result:any[]=[];
+ for(const r of project.requests||[]){if(r.state!=='pending')continue;
+  for(const claim of r.planningClaims||[]){let left=claim.quantity;for(const type of ['stock','receipt']){const c=capacities.get(type+':'+claim.batchId);if(!c)continue;const quantity=Math.min(left,c.quantity);c.quantity-=quantity;left-=quantity;if(r.id===request.id&&quantity)result.push({hold:c.hold,quantity});}}
+ }
+ return result;
 }

@@ -1,3 +1,4 @@
+import {stockQuality} from './stock-quality';
 import {tehranDay} from './serials';
 import type {Session} from './permissions';
 export const flowRoles=['inventory','qc','production','procurement','sales','logistics'] as const;
@@ -10,7 +11,8 @@ export function suggestion(material:any,balances:any[],receipts:any[],builds:any
  const total=balances.filter(b=>ids.has(b.item_id)&&['raw','line'].includes(b.warehouse)).reduce((n,b)=>n+b.quantity,0);
  const raw=balances.filter(b=>ids.has(b.item_id)&&b.warehouse==='raw').reduce((n,b)=>n+b.quantity,0);
  const demand=builds.filter(b=>['planned','prepared'].includes(b.data.state)).reduce((n,b)=>{const bom=boms.find(x=>x.id===b.data.bomId);return n+(bom?JSON.parse(bom.lines).filter((l:any)=>l.partCode===material.data.code).reduce((a:number,l:any)=>a+Math.round(Number(l.quantity)*1000),0):0)},0);
- return {raw,total,demand,available:total-demand,low:total<demand,proposed:Math.max(0,demand-total)};
+ const pending=balances.filter(b=>ids.has(b.item_id)&&b.warehouse==='quarantine').reduce((n,b)=>n+stockQuality(b.warehouse,b.quantity,receipts.find(r=>r.id===b.item_id||r.data.batchId===b.item_id),undefined,tehranDay()).pending,0);
+ return {raw,total,pending,demand,available:total-demand,projected:total+pending-demand,low:total+pending<demand,proposed:Math.max(0,demand-total-pending)};
 }
 
 // Old accounts retain material-warehouse rights until the admin explicitly scopes them.

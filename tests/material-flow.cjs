@@ -136,5 +136,9 @@ const p=await create('product',{code:'FLOW',name:'FlowDevice',group:'سایر ت
  assert.equal(entities('material').find(m=>m.data.code==='9405').data.unit,'جفت');
  console.log('Set/pair units passed: HTTP and MCP master, immutable unit, receipt quantity and canonical centimetre spelling.');
  identity=null;assert.equal((await flow.GET()).status,401);
+ const suggest=load('lib/material-flow.ts').suggestion,sm={id:'suggest-material',data:{code:'S',unit:'عدد'}},sr={id:'suggest-batch',data:{batchId:'suggest-batch',materialId:'suggest-material',state:'pending_qc',accepted:0}},sb=[{item_id:'suggest-batch',warehouse:'quarantine',quantity:5000}],sd=[{data:{state:'planned',bomId:'suggest-bom'}}],sBoms=[{id:'suggest-bom',lines:JSON.stringify([{partCode:'S',unit:'عدد',quantity:'4'}])}];
+ let sg=suggest(sm,sb,[sr],sd,sBoms);assert.equal(sg.pending,5000);assert.equal(sg.proposed,0);assert.equal(sg.available,-4000,'Pending only covers purchasing, never consumable availability');
+ sr.data.state='awaiting_warehouse';sr.data.accepted=3000;sg=suggest(sm,sb,[sr],sd,sBoms);assert.equal(sg.pending,3000);assert.equal(sg.proposed,1000);
+ sr.data.state='stored';sb[0].quantity=2000;sb.push({item_id:'suggest-batch',warehouse:'raw',quantity:3000});sg=suggest(sm,sb,[sr],sd,sBoms);assert.equal(sg.pending,0);assert.equal(sg.total,3000);assert.equal(sg.proposed,1000);
  console.log('Material flow passed: partial incoming QC, quarantine, slot conflicts, FIFO/split batches, idempotency, role checks, serial capacity, assembler, stock rollback, actual consumption, repair and retained retest, independent procurement disabled.');
 })().catch(e=>{console.error(e);process.exit(1)});

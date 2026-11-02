@@ -1,6 +1,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript');
 const tree={};vm.runInNewContext(ts.transpileModule(fs.readFileSync('lib/warehouse-tree.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:tree,Map,Set});
-const out={};vm.runInNewContext(ts.transpileModule(fs.readFileSync('lib/warehouse-stock.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:out,Map,Set,require:()=>tree});
+const quality={};vm.runInNewContext(ts.transpileModule(fs.readFileSync('lib/stock-quality.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:quality,Date});
+const out={};vm.runInNewContext(ts.transpileModule(fs.readFileSync('lib/warehouse-stock.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:out,Map,Set,require:n=>n.includes('stock-quality')?quality:tree});
 const entry=(id,code,quantity,unit='عدد',kind='material',warehouse='w1',locations='A')=>({item_id:id,itemCode:code,quantity,unit,kind,warehouseId:warehouse,locations,warehouse:'raw',name:'Same name',row:{id,data:{code:'LOT-'+id}},passport:{details:[],lot:[{label:'Code',value:id}]}});
 const lots=[entry('b1','20100040',1250),entry('b1','20100040',750,'عدد','material','w2','B'),entry('b2','20100040',3000),entry('d1','SA5',1000,'دستگاه','product'),entry('d2','SA5',1000,'دستگاه','product')];
 let groups=out.groupWarehouseStock(lots);assert.equal(groups.length,2);assert.equal(groups[0].quantity,5000);assert.equal(groups[0].lotCount,2,'One batch in two locations counts once');assert.equal(groups[0].entries.length,3);assert.equal(groups[0].passport.lot.length,0,'A group never masquerades as the first lot');assert.equal(groups[1].quantity,2000);assert.equal(groups[1].lotCount,2);
@@ -15,3 +16,15 @@ assert.equal(out.filterWarehouseStock(lots,{warehouse:'root',includeChildren:fal
 assert.equal(tree.warehousePath(ws,'w2'),'Root / Child / Grandchild');
 const reserved=out.groupWarehouseStock([{...lots[0],quantity:5000,reserved:2000},{...lots[1],quantity:3000,reserved:500}])[0];assert.equal(reserved.quantity,8000);assert.equal(reserved.reserved,2500);assert.equal(reserved.available,5500);
 assert.equal(tree.warehouseDescendants([{id:'a',data:{parentId:'b'}},{id:'b',data:{parentId:'a'}}],'a').size,2,'Corrupt legacy cycles terminate');
+
+const q=(stage,n,r,b)=>quality.stockQuality(stage,n,r,b,'2026-11-02');
+assert.deepEqual(JSON.parse(JSON.stringify(q('quarantine',5000,{state:'pending_qc'}))),{usable:0,pending:5000,rejected:0});
+assert.equal(q('quarantine',5000,{state:'awaiting_warehouse',accepted:3000}).pending,3000);
+assert.equal(q('quarantine',5000,{state:'awaiting_warehouse',accepted:3000}).rejected,2000);
+assert.equal(q('quarantine',2000,{state:'stored',accepted:3000}).rejected,2000);
+assert.equal(q('quarantine',2000,{state:'rejected'}).rejected,2000);
+assert.equal(q('nonconforming',2000).rejected,2000);
+assert.equal(q('raw',2000,undefined,{expiry:'2026-11-01'}).usable,0);
+const mixed=out.groupWarehouseStock([{...lots[0],quality:q('raw',1250)}, {...lots[1],quality:q('quarantine',750,{state:'awaiting_warehouse',accepted:500})}])[0];
+assert.equal(mixed.quantity,2000);assert.equal(mixed.usable,1250);assert.equal(mixed.pending,500);assert.equal(mixed.rejected,250);assert.equal(mixed.available,1250);
+console.log('PASS mixed receipt QC classification: partial accept before shelving, rejected remainder after shelving, full reject, expired, nonconforming and grouped usable availability.');

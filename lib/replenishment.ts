@@ -1,7 +1,7 @@
 import {storedAccessPermissions} from './permissions';
 import {storage} from './storage';
 import {AccessError} from './authorization';
-import {supplyEntities,stockCandidates,supplyLock,coverage} from './sourcing';
+import {supplyEntities,stockCandidates,pendingCandidates,supplyLock,coverage} from './sourcing';
 import {dayAt,addDay,notice} from './duties';
 import {scaled} from './production';
 import {defaultCalendar,addWorkingMinutes,workingMinutes,workingNow,localParts,workWindow} from './workflow-calendar';
@@ -14,15 +14,15 @@ export async function shortageSnapshot(m:any,leadDays=7){
  const legacy=(await db.prepare("SELECT m.quantity FROM production_materials m JOIN inventory_batches b ON b.batch_id=m.batch_id WHERE b.part_code=? AND b.unit=? AND NOT EXISTS(SELECT 1 FROM production_receipts r WHERE r.order_id=m.order_id)").bind(m.data.code,m.data.unit).all()).results as any[];
  let production=legacy.reduce((n,r)=>n+r.quantity,0);
  for(const b of builds.filter(b=>['planned','prepared'].includes(b.data.state))){if(b.data.state==='prepared')production+=(b.data.materials||[]).filter((a:any)=>a.partCode===m.data.code).reduce((n:number,a:any)=>n+a.quantity,0);else{const bom=boms.find(x=>x.id===b.data.bomId);if(bom)production+=JSON.parse(bom.lines).filter((l:any)=>l.partCode===m.data.code&&l.unit===m.data.unit).reduce((n:number,l:any)=>n+scaled(l.quantity),0);}}
- const stock=candidates.reduce((n,c)=>n+c.quantity,0),reserved=candidates.reduce((n,c)=>n+c.held,0),free=Math.max(0,stock-reserved-production),due=addDay(dayAt(),leadDays),orders=await supplyEntities('purchase_order'),receipts=await supplyEntities('receipt');let incoming=0;
+ const stock=candidates.reduce((n,c)=>n+c.quantity,0),reserved=candidates.reduce((n,c)=>n+c.held,0),free=Math.max(0,stock-reserved-production),due=addDay(dayAt(),leadDays),orders=await supplyEntities('purchase_order'),receipts=await supplyEntities('receipt'),waiting=await pendingCandidates(m.data.code,m.data.unit);let incoming=0;
  for(const o of orders.filter(o=>o.data.partCode===m.data.code&&o.data.unit===m.data.unit&&['issued','paid','preparing','shipped'].includes(o.data.state)&&o.data.eta>=dayAt()&&o.data.eta<=due)){
-  const received=receipts.filter(r=>r.data.purchaseOrderId===o.id).reduce((n,r)=>n+(r.data.state==='pending_qc'?r.data.quantity:r.data.accepted),0),held:any=await db.prepare("SELECT COALESCE(SUM(quantity),0) n FROM sourcing_holds WHERE source_type='po' AND source_id=?").bind(o.id).first();incoming+=Math.max(0,o.data.quantity-received-held.n);
+  const received=receipts.filter(r=>r.data.purchaseOrderId===o.id).reduce((n,r)=>n+r.data.quantity,0),held:any=await db.prepare("SELECT COALESCE(SUM(quantity),0) n FROM sourcing_holds WHERE source_type='po' AND source_id=?").bind(o.id).first();incoming+=Math.max(0,o.data.quantity-received-Math.max(0,held.n-waiting.filter(c=>c.data.purchaseOrderId===o.id).reduce((n,c)=>n+c.legacyHeld,0)));
  }
- // Accepted but not yet shelved is still unavailable; pending receipts are shown separately.
- const quarantine=receipts.filter(r=>r.data.materialId===m.id&&r.data.state!=='stored').reduce((n,r)=>n+(r.data.state==='pending_qc'?r.data.quantity:r.data.accepted),0);
- const reorder=0,target=0,projected=free+incoming,proposed=0;
- if(![stock,reserved,production,incoming,quarantine,proposed].every(Number.isSafeInteger))throw new AccessError('مقدار موجودی از محدوده محاسبه خارج است.',400);
- return {stock,reserved,production,free,incoming,quarantine,projected,reorder,target,low:projected<reorder,proposed,needBy:due,fingerprint:JSON.stringify([stock,reserved,production,incoming,quarantine,reorder,target])};
+ // Pending coverage is reserved independently and is never releasable stock.
+ const quarantine=waiting.reduce((n,c)=>n+c.quantity,0),pendingFree=Math.max(0,waiting.reduce((n,c)=>n+Math.max(0,c.quantity-c.held),0)-Math.max(0,production-stock+reserved));
+ const reorder=0,target=0,projected=free+pendingFree+incoming,proposed=0;
+ if(![stock,reserved,production,incoming,quarantine,pendingFree,projected,proposed].every(Number.isSafeInteger))throw new AccessError('مقدار موجودی از محدوده محاسبه خارج است.',400);
+ return {stock,reserved,production,free,incoming,quarantine,pendingFree,projected,reorder,target,low:projected<reorder,proposed,needBy:due,fingerprint:JSON.stringify([stock,reserved,production,incoming,quarantine,pendingFree,reorder,target])};
 }
 const closed=['completed','cancelled','released','rejected'];
 export async function scanReplenishment(){return {created:0,enabled:false,basis:'approved_production',notice:'تأمین فقط از کسری برنامه تولید تأییدشده محاسبه می‌شود؛ پایش موجودی هدف کنار گذاشته شده است.'};}

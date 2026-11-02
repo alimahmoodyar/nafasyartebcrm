@@ -1,3 +1,4 @@
+import {stockQuality} from './stock-quality';
 import {accessPermissions,storedAccessPermissions} from './permissions';
 import {productProductionMode} from './model';
 import {supplierWork,rfqComplete} from './suppliers';
@@ -33,11 +34,54 @@ export function quoteCost(q:any,amount:number){const price=milli(q.unitPrice),fx
 export const decode=(r:any)=>({...r,data:JSON.parse(r.data)});
 export async function supplyEntities(type:string){return (await storage().prepare('SELECT * FROM flow_entities WHERE type=? ORDER BY created,id').bind(type).all()).results.map(decode);}
 export async function stockCandidates(code:string,unit:string){return (await storage().prepare("SELECT r.id,r.payload,SUM(i.quantity) AS quantity,COALESCE((SELECT SUM(h.quantity) FROM sourcing_holds h WHERE h.source_type='stock' AND h.source_id=r.id),0) AS held FROM records r JOIN inventory_balances i ON i.item_id=r.id WHERE r.kind='batch' AND json_extract(r.payload,'$.partCode')=? AND json_extract(r.payload,'$.unit')=? AND json_extract(r.payload,'$.status')='تأیید' AND (COALESCE(json_extract(r.payload,'$.expiry'),'')='' OR json_extract(r.payload,'$.expiry')>=?) AND i.warehouse IN ('raw','line') GROUP BY r.id HAVING SUM(i.quantity)>0 ORDER BY r.created,r.id").bind(code,unit,dayAt()).all()).results as any[];}
-export async function coverage(plan:any){const db=storage(),holds=(await db.prepare('SELECT * FROM sourcing_holds WHERE plan_id=?').bind(plan.id).all()).results as any[],orders=await supplyEntities('purchase_order');const lines=[];for(const l of plan.data.lines||[]){let stock=0,pipeline=0;for(const h of holds.filter(h=>h.part_code===l.partCode)){if(h.source_type==='stock'){const candidates=await stockCandidates(l.partCode,l.unit);const c=candidates.find(c=>c.id===h.source_id);if(c&&c.quantity>=c.held)stock+=h.quantity;}else{const o=orders.find(o=>o.id===h.source_id);if(o&&['issued','paid','preparing','shipped'].includes(o.data.state)&&o.data.eta<=plan.data.needBy&&o.data.eta>=dayAt())pipeline+=h.quantity;}}lines.push({...l,stock,pipeline,shortage:Math.max(0,l.required-stock-pipeline)});}return lines;}
+/** Pending receipts cover purchasing demand, never physical production release. */
+export async function pendingCandidates(code:string,unit:string,excludePlan=''){
+ const db=storage(),rows=(await db.prepare("SELECT r.id,r.payload,f.data,i.quantity AS balance FROM records r JOIN flow_entities f ON f.id=r.id AND f.type='receipt' JOIN inventory_balances i ON i.item_id=r.id AND i.warehouse='quarantine' WHERE r.kind='batch' AND json_extract(r.payload,'$.partCode')=? AND json_extract(r.payload,'$.unit')=? AND i.quantity>0 ORDER BY r.created,r.id").bind(code,unit).all()).results as any[];
+ const holds=(await db.prepare("SELECT * FROM sourcing_holds WHERE part_code=? AND unit=? AND plan_id<>?").bind(code,unit,excludePlan).all()).results as any[],poLeft=new Map<string,number>();
+ for(const h of holds.filter(h=>h.source_type==='po'))poLeft.set(h.source_id,(poLeft.get(h.source_id)||0)+h.quantity);
+ return rows.map(row=>{const data=JSON.parse(row.data),quantity=stockQuality('quarantine',row.balance,data,JSON.parse(row.payload),dayAt()).pending,directHeld=holds.filter(h=>h.source_type==='receipt'&&h.source_id===row.id).reduce((n,h)=>n+h.quantity,0),legacyHeld=Math.min(Math.max(0,quantity-directHeld),poLeft.get(data.purchaseOrderId)||0);poLeft.set(data.purchaseOrderId,Math.max(0,(poLeft.get(data.purchaseOrderId)||0)-legacyHeld));return {id:row.id,quantity,directHeld,legacyHeld,held:directHeld+legacyHeld,data};}).filter(c=>c.quantity>0);
+}
+async function orderedHolds(type:string,source:string){return (await storage().prepare("SELECT h.*,COALESCE(json_extract(p.data,'$.needBy'),json_extract(p.data,'$.due')) need_by FROM sourcing_holds h JOIN flow_entities p ON p.id=h.plan_id WHERE h.source_type=? AND h.source_id=? ORDER BY COALESCE(json_extract(p.data,'$.needBy'),json_extract(p.data,'$.due')),p.created,h.id").bind(type,source).all()).results as any[];}
+function quota(rows:any[],id:string,capacity:number){for(const h of rows){const n=Math.min(capacity,h.quantity);if(h.id===id)return n;capacity-=n;}return 0;}
+export async function coverage(plan:any){
+ const db=storage(),holds=(await db.prepare('SELECT * FROM sourcing_holds WHERE plan_id=?').bind(plan.id).all()).results as any[],orders=await supplyEntities('purchase_order'),receipts=await supplyEntities('receipt'),lines=[];
+ for(const l of plan.data.lines||[]){let stock=0,pending=0,pipeline=0;const candidates=await stockCandidates(l.partCode,l.unit),waiting=await pendingCandidates(l.partCode,l.unit);
+  for(const h of holds.filter(h=>h.part_code===l.partCode&&h.unit===l.unit)){
+   if(h.source_type==='stock'){const c=candidates.find(c=>c.id===h.source_id);if(c&&c.quantity>=c.held)stock+=h.quantity;}
+   else if(h.source_type==='receipt'){const c=waiting.find(c=>c.id===h.source_id);if(c)pending+=quota(await orderedHolds('receipt',c.id),h.id,c.quantity);}
+   else if(h.source_type==='po'){
+    const o=orders.find(o=>o.id===h.source_id);if(!o||!['issued','paid','preparing','shipped'].includes(o.data.state))continue;
+    let arrived=waiting.filter(c=>c.data.purchaseOrderId===o.id).reduce((n,c)=>n+Math.max(0,c.quantity-c.directHeld),0),future=Math.max(0,o.data.quantity-receipts.filter(r=>r.data.purchaseOrderId===o.id).reduce((n,r)=>n+r.data.quantity,0));
+    for(const other of await orderedHolds('po',o.id)){const a=Math.min(arrived,other.quantity);arrived-=a;const f=o.data.eta>=dayAt()&&o.data.eta<=other.need_by?Math.min(future,other.quantity-a):0;future-=f;if(other.id===h.id){pending+=a;pipeline+=f;break;}}
+   }
+  }
+  lines.push({...l,stock,pending,pipeline,shortage:Math.max(0,l.required-stock-pending-pipeline)});
+ }
+ return lines;
+}
 /** Called AFTER all stock entries in the same transaction; raw→line transfers keep holds. */
 export function holdChecks(db:D1Database,operation:string,items:string[]){return [...new Set(items)].map(item=>db.prepare("UPDATE inventory_operations SET guard=CASE WHEN COALESCE((SELECT SUM(quantity) FROM inventory_balances WHERE item_id=? AND warehouse IN ('raw','line')),0)>=COALESCE((SELECT SUM(quantity) FROM sourcing_holds WHERE source_type='stock' AND source_id=?),0) THEN guard ELSE 0 END WHERE id=?").bind(item,item,operation));}
-/** Convert purchase allocations to physical reservations only when accepted goods enter raw stock. */
-export async function allocateAcceptedPurchase(orderId:string,batchId:string,accepted:number){const db=storage(),rows=(await db.prepare("SELECT h.* FROM sourcing_holds h JOIN flow_entities p ON p.id=h.plan_id WHERE h.source_type='po' AND h.source_id=? ORDER BY json_extract(p.data,'$.needBy'),p.created,h.id").bind(orderId).all()).results as any[];let left=accepted;const result:D1PreparedStatement[]=[];for(const h of rows){const n=Math.min(left,h.quantity);if(!n)break;result.push(db.prepare('DELETE FROM sourcing_holds WHERE id=?').bind(h.id));if(n<h.quantity)result.push(db.prepare('INSERT INTO sourcing_holds(id,plan_id,part_code,unit,source_type,source_id,quantity) VALUES(?,?,?,?,?,?,?)').bind(h.id,h.plan_id,h.part_code,h.unit,'po',h.source_id,h.quantity-n));result.push(db.prepare("INSERT INTO sourcing_holds(id,plan_id,part_code,unit,source_type,source_id,quantity) VALUES(?,?,?,?,'stock',?,?) ON CONFLICT(plan_id,source_type,source_id) DO UPDATE SET quantity=sourcing_holds.quantity+excluded.quantity").bind(crypto.randomUUID(),h.plan_id,h.part_code,h.unit,batchId,n));left-=n;}return result;}
+function reserve(db:D1Database,h:any,type:string,source:string,n:number){return db.prepare("INSERT INTO sourcing_holds(id,plan_id,part_code,unit,source_type,source_id,quantity) VALUES(?,?,?,?,?,?,?) ON CONFLICT(plan_id,source_type,source_id) DO UPDATE SET quantity=sourcing_holds.quantity+excluded.quantity").bind(crypto.randomUUID(),h.plan_id,h.part_code,h.unit,type,source,n);}
+/** Arrival moves its existing purchase claims to pending receipt claims atomically. */
+export async function allocatePurchaseReceipt(orderId:string,batchId:string,amount:number,target='receipt'){
+ const db=storage(),result:D1PreparedStatement[]=[];let left=amount;
+ for(const h of await orderedHolds('po',orderId)){const n=Math.min(left,h.quantity);if(!n)break;result.push(db.prepare('DELETE FROM sourcing_holds WHERE id=?').bind(h.id));if(n<h.quantity)result.push(reserve(db,h,'po',orderId,h.quantity-n));result.push(reserve(db,h,target,batchId,n));left-=n;}
+ return result;
+}
+/** A rejection removes purchasing coverage immediately; PO claims retain the
+ * intended plan for an explicitly received replacement, without assuming stock. */
+export async function reconcileReceiptHolds(batchId:string,accepted:number,orderId='',shelved=false){
+ const db=storage(),result:D1PreparedStatement[]=[];let left=accepted;
+ for(const h of await orderedHolds('receipt',batchId)){
+  const n=Math.min(left,h.quantity);left-=n;result.push(db.prepare('DELETE FROM sourcing_holds WHERE id=?').bind(h.id));
+  if(n)result.push(reserve(db,h,shelved?'stock':'receipt',batchId,n));
+  if(h.quantity>n&&orderId)result.push(reserve(db,h,'po',orderId,h.quantity-n));
+ }
+ // Legacy receipts may still carry PO claims rather than receipt claims.
+ if(shelved&&left&&orderId)result.push(...await allocatePurchaseReceipt(orderId,batchId,left,'stock'));
+ return result;
+}
+export async function allocateAcceptedPurchase(orderId:string,batchId:string,accepted:number){return reconcileReceiptHolds(batchId,accepted,orderId,true);}
 /** Lock snapshot used by planning and receipt/shelving. No runtime schema mutation. */
 export async function supplyLock(db:D1Database,id:string){const r:any=await db.prepare("SELECT revision FROM flow_entities WHERE id='sourcing-lock'").first();return [db.prepare("UPDATE inventory_operations SET guard=CASE WHEN COALESCE((SELECT revision FROM flow_entities WHERE id='sourcing-lock'),0)=? THEN guard ELSE 0 END WHERE id=?").bind(r?.revision||0,id),db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES('sourcing-lock','sourcing_lock','{}',1,?,?) ON CONFLICT(id) DO UPDATE SET revision=flow_entities.revision+1,updated=excluded.updated").bind(new Date().toISOString(),new Date().toISOString())];}
 export function nextWork(p:any,quotes:any[],orders:any[],lines:any[]){const steps:{key:string;role:string;title:string}[]=[];const add=(key:string,role:string,title:string)=>steps.push({key,role,title});if(p.data.state==='pending')add('approve','ceo','بررسی درخواست تولید');if(['waiting_bom','approved','sourcing','ready'].includes(p.data.state)&&p.data.finance?.status!=='approved')add('budget','finance','اعلام برنامه تأمین مالی');if(p.data.state==='waiting_bom')add('bom','engineering','تکمیل و معرفی BOM');if(p.data.state==='approved')add('inventory','inventory','محاسبه مواد و تخصیص موجودی');if(p.data.state==='sourcing'||p.data.state==='ready'){

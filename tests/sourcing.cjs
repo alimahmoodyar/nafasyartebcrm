@@ -84,11 +84,11 @@ async function detail(id,user){const go=()=>sourcing.GET(request('/api/sourcing?
  await source('track',{planId:pid,orderId:order,stage:'preparing',eta:later,reference:'BACK',notes:'invalid downgrade'},400,actor('foreign'));
  const receiveBody={id:crypto.randomUUID(),planId:pid,orderId:order,day:today,quantity:'4',notes:'partial arrival'};
  await source('receive',receiveBody,200,actor('inventory'));await source('receive',receiveBody,200,actor('inventory'));
- let arrival=entities('receipt').find(r=>r.data.purchaseOrderId===order);assert.ok(arrival);assert.equal(stock(arrival.id,'quarantine'),4000);assert.equal((await detail(pid)).lines[0].stock,4000);
+ let arrival=entities('receipt').find(r=>r.data.purchaseOrderId===order);assert.ok(arrival);assert.equal(stock(arrival.id,'quarantine'),4000);assert.equal((await detail(pid)).lines[0].stock,4000);assert.equal((await detail(pid)).lines[0].pending,4000);assert.equal((await detail(pid)).lines[0].pipeline,2000);assert.equal((await detail(pid)).lines[0].shortage,0);
  await source('ready',{planId:pid,notes:'not QC yet'},400,actor('inventory'));
  await source('receive',{planId:pid,orderId:order,day:today,quantity:'3',notes:'overpending'},400,actor('inventory'));
- await op('incoming_qc',{receiptId:arrival.id,accepted:'3',rejected:'1',values:{purity:'93'},notes:'1 rejected'});await op('shelve',{receiptId:arrival.id,location:'A-1-1-2'});
- d=await detail(pid);assert.equal(d.lines[0].stock,7000);assert.equal(d.lines[0].pipeline,3000);
+ await op('incoming_qc',{receiptId:arrival.id,accepted:'3',rejected:'1',values:{purity:'93'},notes:'1 rejected'});assert.equal((await detail(pid)).lines[0].pending,3000);assert.equal((await detail(pid)).lines[0].shortage,1000);await op('shelve',{receiptId:arrival.id,location:'A-1-1-2'});
+ d=await detail(pid);assert.equal(d.lines[0].stock,7000);assert.equal(d.lines[0].pipeline,2000);assert.equal(d.lines[0].shortage,1000,'Rejected quantity is shortage, never assumed replacement');
  await source('close_order',{planId:pid,orderId:order,notes:'incomplete'},400,actor('inventory'));
  await source('receive',{planId:pid,orderId:order,day:today,quantity:'3',invoiceQuantity:'3',discrepancyNotes:'Replacement for one quality-rejected unit plus balance',notes:'balance plus replacement'},200,actor('inventory'));
  arrival=entities('receipt').filter(r=>r.data.purchaseOrderId===order).find(r=>r.data.state==='pending_qc');await op('incoming_qc',{receiptId:arrival.id,accepted:'3',rejected:'0',values:{purity:'94'},notes:'pass'});await op('shelve',{receiptId:arrival.id,location:'A-1-1-3'});
@@ -131,5 +131,54 @@ async function detail(id,user){const go=()=>sourcing.GET(request('/api/sourcing?
  await source('create',{productId:p2.id,count:1,origin:'forecast',needBy:future,reference:'ENGINEERING-INTERNAL'},200,actor('engineering'));
  const definition=catalog.discoverTools().find(t=>t.name==='update_user');
  assert.ok(definition.inputSchema.properties.permissions.properties.supplyRoles.items.enum.includes('production_planning'));
+ // Pending receipts cover purchases once, across competing approved plans.
+ await op('material',{code:'99',name:'Pending material',unit:'عدد',specs:'QC',fields,revision:0});
+ const pendingMaterial=entities('material').find(m=>m.data.code==='99');
+ const pendingProduct=await create('product',{code:'PENDING-PRODUCT',name:'Pending test',group:'سایر تجهیزات پزشکی',model:'M',productionMode:'project',status:'فعال'});
+ await operate({mode:'bom',productId:pendingProduct.id,previousVersion:0,lines:[{partCode:'99',name:'Pending material',unit:'عدد',quantity:'1'}]});
+ await op('receipt',{materialId:pendingMaterial.id,day:today,quantity:'5',supplier:'Pending supplier'});
+ const waitingReceipt=entities('receipt').find(r=>r.data.materialId===pendingMaterial.id);
+ const pendingPlans=[];for(const ref of ['WAIT-A','WAIT-B'])pendingPlans.push((await source('create',{productId:pendingProduct.id,count:4,origin:'forecast',needBy:future,reference:ref})).planId);
+ const approvals=await Promise.all(pendingPlans.map(planId=>context.run(actor('ceo'),()=>sourcing.POST(request('/api/sourcing','POST',{id:crypto.randomUUID(),mode:'approve',planId,revision:current(planId).revision,count:4,needBy:future,notes:'approve concurrent need'})))));
+ assert.deepEqual(approvals.map(r=>r.status).sort(),[200,409]);
+ await source('approve',{planId:pendingPlans[approvals.findIndex(r=>r.status===409)],count:4,needBy:future,notes:'retry current stock'},200,actor('ceo'));
+ let pendingLines=await Promise.all(pendingPlans.map(async id=>(await detail(id)).lines[0]));
+ assert.deepEqual(pendingLines.map(l=>l.pending).sort((a,b)=>a-b),[1000,4000]);assert.equal(pendingLines.reduce((n,l)=>n+l.shortage,0),3000);
+ for(const id of pendingPlans)await source('ready',{planId:id,notes:'pending is not usable'},400,actor('inventory'));
+ await source('calculate',{planId:pendingPlans[0],notes:'reclaim own pending reservation'},200,actor('inventory'));
+ assert.equal(sql.prepare("SELECT SUM(quantity) n FROM sourcing_holds WHERE source_type='receipt' AND source_id=?").get(waitingReceipt.id).n,5000);
+ const repl=load('lib/replenishment.ts');let projection=await repl.shortageSnapshot(pendingMaterial);assert.equal(projection.quarantine,5000);assert.equal(projection.pendingFree,0);assert.equal(projection.projected,0);
+ const beforeFreeze=sql.prepare('SELECT * FROM sourcing_holds ORDER BY id').all();
+ sql.prepare("UPDATE reset_control SET phase='maintenance',internal=0,updated=? WHERE id=1").run(now);
+ await op('incoming_qc',{receiptId:waitingReceipt.id,accepted:'3',values:{purity:'92'},notes:'blocked by freeze'},423);
+ assert.deepEqual(sql.prepare('SELECT * FROM sourcing_holds ORDER BY id').all(),beforeFreeze);
+ sql.prepare("UPDATE reset_control SET phase='testing' WHERE id=1").run();
+ await op('incoming_qc',{receiptId:waitingReceipt.id,accepted:'3',values:{purity:'92'},notes:'2 rejected'});
+ pendingLines=await Promise.all(pendingPlans.map(async id=>(await detail(id)).lines[0]));assert.equal(pendingLines.reduce((n,l)=>n+l.pending,0),3000);assert.equal(pendingLines.reduce((n,l)=>n+l.shortage,0),5000);
+ await op('shelve',{receiptId:waitingReceipt.id,location:'P-1-1-1'});
+ pendingLines=await Promise.all(pendingPlans.map(async id=>(await detail(id)).lines[0]));assert.equal(pendingLines.reduce((n,l)=>n+l.stock,0),3000);assert.equal(pendingLines.reduce((n,l)=>n+l.pending,0),0);assert.equal(pendingLines.reduce((n,l)=>n+l.shortage,0),5000);
+ assert.equal(stock(waitingReceipt.id,'quarantine'),2000);assert.equal((await repl.shortageSnapshot(pendingMaterial)).quarantine,0,'Rejected remainder never covers purchases');
+ const snapshotViaMcp=await catalog.executeTool('get_sourcing_plan',{planId:pendingPlans[0]},base,{user:actor('inventory'),scope:'read',tokenId:null});assert.equal(snapshotViaMcp.lines[0].pending,0);
+ // Old releases left purchase holds attached to arrived receipts. They still own
+ // that coverage, so another plan cannot claim the same pending delivery.
+ const seed=(id,type,data)=>sql.prepare('INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?)').run(id,type,JSON.stringify(data),now,now);
+ seed('legacy-po','purchase_order',{partCode:'99',unit:'عدد',quantity:2000,state:'issued',eta:later});
+ await op('receipt',{materialId:pendingMaterial.id,day:today,quantity:'2',supplier:'Legacy supplier'});
+ const legacyReceipt=entities('receipt').filter(r=>r.data.materialId===pendingMaterial.id&&r.data.state==='pending_qc')[0];
+ sql.prepare('UPDATE flow_entities SET data=? WHERE id=?').run(JSON.stringify({...legacyReceipt.data,purchaseOrderId:'legacy-po'}),legacyReceipt.id);
+ sql.prepare("INSERT INTO sourcing_holds(id,plan_id,part_code,unit,source_type,source_id,quantity) VALUES('legacy-po-hold',?,'99','عدد','po','legacy-po',2000)").run(pendingPlans[0]);
+ let legacyLine=(await detail(pendingPlans[0])).lines[0];assert.equal(legacyLine.pending,2000);assert.equal(legacyLine.pipeline,0);
+ assert.equal((await repl.shortageSnapshot(pendingMaterial)).pendingFree,0);
+ await source('calculate',{planId:pendingPlans[1],notes:'must not steal legacy pending'},200,actor('inventory'));assert.equal((await detail(pendingPlans[1])).lines[0].pending,0);
+ // Pending coverage does not depend on an ETA once physically received.
+ const expiredEta=entities('purchase_order').find(o=>o.id==='legacy-po');sql.prepare('UPDATE flow_entities SET data=? WHERE id=?').run(JSON.stringify({...expiredEta.data,eta:'2000-01-01'}),'legacy-po');assert.equal((await detail(pendingPlans[0])).lines[0].pending,2000);
+ await op('incoming_qc',{receiptId:legacyReceipt.id,accepted:'0',values:{purity:'80'},notes:'all rejected'});assert.equal((await detail(pendingPlans[0])).lines[0].pending,0);assert.equal((await detail(pendingPlans[0])).lines[0].pipeline,0);
+ // Legacy serial-level production demand has priority over free pending stock.
+ await op('receipt',{materialId:pendingMaterial.id,day:today,quantity:'2',supplier:'Future legacy production'});
+ const pendingBom=sql.prepare('SELECT id FROM bom_versions WHERE product_id=?').get(pendingProduct.id).id;
+ for(const id of ['legacy-build-A','legacy-build-B'])seed(id,'build',{state:'planned',bomId:pendingBom});
+ const extraPlan=(await source('create',{productId:pendingProduct.id,count:1,origin:'forecast',needBy:future,reference:'RESPECT-LEGACY-PENDING'})).planId;
+ await source('approve',{planId:extraPlan,count:1,needBy:future,notes:'do not steal legacy pending'},200,actor('ceo'));assert.equal((await detail(extraPlan)).lines[0].pending,0);assert.equal((await detail(extraPlan)).lines[0].shortage,1000);
+ console.log('PASS pending purchasing coverage: concurrent claims, own reallocation, no premature release, partial/full rejection, shelve conversion, legacy PO deduplication, overdue receipt, MCP parity and reset freeze rollback.');
  console.log('Sourcing passed: production planning HTTP/MCP requests, CEO gate, independent finance, role checks, frozen BOM, stock reservations, forecast deduplication, RFQ, budget, QC receipts and idempotency.');
 })().catch(e=>{console.error(e);process.exit(1)});
