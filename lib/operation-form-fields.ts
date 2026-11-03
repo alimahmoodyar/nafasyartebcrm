@@ -39,8 +39,8 @@ export function operationDataSchema(tool:string,mode:string):any|undefined{
  if(tool==='routine_production_apply'){
   choose('method',{quantity:'بر اساس تعداد موردنیاز',people:'بر اساس افراد و زمان'});if(p.memberIds)p.memberIds={type:'array',items:{type:'string'}};if(p.previewKey)p.previewKey={type:'string',uiHidden:true};if(mode==='quality'&&p.reference)p.reference.title='مرجع کنترل کیفیت';
   for(const k of ['restMinutes','setupMinutes','efficiencyPercent','lowerPercent','upperPercent','count','stage','leaveMinutes','downtimeMinutes','good','scrap','reworkCount','actualMinutes','overtimeMinutes'])if(p[k])p[k].type='number';
-  if(p.steps)p.steps={type:'array',items:object('title minutes crewSize allowancesIncluded bom')};
-  if(p.steps){p.steps.items.properties.minutes.type='number';p.steps.items.properties.crewSize.type='number';p.steps.items.properties.allowancesIncluded.type='boolean';p.steps.items.properties.bom={type:'array',items:object('materialId quantity')};}
+  if(p.steps)p.steps={type:'array',items:object('title minutes crewSize bom')};
+  if(p.steps){p.steps.items.properties.minutes.type='number';p.steps.items.properties.crewSize.type='number';p.steps.items.properties.bom={type:'array',items:object('materialId quantity')};}
   if(p.rates)p.rates={type:'array',items:object('jobId hourly overtimeHourly')};
   if(p.allocations)p.allocations={type:'array',items:object('batchId quantity')};
  }
