@@ -1,5 +1,6 @@
 // Shared by the read-only capacity preview and the confirmed, atomic plan write.
-export type PlannedWork={memberId:string;memberName:string;day:string;start:number;end:number;stage:number;count:number};
+export type PlannedWork={memberId:string;memberName:string;day:string;start:number;end:number;stage:number;count:number;crew?:{id:string;name:string}[]};
+export const workMembers=(work:any)=>work.crew?.length?work.crew:[{id:work.memberId,name:work.memberName}];
 export function routinePolicy(entities:any[],day:string){return entities.filter(e=>e.type==='routine_policy'&&e.data.effective<=day).sort((a,b)=>b.data.effective.localeCompare(a.data.effective)||b.data.version-a.data.version)[0];}
 export function planRoutine(input:any,source:{entities:any[];members:any[]}){
  const fail=(message:string):never=>{throw new Error(message)};
@@ -15,15 +16,28 @@ export function planRoutine(input:any,source:{entities:any[];members:any[]}){
  const members=ids.map((id:string)=>source.members.find(m=>m.id===id));if(members.some((m:any)=>!m))fail('افراد باید از فهرست کارکنان فعال انتخاب شوند.');
  const dates=Array.from({length:input.days},(_,i)=>new Date(Date.parse(input.day)+i*86400000).toISOString().slice(0,10));
  const policies=dates.map(day=>routinePolicy(source.entities,day));
- if(policies.some(p=>!p||['setupMinutes','efficiencyPercent','restMinutes','lowerPercent','upperPercent'].some(k=>p.data[k]==null))||route.data.steps.some((s:any)=>s.allowancesIncluded==null||!(s.seconds>0)))fail('زمان استاندارد و تنظیمات زمان مفید برای تمام روزهای برنامه باید کامل باشد؛ از «تنظیمات و سوابق» تکمیل کنید.');
+ if(policies.some(p=>!p||['setupMinutes','efficiencyPercent','restMinutes','lowerPercent','upperPercent'].some(k=>p.data[k]==null))||route.data.steps.some((s:any)=>s.allowancesIncluded==null||!(s.seconds>0)))fail('زمان استاندارد و تنظیمات زمان مفید برای تمام روزهای برنامه باید کامل باشد؛ از «تنظیمات و کارسنجی» تکمیل کنید.');
  const leaveBlocks:any[]=[];for(const e of source.entities.filter(e=>e.type==='hr_request'&&e.data.kind==='leave'&&e.data.state==='approved'&&ids.includes(e.data.memberId))){const d=e.data;for(const day of dates.filter(day=>d.start<=day&&d.end>=day)){const from=d.hourly?clock(d.startTime):0,to=d.hourly?clock(d.endTime):1440;if(!Number.isFinite(from)||!Number.isFinite(to)||to<=from)fail('بازه مرخصی مصوب یکی از افراد نامعتبر است؛ ابتدا در پرسنلی اصلاح شود.');leaveBlocks.push({memberId:d.memberId,day,start:from,end:to});}}
- const existing=source.entities.filter(e=>e.type==='routine_job'&&e.data.state!=='cancelled').map(e=>e.data).concat(leaveBlocks);
+ const existing=source.entities.flatMap(e=>e.type==='routine_job'&&e.data.state!=='cancelled'?[e.data]:e.type==='plan'?e.data.schedule||[]:[]).flatMap(j=>workMembers(j).map((m:any)=>({...j,memberId:m.id}))).concat(leaveBlocks);
  // Whole-stage precedence is deliberately conservative: the next operation starts
  // after the preceding stage's entire planned batch, not on imaginary future WIP.
  function schedule(count:number,pool:any[]){
   const work:PlannedWork[]=[],busy=existing.map(j=>({memberId:j.memberId,day:j.day,start:j.start,end:j.end}));let gateDay=dates[0],gateTime=start;
   for(let stage=0;stage<route.data.steps.length;stage++){
-   const step=route.data.steps[stage];let remaining=count,lastDay=gateDay,lastTime=gateTime;
+   const step=route.data.steps[stage],crewSize=step.crewSize??1;let remaining=count,lastDay=gateDay,lastTime=gateTime;
+   if(!Number.isSafeInteger(crewSize)||crewSize<1||crewSize>10)fail('تعداد افراد هم‌زمان هر مرحله باید بین یک تا ۱۰ باشد.');
+   if(crewSize>1){
+    for(const day of dates){if(day<gateDay)continue;const policy=policies[dates.indexOf(day)]!.data,overhead=policy.setupMinutes+(step.allowancesIncluded?0:policy.restMinutes),unitMinutes=step.seconds/60/(policy.efficiencyPercent/100);
+     for(let cursor=Math.max(start,day===gateDay?gateTime:start);cursor<end&&remaining;cursor++){
+      const slots=pool.map(member=>{const blocks=busy.filter(j=>j.memberId===member.id&&j.day===day&&j.end>cursor&&j.start<end);if(blocks.some(j=>j.start<=cursor))return null;return {member,end:Math.min(end,...blocks.map(j=>j.start))};}).filter(Boolean) as {member:any;end:number}[];
+      const team=slots.filter(s=>s.end-cursor>=overhead+Math.ceil(unitMinutes)).sort((a,b)=>b.end-a.end).slice(0,crewSize);if(team.length<crewSize)continue;
+      const until=Math.min(...team.map(s=>s.end)),quantity=Math.min(remaining,Math.floor((until-cursor-overhead)/unitMinutes+1e-7));if(!quantity)continue;
+      const finish=cursor+overhead+Math.ceil(quantity*unitMinutes),crew=team.map(s=>({id:s.member.id,name:s.member.name}));
+      work.push({memberId:crew[0].id,memberName:crew.map(m=>m.name).join('، '),crew,day,start:cursor,end:finish,stage,count:quantity});for(const m of crew)busy.push({memberId:m.id,day,start:cursor,end:finish});remaining-=quantity;lastDay=day;lastTime=finish;cursor=finish-1;
+      if(work.length>500)fail('برنامه بیش از حد بزرگ است؛ بازه یا گروه کوچک‌تری انتخاب کنید.');
+     }if(!remaining)break;
+    }if(remaining)return null;gateDay=lastDay;gateTime=lastTime;continue;
+   }
    for(let di=0;di<dates.length&&remaining;di++){
     const day=dates[di];if(day<gateDay)continue;const policy=policies[di]!.data;
     const overhead=policy.setupMinutes+(step.allowancesIncluded?0:policy.restMinutes);
@@ -58,10 +72,10 @@ export function planRoutine(input:any,source:{entities:any[];members:any[]}){
   // Deterministic prefix search finds a feasible team; preview names remain explicit.
   for(let size=1;size<=members.length;size++){work=schedule(count,members.slice(0,size));if(work)break;}
  }else{
-  let low=0,high=Math.min(100000,Math.floor(input.days*(end-start)*60*members.length/route.data.steps.reduce((n:number,s:any)=>n+s.seconds,0)));
+  let low=0,high=Math.min(input.maxCount??100000,100000,Math.floor(input.days*(end-start)*60*members.length/route.data.steps.reduce((n:number,s:any)=>n+s.seconds*(s.crewSize??1),0)));
   while(low<high){const mid=Math.ceil((low+high)/2);if(schedule(mid,members))low=mid;else high=mid-1;}count=low;work=count?schedule(count,members):null;
  }
  if(!work)return {feasible:false,count:input.method==='quantity'?input.count:0,reason:'ظرفیت آزاد این افراد در بازه انتخاب‌شده برای تکمیل قطعه کافی نیست. تعداد، بازه یا افراد را تغییر دهید.',work:[],routeId:route.id};
- const used=[...new Set(work.map(j=>j.memberId))];
- return {feasible:true,routeId:route.id,routeRevision:route.revision,count,personHours:count*route.data.steps.reduce((n:number,s:any)=>n+s.seconds,0)/3600,scheduledHours:work.reduce((n,j)=>n+j.end-j.start,0)/60,people:used.length,work,policies:policies.map((p,i)=>({day:dates[i],id:p!.id,revision:p!.revision})),basis:'زمان استاندارد و ظرفیت ثبت‌شده؛ مراحل به‌ترتیب و پس از تکمیل مرحله قبل. روزها تقویمی‌اند؛ مرخصی مصوب و تخصیص‌های ثبت‌شده کسر شده‌اند؛ تعطیلی، شیفت یا عدم‌حضور ثبت‌نشده باید در انتخاب روز و ساعت لحاظ شود.'};
+ const used=[...new Set(work.flatMap(j=>workMembers(j).map((m:any)=>m.id)))];
+ return {feasible:true,routeId:route.id,routeRevision:route.revision,count,personHours:count*route.data.steps.reduce((n:number,s:any)=>n+s.seconds*(s.crewSize??1),0)/3600,scheduledHours:work.reduce((n,j)=>n+(j.end-j.start)*workMembers(j).length,0)/60,people:used.length,work,policies:policies.map((p,i)=>({day:dates[i],id:p!.id,revision:p!.revision})),basis:'زمان استاندارد و ظرفیت ثبت‌شده؛ مراحل به‌ترتیب و پس از تکمیل مرحله قبل. روزها تقویمی‌اند؛ مرخصی مصوب و تخصیص‌های ثبت‌شده کسر شده‌اند؛ تعطیلی، شیفت یا عدم‌حضور ثبت‌نشده باید در انتخاب روز و ساعت لحاظ شود.'};
 }

@@ -184,3 +184,8 @@ resetHelp.push("فرم‌های مشخصات سفارش مشتری، نسخه‌
 resetHelp.push('راهنماهای عیب‌یابی محصول، تاریخچه تأیید و دفترچه‌های پیوست‌شده بخشی از پرونده‌های کیفیت‌اند؛ در پاک‌سازی عملیات حفظ و در پاک‌سازی کامل با فهرست قطعه‌های فایل پشتیبان‌گیری و حذف می‌شوند.');
 
 // material_file technical drawings/documents share material catalog preservation with material_photo. Full reset includes active/removed private objects; generic 0016 flow/inventory freeze and existing training wrappers apply. No new tables/FKs.
+
+// Shared production work-study extends routine_route (catalog) with productId/crewSize.
+// Reviewed final schedules/worker identities are embedded in operational plan/build;
+// generic flow_entities freeze, all-row backup and both resets already include them.
+// No new table, FK or blob. Operations reset preserves work-study/time/label catalogs.

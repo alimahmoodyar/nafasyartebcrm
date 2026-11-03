@@ -51,3 +51,5 @@ assistantWriteNames.add('save_material_warehouse');Object.assign(actionTitles,{s
 assistantWriteNames.delete('request_replenishment');
 
 for(const name of ['list_material_files','list_material_photos','get_material_visual_candidates','get_material_photo'])assistantReadNames.add(name);
+
+assistantReadNames.add('estimate_finished_production');assistantWriteNames.add('set_product_label_settings');Object.assign(actionTitles,{estimate_finished_production:'محاسبه برنامه تولید محصول نهایی',set_product_label_settings:'تنظیمات برچسب محصول',set_daily_capacity:'تنظیمات برچسب محصول',create_daily_production_plan:'ثبت برنامه تولید محصول نهایی'});
