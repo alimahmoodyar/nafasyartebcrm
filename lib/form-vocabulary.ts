@@ -267,7 +267,7 @@ export const fieldTitles:Record<string,string>={
   "recoverableTaxRial": "مالیات قابل بازیافت، جدا از قیمت (ریال)",
   "reportedPaidRial": "مبلغ پرداخت اعلام‌شده (ریال)",
   "paymentReference": "مرجع پرداخت یا «پرداخت گزارش نشده»",
-  "restMinutes": "استراحت؛ خالی = تعیین‌نشده",
+  "restMinutes": "مجموع استراحت روزانه هر نفر (دقیقه)؛ خالی = تعیین‌نشده",
   "setupMinutes": "آماده‌سازی؛ خالی = تعیین‌نشده",
   "efficiencyPercent": "درصد زمان مفید (۱ تا ۱۰۰)",
   "lowerPercent": "کف بازه، درصد استاندارد (۰ تا ۱۰۰)",
@@ -880,7 +880,7 @@ export const toolFieldTitles:Record<string,Record<string,string>>={
     "paymentReference": "مرجع پرداخت یا «پرداخت گزارش نشده»"
   },
   "routine_production_apply": {
-    "restMinutes": "استراحت همین بازه؛ خالی = سیاست",
+    "restMinutes": "مجموع استراحت روزانه هر نفر (دقیقه)",
     "setupMinutes": "آماده‌سازی همین کار؛ خالی = سیاست",
     "efficiencyPercent": "درصد زمان مفید (۱ تا ۱۰۰)",
     "lowerPercent": "کف بازه، درصد استاندارد (۰ تا ۱۰۰)",

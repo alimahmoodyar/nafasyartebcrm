@@ -1,10 +1,16 @@
 import {costRead,costWrite} from './costing';
+import {workMembers} from './routine-planning';
 export function routineRoles(u:any){const p=u.permissions,internal=!p.salesAgentId&&!p.serviceAgentId&&!p.hospitalCenterId,manager=internal&&(u.isAdmin||p.supplyRoles?.includes('ceo')),foreman=internal&&(manager||p.flowRoles?.includes('production')),engineering=internal&&(manager||p.supplyRoles?.includes('engineering')),quality=internal&&(manager||p.flowRoles?.includes('qc')),section=internal&&!!(!!manager||!!foreman||!!engineering||!!quality||p.roleAssignment?.roles.includes('production_worker')||p.manualPrograms?.includes('routine-production')),read=internal;
  return {read,section,manager:!!manager,foreman:!!foreman,engineering:!!engineering,quality:!!quality,finance:costWrite(u),financial:costRead(u),staff:!!(section&&(foreman||engineering||quality||costRead(u)))};}
-export function targetFor(j:any){const p=j.policy,s=j.step,span=j.end-j.start,rest=s.allowancesIncluded?0:(j.restMinutes??p.restMinutes??0),setup=j.setupMinutes??p.setupMinutes??0;
+export function allocateDailyRest(jobs:any[]){const used=new Set<string>(),result=new Map<string,{minutes:number;configured:boolean}>();
+ const ordered=[...jobs].filter(j=>(j.data||j).state!=='cancelled').sort((a:any,b:any)=>{const x=a.data||a,y=b.data||b;return String(x.day).localeCompare(String(y.day))||Number(x.start)-Number(y.start)||String(a.id||'').localeCompare(String(b.id||''));});
+ for(const item of ordered){const j=item.data||item,id=item.id||j.id||'',members=workMembers(j),keys=members.map((m:any)=>j.day+'|'+m.id),first=keys.some((key:string)=>!used.has(key)),configured=j.restMinutes!=null||j.policy?.restMinutes!=null||j.step?.allowancesIncluded===true,rest=j.restMinutes??j.policy?.restMinutes??0;
+  result.set(id,{minutes:first&&!j.step?.allowancesIncluded?Number(rest)||0:0,configured});for(const key of keys)used.add(key);
+ }return result;}
+export function targetFor(j:any,dailyRest?:{minutes:number;configured:boolean}){const p=j.policy,s=j.step,span=j.end-j.start,rest=s.allowancesIncluded?0:(dailyRest?.minutes??j.restMinutes??p.restMinutes??0),restConfigured=dailyRest?.configured??(j.restMinutes??p.restMinutes)!=null,setup=j.setupMinutes??p.setupMinutes??0;
  const useful=Math.max(0,span-j.leaveMinutes-j.downtimeMinutes-rest-setup)*(p.efficiencyPercent??100)/100;
  const standard=Math.floor(useful*60/s.seconds),lower=Math.floor(standard*(p.lowerPercent??100)/100),upper=Math.floor(standard*(p.upperPercent??100)/100);
- const provisional=j.rework===true||(!s.allowancesIncluded&&(j.restMinutes??p.restMinutes)==null)||(j.setupMinutes??p.setupMinutes)===null||p.efficiencyPercent===null||p.lowerPercent===null||p.upperPercent===null||s.allowancesIncluded===null;
+ const provisional=j.rework===true||(!s.allowancesIncluded&&!restConfigured)||(j.setupMinutes??p.setupMinutes)===null||p.efficiencyPercent===null||p.lowerPercent===null||p.upperPercent===null||s.allowancesIncluded===null;
  const regular=j.outputs.filter((x:any)=>!x.overtime).reduce((n:number,x:any)=>n+x.good,0),overtime=j.outputs.filter((x:any)=>x.overtime).reduce((n:number,x:any)=>n+x.good,0);
  const target=Math.min(standard,j.assigned),low=Math.min(lower,j.assigned),high=Math.min(upper,j.assigned);
  return {usefulMinutes:useful,standard,target,lower:low,upper:high,provisional,regular,overtime,shortfall:Math.max(0,low-regular),attainment:target?Math.round(regular/target*1000)/10:null};}
@@ -13,7 +19,7 @@ export const routineHelp=[
  'پیشنهاد گروه بر اساس ظرفیت زمانی ثبت‌شده با کسر مرخصی مصوب است، نه مهارت اثبات‌نشده؛ مسئول تولید باید تناسب مهارت، تعطیلی و مرخصی ثبت‌نشده و آمادگی مواد را بررسی کند. برنامه چندمرحله‌ای محافظه‌کارانه است: مرحله بعد بعد از تکمیل برنامه مرحله قبل زمان‌بندی می‌شود و شروع واقعی به خروجی آماده نیاز دارد.',
  'برای برنامه جدید، مسئول کیفیت می‌تواند همان کارگر باشد؛ مجوز فقط همان بچ است و نقش عمومی کیفیت نمی‌دهد. خروجی آخر پس از کنترل واقعی کیفیت مستقیم به موجودی نیمه‌آماده خط می‌رود. بچ‌های قدیمی همچنان رسید و جانمایی انبار دارند.',
  'مهندسی برای هر قطعه واسط، نسخه مسیر ساخت و زمان هر عملیات را ثبت می‌کند. BOM هر مرحله جداست. تغییر مسیر فقط بر بچ‌های جدید اثر دارد.',
- 'سرکارگر دارای نقش تولید، بازه کار روزانه و تعداد تخصیص را تعیین می‌کند. استراحت، آماده‌سازی، ضریب زمان مفید و بازه هدف قابل تنظیم‌اند؛ مقدار تعیین‌نشده هدف را موقت می‌کند. استراحت منظورشده در استاندارد دوباره کسر نمی‌شود.',
+ 'مدیر در سیاست زمان مفید، استراحت مجموع روزانه هر نفر را به دقیقه وارد می‌کند؛ برنامه‌ریزی و هدف روزانه آن را فقط یک بار در روز برای هر نفر کسر می‌کنند. آماده‌سازی برای هر بازه تخصیص جداست. زمان دقیق استراحت در برنامه رزرو نمی‌شود و باید در بازه حضور لحاظ شود. اگر استراحت در زمان استاندارد عملیات منظور شده باشد، دوباره کسر نمی‌شود.',
  'خروجی سالم، ضایعات، دوباره‌کاری و کار باقی‌مانده جدا هستند. تأیید عملیات میانی فقط موجودی در جریان ساخت را جابه‌جا می‌کند. در بچ‌های روش قبلی، برای خروجی آخرین مرحله هنگام تأیید کیفیت یکی از انبارهای فعال تعریف‌شده توسط کاربر انتخاب می‌شود. رسید تا جانمایی انباردار آماده مصرف نیست. تحویل مقدار لازم به خط تولید از گردش مواد انجام می‌شود؛ این انتقال مصرف نیست.',
  'مواد از موجودی خط کسر می‌شوند؛ انتقال انبار به خط از گردش مواد موجود انجام می‌شود و مصرف نیست. مصرف پیشنهادی BOM را با مصرف واقعی تطبیق دهید؛ مغایرت دلیل می‌خواهد. دوباره‌کاری مصرف استاندارد تکراری ندارد و مواد اضافی آن جدا ثبت می‌شود.',
  'نتیجه عادی و اضافه‌کاری جدا هستند. کسری هدف با دلیل و بررسی سرکارگر ثبت می‌شود؛ هیچ کسر حقوق، تغییر مزایا یا دستور کار بدون مزد از این بخش صادر نمی‌شود.',

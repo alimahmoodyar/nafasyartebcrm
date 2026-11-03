@@ -18,32 +18,34 @@ export function planRoutine(input:any,source:{entities:any[];members:any[]}){
  const policies=dates.map(day=>routinePolicy(source.entities,day));
  if(policies.some(p=>!p||['setupMinutes','efficiencyPercent','restMinutes','lowerPercent','upperPercent'].some(k=>p.data[k]==null))||route.data.steps.some((s:any)=>s.allowancesIncluded==null||!(s.seconds>0)))fail('زمان استاندارد و تنظیمات زمان مفید برای تمام روزهای برنامه باید کامل باشد؛ از «تنظیمات و کارسنجی» تکمیل کنید.');
  const leaveBlocks:any[]=[];for(const e of source.entities.filter(e=>e.type==='hr_request'&&e.data.kind==='leave'&&e.data.state==='approved'&&ids.includes(e.data.memberId))){const d=e.data;for(const day of dates.filter(day=>d.start<=day&&d.end>=day)){const from=d.hourly?clock(d.startTime):0,to=d.hourly?clock(d.endTime):1440;if(!Number.isFinite(from)||!Number.isFinite(to)||to<=from)fail('بازه مرخصی مصوب یکی از افراد نامعتبر است؛ ابتدا در پرسنلی اصلاح شود.');leaveBlocks.push({memberId:d.memberId,day,start:from,end:to});}}
- const existing=source.entities.flatMap(e=>e.type==='routine_job'&&e.data.state!=='cancelled'?[e.data]:e.type==='plan'?e.data.schedule||[]:[]).flatMap(j=>workMembers(j).map((m:any)=>({...j,memberId:m.id}))).concat(leaveBlocks);
+ const reserved=source.entities.flatMap(e=>e.type==='routine_job'&&e.data.state!=='cancelled'?[e.data]:e.type==='plan'?e.data.schedule||[]:[]);
+ const existing=reserved.flatMap(j=>workMembers(j).map((m:any)=>({...j,memberId:m.id}))).concat(leaveBlocks);
  // Whole-stage precedence is deliberately conservative: the next operation starts
  // after the preceding stage's entire planned batch, not on imaginary future WIP.
  function schedule(count:number,pool:any[]){
-  const work:PlannedWork[]=[],busy=existing.map(j=>({memberId:j.memberId,day:j.day,start:j.start,end:j.end}));let gateDay=dates[0],gateTime=start;
+  const work:PlannedWork[]=[],busy=existing.map(j=>({memberId:j.memberId,day:j.day,start:j.start,end:j.end})),restUsed=new Set<string>(reserved.flatMap(j=>workMembers(j).map((m:any)=>j.day+'|'+m.id)));let gateDay=dates[0],gateTime=start;
   for(let stage=0;stage<route.data.steps.length;stage++){
    const step=route.data.steps[stage],crewSize=step.crewSize??1;let remaining=count,lastDay=gateDay,lastTime=gateTime;
    if(!Number.isSafeInteger(crewSize)||crewSize<1||crewSize>10)fail('تعداد افراد هم‌زمان هر مرحله باید بین یک تا ۱۰ باشد.');
    if(crewSize>1){
-    for(const day of dates){if(day<gateDay)continue;const policy=policies[dates.indexOf(day)]!.data,overhead=policy.setupMinutes+(step.allowancesIncluded?0:policy.restMinutes),unitMinutes=step.seconds/60/(policy.efficiencyPercent/100);
+    for(const day of dates){if(day<gateDay)continue;const policy=policies[dates.indexOf(day)]!.data,unitMinutes=step.seconds/60/(policy.efficiencyPercent/100);
      for(let cursor=Math.max(start,day===gateDay?gateTime:start);cursor<end&&remaining;cursor++){
       const slots=pool.map(member=>{const blocks=busy.filter(j=>j.memberId===member.id&&j.day===day&&j.end>cursor&&j.start<end);if(blocks.some(j=>j.start<=cursor))return null;return {member,end:Math.min(end,...blocks.map(j=>j.start))};}).filter(Boolean) as {member:any;end:number}[];
-      const team=slots.filter(s=>s.end-cursor>=overhead+Math.ceil(unitMinutes)).sort((a,b)=>b.end-a.end).slice(0,crewSize);if(team.length<crewSize)continue;
+      const team=slots.sort((a,b)=>Number(restUsed.has(day+'|'+b.member.id))-Number(restUsed.has(day+'|'+a.member.id))||b.end-a.end).slice(0,crewSize);if(team.length<crewSize)continue;
+      const rest=step.allowancesIncluded||team.every(s=>restUsed.has(day+'|'+s.member.id))?0:policy.restMinutes,overhead=policy.setupMinutes+rest;if(team.some(s=>s.end-cursor<overhead+Math.ceil(unitMinutes)))continue;
       const until=Math.min(...team.map(s=>s.end)),quantity=Math.min(remaining,Math.floor((until-cursor-overhead)/unitMinutes+1e-7));if(!quantity)continue;
       const finish=cursor+overhead+Math.ceil(quantity*unitMinutes),crew=team.map(s=>({id:s.member.id,name:s.member.name}));
-      work.push({memberId:crew[0].id,memberName:crew.map(m=>m.name).join('، '),crew,day,start:cursor,end:finish,stage,count:quantity});for(const m of crew)busy.push({memberId:m.id,day,start:cursor,end:finish});remaining-=quantity;lastDay=day;lastTime=finish;cursor=finish-1;
+      work.push({memberId:crew[0].id,memberName:crew.map(m=>m.name).join('، '),crew,day,start:cursor,end:finish,stage,count:quantity});for(const m of crew){busy.push({memberId:m.id,day,start:cursor,end:finish});restUsed.add(day+'|'+m.id);}remaining-=quantity;lastDay=day;lastTime=finish;cursor=finish-1;
       if(work.length>500)fail('برنامه بیش از حد بزرگ است؛ بازه یا گروه کوچک‌تری انتخاب کنید.');
      }if(!remaining)break;
     }if(remaining)return null;gateDay=lastDay;gateTime=lastTime;continue;
    }
    for(let di=0;di<dates.length&&remaining;di++){
     const day=dates[di];if(day<gateDay)continue;const policy=policies[di]!.data;
-    const overhead=policy.setupMinutes+(step.allowancesIncluded?0:policy.restMinutes);
     const slots=pool.map(member=>{
      let cursor=Math.max(start,day===gateDay?gateTime:start);const intervals=busy.filter(j=>j.memberId===member.id&&j.day===day&&j.end>cursor&&j.start<end).sort((a,b)=>a.start-b.start),gaps:{start:number;end:number;capacity:number}[]=[];
-     const add=(from:number,to:number)=>{const capacity=Math.floor((Math.max(0,to-from-overhead)*policy.efficiencyPercent/100*60+1e-7)/step.seconds);if(capacity)gaps.push({start:from,end:to,capacity});};
+     let restPending=!step.allowancesIncluded&&!restUsed.has(day+'|'+member.id);
+     const add=(from:number,to:number)=>{const overhead=policy.setupMinutes+(restPending?policy.restMinutes:0),capacity=Math.floor((Math.max(0,to-from-overhead)*policy.efficiencyPercent/100*60+1e-7)/step.seconds);if(capacity){gaps.push({start:from,end:to,capacity,overhead});restPending=false;}};
      for(const interval of intervals){if(interval.start>cursor)add(cursor,Math.min(end,interval.start));cursor=Math.max(cursor,interval.end);}if(cursor<end)add(cursor,end);
      return {member,gaps,capacity:gaps.reduce((n,g)=>n+g.capacity,0)};
     });
@@ -51,14 +53,15 @@ export function planRoutine(input:any,source:{entities:any[];members:any[]}){
     // Fill the earliest common completion horizon. Capacity at minute t-1 is
     // allocated first, then units becoming available at t. This keeps targets
     // balanced for equal shifts and monotone for the capacity binary search.
-    const capacityAt=(gap:any,t:number)=>Math.floor((Math.max(0,Math.min(gap.end,t)-gap.start-overhead)*policy.efficiencyPercent/100*60+1e-7)/step.seconds);
+    const capacityAt=(gap:any,t:number)=>Math.floor((Math.max(0,Math.min(gap.end,t)-gap.start-gap.overhead)*policy.efficiencyPercent/100*60+1e-7)/step.seconds);
     const until=(t:number)=>slots.reduce((n,slot)=>n+slot.gaps.reduce((q,g)=>q+capacityAt(g,t),0),0);
     let low=start,high=end;while(low<high){const mid=Math.floor((low+high)/2);if(until(mid)>=dailyCount)high=mid;else low=mid+1;}
     const horizon=low;let extra=dailyCount-until(horizon-1);
     for(const slot of slots)for(const gap of slot.gaps){
      const base=capacityAt(gap,horizon-1),increment=Math.min(extra,capacityAt(gap,horizon)-base),quantity=base+increment;extra-=increment;if(!quantity)continue;
-     const finish=gap.start+overhead+Math.ceil(quantity*step.seconds/60/(policy.efficiencyPercent/100));
+     const finish=gap.start+gap.overhead+Math.ceil(quantity*step.seconds/60/(policy.efficiencyPercent/100));
      const job={memberId:slot.member.id,memberName:slot.member.name,day,start:gap.start,end:finish,stage,count:quantity};work.push(job);busy.push(job);remaining-=quantity;
+     restUsed.add(day+'|'+slot.member.id);
      if(work.length>500)fail('برنامه بیش از حد بزرگ است؛ بازه یا گروه کوچک‌تری انتخاب کنید.');
      if(day>lastDay||day===lastDay&&finish>lastTime){lastDay=day;lastTime=finish;}
     }
