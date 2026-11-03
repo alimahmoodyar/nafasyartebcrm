@@ -11,7 +11,7 @@ vm.runInNewContext(source,{exports,require:n=>{if(n==='cloudflare:workers')retur
 const api=load('app/api/routine-production/route.ts'),ctx=load('lib/mcp/context.ts').mcpActor,permissions=load('lib/permissions.ts');
 let user={userId:'owner',name:'Owner',isAdmin:true,permissions:permissions.allPermissions};const admin=user;
 const entity=(id,type,data)=>sql.prepare('INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?)').run(id,type,JSON.stringify(data),'2026-10-01','2026-10-01');
-const member=(id,p)=>sql.prepare("INSERT INTO app_members(id,email,name,unit,status,permissions,created,updated) VALUES(?,?,?,'unit','active',?,?,?)").run(id,id+'@test',id,JSON.stringify({read:[],write:[],eventStages:[],...p}),'2026-10-01','2026-10-01');
+const member=(id,p)=>sql.prepare("INSERT INTO app_members(id,email,name,unit,status,permissions,created,updated) VALUES(?,?,?,'unit','active',?,?,?)").run(id,id+'@test',id,JSON.stringify({read:[],write:[],eventStages:[],flowRoles:['production'],...p}),'2026-10-01','2026-10-01');
 const body=(mode,x={})=>({id:crypto.randomUUID(),mode,confirmed:true,notes:'Documented evidence',...x});
 async function post(b,status=200){const r=await ctx.run(user,()=>api.POST(new Request('https://test.local/api/routine-production',{method:'POST',headers:{origin:'https://test.local'},body:JSON.stringify(b)})));const d=await r.json();assert.equal(r.status,status,b.mode+': '+JSON.stringify(d));return d;}
 async function get(){const r=await ctx.run(user,()=>api.GET());assert.equal(r.status,200);return r.json();}
@@ -30,6 +30,7 @@ async function finalPost(b,status=200){const r=await ctx.run(user,()=>finishedAp
  sql.prepare("INSERT INTO records(id,kind,payload,created) VALUES('product','product',?,'2026-11-01')").run(JSON.stringify({code:'99',name:'Oxygen',model:'Model',status:'فعال',productionMode:'serial'}));
  sql.prepare("INSERT INTO bom_versions(id,product_id,version,lines,actor,created) VALUES('bom','product',1,'[]','owner','2026-11-01')").run();
  sql.prepare("INSERT INTO quality_templates(id,product_id,version,title,fields,created,created_by) VALUES('qc','product',1,'QC','[]','2026-11-01','owner')").run();
+ entity('initial-product-version','product_version',{productId:'product',version:1,design:'D1',firmware:'',effectiveFrom:'2026-11-01'});
  entity('approved','sourcing_plan',{state:'released',approvedBy:'ceo',productId:'product',count:10,bom:{id:'bom'}});
  entity('part','material',{code:'22',name:'Valve',unit:'عدد'});
  const route=body('route',{productId:'product',steps:[{title:'Assemble',seconds:3600,crewSize:1,allowancesIncluded:true,bom:[]}]});await post(route);

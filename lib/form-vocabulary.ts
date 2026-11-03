@@ -1338,3 +1338,5 @@ Object.assign(fieldTitles,{sourcingPlanId:'برنامه مصوب تحویل‌ش
 Object.assign(toolModeTitles.routine_production_apply,{plan:'ثبت برنامه تولید روزانه و تخصیص‌ها',start:'شروع عملیات برنامه',cancel_job:'لغو عملیات شروع‌نشده'});
 Object.assign(toolFieldTitles.routine_production_apply,{method:'روش برنامه‌ریزی',count:'تعداد موردنیاز تولید / تخصیص',memberIds:'افراد قابل تخصیص',qcMemberId:'مسئول کیفیت همین برنامه',previewKey:'کلید محاسبه تأییدشده',days:'تعداد روز تقویمی'});
 toolFieldTitles.estimate_routine_production={routeId:'قطعه نیمه‌آماده / مسیر ساخت',method:'روش برنامه‌ریزی',count:'تعداد موردنیاز تولید',memberIds:'افراد قابل تخصیص',day:'روز شروع',days:'تعداد روز تقویمی',start:'شروع کار روزانه',end:'پایان کار روزانه'};
+
+Object.assign(toolFieldTitles.personnel_apply,{productionEligible:'قابل تخصیص به عملیات تولید'});

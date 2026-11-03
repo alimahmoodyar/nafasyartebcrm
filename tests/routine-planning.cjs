@@ -11,7 +11,7 @@ vm.runInNewContext(source,{exports,require:n=>{if(n==='cloudflare:workers')retur
 const api=load('app/api/routine-production/route.ts'),ctx=load('lib/mcp/context.ts').mcpActor,permissions=load('lib/permissions.ts');
 let user={userId:'owner',name:'Owner',isAdmin:true,permissions:permissions.allPermissions};const admin=user;
 const entity=(id,type,data)=>sql.prepare('INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?)').run(id,type,JSON.stringify(data),'2026-10-01','2026-10-01');
-const member=(id,p)=>sql.prepare("INSERT INTO app_members(id,email,name,unit,status,permissions,created,updated) VALUES(?,?,?,'unit','active',?,?,?)").run(id,id+'@test',id,JSON.stringify({read:[],write:[],eventStages:[],...p}),'2026-10-01','2026-10-01');
+const member=(id,p)=>sql.prepare("INSERT INTO app_members(id,email,name,unit,status,permissions,created,updated) VALUES(?,?,?,'unit','active',?,?,?)").run(id,id+'@test',id,JSON.stringify({read:[],write:[],eventStages:[],flowRoles:['production'],...p}),'2026-10-01','2026-10-01');
 const body=(mode,x={})=>({id:crypto.randomUUID(),mode,confirmed:true,notes:'Documented evidence',...x});
 async function post(b,status=200){const r=await ctx.run(user,()=>api.POST(new Request('https://test.local/api/routine-production',{method:'POST',headers:{origin:'https://test.local'},body:JSON.stringify(b)})));const d=await r.json();assert.equal(r.status,status,b.mode+': '+JSON.stringify(d));return d;}
 async function get(){const r=await ctx.run(user,()=>api.GET());assert.equal(r.status,200);return r.json();}

@@ -1,3 +1,4 @@
+// hr_employee.productionEligible is an audited operational profile flag. Both reset scopes back up/delete it with hr_employee under existing flow_entities freeze; no new table/FK/blob. Production-role defaults are derived from preserved accounts after reset.
 // routine_plan and scheduled/cancelled routine_job live in operational flow_entities. Both reset scopes back up/delete them with routine_lot; generic 0016 freeze covers atomic plans, worker/QC audit and line inventory writes. No new table/FK/blob or preservation exemption.
 // sale.sourceWarehouses is the dispatch-time origin snapshot in existing operational sale JSON;
 // both reset scopes, backups and 0016 freeze already cover it, with no new table/FK.

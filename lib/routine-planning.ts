@@ -1,3 +1,4 @@
+import {productionEligible} from './production-people';
 // Shared by the read-only capacity preview and the confirmed, atomic plan write.
 export type PlannedWork={memberId:string;memberName:string;day:string;start:number;end:number;stage:number;count:number;crew?:{id:string;name:string}[]};
 export const workMembers=(work:any)=>work.crew?.length?work.crew:[{id:work.memberId,name:work.memberName}];
@@ -15,7 +16,7 @@ export function planRoutine(input:any,source:{entities:any[];members:any[]}){
  if(!['quantity','people'].includes(input.method))fail('روش برنامه‌ریزی را انتخاب کنید.');
  if(input.method==='quantity'&&(!Number.isSafeInteger(input.count)||input.count<1||input.count>100000))fail('تعداد موردنیاز تولید را بین یک تا صد هزار وارد کنید.');
  const ids=input.memberIds;if(!Array.isArray(ids)||!ids.length||ids.length>50||new Set(ids).size!==ids.length)fail('حداقل یک نفر و حداکثر ۵۰ نفر را برای بررسی ظرفیت انتخاب کنید.');
- const members=ids.map((id:string)=>source.members.find(m=>m.id===id));if(members.some((m:any)=>!m))fail('افراد باید از فهرست کارکنان فعال انتخاب شوند.');
+ const members=ids.map((id:string)=>source.members.find(m=>m.id===id&&productionEligible(m,source.entities,input.day,new Date(Date.parse(input.day)+(input.days-1)*86400000).toISOString().slice(0,10))));if(members.some((m:any)=>!m))fail('افراد باید از فهرست کارکنان فعال و مجاز برای تولید در این بازه انتخاب شوند.');
  const dates=Array.from({length:input.days},(_,i)=>new Date(Date.parse(input.day)+i*86400000).toISOString().slice(0,10));
  const policies=dates.map(day=>routinePolicy(source.entities,day));
  if(policies.some(p=>!p||['setupMinutes','restMinutes','lowerPercent','upperPercent'].some(k=>p.data[k]==null))||route.data.steps.some((s:any)=>!(s.seconds>0)))fail('زمان استاندارد و تنظیمات زمان مفید برای تمام روزهای برنامه باید کامل باشد؛ از «تنظیمات و کارسنجی» تکمیل کنید.');
