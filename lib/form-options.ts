@@ -3,7 +3,6 @@ import {materialUnitLabels} from './material-units';
 import {jobRoles} from './permissions';
 import {supplyRoles} from './sourcing-labels';
 import {reminderLinks,reminderTriggers,reminderModes,reminderConditions,reminderFields,reminderDelegationKinds} from './reminder-contract';
-import {trainingRoles} from './training-contract';
 // Enumerated wire values with display-only Persian captions. Keys include the full field path.
 export const toolOptions:Record<string,Record<string,Record<string,string>>>={
  "routine_production_apply": {
@@ -21,71 +20,7 @@ export const toolOptions:Record<string,Record<string,Record<string,string>>>={
    "cost": "نهایی‌سازی بهای بچ"
   }
  },
- "training_workspace_request": {
-  "roleId": {
-   "role-0": "نقش آموزشی 1",
-   "role-1": "نقش آموزشی 2",
-   "role-2": "نقش آموزشی 3",
-   "role-3": "نقش آموزشی 4",
-   "role-4": "نقش آموزشی 5",
-   "role-5": "نقش آموزشی 6",
-   "role-6": "نقش آموزشی 7",
-   "role-7": "نقش آموزشی 8",
-   "role-8": "نقش آموزشی 9",
-   "role-9": "نقش آموزشی 10",
-   "role-10": "نقش آموزشی 11",
-   "role-11": "نقش آموزشی 12",
-   "role-12": "نقش آموزشی 13",
-   "role-13": "نقش آموزشی 14",
-   "role-14": "نقش آموزشی 15",
-   "role-15": "نقش آموزشی 16",
-   "role-16": "نقش آموزشی 17",
-   "role-17": "نقش آموزشی 18",
-   "role-18": "نقش آموزشی 19",
-   "role-19": "نقش آموزشی 20",
-   "role-20": "نقش آموزشی 21",
-   "role-21": "نقش آموزشی 22",
-   "role-22": "نقش آموزشی 23",
-   "role-23": "نقش آموزشی 24",
-   "role-24": "نقش آموزشی 25",
-   "role-25": "نقش آموزشی 26",
-   "role-26": "نقش آموزشی 27",
-   "role-27": "نقش آموزشی 28",
-   "role-28": "نقش آموزشی 29",
-   "role-29": "نقش آموزشی 30",
-   "role-30": "نقش آموزشی 31",
-   "role-31": "نقش آموزشی 32",
-   "role-32": "نقش آموزشی 33",
-   "role-33": "نقش آموزشی 34",
-   "role-34": "نقش آموزشی 35",
-   "role-35": "نقش آموزشی 36",
-   "role-36": "نقش آموزشی 37",
-   "role-37": "نقش آموزشی 38",
-   "role-38": "نقش آموزشی 39",
-   "role-39": "نقش آموزشی 40",
-   "role-40": "نقش آموزشی 41",
-   "role-41": "نقش آموزشی 42",
-   "role-42": "نقش آموزشی 43",
-   "role-43": "نقش آموزشی 44",
-   "role-44": "نقش آموزشی 45",
-   "role-45": "نقش آموزشی 46",
-   "role-46": "نقش آموزشی 47",
-   "role-47": "نقش آموزشی 48",
-   "role-48": "نقش آموزشی 49",
-   "role-49": "نقش آموزشی 50",
-   "role-50": "نقش آموزشی 51",
-   "role-51": "نقش آموزشی 52",
-   "role-52": "نقش آموزشی 53",
-   "role-53": "نقش آموزشی 54"
-  },
-  "method": {
-   "GET": "دریافت اطلاعات (GET)",
-   "POST": "ثبت اطلاعات (POST)",
-   "PATCH": "اصلاح اطلاعات (PATCH)",
-   "DELETE": "حذف اطلاعات (DELETE)",
-   "PUT": "ذخیره اطلاعات (PUT)"
-  }
- },
+
  "get_system_reset_status": {
   "scope": {
    "operations": "اطلاعات عملیاتی",
@@ -1526,11 +1461,9 @@ export const toolOptions:Record<string,Record<string,Record<string,string>>>={
  }
 };
 
-toolOptions.training_workspace_request.roleId={"role-0":"مدیر فروش","role-1":"کارشناس فروش","role-2":"مالی فروش","role-3":"نماینده فروش","role-4":"تأمین","role-5":"مسئول تدارکات","role-6":"کارشناس تدارکات و حمل‌ونقل","role-7":"مالی","role-8":"انبار","role-9":"تولید","role-10":"کنترل کیفیت","role-11":"فروش و تحویل","role-12":"خدمات خانگی","role-13":"خدمات بیمارستانی","role-14":"نماینده خدمات","role-15":"خدمات پس از فروش","role-16":"مدیریت — فقط مشاهده","role-17":"مهندسی نرم‌افزار","role-18":"اداری و منابع انسانی","role-19":"تهیه حقوق‌ودستمزد","role-20":"تأیید حقوق و احکام","role-21":"تأیید پرداخت پرسنلی","role-22":"ثبت پرداخت پرسنلی","role-23":"مدیر تضمین کیفیت","role-24":"کارشناس تضمین کیفیت و کنترل مدارک","role-25":"مسئول کنترل کیفیت","role-26":"کارشناس مجوزها","role-27":"مسئول فنی","role-28":"مسئول تجهیزات آزمون","role-29":"ممیز داخلی","role-30":"ممیز بیرونی — فقط مشاهده","role-31":"تحقیق‌وتوسعه و مهندسی طراحی","role-32":"مدیرعامل","role-33":"مدیر بازرگانی","role-34":"بازرگانی خارجی","role-35":"مدیر سامانه","role-36":"مدیر خدمات پس از فروش","role-37":"برنامه‌ریز فروش","role-38":"مدیرعامل تأمین","role-39":"مهندس محصول","role-40":"کنترل موجودی تأمین","role-41":"کنترل مالی تأمین","role-42":"کارشناس خرید داخلی","role-43":"کارشناس خرید خارجی","role-44":"پذیرش خدمات","role-45":"تکنسین خدمات","role-46":"هماهنگ‌کننده خدمات","role-47":"انبار خدمات","role-48":"ارسال خدمات","role-49":"مالی خدمات","role-50":"مسئول مرکز بیمارستانی ۱","role-51":"مسئول مرکز بیمارستانی ۲","role-52":"تکنسین فنی بیمارستانی","role-53":"تکنسین فنی خانگی"};
 
 toolOptions.get_service_warranty={domain:{home:'خانگی',hospital:'بیمارستانی'}};
 
-toolOptions.training_workspace_request.roleId=Object.fromEntries(trainingRoles.map(r=>[r.id,r.name]));
 
 for(const tool of ['create_user','update_user','create_password_user','update_password_user']){toolOptions[tool]={...toolOptions[tool],'permissions.assetRoles.*':{custodian:'اموال‌دار'}};}
 toolOptions.assets_apply={mode:{register:'ثبت اموال',edit:'ویرایش مشخصات',transfer:'تحویل یا برگشت اموال',confirm_annual:'ثبت تأیید سالیانه',request_clearance:'درخواست تسویه اموال',approve_clearance:'تأیید تسویه اموال',cancel_clearance:'لغو تسویه اموال',install_position:'تعریف سمت اموال‌دار'},condition:{good:'سالم',repair:'نیازمند تعمیر',damaged:'آسیب‌دیده'},holderKind:{stock:'انبار / محل شرکت',employee:'کارمند شرکت',contractor:'پیمانکار'}};

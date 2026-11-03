@@ -1,6 +1,6 @@
-import {trainingDispatch} from '@/lib/training';
-export const GET=trainingDispatch;
-export const POST=trainingDispatch;
-export const PATCH=trainingDispatch;
-export const DELETE=trainingDispatch;
-export const PUT=trainingDispatch;
+import {trainingRetired} from '@/lib/training-retired';
+export const GET=trainingRetired;
+export const POST=trainingRetired;
+export const PATCH=trainingRetired;
+export const DELETE=trainingRetired;
+export const PUT=trainingRetired;

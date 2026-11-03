@@ -1,3 +1,3 @@
-import {trainingStatus,trainingInitialize} from '@/lib/training';
-export const GET=trainingStatus;
-export const POST=trainingInitialize;
+import {trainingRetired} from '@/lib/training-retired';
+export const GET=trainingRetired;
+export const POST=trainingRetired;
