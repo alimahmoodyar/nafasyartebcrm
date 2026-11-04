@@ -2,14 +2,14 @@
 import {useEffect,useRef,useState,type ButtonHTMLAttributes} from 'react';
 import {RefreshCw} from 'lucide-react';
 
-type Props=Omit<ButtonHTMLAttributes<HTMLButtonElement>,'onClick'|'children'> & {onRefresh:()=>unknown;retry?:boolean};
+type Props=Omit<ButtonHTMLAttributes<HTMLButtonElement>,'onClick'|'children'> & {onRefresh:()=>unknown;retry?:boolean;quiet?:boolean;pauseAuto?:boolean};
 
 // Entry/save loading stays with each page. This only repeats its read operation
 // when returning to an idle, visible page, never while an entry form is open.
-export function RefreshButton({onRefresh,disabled,className='',retry=false,...props}:Props){
- const button=useRef<HTMLButtonElement>(null),latest=useRef(onRefresh),blocked=useRef(disabled),running=useRef(false),last=useRef(0),alive=useRef(true);
+export function RefreshButton({onRefresh,disabled,className='',retry=false,quiet=false,pauseAuto=false,...props}:Props){
+ const anchor=useRef<HTMLSpanElement>(null),button=useRef<HTMLButtonElement>(null),latest=useRef(onRefresh),blocked=useRef(disabled),autoBlocked=useRef(pauseAuto),running=useRef(false),last=useRef(0),alive=useRef(true);
  const [busy,setBusy]=useState(false),[failed,setFailed]=useState(false);
- latest.current=onRefresh;blocked.current=disabled;
+ latest.current=onRefresh;blocked.current=disabled;autoBlocked.current=pauseAuto;
  async function refresh(){
   if(blocked.current||running.current)return;
   running.current=true;last.current=Date.now();setBusy(true);setFailed(false);
@@ -21,8 +21,8 @@ export function RefreshButton({onRefresh,disabled,className='',retry=false,...pr
   const schedule=()=>{
    clearTimeout(timer);
    timer=setTimeout(()=>{
-    const el=button.current;
-    if(document.visibilityState!=='visible'||!el||el.closest('[hidden]')||!el.getClientRects().length||Date.now()-last.current<1500)return;
+    const el=button.current||anchor.current;
+    if(autoBlocked.current||document.visibilityState!=='visible'||!el||el.closest('[hidden]')||!el.getClientRects().length||Date.now()-last.current<1500)return;
     // Do not reload behind an editor, confirmation dialog or any visible form.
     if([...document.querySelectorAll('form,[role="dialog"],[role="alertdialog"],dialog[open]')].some(node=>node.getClientRects().length>0))return;
     void run.current();
@@ -31,5 +31,6 @@ export function RefreshButton({onRefresh,disabled,className='',retry=false,...pr
   window.addEventListener('focus',schedule);document.addEventListener('visibilitychange',schedule);
   return()=>{alive.current=false;clearTimeout(timer);window.removeEventListener('focus',schedule);document.removeEventListener('visibilitychange',schedule);};
  },[]);
- return <button {...props} ref={button} type="button" className={'btn refresh-button '+className} disabled={disabled||busy} aria-label={failed||retry?'تلاش دوباره':'تازه‌سازی اطلاعات'} title={failed||retry?'تلاش دوباره':'تازه‌سازی اطلاعات'} aria-busy={busy} onClick={()=>void refresh()}><RefreshCw size={17} aria-hidden="true"/>{(failed||retry)&&<span>تلاش دوباره</span>}</button>;
+ const control=<button {...props} ref={button} type="button" className={'btn refresh-button '+className} disabled={disabled||busy} aria-label={failed||retry?'تلاش دوباره':'تازه‌سازی اطلاعات'} title={failed||retry?'تلاش دوباره':'تازه‌سازی اطلاعات'} aria-busy={busy} onClick={()=>void refresh()}><RefreshCw size={17} aria-hidden="true"/>{(failed||retry)&&<span>تلاش دوباره</span>}</button>;
+ return quiet?<span ref={anchor} className="refresh-retry-anchor">{failed||retry?control:null}</span>:control;
 }

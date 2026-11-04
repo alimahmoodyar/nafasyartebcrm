@@ -22,6 +22,7 @@ function emit(scope,name){listeners[scope].get(name)?.()}
  emit('window','focus');await flush();render().props.onClick();assert.equal(calls,2,'Manual/automatic refreshes cannot overlap');complete();await settle();assert.equal(render().props.disabled,false);
  props={onRefresh:async()=>{throw Error('offline')}};render().props.onClick();await settle();assert.equal(render().props['aria-label'],'تلاش دوباره');
  props={onRefresh:async()=>{calls++}};render().props.onClick();await settle();assert.equal(calls,3);assert.equal(render().props['aria-label'],'تازه‌سازی اطلاعات','Latest callback is used and retry recovers');
+ props={onRefresh:async()=>{calls++},quiet:true,pauseAuto:true};assert.equal(render().props.children,null,'Quiet idle refresh has no visible button');emit('window','focus');await flush();assert.equal(calls,3,'Draft notes pause automatic refresh');props={...props,pauseAuto:false};render();emit('window','focus');await flush();assert.equal(calls,4,'Quiet refresh still reloads an idle visible page');props={...props,retry:true};assert.ok(render().props.children,'Retry appears after a page error');
  emit('window','focus');cleanup();assert.equal(timers.size,0);assert.equal(listeners.window.size,0);assert.equal(listeners.document.size,0,'Unmount removes refresh listeners');
  console.log('PASS refresh: no duplicate entry fetch, debounced focus/visibility, hidden/background/busy and editor guards, no overlapping calls, retry recovery, latest callback and cleanup.');
 })().catch(e=>{console.error(e);process.exitCode=1});
