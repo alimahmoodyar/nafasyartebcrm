@@ -404,3 +404,5 @@ html,button,input,textarea,select,option,svg text{font-family:"Vazirmatn",sans-s
 .production-inbox__item:last-child{border-bottom:0}
 
 .routine-plans__people-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px;max-height:240px;overflow-y:auto;margin:10px 0}.routine-plans__person{display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:12px;padding:10px;cursor:pointer}.routine-plans__person input{width:18px;height:18px;flex:none;accent-color:#16804d}.routine-plans__person span{display:grid;gap:3px}.routine-plans__person small{font-size:12px}
+
+.material-catalog-item-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.material-catalog-item-heading h3{margin:0}.material-catalog-item-heading .btn{flex-shrink:0}
