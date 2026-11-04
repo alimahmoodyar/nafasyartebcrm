@@ -1,3 +1,4 @@
+import * as deviceBom from '@/app/api/device-bom/route';
 import * as bomEffectivity from '@/app/api/bom-effectivity/route';
 import {productionParticipant} from '@/lib/production-participant';
 import * as finishedEstimateApi from '@/app/api/flow/estimate/route';
@@ -636,5 +637,7 @@ add({name:'attach_material_photo',description:'Confirmed general-inventory/admin
 
 api('remove_material_file','Confirmed removal of a material technical drawing/document from the active catalog; exact file revision required. Historical private original remains in reset/backup. No stock change.',obj({id,confirmed,materialId:id,fileId:id,revision:integer(1,1e9)}),'/api/material-files','DELETE',materialFilesApi.DELETE);
 
-api('get_bom_effectivity','Read permitted product BOM execution points and pending sourcing plans. Existing issued plans and serials remain frozen.',obj({productId:id}),'/api/bom-effectivity','GET',bomEffectivity.GET);
+api('get_bom_effectivity','Read permitted product BOM execution points and pending sourcing plans. Existing issued plans and serials remain frozen.',obj({productId:id}),'/api/bom-effectivity','GET',bomEffectivity.GET,{},['productId']);
 api('apply_bom_effectivity','QA/admin: preview then apply exact BOM execution point with fresh token, explicit quality confirmation and reason. scope future means future CEO approvals; plans means only exact pending sourcing plans. Never changes issued instructions or WIP serials. UUID retries reuse exact payload.',obj({id,mode:enumeration(['preview','apply']),productId:id,bomId:id,scope:enumeration(['future','plans']),planIds:list(id,100),notes:text('',4000),token:text('',64),confirmed,qualityConfirmed:{type:'boolean'}},['mode','productId','bomId','scope','notes']),'/api/bom-effectivity','POST',bomEffectivity.POST);
+
+api('get_device_bom','Read the exact frozen BOM version and full standard-material list attached to a device serial via build or legacy production sheet. Requires device and product read. Never substitutes latest product BOM for historical devices; unbound serials explicitly return no BOM. Read-only.',obj({deviceId:id}),'/api/device-bom','GET',deviceBom.GET,{},['deviceId']);
