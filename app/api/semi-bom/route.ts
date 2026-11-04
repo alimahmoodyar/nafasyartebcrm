@@ -4,7 +4,7 @@ import {storage} from '@/lib/storage';
 
 const json=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
 const fail=(message:string,status=400):never=>{throw new AccessError(message,status)};
-const text=(v:unknown,max=200)=>{if(typeof v!=='string'||v.length>max)fail('مقدار واردشده معتبر نیست.');return v.trim()};
+const text=(v:unknown,max=200)=>{if(typeof v!=='string'||v.length>max)fail('مقدار واردشده معتبر نیست.');return (v as string).trim()};
 const amount=(v:unknown)=>{const n=Number(String(v).replace(/,/g,''));if(!Number.isFinite(n)||n<=0||n>1e9||Math.round(n*1000)!==n*1000)fail('مقدار مصرف باید مثبت و حداکثر سه رقم اعشار باشد.');return n};
 const canWrite=(u:any)=>u.isAdmin||can(u,'product','write')&&(u.permissions.flowRoles?.includes('inventory')||u.permissions.supplyRoles?.some((r:string)=>['engineering','ceo'].includes(r)));
 export async function GET(){try{const u=await requireAccess();if(!can(u,'product','read'))fail('دسترسی مشاهده BOM ندارید.',403);const db=storage(),[materials,boms]=await Promise.all([db.prepare("SELECT id,data,revision FROM flow_entities WHERE type='material' ORDER BY id").all(),db.prepare("SELECT id,data,revision,created FROM flow_entities WHERE type='semi_bom' ORDER BY created DESC").all()]),all=(materials.results||[]).map((r:any)=>({...r,data:JSON.parse(r.data)})),basic=(m:any)=>({id:m.id,revision:m.revision,code:m.data.code,name:m.data.name,unit:m.data.unit,kind:m.data.kind});return json({materials:all.filter((m:any)=>m.data.kind==='semi_finished').map(basic),rawMaterials:all.map(basic),boms:(boms.results||[]).map((r:any)=>({...r,data:JSON.parse(r.data)})),canWrite:canWrite(u)});}catch(e){return accessResponse(e)||json({error:'دریافت BOM قطعات واسط انجام نشد.'},503);}}
