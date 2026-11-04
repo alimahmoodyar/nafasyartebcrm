@@ -36,11 +36,12 @@ async function supplier(mode,b={},status=200,user=actor('domestic')){const body=
  identity=owner;await auth.session();
  const today=load('lib/duties.ts').dayAt(),later=new Date(Date.now()+10*86400000).toISOString().slice(0,10),future=new Date(Date.now()+20*86400000).toISOString().slice(0,10),now=new Date().toISOString();
  for(const role of ['sales','ceo','inventory','engineering','finance','domestic','foreign']){const a=actor(role);sql.prepare("INSERT INTO app_members(id,email,name,unit,status,subject,permissions,revision,created,updated) VALUES(?,?,?,'test','active',?,?,1,?,?)").run(a.userId,a.email,a.name,a.userId,JSON.stringify(a.permissions),now,now);}
- const p=await create('product',{code:'SUP',name:'SupplierTest',group:'G',model:'M',productionMode:'project',warrantyMonths:'12',status:'فعال'});
+ const p=await create('product',{code:'SUP',name:'SupplierTest',group:'سایر تجهیزات پزشکی',model:'M',productionMode:'project',warrantyMonths:'12',status:'فعال'});
  await op('material',{code:'01',name:'Part',unit:'عدد',specs:'V1',defaultLocation:'A-1-1-1',reorderPoint:'0',targetStock:'0',fields:[{key:'quality',label:'Quality',type:'number',unit:'%',min:'90',max:'100',required:true}],qcOwner:'',warehouseOwner:'',procurementOwner:'',revision:0});
  const material=entities('material')[0];
  await source('routes',{materialId:material.id,revision:material.revision,routes:['domestic']},200,actor('engineering'));
  await operate({mode:'bom',productId:p.id,previousVersion:0,lines:[{partCode:'01',name:'Part',unit:'عدد',quantity:'2'}]});
+ const effectivity=load('app/api/bom-effectivity/route.ts'),effectBody={mode:'preview',productId:p.id,bomId:sql.prepare('SELECT id FROM bom_versions WHERE product_id=?').get(p.id).id,scope:'future',notes:'approved QA release'};let effectResponse=await effectivity.POST(request('/api/bom-effectivity','POST',effectBody)),effect=await effectResponse.json();effectResponse=await effectivity.POST(request('/api/bom-effectivity','POST',{...effectBody,mode:'apply',id:crypto.randomUUID(),confirmed:true,qualityConfirmed:true,token:effect.token}));assert.equal(effectResponse.status,200);
  const supplierBody={name:'Factory A',country:'ایران',phone:'02100000000',contact:'Contact',route:'domestic',kind:'manufacturer',active:true};
  await supplier('supplier',supplierBody,403,actor('sales'));
  await supplier('supplier',{...supplierBody,confirmed:false},400);
@@ -53,7 +54,7 @@ async function supplier(mode,b={},status=200,user=actor('domestic')){const body=
  await supplier('review',review,403,actor('ceo'));await supplier('review',{...review,scores:{quality:101}},400,qc);
  await supplier('review',review,200,qc);assert.equal(entities('supplier_review')[0].data.score,null);
  const pid=(await source('create',{productId:p.id,count:5,origin:'forecast',needBy:future,reference:'RFQ',notes:'test'},200,actor('sales'))).planId;
- await source('approve',{planId:pid,count:5,needBy:future,notes:'approved'},200,actor('ceo'));await source('calculate',{planId:pid,notes:'start'},200,actor('inventory'));
+ await source('approve',{planId:pid,count:5,needBy:future,notes:'approved'},200,actor('ceo'));await source('calculate',{planId:pid,notes:'start'},200,actor('inventory'));await source('inventory_confirm',{planId:pid,confirmed:true,inventoryToken:(await detail(pid)).inventoryToken,notes:'warehouse reviewed'},200,actor('inventory'));
  let d=await detail(pid,actor('domestic'));assert.equal(d.work.filter(w=>w.role==='domestic').length,2);assert.ok(d.work.some(w=>w.instructions?.includes('02100000000')&&w.instructions.includes('V1')));
  const task=sql.prepare("SELECT * FROM duty_runs WHERE assignee='domesticUser' AND state='open' LIMIT 1").get();assert.ok(JSON.parse(task.data).sourcingWorkflow);
  const tasks=load('app/api/tasks/route.ts');assert.equal((await context.run(actor('domestic'),()=>tasks.POST(request('/api/tasks','POST',{id:crypto.randomUUID(),mode:'submit',taskId:task.id,revision:task.revision,note:'done'})))).status,400);
@@ -97,7 +98,7 @@ async function supplier(mode,b={},status=200,user=actor('domestic')){const body=
  const reviewNow=entities('supplier_material').find(l=>l.id===l1.id);
  const mcpReview=await catalog.executeTool('review_material_supplier',{id:crypto.randomUUID(),linkId:l1.id,revision:reviewNow.revision,status:'approved',qualityRisk:'low',supplyRisk:'medium',reviewDue:future,rationale:'review via same handler',evidence:'QC-MCP',restrictions:'',maxQuantity:'',scores:{},confirmed:true},base,{user:qc,scope:'read_write',tokenId:null});assert.equal(mcpReview.saved,true);
  const pid2=(await source('create',{productId:p.id,count:1,origin:'forecast',needBy:future,reference:'RFQ-2'})).planId;
- await source('approve',{planId:pid2,count:1,needBy:future,notes:'approved'});await source('calculate',{planId:pid2,notes:'start'});
+ await source('approve',{planId:pid2,count:1,needBy:future,notes:'approved'});await source('calculate',{planId:pid2,notes:'start'});await source('inventory_confirm',{planId:pid2,confirmed:true,inventoryToken:(await detail(pid2)).inventoryToken,notes:'warehouse reviewed'});
  const oldRound=current(pid2).data.lines[0].round;await source('quote',{...quote,planId:pid2});
  await source('refresh_suppliers',{planId:pid2,notes:'new round after supplier change'},200,actor('engineering'));
  assert.equal(current(pid2).data.lines[0].round,oldRound+1);assert.equal((await detail(pid2,actor('domestic'))).work.filter(w=>w.role==='domestic').length,2);

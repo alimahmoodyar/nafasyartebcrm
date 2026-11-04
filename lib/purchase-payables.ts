@@ -1,3 +1,4 @@
+import {currentRemainderResolution} from './sourcing-workflow';
 import {financialAccess} from './financial-access';
 import {invoiceDocumentMissing} from './purchase-invoice';
 import {moneyMicro,moneyText,costRead,costWrite} from './costing';
@@ -23,7 +24,7 @@ export function invoiceMatch(c:any,i:any,rows:any[]){
  if(!o||o.data.state==='cancelled')blockers.push('سفارش نامعتبر یا لغوشده');
  if(!receipts.length||receipts.some((r:any)=>!r||r.data.purchaseOrderId!==l.orderId))blockers.push('رسید کالا کامل نیست');
  const received=receipts.reduce((n:number,r:any)=>n+(r?.data.quantity||0),0),accepted=receipts.reduce((n:number,r:any)=>n+(r?.data.accepted||0),0),rejected=receipts.reduce((n:number,r:any)=>n+(r?.data.rejected||0),0);
- if(received!==l.quantity)blockers.push('مغایرت تعداد فاکتور و دریافت');if(rejected)blockers.push('کالای مردود نیازمند تعیین تکلیف');if(receipts.some((r:any)=>r&&!['stored','rejected'].includes(r.data.state)))blockers.push('دریافت، کیفیت یا جانمایی کامل نیست');
+ const resolved=currentRemainderResolution(o,rows)&&accepted===l.quantity;if(received!==l.quantity&&!resolved)blockers.push('مغایرت تعداد فاکتور و دریافت');if(rejected&&!resolved)blockers.push('کالای مردود نیازمند تعیین تکلیف');if(receipts.some((r:any)=>r&&!['stored','rejected'].includes(r.data.state)))blockers.push('دریافت، کیفیت یا جانمایی کامل نیست');
  return {orderId:l.orderId,partCode:o?.data.partCode,ordered:o?.data.quantity,invoice:l.quantity,received,accepted,rejected,receipts:receipts.map((r:any)=>r?{id:r.id,revision:r.revision,state:r.data.state}:null)};
  });
  return {lines,blockers:[...new Set(blockers)]};

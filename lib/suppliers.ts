@@ -31,7 +31,7 @@ export async function supplierMetrics(link:any){
 }
 export async function buildSupplierTargets(lines:any[],existing:any[]=[]){
  const links=await supplierRows('supplier_material'),suppliers=await supplierRows('supplier');const targets:any[]=[];
- for(const l of lines){if(!links.some(x=>x.data.materialId===l.materialId))continue;for(const route of l.routes||[]){const old=existing.filter(t=>t.partCode===l.partCode&&t.round===l.round&&t.route===route);if(old.length){targets.push(...old);continue;}
+ for(const l of lines){for(const route of l.routes||[]){const old=existing.filter(t=>t.partCode===l.partCode&&t.round===l.round&&t.route===route);if(old.length){targets.push(...old);continue;}
  const candidates=links.filter(x=>x.data.materialId===l.materialId).flatMap(link=>{const s=suppliers.find(s=>s.id===link.data.supplierId);return s&&s.data.active&&s.data.route===route&&!['suspended','rejected'].includes(link.data.status)?[{link,s}]:[];});
  if(!candidates.length)targets.push({partCode:l.partCode,round:l.round,route,missing:true});
  for(const {link,s} of candidates)targets.push({partCode:l.partCode,round:l.round,route,linkId:link.id,supplierId:s.id,name:s.data.name,contact:s.data.contact,phone:s.data.phone,email:s.data.email,messenger:s.data.messenger,status:link.data.status,quantity:l.shortage,unit:l.unit,specs:l.specs||'',materialRevision:l.materialRevision});
