@@ -1,3 +1,4 @@
+import * as domesticSourcing from '@/app/api/sourcing/domestic/route';
 import * as deviceBom from '@/app/api/device-bom/route';
 import * as bomEffectivity from '@/app/api/bom-effectivity/route';
 import {productionParticipant} from '@/lib/production-participant';
@@ -642,3 +643,5 @@ api('get_bom_effectivity','Read permitted product BOM execution points and pendi
 api('apply_bom_effectivity','QA/admin: preview then apply exact BOM execution point with fresh token, explicit quality confirmation and reason. scope future means future CEO approvals; plans means only exact pending sourcing plans. Never changes issued instructions or WIP serials. UUID retries reuse exact payload.',obj({id,mode:enumeration(['preview','apply']),productId:id,bomId:id,scope:enumeration(['future','plans']),planIds:list(id,100),notes:text('',4000),token:text('',64),confirmed,qualityConfirmed:{type:'boolean'}},['mode','productId','bomId','scope','notes']),'/api/bom-effectivity','POST',bomEffectivity.POST);
 
 api('get_device_bom','Read the exact frozen BOM version and full standard-material list attached to a device serial via build or legacy production sheet. Requires device and product read. Never substitutes latest product BOM for historical devices; unbound serials explicitly return no BOM. Read-only.',obj({deviceId:id}),'/api/device-bom','GET',deviceBom.GET,{},['deviceId']);
+
+api('get_domestic_sourcing_inbox','Domestic buyer/admin only: read warehouse-approved domestic material needs, quote review summaries, domestic purchase tracking and case history. Unconfirmed warehouse proposals and foreign-only purchases are excluded. Open exact case with get_sourcing_plan and use existing role-checked sourcing actions; no new purchasing authority.',obj({}),'/api/sourcing/domestic','GET',domesticSourcing.GET);

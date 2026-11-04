@@ -1,0 +1,14 @@
+'use client';
+import {useEffect,useState} from 'react';
+import {ProgramWorkspace,SubprogramNavigation} from './program-workspace';
+import {RefreshButton} from './refresh-button';
+import {supplyStates} from '@/lib/sourcing-labels';
+import {formatDate} from '@/lib/persian-date';
+export function DomesticSourcingPanel({onOpen}:{onOpen:(id:string)=>void}){
+ const [data,setData]=useState<any>(null),[error,setError]=useState(''),[tab,setTab]=useState('needs'),[search,setSearch]=useState('');
+ async function load(){try{const r=await fetch('/api/sourcing/domestic',{cache:'no-store'}),d=await r.json() as any;if(!r.ok)throw Error(d.error);setData(d);setError('')}catch(e){setError(e instanceof Error?e.message:'دریافت انجام نشد.')}}
+ useEffect(()=>{void load()},[]);
+ const rows=data?(tab==='needs'?data.needs:tab==='quotes'?data.quotes:tab==='orders'?data.orders.filter((o:any)=>!['closed','cancelled'].includes(o.state)):data.cases):[];
+ const labels:Record<string,string>={awaiting_funding:'منتظر تأمین وجه',issued:'دستور خرید صادرشده',paid:'پرداخت گزارش‌شده',preparing:'آماده‌سازی',shipped:'در حال حمل',closed:'بسته‌شده',cancelled:'لغوشده',pending:'منتظر بررسی',pass:'تأیید',fail:'رد'};
+ return <ProgramWorkspace programId="domestic-sourcing" title="بازرگانی داخلی"><SubprogramNavigation items={[["needs","نیازهای تأییدشده و استعلام"],["quotes","پیشنهادها و بررسی‌ها"],["orders","پیگیری خریدهای داخلی"],["history","سوابق پرونده‌ها"]]} value={tab} onChange={v=>{setTab(v);setSearch('')}}/><section className="panel inside"><h2>بازرگانی داخلی</h2><p>نیازهای ارسالی انبار و خریدهای مسیر داخلی؛ ثبت استعلام و گزارش مراحل از داخل پروندهٔ مربوط انجام می‌شود.</p><RefreshButton quiet retry={!!error} onRefresh={load}/>{error&&<p role="alert">{error}</p>}{rows.length>0&&<label className="field">جست‌وجوی کالا، تأمین‌کننده یا مرجع<input value={search} onChange={e=>setSearch(e.target.value)}/></label>}{data&&!rows.length&&<p role="status">موردی در این بخش ندارید.</p>}{rows.filter((r:any)=>[r.name,r.partCode,r.reference,r.supplier].join(' ').includes(search)).map((r:any,i:number)=><article className="flow-card" key={r.id||r.planId+':'+r.partCode+':'+i}><h3>{r.partCode&&r.partCode+' · '}{r.name||r.supplier||r.reference}</h3>{r.productName&&<p>{r.productName} · {r.reference}</p>}{r.shortage!==undefined&&<p>کسری: {(r.shortage/1000).toLocaleString('fa-IR')} {r.unit} · {r.quoted?'پیشنهاد ثبت شده':'منتظر استعلام'}</p>}{r.quantity!==undefined&&<p>مقدار: {(r.quantity/1000).toLocaleString('fa-IR')} {r.unit}</p>}{r.state&&<p>{labels[r.state]||supplyStates[r.state]||r.state}</p>}{r.technical&&<p>بررسی فنی: {labels[r.technical]||r.technical}</p>}{(r.needBy||r.eta)&&<p>موعد: {formatDate(r.needBy||r.eta)}</p>}<button type="button" className="btn primary" onClick={()=>onOpen(r.planId||r.id)}>باز کردن پرونده و انجام کار</button></article>)}</section></ProgramWorkspace>;
+}
