@@ -1,4 +1,5 @@
 "use client";
+import {RefreshButton} from './refresh-button';
 import {NumberInput} from '@/components/trace/number-input';
 import {IconDisclosure,IconActions} from "./program-workspace";
 import {formatDateTime} from '@/lib/persian-date';
@@ -20,7 +21,7 @@ export function QualityPanel({id,mode,demo,write,onSaved,fixedTemplateId}:{fixed
  const r=await fetch('/api/quality/'+(mode==='product'?'templates':'reports'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),d=await r.json() as {error?:string;template?:QTemplate;report?:QReport};if(!r.ok)throw new Error(d.error);if(mode==='product'&&d.template)setTemplates(p=>[d.template!,...p]);if(mode==='device'&&d.report){setReports(p=>[d.report!,...p.filter(x=>x.id!==d.report!.id)]);onSaved?.();}setEditing(false);setMessage(mode==='product'?'نسخه فرم ذخیره شد.':'برگ کنترل کیفیت و رویداد آزمون نهایی ثبت شد. فایل‌های آزمون را پایین همین برگه پیوست کنید.');}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
  function patch(i:number,data:Partial<QField>){setFields(prev=>prev.map((f,n)=>n===i?{...f,...data}:f));}
  function exportReport(r:QReport){const u=URL.createObjectURL(new Blob([JSON.stringify({format:'nafasyar-quality-report-v1',...r},null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=u;a.download='quality-'+r.id+'.json';a.click();URL.revokeObjectURL(u);}
- return <section className="detailsection"><IconActions scope="quality-panel-actions-f2f68f72ac"><h2><ClipboardCheck size={18} style={{display:'inline',marginLeft:8}}/>{mode==='product'?'فرم کنترل کیفیت محصول':'برگ‌های کنترل کیفیت دستگاه'}</h2>{!demo&&<button type="button" className="btn" disabled={loading||busy||editing} onClick={load}><RefreshCw size={16}/>تازه‌سازی</button>}</IconActions>
+ return <section className="detailsection"><IconActions scope="quality-panel-actions-f2f68f72ac"><h2><ClipboardCheck size={18} style={{display:'inline',marginLeft:8}}/>{mode==='product'?'فرم کنترل کیفیت محصول':'برگ‌های کنترل کیفیت دستگاه'}</h2>{!demo&&<RefreshButton retry={!!error} type="button" className="btn" disabled={loading||busy||editing} onRefresh={load} />}</IconActions>
  {demo?<p className="subtle">در اطلاعات شرکت، فرم را در شناسنامه محصول تعریف کنید و برای هر دستگاه تکمیل و عکس یا فایل آزمون را پیوست کنید.</p>:<>
  {mode==='product'&&<p className="subtle">معیارها و حدود پذیرش را تعریف کنید. تغییر فرم، نسخه جدید می‌سازد و برگه‌های قبلی حفظ می‌شوند.</p>}
  {loading&&<p role="status">در حال دریافت فرم‌ها…</p>}{error&&<p className="notice error" role="alert">{error}</p>}{message&&<p className="notice" role="status">{message}</p>}

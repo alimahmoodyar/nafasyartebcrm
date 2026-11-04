@@ -1,4 +1,5 @@
 'use client';
+import {RefreshButton} from './refresh-button';
 import {NumberInput} from '@/components/trace/number-input';
 import {IconDisclosure,IconActions,useWorkspaceBack} from "./program-workspace";
 import {useEffect,useState,useRef} from 'react';
@@ -32,7 +33,7 @@ export function PurchaseSettlementPanel({planId='',initialOrderId=''}:{planId?:s
  const input=(key:string,label:string,numeric=false)=><label className="field">{label}<NumberInput fieldKey={key} required value={draft[key]??''} onChange={e=>set(key,numeric?latinDigits(e.target.value):e.target.value)}/></label>;
  const eligible=catalog.receipts.filter((r:any)=>!r.claimedBy||r.claimedBy===draft?.settlementId);
  return <div ref={backRef} data-workspace-mutation-busy={busy}><h2>تسویه خرید و قیمت‌گذاری بچ</h2><p>فاکتور نهایی و مدارک با بازرگانی؛ تخصیص هزینه و تأیید قیمت با مالی.</p>{error&&<p className="notice error" role="alert">{error}</p>}{message&&<p role="status">{message}</p>}
- <IconActions scope="purchase-settlement-panel-actions-8d5ea69260"><button className="btn" disabled={busy} onClick={()=>void refresh().catch(e=>setError(e.message))}>تازه‌سازی</button>{catalog.buyerRoutes.length>0&&<button className="btn primary" disabled={busy} onClick={()=>{setDetail(null);start();}}>پرونده جدید</button>}</IconActions>
+ <IconActions scope="purchase-settlement-panel-actions-8d5ea69260"><RefreshButton retry={!!error} className="btn" disabled={busy} onRefresh={()=>refresh().catch(e=>setError(e.message))} />{catalog.buyerRoutes.length>0&&<button className="btn primary" disabled={busy} onClick={()=>{setDetail(null);start();}}>پرونده جدید</button>}</IconActions>
  {detailLoading&&<p role="status">در حال دریافت پرونده…</p>}
  {!detail&&!draft&&!detailLoading&&<>{!catalog.settlements.length&&<p className="empty">پرونده تسویه‌ای ثبت نشده است. بعد از دریافت کالا، بازرگانی پرونده را ایجاد و فاکتور را پیوست کند.</p>}{catalog.settlements.filter((s:any)=>!initialOrderId||s.data.lines.some((l:any)=>catalog.receipts.find((r:any)=>r.id===l.receiptId)?.data.purchaseOrderId===initialOrderId)).map((s:any)=><article className="flow-card" key={s.id}><h3>{s.data.supplier} · فاکتور {s.data.invoiceNumber}</h3><p>{states[s.data.state]} · {formatDate(s.data.invoiceDay)}</p><button className="btn" disabled={busy} onClick={()=>void open(s.id).catch(e=>setError(e.message))}>باز کردن پرونده</button></article>)}</>}
  {detail&&!draft&&<><h3>{d.supplier} · فاکتور {d.invoiceNumber}</h3><p>{states[d.state]} · {formatDate(d.invoiceDay)} · ارز {d.currency}</p><p>محدوده فاکتور/محموله: {d.shipmentScope}</p><p>نرخ ریالی فعلی: {p.fxRate} · منبع: {d.finance?.fxSource||d.fxSource}</p>{d.returnNote&&<p className="notice">علت برگشت: {d.returnNote}</p>}{d.approvals?.length>0&&d.state!=='approved'&&<p className="notice">قیمت تأیید قبلی تا تأیید اصلاحیه برقرار است.</p>}

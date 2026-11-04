@@ -1,4 +1,5 @@
 'use client';
+import {RefreshButton} from './refresh-button';
 import {useEffect,useState} from 'react';
 import {NumberInput} from './number-input';
 import {SolarDate} from './solar-date';
@@ -57,7 +58,7 @@ export function BuildIntakePanel({demo=false,targetId='',onNavigate=()=>{}}:{dem
  const contracts=data.contracts.filter(contract=>!!order&&(contract.agentId?contract.agentId===order.agentId:normalizeParty(contract.party||'')===normalizeParty(order.customer||'')));
  const files=(data.files||[]).filter(entry=>entry.data.agentId===order?.agentId);
  const actions=intake?buildIntakeActions(data.roles,intake.data.state):[];
- return <ProgramWorkspace programId="build-intake" title="مشخصات سفارش ساخت" direct={!!targetId}><section className="panel build-intake-panel" dir="rtl"><div className="panelhead"><div><h2>مشخصات سفارش ساخت</h2><p>محصول را از سفارش فروش انتخاب کنید؛ فرم مصوب همان محصول برای ثبت نیاز مشتری باز می‌شود.</p></div><div className="tools">{roles?.sales&&<button className="btn primary" disabled={busy} onClick={()=>newDraft()}>سفارش ساخت جدید</button>}<button className="btn" disabled={busy} onClick={()=>void load().catch(e=>setError(e.message))}>تازه‌سازی</button></div></div>
+ return <ProgramWorkspace programId="build-intake" title="مشخصات سفارش ساخت" direct={!!targetId}><section className="panel build-intake-panel" dir="rtl"><div className="panelhead"><div><h2>مشخصات سفارش ساخت</h2><p>محصول را از سفارش فروش انتخاب کنید؛ فرم مصوب همان محصول برای ثبت نیاز مشتری باز می‌شود.</p></div><div className="tools">{roles?.sales&&<button className="btn primary" disabled={busy} onClick={()=>newDraft()}>سفارش ساخت جدید</button>}<RefreshButton retry={!!error} className="btn" disabled={busy} onRefresh={()=>load().catch(e=>setError(e.message))} /></div></div>
  {error&&<p className="notice error" role="alert">{error}</p>}{message&&<p role="status">{message}</p>}
  {!draft&&<label className="field">پرونده سفارش ساخت<select value={selected} onChange={e=>{setSelected(e.target.value);setDecision(null);setError('');}}><option value="">انتخاب کنید</option>{data.intakes.map(i=><option key={i.id} value={i.id}>{i.data.title} · {states[i.data.state]||i.data.state}</option>)}</select></label>}
  {!draft&&!intake&&<p className="empty">{data.intakes.length?'یک پرونده را انتخاب کنید.':'هنوز سفارش ساختی ثبت نشده است.'} {roles?.sales?'از سفارش فروش، محصول و مشخصات موردنیاز مشتری را ثبت کنید.':''}</p>}

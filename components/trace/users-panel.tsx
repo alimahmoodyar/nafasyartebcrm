@@ -1,4 +1,5 @@
 "use client";
+import {RefreshButton} from './refresh-button';
 import {NumberInput} from '@/components/trace/number-input';
 import {WarehouseResponsibilityPicker} from './warehouse-responsibility-picker';
 import {JobRolePicker} from "./job-role-picker";
@@ -72,7 +73,7 @@ export function UsersPanel({owner}: {owner: Session}) {
   }
   return <section>
     <div className="notice"><div><strong>مدیریت حساب‌ها · نام کاربری و رمز عبور</strong><p>برای همکاران نام کاربری و رمز عبور بسازید و دسترسی واحدشان را مشخص کنید. نام، نام کاربری، واحد، دسترسی و رمز جدید قابل ویرایش است. تغییر نام کاربری یا رمز، ورود دوباره می‌خواهد. حذف حساب، دسترسی را قطع می‌کند و سوابق فعالیت را نگه می‌دارد.</p></div></div>
-    <div className="panel" style={{marginTop: 18}}><div className="panelhead"><div><h2>کاربران و دسترسی‌ها</h2><p className="subtle">دسترسی در سطح بخش؛ مجوز ثبت شامل ویرایش‌های مجاز همان بخش است.</p></div><IconActions scope="users-panel-actions-d78178440c"><button className="btn" onClick={load} disabled={loading}><RefreshCw size={16}/>تازه‌سازی</button><button className="btn primary" onClick={() => start()}><Plus size={17}/>تعریف حساب</button></IconActions></div>
+    <div className="panel" style={{marginTop: 18}}><div className="panelhead"><div><h2>کاربران و دسترسی‌ها</h2><p className="subtle">دسترسی در سطح بخش؛ مجوز ثبت شامل ویرایش‌های مجاز همان بخش است.</p></div><IconActions scope="users-panel-actions-d78178440c"><RefreshButton retry={!!error} className="btn" onRefresh={load} disabled={loading} /><button className="btn primary" onClick={() => start()}><Plus size={17}/>تعریف حساب</button></IconActions></div>
       <div className="owner-account"><ShieldCheck size={22}/><div><strong>{owner.name} · مدیر اصلی</strong><p className="subtle" dir="ltr">{owner.email}</p></div><span className="badge good">دسترسی کامل · محافظت‌شده</span></div>
       {error && <p className="notice error" role="alert">{error}</p>}{message && <p className="notice" role="status">{message}</p>}
       <div className="search" style={{margin:"18px 0"}}><Search size={18} aria-hidden="true"/><input type="search" aria-label="جست‌وجوی اشخاص بر اساس نام یا نقش" placeholder="جست‌وجو بر اساس نام، نام کاربری یا نقش" value={memberSearch} onChange={e=>setMemberSearch(e.target.value)}/></div>

@@ -1,4 +1,5 @@
 "use client";
+import {RefreshButton} from './refresh-button';
 import {NumberInput} from '@/components/trace/number-input';
 import {useEffect,useRef,useState} from 'react';
 import {Plus,ShieldCheck,FileText,Upload,RefreshCw,Download} from 'lucide-react';
@@ -37,7 +38,7 @@ export function QmsPanel({demo=false,targetId=''}:{demo?:boolean;targetId?:strin
  }
  if(demo)return <p className="notice">برای پرونده‌های واقعی کیفیت وارد اطلاعات شرکت شوید.</p>;
  if(!data)return <p className="notice">{error||'در حال دریافت پرونده‌های کیفیت…'}</p>;
- return <ProgramWorkspace programId="qms-panel" direct={!!targetId} title="کیفیت و تحقیق‌وتوسعه"><section dir="rtl" className="space-y-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold flex gap-2"><ShieldCheck/> کیفیت، تحقیق‌وتوسعه و مجوزها</h2><p className="text-sm text-muted-foreground">پروندهٔ محصول، فرم‌ها، مدارک و پیگیری تأییدها</p></div><button className="btn" disabled={busy} onClick={()=>void load().catch(e=>setError(e.message))}><RefreshCw size={16}/> تازه‌سازی</button></div>
+ return <ProgramWorkspace programId="qms-panel" direct={!!targetId} title="کیفیت و تحقیق‌وتوسعه"><section dir="rtl" className="space-y-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold flex gap-2"><ShieldCheck/> کیفیت، تحقیق‌وتوسعه و مجوزها</h2><p className="text-sm text-muted-foreground">پروندهٔ محصول، فرم‌ها، مدارک و پیگیری تأییدها</p></div><RefreshButton retry={!!error} className="btn" disabled={busy} onRefresh={()=>load().catch(e=>setError(e.message))} /></div>
  {error&&<p role="alert" className="notice danger">{error}</p>}{message&&<p role="status" className="notice">{message}</p>}
  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">{Object.entries({total:'پرونده',review:'در انتظار بررسی',overdue:'موعد گذشته',expiring:'اعتبار تا ۳۰ روز آینده'}).map(([k,l])=><div key={k} className="rounded-xl border p-4"><strong className="text-2xl">{data.summary[k].toLocaleString('fa-IR')}</strong><p>{l}</p></div>)}</div>
  <SubprogramNavigation items={Object.entries(data.kinds).map(([key,value]:any)=>[key,value.title])} value={kind} onChange={value=>{setKind(value);setSelected('')}}/>

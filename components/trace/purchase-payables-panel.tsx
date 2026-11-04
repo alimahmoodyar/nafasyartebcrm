@@ -1,4 +1,5 @@
 'use client';
+import {RefreshButton} from './refresh-button';
 import {NumberInput} from '@/components/trace/number-input';
 import {PurchaseServicesPanel} from './purchase-services-panel';
 import {PurchaseInvoiceReport} from './purchase-invoice-report';
@@ -29,7 +30,7 @@ export function PurchasePayablesPanel(){
  if(!data)return <div className="panel"><p role="status">{error||'در حال خواندن بدهی و پرداخت خرید…'}</p><button className="btn" onClick={()=>void load().catch(e=>setError(e.message))}>تلاش دوباره</button></div>;
  const editable=!!c&&data.routes.includes(d.route);
  const allQueue=data.cases.flatMap((x:any)=>[...x.view.invoices.flatMap((i:any)=>i.queue.filter((q:any)=>Number(q.remaining)>0).map((q:any)=>({...q,caseId:x.id,supplier:x.data.supplier,reference:i.reference,kind:'تسویه فاکتور'}))),...x.view.advances.filter((a:any)=>Number(a.remaining)>0).map((a:any)=>({...a,caseId:x.id,supplier:x.data.supplier,reference:a.condition,kind:'پیش‌پرداخت',blockers:a.released?[]:['نیازمند اجازه مالی / رفع مانع']}))]).sort((a:any,b:any)=>a.due.localeCompare(b.due));
- return <section className="panel" dir="rtl"><div className="panelhead"><h2>بدهی و پرداخت خرید</h2><IconActions scope="purchase-payables-panel-actions-406595cdb7">{data.routes.length>0&&btn('create','پرونده جدید',{caseId:undefined,revision:0})}<button className="btn" onClick={()=>void load().catch(e=>setError(e.message))}>تازه‌سازی</button></IconActions></div>
+ return <section className="panel" dir="rtl"><div className="panelhead"><h2>بدهی و پرداخت خرید</h2><IconActions scope="purchase-payables-panel-actions-406595cdb7">{data.routes.length>0&&btn('create','پرونده جدید',{caseId:undefined,revision:0})}<RefreshButton retry={!!error} className="btn" onRefresh={()=>load().catch(e=>setError(e.message))} /></IconActions></div>
  <p className="notice">مبالغ ریال · ثبت بدهی، اجازه پرداخت و ثبت پرداخت واقعی سه مرحله مستقل‌اند. سند سپیدار یا انتقال بانکی صادر نمی‌شود.</p>
  {error&&!draft&&<p role="alert" className="notice error">{error}</p>}{message&&<p role="status">{message}</p>}
  <IconDisclosure scope="purchase-payables-panel-details-ad546b249d" title={<> راهنمای گردش و دستیار </>}><ul>{data.help.map((h:string)=><li key={h}>{h}</li>)}</ul></IconDisclosure>

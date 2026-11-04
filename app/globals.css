@@ -411,3 +411,10 @@ html,button,input,textarea,select,option,svg text{font-family:"Vazirmatn",sans-s
 .warehouse-page-path li { display: flex; align-items: center; gap: .65rem; color: var(--muted-foreground, #64748b); }
 .warehouse-page-path [aria-current="page"] { color: var(--foreground, #24304f); font-weight: 700; }
 .warehouse-page-path__separator { font-weight: 400; }
+
+.refresh-button { padding: .45rem !important; min-width: 2.25rem; min-height: 2.25rem; gap: .35rem; flex-shrink: 0; }
+.refresh-button[aria-busy="true"] > svg { animation: refresh-spin 1s linear infinite; }
+@keyframes refresh-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .refresh-button[aria-busy="true"] > svg { animation: none; } }
+.material-catalog-search { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .65rem; margin-block: 1rem; }
+.material-catalog-search > .field { flex: 1 1 18rem; }

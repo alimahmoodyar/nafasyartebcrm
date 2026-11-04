@@ -1,4 +1,5 @@
 'use client';
+import {RefreshButton} from './refresh-button';
 import {MaterialSelect} from './material-select';
 import {warehouseTarget} from '@/lib/warehouse-workspace';
 import {NumberInput} from '@/components/trace/number-input';
@@ -29,7 +30,7 @@ export function BuildProjectsPanel({demo=false,targetId='',onNavigate=()=>{},ini
  if(!data)return <div className="panel"><p>{error||'در حال خواندن پروژه‌های ساخت…'}</p><button className="btn" onClick={()=>void load().catch(e=>setError(e.message))}>تلاش دوباره</button></div>;
  const units=p?.units.map((u:any)=>[u.id,u.title])||[],person=(id:string)=>data.members.find((m:any)=>m.id===id)?.name||id;
  const stocks=p?.requests.filter((r:any)=>r.state==='issued').flatMap((r:any)=>r.lots.map((l:any)=>({...l,unitId:r.unitId,partCode:r.partCode,unit:r.unit,remaining:l.quantity-p.movements.filter((m:any)=>m.lotId===l.id).reduce((n:number,m:any)=>n+m.quantity,0)})))||[];
- return <ProgramWorkspace programId="build-projects" direct={warehouseOnly||!!targetId} title="پروژه ساخت"><section className="panel" dir="rtl"><div className="panelhead"><div><h2>پروژه‌های ساخت بیمارستانی</h2><p>قطعات پایه و سفارشی · موجودی نزد پروژه · هزینه واقعی ساخت و اجرا</p></div><IconActions scope="build-projects-panel-actions-5d7056349e">{!warehouseOnly&&roles.engineering&&btn('create','پروژه جدید',{projectId:undefined,revision:0})}<button className="btn" onClick={()=>void load().catch(e=>setError(e.message))}>تازه‌سازی</button></IconActions></div>
+ return <ProgramWorkspace programId="build-projects" direct={warehouseOnly||!!targetId} title="پروژه ساخت"><section className="panel" dir="rtl"><div className="panelhead"><div><h2>پروژه‌های ساخت بیمارستانی</h2><p>قطعات پایه و سفارشی · موجودی نزد پروژه · هزینه واقعی ساخت و اجرا</p></div><IconActions scope="build-projects-panel-actions-5d7056349e">{!warehouseOnly&&roles.engineering&&btn('create','پروژه جدید',{projectId:undefined,revision:0})}<RefreshButton retry={!!error} className="btn" onRefresh={()=>load().catch(e=>setError(e.message))} /></IconActions></div>
  {error&&!draft&&<p role="alert" className="notice error">{error}</p>}{message&&<p role="status">{message}</p>}
  <label className="field">پروژه<select value={selected} onChange={e=>setSelected(e.target.value)}><option value="">انتخاب کنید</option>{data.projects.map((r:any)=><option key={r.id} value={r.id}>{r.data.title} · {r.data.customer} · {r.data.state==='closed'?'بسته':'باز'}</option>)}</select></label>
  {!project&&<p className="empty">پروژه را بسازید؛ سپس تجهیزات و BOM پایه یا اختصاصی آن را تعریف کنید.</p>}

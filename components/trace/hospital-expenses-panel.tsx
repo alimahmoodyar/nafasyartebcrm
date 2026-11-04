@@ -1,4 +1,5 @@
 'use client';
+import {RefreshButton} from './refresh-button';
 import {NumberInput} from '@/components/trace/number-input';
 import {IconActions,IconDisclosure} from "./program-workspace";
 import {useEffect,useState} from 'react';
@@ -22,7 +23,7 @@ export function HospitalExpensesPanel(){
  const policies=data.policies,claims=data.claims,policy=draft?.mode==='submit'?policies.find((p:any)=>p.data.start<=draft.day&&p.data.end>=draft.day):null,category=policy?.data.categories.find((c:any)=>c.id===draft?.categoryId),group=policy?.data.groups.find((g:any)=>g.id===category?.groupId);
  const spent=group?claims.filter((r:any)=>r.data.ownerId===data.mid&&r.data.day===draft.day&&r.data.groupId===group.id&&r.data.state!=='rejected').reduce((n:bigint,r:any)=>n+BigInt(r.data.amount),BigInt(0)):BigInt(0),cap=BigInt(group?.limit||0),amount=/^\d+$/.test(draft?.amount||'')?BigInt(draft.amount):BigInt(0),over=group&&spent+amount>cap?spent+amount-cap:BigInt(0);
  const visible=claims.filter((r:any)=>filter==='all'||filter==='excess'&&BigInt(r.data.control.excess)>BigInt(0)||filter==='open'&&['manager','finance'].includes(r.data.state));
- return <section className="flow-card" dir="rtl"><IconActions scope="hospital-expenses-panel-actions-8783f8f8ad"><h3>تنخواه و هزینه‌های مأموریت</h3><button className="btn" disabled={busy} onClick={load}>تازه‌سازی</button>{data.jobs.some((j:any)=>j.data.technicianId===data.mid)&&<button className="btn primary" onClick={()=>start('submit')}>ثبت هزینه و فاکتور</button>}{data.roles.configure&&<button className="btn" onClick={()=>start('policy',{title:'سقف هزینه‌های مأموریت',start:localDay(),end:localDay(),groups:initialGroups,categories:initialCategories,assignments:[{ownerId:'',managerId:'',financeId:''}]})}>تعریف سقف و تأییدکنندگان</button>}</IconActions>
+ return <section className="flow-card" dir="rtl"><IconActions scope="hospital-expenses-panel-actions-8783f8f8ad"><h3>تنخواه و هزینه‌های مأموریت</h3><RefreshButton retry={!!error} className="btn" disabled={busy} onRefresh={load} />{data.jobs.some((j:any)=>j.data.technicianId===data.mid)&&<button className="btn primary" onClick={()=>start('submit')}>ثبت هزینه و فاکتور</button>}{data.roles.configure&&<button className="btn" onClick={()=>start('policy',{title:'سقف هزینه‌های مأموریت',start:localDay(),end:localDay(),groups:initialGroups,categories:initialCategories,assignments:[{ownerId:'',managerId:'',financeId:''}]})}>تعریف سقف و تأییدکنندگان</button>}</IconActions>
  <p className="subtle">مبالغ به ریال است. هزینه هر روز در تمام مأموریت‌ها جمع می‌شود. تأیید نهایی هزینه به معنی پرداخت وجه یا تسویه مانده تنخواه نیست.</p>
  {notice&&<p className="notice" role="status">{notice}</p>}{error&&!draft&&<p className="notice error" role="alert">{error}</p>}
  {!policies.length&&<p className="notice">ابتدا مسئول مالی سقف‌ها، بازه اعتبار، مدیر مستقیم و تأییدکننده تنخواه هر تکنسین را تعریف کند.</p>}

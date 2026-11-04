@@ -1,4 +1,5 @@
 'use client';
+import {RefreshButton} from './refresh-button';
 import {warehousePath} from '@/lib/warehouse-tree';
 import {Dialog,DialogContent,DialogTitle,DialogDescription} from '@/components/ui/dialog';
 import {MaterialAttachments} from './material-attachments';
@@ -21,7 +22,7 @@ export function WarehouseStockPanel({user,demo,onOpen,onHistory}:{onHistory?:(gr
    <label className="field">نوع موجودی<select value={kind} onChange={e=>setKind(e.target.value)}><option value="">همه</option><option value="material">مواد اولیه</option><option value="product">محصول نهایی</option></select></label>
    <label className="field">انبار یا مرکز خدمات<select value={warehouse} onChange={e=>setWarehouse(e.target.value)}><option value="">همه انبارهای مجاز</option>{warehouses.map((w:any)=><option key={w.id} value={w.id}>{warehousePath(warehouses,w.id)}</option>)}</select></label>
   </div>
-  <div className="warehouse-stock__toolbar"><label className="flow-check"><input type="checkbox" checked={includeChildren} onChange={e=>setIncludeChildren(e.target.checked)}/>شامل زیرانبارها</label><button type="button" className="btn" onClick={()=>void load()}>تازه‌سازی</button></div>
+  <div className="warehouse-stock__toolbar"><label className="flow-check"><input type="checkbox" checked={includeChildren} onChange={e=>setIncludeChildren(e.target.checked)}/>شامل زیرانبارها</label><RefreshButton retry={!!error} type="button" className="btn" onRefresh={()=>load()} /></div>
   {error&&<p className="notice error" role="alert">{error}</p>}{!data&&!error&&<p role="status">در حال دریافت موجودی…</p>}
   {entries.some((e:any)=>e.serviceLotId&&!e.warehouseId)&&<p className="notice">بخشی از موجودی خدمات هنوز به انبار متصل نشده است؛ در «همه انبارهای مجاز» دیده می‌شود. مدیر می‌تواند در تعریف انبار، مرکز خدمات را انتخاب کند.</p>}
   {data&&<>
