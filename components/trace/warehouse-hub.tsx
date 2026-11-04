@@ -32,7 +32,7 @@ export function WarehouseHub({user,records,demo,onSaved,onOpen,onNavigate,target
  function render(item:WarehouseEntry,receiptLaunch?:number){
   const key=item.key+focus;
   if((item.source==='flow'||item.source==='warehouse')&&item.view==='stock')return <WarehouseStockPanel key={key} user={user} demo={demo} onOpen={onOpen} onHistory={g=>onNavigate('warehouse',stockHistoryTarget(g))}/>;
-  if(item.source==='flow')return <MaterialFlow key={key} receiptLaunch={receiptLaunch} initialTab={item.view==='nonconforming'?'requests':item.view} initialAction={item.view==='nonconforming'?'reject':undefined} embedded onWarehouseReceipt={item.view==='materials'?(mid=>onNavigate('warehouse',warehouseTarget('flow','new-receipt:'+mid,'receipts'))):undefined} targetId={focus} demo={demo} onSaved={onSaved} onOpen={onOpen}/>;
+  if(item.source==='flow')return <MaterialFlow key={key} hideHeading receiptLaunch={receiptLaunch} initialTab={item.view==='nonconforming'?'requests':item.view} initialAction={item.view==='nonconforming'?'reject':undefined} embedded onWarehouseReceipt={item.view==='materials'?(mid=>onNavigate('warehouse',warehouseTarget('flow','new-receipt:'+mid,'receipts'))):undefined} targetId={focus} demo={demo} onSaved={onSaved} onOpen={onOpen}/>;
   if(item.source==='inventory')return <ProductionPanel key={key} embedded stockMode={item.view as 'report'|'transfer'|'opening'} view="stock" records={records} user={user} demo={demo} onSaved={onSaved}/>;
   if(item.source==='fulfillment')return <FulfillmentPanel key={key} embedded initialTab={item.view} demo={demo} onSaved={onSaved}/>;
   if(item.source==='batch')return <WarehouseHistoryPanel key={key} demo={demo} initial={parseStockHistory(focus)}/>;
@@ -42,13 +42,14 @@ export function WarehouseHub({user,records,demo,onSaved,onOpen,onNavigate,target
   return null;
  }
  return <ProgramWorkspace programId="warehouse" title="انبار" direct={!!active&&!!targetId}>
-  <SubprogramNavigation items={available.map(([key])=>[key,warehouseGroupTitles[key]])} value={group} onChange={openGroup}/>
+  <SubprogramNavigation showLabel={false} items={available.map(([key])=>[key,warehouseGroupTitles[key]])} value={group} onChange={openGroup}/>
   {group&&<ProgramWorkspace key={group+(active||taskOverview?'leaf':'menu')} programId={'warehouse-'+group} title={warehouseGroupTitles[group]} direct={group==='operations'||!!active||taskOverview}>
-   {group!=='operations'&&group!=='dispatch'&&!taskOverview&&<SubprogramNavigation items={choices.map(item=>[item.key,item.title])} value={leaf} onChange={key=>{if(!choices.some(item=>item.key===key))return false;setLeaf(key);setFocus('');}}/>}
-   {taskOverview&&<><h2>کارتابل انبار</h2>{choices.map(item=><div key={item.key}>{render(item)}</div>)}</>}
+   {group!=='operations'&&group!=='dispatch'&&!taskOverview&&<SubprogramNavigation showLabel={false} items={choices.map(item=>[item.key,item.title])} value={leaf} onChange={key=>{if(!choices.some(item=>item.key===key))return false;setLeaf(key);setFocus('');}}/>}
+   <nav className="warehouse-page-path" aria-label="مسیر صفحه انبار" dir="rtl"><ol>{['انبار',warehouseGroupTitles[group],...(active&&active.title!==warehouseGroupTitles[group]?[active.title]:[])].map((title,index,path)=><li key={index}>{index>0&&<span className="warehouse-page-path__separator" aria-hidden="true">←</span>}<span aria-current={index===path.length-1?'page':undefined}>{title}</span></li>)}</ol></nav>
+   {taskOverview&&<>{choices.map(item=><div key={item.key}>{render(item)}</div>)}</>}
    {group==='operations'&&<WarehouseOperations key={leaf+focus} entries={choices} initial={active} renderSource={render} demo={demo} onSaved={onSaved}/>}
    {group==='dispatch'&&<WarehouseDispatchPanel demo={demo} user={user} onSaved={onSaved} onNavigate={onNavigate}/>}
-   {group!=='operations'&&group!=='dispatch'&&active&&<><h2 className="warehouse-leaf-title">{active.title}</h2>{render(active)}</>}
+   {group!=='operations'&&group!=='dispatch'&&active&&render(active)}
   </ProgramWorkspace>}
   {!available.length&&<p className="notice">برای این حساب کار مجازی در انبار تعریف نشده است.</p>}
  </ProgramWorkspace>;

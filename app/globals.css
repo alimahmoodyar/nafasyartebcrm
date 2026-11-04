@@ -404,3 +404,10 @@ html,button,input,textarea,select,option,svg text{font-family:"Vazirmatn",sans-s
 .production-inbox__item:last-child{border-bottom:0}
 
 .routine-plans__people-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px;max-height:240px;overflow-y:auto;margin:10px 0}.routine-plans__person{display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:12px;padding:10px;cursor:pointer}.routine-plans__person input{width:18px;height:18px;flex:none;accent-color:#16804d}.routine-plans__person span{display:grid;gap:3px}.routine-plans__person small{font-size:12px}
+
+/* Warehouse location in the application; separate from inventory workflow stages. */
+.warehouse-page-path { margin-block: 0 1rem; overflow-x: auto; }
+.warehouse-page-path ol { display: flex; align-items: center; gap: .65rem; list-style: none; margin: 0; padding: .4rem 0; white-space: nowrap; }
+.warehouse-page-path li { display: flex; align-items: center; gap: .65rem; color: var(--muted-foreground, #64748b); }
+.warehouse-page-path [aria-current="page"] { color: var(--foreground, #24304f); font-weight: 700; }
+.warehouse-page-path__separator { font-weight: 400; }
