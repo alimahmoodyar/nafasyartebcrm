@@ -453,3 +453,5 @@ html,button,input,textarea,select,option,svg text{font-family:"Vazirmatn",sans-s
 .bom-import-table input, .bom-import-table textarea, .bom-import-table select { width: 100% !important; min-width: 0; box-sizing: border-box; }
 .bom-import-table textarea { min-height: 70px; resize: vertical; }
 .bom-import-table thead { position: sticky; top: 0; background: var(--background); z-index: 1; }
+/* One compact, single-line route from the home menu to the open section. */
+.workspace-breadcrumb{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;white-space:nowrap;overflow:hidden;min-width:0}.workspace-crumb-link{border:0;background:transparent;color:#53658a;font:inherit;padding:4px 2px;cursor:pointer;flex:0 0 auto}.workspace-crumb-part{display:inline-flex;align-items:center;gap:8px;min-width:0;white-space:nowrap}.workspace-crumb-part strong{display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}.workspace-breadcrumb>svg{flex:0 0 auto}.workspace-crumb-part>svg{flex:0 0 auto}
