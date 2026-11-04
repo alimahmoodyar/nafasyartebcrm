@@ -60,7 +60,7 @@ export async function coverage(plan:any){
  return lines;
 }
 /** Called AFTER all stock entries in the same transaction; raw→line transfers keep holds. */
-export function holdChecks(db:D1Database,operation:string,items:string[]){return [...new Set(items)].map(item=>db.prepare("UPDATE inventory_operations SET guard=CASE WHEN COALESCE((SELECT SUM(quantity) FROM inventory_balances WHERE item_id=? AND warehouse IN ('raw','line')),0)>=COALESCE((SELECT SUM(quantity) FROM sourcing_holds WHERE source_type='stock' AND source_id=?),0) THEN guard ELSE 0 END WHERE id=?").bind(item,item,operation));}
+export function holdChecks(db:D1Database,operation:string,items:string[]){return [...new Set(items)].map(item=>db.prepare("UPDATE inventory_operations SET guard=CASE WHEN COALESCE((SELECT SUM(quantity) FROM inventory_balances WHERE item_id=? AND warehouse IN ('raw','line','transit')),0)>=COALESCE((SELECT SUM(quantity) FROM sourcing_holds WHERE source_type='stock' AND source_id=?),0) THEN guard ELSE 0 END WHERE id=?").bind(item,item,operation));}
 function reserve(db:D1Database,h:any,type:string,source:string,n:number){return db.prepare("INSERT INTO sourcing_holds(id,plan_id,part_code,unit,source_type,source_id,quantity) VALUES(?,?,?,?,?,?,?) ON CONFLICT(plan_id,source_type,source_id) DO UPDATE SET quantity=sourcing_holds.quantity+excluded.quantity").bind(crypto.randomUUID(),h.plan_id,h.part_code,h.unit,type,source,n);}
 /** Arrival moves its existing purchase claims to pending receipt claims atomically. */
 export async function allocatePurchaseReceipt(orderId:string,batchId:string,amount:number,target='receipt'){
