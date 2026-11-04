@@ -1,6 +1,6 @@
 "use client";
 import {Fragment,isValidElement,cloneElement,createContext,useCallback,useContext,useEffect,useLayoutEffect,useMemo,useRef,useState,type ReactNode,type ReactElement,type CSSProperties} from 'react';
-import {ArrowRight,Boxes,ClipboardList,FileText,Users,Settings2,ChartNoAxesCombined,Wallet,Truck,Wrench,Factory,CalendarDays,BookOpen,Mail,ShieldCheck,type LucideIcon} from 'lucide-react';
+import {ArrowRight,Boxes,ClipboardList,ClipboardPlus,History,FileText,Users,Settings2,ChartNoAxesCombined,Wallet,Truck,Wrench,Factory,CalendarDays,BookOpen,Mail,ShieldCheck,type LucideIcon} from 'lucide-react';
 import {PersonalHome} from './personal-home';
 import {createPortal} from 'react-dom';
 import {currentWorkspaceBack,type WorkspaceBackEntry} from '@/lib/workspace-back';
@@ -44,6 +44,8 @@ type WorkspaceContext={register:(menu:Menu|null)=>void;showHome:boolean;open:()=
 const NavigationContext=createContext<WorkspaceContext|null>(null);
 export function subprogramIcon(key:string,title:string):LucideIcon{
  const text=key+' '+title;
+ if(/history|سوابق|تاریخچه|پیگیری/.test(text))return History;
+ if(/request|درخواست/.test(text))return ClipboardPlus;
  if(/\bterms\b|template|الگو/.test(text))return FileText;
  if(/settings|polic|تنظیم|قواعد|استاندارد/.test(text))return Settings2;
  if(/report|analysis|overview|گزارش|تحلیل/.test(text))return ChartNoAxesCombined;
