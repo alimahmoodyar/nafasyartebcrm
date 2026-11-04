@@ -435,3 +435,5 @@ html,button,input,textarea,select,option,svg text{font-family:"Vazirmatn",sans-s
 .material-catalog-import__footer { border-top: 1px solid var(--border); padding-top: 12px; background: var(--background); display: grid; gap: 10px; }
 .material-catalog-import__actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 @media (max-width: 640px) { .material-catalog-import__actions > button { flex: 1 1 100%; } }
+
+.material-catalog-item-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.material-catalog-item-heading h3{margin:0}.material-catalog-item-heading .btn{flex-shrink:0}
