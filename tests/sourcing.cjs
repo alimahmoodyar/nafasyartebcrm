@@ -46,11 +46,12 @@ async function detail(id,user){const go=()=>sourcing.GET(request('/api/sourcing?
  await source('calculate',{planId:pid,notes:'not approved'},400,actor('inventory'));
  await source('approve',{planId:pid,count:5,needBy:future,notes:'approved'},403,actor('sales'));
  await source('approve',{planId:pid,count:5,needBy:future,notes:'approved'},200,actor('ceo'));
- assert.equal(current(pid).data.bom.version,1);assert.equal(current(pid).data.state,'sourcing');assert.equal(current(pid).data.lines[0].required,10000);assert.equal(current(pid).data.lines[0].stock,4000);assert.equal(current(pid).data.lines[0].shortage,6000);assert.ok(Array.isArray(current(pid).data.supplierTargets));
+ assert.equal(current(pid).data.bom.version,1);assert.equal(current(pid).data.state,'inventory_review');assert.equal(current(pid).data.lines[0].required,10000);assert.equal(current(pid).data.lines[0].stock,4000);assert.equal(current(pid).data.lines[0].shortage,6000);assert.equal(current(pid).data.supplierTargets,undefined);
  // CEO approval itself calculates and reserves the BOM shortage; no manual target is involved.
 
  await operate({mode:'bom',productId:p.id,previousVersion:1,lines:[{partCode:'01',name:'Part',unit:'عدد',quantity:'3'}]});assert.equal(current(pid).data.bom.lines[0].quantity,'2');
  await source('calculate',{planId:pid,notes:'stock checked'},200,actor('inventory'));
+ let review=await detail(pid);await source('inventory_confirm',{planId:pid,confirmed:true,inventoryToken:review.inventoryToken,notes:'reviewed and sent to commerce'},200,actor('inventory'));
  let d=await detail(pid);assert.equal(d.lines[0].required,10000);assert.equal(d.lines[0].stock,4000);assert.equal(d.lines[0].shortage,6000);assert.equal(d.work.filter(w=>w.role==='domestic'||w.role==='foreign').length,2);
  // Customer allocation within forecast does not create additional demand.
  await source('create',{productId:p.id,count:2,origin:'customer',forecastId:pid,needBy:future,reference:'CUSTOMER-1'},200,actor('sales'));assert.equal(entities('sourcing_plan').length,1);
@@ -101,7 +102,7 @@ async function detail(id,user){const go=()=>sourcing.GET(request('/api/sourcing?
  const p2=await create('product',{code:'SUP2',name:'No BOM',group:'سایر تجهیزات پزشکی',model:'M',warrantyMonths:'12',status:'فعال'}),missing=(await source('create',{productId:p2.id,count:1,origin:'customer',needBy:future,reference:'MISSING'})).planId;
  await source('approve',{planId:missing,count:1,needBy:future,notes:'approved'});assert.equal(current(missing).data.state,'waiting_bom');
  await source('calculate',{planId:missing,notes:'no BOM'},400);await operate({mode:'bom',productId:p2.id,previousVersion:0,lines:[{partCode:'01',name:'Part',unit:'عدد',quantity:'1'}]});
- const bom2=sql.prepare('SELECT id FROM bom_versions WHERE product_id=?').get(p2.id).id;await activate(p2.id,bom2);await source('bom',{planId:missing,bomId:bom2,notes:'released engineering BOM'},200,actor('engineering'));assert.equal(current(missing).data.state,'sourcing');
+ const bom2=sql.prepare('SELECT id FROM bom_versions WHERE product_id=?').get(p2.id).id;await activate(p2.id,bom2);await source('bom',{planId:missing,bomId:bom2,notes:'released engineering BOM'},200,actor('engineering'));assert.equal(current(missing).data.state,'inventory_review');
  const outsider={...actor('none'),permissions:{read:[],write:[],eventStages:[]}};assert.equal((await context.run(outsider,()=>sourcing.GET(request('/api/sourcing')))).status,403);
  token=(await mint('read')).token;assert.ok(!(await call('get_sourcing_plan',{planId:pid})).error);assert.ok((await call('followup_sourcing_plan',{id:crypto.randomUUID(),planId:missing,revision:current(missing).revision,notes:'MCP',confirmed:true})).error);
  token=(await mint('read_write')).token;assert.ok(!(await call('followup_sourcing_plan',{id:crypto.randomUUID(),planId:missing,revision:current(missing).revision,notes:'MCP',confirmed:true})).error);

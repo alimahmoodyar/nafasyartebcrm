@@ -1,4 +1,5 @@
 'use client';
+import {WarehouseSupplyPanel} from './warehouse-supply-panel';
 import {WarehouseDispatchPanel} from './warehouse-dispatch-panel';
 import {WarehouseHistoryPanel} from './warehouse-history-panel';
 import {WarehouseOperations} from './warehouse-operations';
@@ -31,6 +32,7 @@ export function WarehouseHub({user,records,demo,onSaved,onOpen,onNavigate,target
  const openGroup=(key:string)=>{if(!groups[key]?.length)return false;setGroup(key);setFocus('');setLeaf(key!=='tasks'&&groups[key].length===1?groups[key][0].key:'');};
  function render(item:WarehouseEntry,receiptLaunch?:number){
   const key=item.key+focus;
+  if(item.source==='sourcing')return <WarehouseSupplyPanel key={key} demo={demo} initialId={focus} onNavigate={onNavigate}/>;
   if((item.source==='flow'||item.source==='warehouse')&&item.view==='stock')return <WarehouseStockPanel key={key} user={user} demo={demo} onOpen={onOpen} onHistory={g=>onNavigate('warehouse',stockHistoryTarget(g))}/>;
   if(item.source==='flow')return <MaterialFlow key={key} hideHeading receiptLaunch={receiptLaunch} initialTab={item.view==='nonconforming'?'requests':item.view} initialAction={item.view==='nonconforming'?'reject':undefined} embedded onWarehouseReceipt={item.view==='materials'?(mid=>onNavigate('warehouse',warehouseTarget('flow','new-receipt:'+mid,'receipts'))):undefined} targetId={focus} demo={demo} onSaved={onSaved} onOpen={onOpen}/>;
   if(item.source==='inventory')return <ProductionPanel key={key} embedded stockMode={item.view as 'report'|'transfer'|'opening'} view="stock" records={records} user={user} demo={demo} onSaved={onSaved}/>;

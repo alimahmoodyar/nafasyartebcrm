@@ -23,7 +23,7 @@ export function canOpenSection(user:Session,s:string):boolean{
  const p=accessPermissions(user.permissions),u={...user,permissions:p};
  const internal=!p.hospitalCenterId&&!p.salesAgentId&&!p.serviceAgentId;
  if(s==='routine-production'&&internal&&u.productionParticipant===true)return true;
- if(s==='warehouse')return internal&&(canOpenSection(u,'flow')||canOpenSection(u,'inventory')||canOpenSection(u,'batch')||canOpenSection(u,'fulfillment')&&warehouseAccess(u,'finished')||canOpenSection(u,'after-sales')&&!!p.serviceRoles?.includes('inventory'));
+ if(s==='warehouse')return internal&&(!!p.supplyRoles?.includes('inventory')||canOpenSection(u,'flow')||canOpenSection(u,'inventory')||canOpenSection(u,'batch')||canOpenSection(u,'fulfillment')&&warehouseAccess(u,'finished')||canOpenSection(u,'after-sales')&&!!p.serviceRoles?.includes('inventory'));
  if(!u.isAdmin&&!selfServicePrograms.includes(s)){
   if(p.roleAssignment&&!programsForRoles(p.roleAssignment.roles).includes(s)&&!(s==='flow'&&p.warehouseResponsibilities?.length))return false;
   if(!p.roleAssignment&&p.manualPrograms!==undefined&&!p.manualPrograms.includes(s))return false;
@@ -73,6 +73,7 @@ export function warehouseNavigation(user:Session){
  const groups:Record<string,WarehouseEntry[]>={tasks:[],stock:[],receive:[],issue:[],operations:[],dispatch:[],returns:[],settings:[]};
  if(!canOpenSection(u,'warehouse'))return groups;
  const add=(group:string,key:string,title:string,source:string,view:string)=>groups[group].push({key,title,source,view});
+ if(u.isAdmin||p.supplyRoles?.includes('inventory'))add('tasks','warehouse-supply','درخواست و تأیید تأمین مواد','sourcing','warehouse-supply');
  const materialScope=['raw','semi','line','quarantine','nonconforming'].filter(warehouse=>warehouseAccess(u,warehouse));
  const flow=canOpenSection(u,'flow'),inventory=flowRole(u,'inventory'),production=u.isAdmin||!!p.flowRoles?.includes('production'),quality=u.isAdmin||!!p.flowRoles?.includes('qc');
  if(flow){
