@@ -96,6 +96,9 @@ export const resetHelp=['قطعات و قیمت مصرف‌کننده واردش
 
 // BOM imports use existing bom_versions, material flow_entities and inventory_operations;
 // existing freeze triggers and catalog/full reset semantics apply without new tables.
+// Catalog-only material_import creates existing material flow_entities plus inventory_operations/access_audit.
+// Operations reset preserves material passports; full reset backs up/deletes them. Existing 0016 freeze triggers
+// cover the atomic import and its audit. No new table, FK, blob, stock or preservation exception.
 
 // sales_* flow entities use the generic freeze triggers (0016); sales_file is included in reset file manifests. No separate ledger tables.
 
