@@ -89,7 +89,7 @@ export function requestsAssistantRead(message:string){
 }
 export function retainAssistantWorkspace(message:string,previous:any){
  if(requestsAssistantClose(message))return false;
- if(!previous?.tool||['succeeded','cancelled','failed','expired'].includes(previous.state)||requestsAssistantRead(message))return false;
+ if(!previous?.tool||['running','review','succeeded','cancelled','failed','expired'].includes(previous.state)||requestsAssistantRead(message))return false;
  return !/(?:فرم|عملیات|برنامه).*(?:ببند|لغو کن)|منصرف شدم|بیخیال|بی خیال|موضوع دیگر|عملیات دیگر|فرم دیگر/.test(message);
 }
 export function requestsOperation(message:string){
