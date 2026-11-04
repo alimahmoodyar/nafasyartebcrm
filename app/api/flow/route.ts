@@ -45,9 +45,10 @@ export async function GET(request?:Request){try{
  }catch(e){return accessResponse(e)||Response.json({error:'دریافت گردش مواد ممکن نشد.'},{status:503})}}
 export async function POST(request:Request){try{
  checkOrigin(request);const u=await requireAccess();const b=JSON.parse(new TextDecoder().decode(await boundedBody(request,180000)));const id=needed(b.id,80);if(!/^[a-f0-9-]{36}$/i.test(id))fail('شناسه عملیات معتبر نیست.');const mode=needed(b.mode,40),db=storage(),now=new Date().toISOString();
+ const materialRouteOnly=mode==='material'&&!u.isAdmin&&!u.permissions.flowRoles?.includes('inventory')&&u.permissions.supplyRoles?.includes('engineering');
  const role:Record<string,string>={warehouse:'inventory',material:'inventory',receipt:'inventory',incoming_qc:'qc',assign_qc:'inventory',shelve:'inventory',request:'production',issue:'inventory',confirm_line_receipt:'production',supply:'inventory',supply_close:'procurement',capacity:'production',plan:'production',assign:'production',prepare:'production',build:'production',reject:'production',repair:'production',print:'production'};
- if(!role[mode]||!flowRole(u,role[mode]))fail('دسترسی این عملیات را ندارید.',403);
- if(mode==='material'&&!u.isAdmin&&!u.permissions.flowRoles?.includes('inventory'))fail('تعریف کالا به نقش عمومی انبار نیاز دارد.',403);
+ if(!role[mode]||(!flowRole(u,role[mode])&&!materialRouteOnly))fail('دسترسی این عملیات را ندارید.',403);
+ if(mode==='material'&&!u.isAdmin&&!u.permissions.flowRoles?.includes('inventory')&&!materialRouteOnly)fail('تعریف کالا به نقش عمومی انبار نیاز دارد.',403);
  if(mode==='receipt'&&!warehouseAccess(u,'quarantine')||mode==='shelve'&&(!warehouseAccess(u,'quarantine')||!warehouseAccess(u,'raw'))||mode==='issue'&&!warehouseAccess(u,'raw'))fail('این انبار در مسئولیت شما نیست.',403);
  const signature=JSON.stringify(b),prior:any=await db.prepare('SELECT payload,actor FROM inventory_operations WHERE id=?').bind(id).first();if(prior){if(prior.payload!==signature||prior.actor!==u.userId)fail('شناسه درخواست تکراری است.',409);return json({saved:true,repeated:true});}
  let materialResult:Record<string,unknown>={};const stmts:D1PreparedStatement[]=[],guards:string[]=[],params:any[]=[],checks:D1PreparedStatement[]=await supplyLock(db,id);
@@ -80,12 +81,16 @@ export async function POST(request:Request){try{
  put(eid,'material_warehouse',{...(old?.data||{}),name,parentId,serviceDomain,serviceOwner,locations:b.locations,active:b.active,assignmentVersion:2},old);
  }else if(mode==='material'){
  const code=normalizePartCode(needed(b.code,12)),eid='material:'+code;const oldRaw:any=await db.prepare('SELECT * FROM flow_entities WHERE id=?').bind(eid).first();let old:any;if(oldRaw){old=await get(eid,'material');if(b.revision!==old.revision)fail('شناسنامه تغییر کرده است.',409);}
+ if(materialRouteOnly){if(!old)fail('نقش تحقیق‌وتوسعه فقط می‌تواند مسیر تأمین کالای ثبت‌شده را ویرایش کند.',403);if(!Array.isArray(b.sourcingRoutes)||!b.sourcingRoutes.length||b.sourcingRoutes.length>2||new Set(b.sourcingRoutes).size!==b.sourcingRoutes.length||b.sourcingRoutes.some((r:string)=>!['domestic','foreign'].includes(r)))fail('حداقل یک مسیر مجاز تأمین انتخاب کنید.');put(eid,'material',{...old.data,sourcingRoutes:b.sourcingRoutes},old);materialResult={materialId:eid,revision:old.revision+1};}
+ else{
  const unit=normalizeMaterialUnit(needed(b.unit,20));if(!unit)fail('واحد معتبر نیست.');if(old&&old.data.unit!==unit)fail('واحد کالای تعریف‌شده ثابت است.');
  if(old&&text(b.specs||'')!==(old.data.specs||'')&&(!u.isAdmin&&!u.permissions.supplyRoles?.includes('engineering')||Object.values(old.data.technicalControls||{}).some((v:any)=>v.held)))fail('تغییر طراحی موجود از کنترل فنی تحقیق‌وتوسعه یا تضمین کیفیت انجام شود.',403);
  const previous={...(old?.data||{})};for(const key of ['qcOwner','warehouseOwner','procurementOwner','targetStock','reorderPoint','defaultLocation'])delete previous[key];
  const kind=b.kind===undefined?(old?.data.kind||'raw'):text(b.kind,30);if(!['raw','semi_finished'].includes(kind))fail('نوع کالا معتبر نیست.');
  if(old&&old.data.kind&&old.data.kind!==kind){const linked=(await db.prepare("SELECT id FROM flow_entities WHERE type='routine_route' AND json_extract(data,'$.materialId')=? LIMIT 1").bind(eid).first())||await db.prepare("SELECT id FROM flow_entities WHERE type='semi_bom' AND json_extract(data,'$.materialId')=? LIMIT 1").bind(eid).first();if(linked)fail('نوع کالایی که مسیر ساخت یا BOM دارد قابل تغییر نیست.');}
- put(eid,'material',{...previous,code,name:needed(b.name),unit,kind,specs:text(b.specs||''),designVersion:(old?.data.designVersion||0)+(old&&text(b.specs||'')!==(old.data.specs||'')?1:0),fields:materialQualityFields(b.fields)},old);materialResult={materialId:eid,revision:(old?.revision||0)+1};
+ const sourcingRoutes=Object.prototype.hasOwnProperty.call(b,'sourcingRoutes')?b.sourcingRoutes:old?.data.sourcingRoutes;if(sourcingRoutes!==undefined&&(!Array.isArray(sourcingRoutes)||!sourcingRoutes.length||sourcingRoutes.length>2||new Set(sourcingRoutes).size!==sourcingRoutes.length||sourcingRoutes.some((r:string)=>!['domestic','foreign'].includes(r))))fail('حداقل یک مسیر مجاز تأمین انتخاب کنید.');
+ put(eid,'material',{...previous,code,name:needed(b.name),unit,kind,specs:text(b.specs||''),...(sourcingRoutes?{sourcingRoutes}:{}),designVersion:(old?.data.designVersion||0)+(old&&text(b.specs||'')!==(old.data.specs||'')?1:0),fields:materialQualityFields(b.fields)},old);materialResult={materialId:eid,revision:(old?.revision||0)+1};
+ }
  }else if(mode==='receipt'){
  const placement=await receiptWarehouse(u,b.warehouseId,b.qcOwner);if(placement.warehouseId){await warehouseAssignment({data:{warehouseId:placement.warehouseId}},'warehouseOwner');if(placement.qcOwner)await assignee(placement.qcOwner,'qc',placement.warehouseId);}
  const m=await get(needed(b.materialId),'material');if(!m.data.fields?.length)fail('ابتدا فرم کنترل کیفیت ماده اولیه واردشده از اکسل را تکمیل کنید.');const day=needed(b.day,10);receiptDay(day);const quantity=scaled(b.quantity),expiry=text(b.expiry||'',10);if(expiry){receiptDay(expiry);if(expiry<day)fail('تاریخ انقضا قبل از ورود است.');}
