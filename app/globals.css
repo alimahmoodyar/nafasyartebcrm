@@ -437,3 +437,19 @@ html,button,input,textarea,select,option,svg text{font-family:"Vazirmatn",sans-s
 @media (max-width: 640px) { .material-catalog-import__actions > button { flex: 1 1 100%; } }
 
 .material-catalog-item-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.material-catalog-item-heading h3{margin:0}.material-catalog-item-heading .btn{flex-shrink:0}
+
+/* Keep the product BOM editor within its wide passport, with one editable list. */
+.product-passport-modal > *, .bom-import-panel { min-width: 0; }
+.bom-import-mapping { margin-block: 16px; }
+.bom-import-mapping > summary { cursor: pointer; font-weight: 600; padding: 10px; }
+.bom-import-mapping .notice { margin-top: 8px; }
+.bom-import-table-scroll { max-height: 60dvh; overflow: auto; width: 100%; min-width: 0; }
+.bom-import-table { table-layout: fixed; min-width: 1080px; }
+.bom-import-table th, .bom-import-table td { white-space: normal; overflow-wrap: anywhere; vertical-align: top; padding: 8px; }
+.bom-import-table th:nth-child(1) { width: 12%; }
+.bom-import-table th:nth-child(2) { width: 26%; }
+.bom-import-table th:nth-child(3), .bom-import-table th:nth-child(4) { width: 10%; }
+.bom-import-table th:nth-child(5), .bom-import-table th:nth-child(6) { width: 14%; }
+.bom-import-table input, .bom-import-table textarea, .bom-import-table select { width: 100% !important; min-width: 0; box-sizing: border-box; }
+.bom-import-table textarea { min-height: 70px; resize: vertical; }
+.bom-import-table thead { position: sticky; top: 0; background: var(--background); z-index: 1; }
