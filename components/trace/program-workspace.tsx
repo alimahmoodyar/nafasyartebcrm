@@ -6,17 +6,19 @@ import {createPortal} from 'react-dom';
 import {currentWorkspaceBack,type WorkspaceBackEntry} from '@/lib/workspace-back';
 
 const AccountContext=createContext<string|null>(null);
+const ActiveSectionContext=createContext('');
+function publishWorkspaceBreadcrumb(accountId:string|null,section:string,segments:string[]){if(!accountId||!section)return;window.dispatchEvent(new CustomEvent('nafasyar-workspace-breadcrumb',{detail:{accountId,section,segments}}));}
 const RootBackContext=createContext<(()=>void)|null>(null);
 type BackRegistry={register:(entry:Omit<WorkspaceBackEntry,'order'>)=>()=>void;invalidate:()=>void;run:()=>void;entries:Map<number,WorkspaceBackEntry>;version:number};
 const BackRegistryContext=createContext<BackRegistry|null>(null);
-export function LayoutAccountProvider({accountId,children,onBack}:{accountId:string;children:ReactNode;onBack?:()=>void}){
+export function LayoutAccountProvider({accountId,children,onBack,activeSection=''}:{accountId:string;children:ReactNode;onBack?:()=>void;activeSection?:string}){
  const inheritedBack=useContext(RootBackContext),inheritedRegistry=useContext(BackRegistryContext),entries=useRef(new Map<number,WorkspaceBackEntry>()),sequence=useRef(0),[version,setVersion]=useState(0),back=useRef(onBack||inheritedBack);
  back.current=onBack||inheritedBack;
  const invalidate=useCallback(()=>setVersion(n=>n+1),[]);
  const register=useCallback((entry:Omit<WorkspaceBackEntry,'order'>)=>{const id=++sequence.current;entries.current.set(id,{...entry,order:id});setVersion(n=>n+1);return()=>{entries.current.delete(id);setVersion(n=>n+1);};},[]);
  const run=useCallback(()=>{const current=currentWorkspaceBack([...entries.current.values()]);if(current)current.handler();else back.current?.();},[]);
  const registry=useMemo(()=>({register,invalidate,run,entries:entries.current,version}),[register,invalidate,run,version]);
- return <RootBackContext.Provider value={onBack||inheritedBack}><BackRegistryContext.Provider value={inheritedRegistry||registry}><AccountContext.Provider value={accountId}>{children}</AccountContext.Provider></BackRegistryContext.Provider></RootBackContext.Provider>;
+ return <RootBackContext.Provider value={onBack||inheritedBack}><BackRegistryContext.Provider value={inheritedRegistry||registry}><ActiveSectionContext.Provider value={activeSection}><AccountContext.Provider value={accountId}>{children}</AccountContext.Provider></ActiveSectionContext.Provider></BackRegistryContext.Provider></RootBackContext.Provider>;
 }
 
 function useBackEntry(handler:()=>void,enabled:boolean,priority:number,modal=false){
@@ -38,7 +40,7 @@ export function WorkspaceBackButton({visible=true}:{visible?:boolean}){
 }
 type Menu={items:[string,string][];value:string;onChange:(key:string)=>void|boolean};
 const ProgramPathContext=createContext('');
-type WorkspaceContext={register:(menu:Menu|null)=>void;showHome:boolean;open:()=>void;reveal:()=>void;select:(key:string)=>void};
+type WorkspaceContext={register:(menu:Menu|null)=>void;showHome:boolean;open:()=>void;reveal:()=>void;select:(key:string)=>void;breadcrumb:(items?:[string,string][],key?:string)=>string[]};
 const NavigationContext=createContext<WorkspaceContext|null>(null);
 export function subprogramIcon(key:string,title:string):LucideIcon{
  const text=key+' '+title;
@@ -60,14 +62,15 @@ export function subprogramIcon(key:string,title:string):LucideIcon{
 }
 export function ProgramWorkspace({programId,title,direct=false,children,status}:{programId:string;title:string;direct?:boolean;children:ReactNode;status?:ReactNode}){
  const parentNavigation=useContext(NavigationContext),rootBack=useContext(RootBackContext);
- const accountId=useContext(AccountContext),[menu,setMenu]=useState<Menu|null>(null),[showHome,setShowHome]=useState(!direct);
+ const accountId=useContext(AccountContext),activeSection=useContext(ActiveSectionContext),[menu,setMenu]=useState<Menu|null>(null),[showHome,setShowHome]=useState(!direct);
  const parentPath=useContext(ProgramPathContext),path=parentPath?parentPath+'/'+programId:programId;
  const register=useCallback((next:Menu|null)=>setMenu(next),[]);
- const select=useCallback((key:string)=>{if(!menu?.items.some(([id])=>id===key))return;if(menu.onChange(key)!==false)setShowHome(false)},[menu]);
+ const breadcrumb=useCallback((items?:[string,string][],key?:string)=>{const parent=parentNavigation?.breadcrumb()||[];const label=items?.find(([id])=>id===key)?.[1];return [...parent,title,...(label?[label]:[])].filter((part,index,list)=>!!part&&(index===0||part!==list[index-1]));},[parentNavigation,title]);
+ const select=useCallback((key:string)=>{if(!menu?.items.some(([id])=>id===key))return;if(menu.onChange(key)!==false){setShowHome(false);publishWorkspaceBreadcrumb(accountId,activeSection,breadcrumb(menu.items,key));}},[menu,accountId,activeSection,breadcrumb]);
  const open=useCallback(()=>{if(menu?.items.length)setShowHome(true);else if(parentNavigation)parentNavigation.open();else rootBack?.();},[menu?.items.length,parentNavigation?.open,rootBack]);
  const reveal=useCallback(()=>setShowHome(false),[]);
  useEffect(()=>{if(direct)setShowHome(false)},[direct]);
- const navigation=useMemo(()=>accountId?({register,showHome,open,reveal,select}):null,[accountId,register,showHome,open,reveal,select]);
+ const navigation=useMemo(()=>accountId?({register,showHome,open,reveal,select,breadcrumb}):null,[accountId,register,showHome,open,reveal,select,breadcrumb]);
  const canLaunch=!!accountId&&!!menu?.items.length;
  const backRef=useWorkspaceBack(()=>setShowHome(true),canLaunch&&!showHome);
  return <NavigationContext.Provider value={navigation}><div className="program-workspace" ref={backRef}>
@@ -78,7 +81,7 @@ export function ProgramWorkspace({programId,title,direct=false,children,status}:
 }
 export function SubprogramNavigation({items,value,onChange}:{items:[string,string][];value:string;onChange:(key:string)=>void|boolean}){
  const context=useContext(NavigationContext),change=useRef(onChange),previous=useRef(value);change.current=onChange;
- const accountId=useContext(AccountContext);const select=useCallback((key:string)=>{const result=change.current(key);if(result!==false)window.dispatchEvent(new CustomEvent('nafasyar-program-navigation',{detail:{accountId}}));return result;},[accountId]);
+ const accountId=useContext(AccountContext),activeSection=useContext(ActiveSectionContext),breadcrumbFor=context?.breadcrumb;const itemsRef=useRef(items);itemsRef.current=items;const select=useCallback((key:string)=>{const result=change.current(key);if(result!==false){window.dispatchEvent(new CustomEvent('nafasyar-program-navigation',{detail:{accountId}}));const currentItems=itemsRef.current;publishWorkspaceBreadcrumb(accountId,activeSection,breadcrumbFor?.(currentItems,key)||[currentItems.find(([id])=>id===key)?.[1]||'']);}return result;},[accountId,activeSection,breadcrumbFor]);
  const signature=JSON.stringify(items),register=context?.register;
  useLayoutEffect(()=>{if(!register)return;register({items:JSON.parse(signature),value,onChange:select});return()=>register(null)},[register,signature,value,select]);
  useEffect(()=>{if(previous.current!==value){previous.current=value;context?.reveal()}},[value,context?.reveal]);
