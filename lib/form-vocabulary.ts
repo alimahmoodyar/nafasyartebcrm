@@ -1340,3 +1340,5 @@ Object.assign(toolFieldTitles.routine_production_apply,{method:'روش برنا�
 toolFieldTitles.estimate_routine_production={routeId:'قطعه نیمه‌آماده / مسیر ساخت',method:'روش برنامه‌ریزی',count:'تعداد موردنیاز تولید',memberIds:'افراد قابل تخصیص',day:'روز شروع',days:'تعداد روز تقویمی',start:'شروع کار روزانه',end:'پایان کار روزانه'};
 
 Object.assign(toolFieldTitles.personnel_apply,{productionEligible:'قابل تخصیص به عملیات تولید'});
+
+Object.assign(toolFieldTitles.save_material_warehouse,{warehouseType:'نوع انبار',directReceiptEnabled:'اجازه دریافت مستقیم مواد اولیه',quarantineWarehouseId:'قرنطینه ورودی؛ خالی برای ساخت خودکار'});

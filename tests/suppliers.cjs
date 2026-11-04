@@ -23,10 +23,11 @@ const entities=type=>sql.prepare('SELECT * FROM flow_entities WHERE type=? ORDER
 const stock=(id,wh)=>sql.prepare('SELECT quantity FROM inventory_balances WHERE item_id=? AND warehouse=?').get(id,wh)?.quantity||0;
 // Serialize test transactions as D1 does; callers may still read the same stale version.
 let batchTail=Promise.resolve();const rawBatch=db.batch.bind(db);db.batch=stmts=>{const next=batchTail.then(()=>rawBatch(stmts));batchTail=next.catch(()=>{});return next};
+const receivingFixture=require('./helpers/receiving-warehouse.cjs')(sql);
 const sourcing=load('app/api/sourcing/route.ts'),context=load('lib/mcp/context.ts').mcpActor;
 const current=id=>entities('sourcing_plan').find(p=>p.id===id);
 const actor=role=>({userId:role+'User',email:role+'@test.local',name:role,isAdmin:false,permissions:{read:[],write:[],eventStages:[],supplyRoles:[role],flowRoles:role==='inventory'?['inventory']:[],warehouses:role==='inventory'?['quarantine','raw']:[]}});
-async function source(mode,b={},status=200,user){const body={id:crypto.randomUUID(),mode,...(b.planId?{revision:current(b.planId).revision}:{}),...b};const go=()=>sourcing.POST(request('/api/sourcing','POST',body));const r=user?await context.run(user,go):await go(),d=await r.json();assert.equal(r.status,status,mode+': '+JSON.stringify(d));return {...d,operationId:body.id};}
+async function source(mode,b={},status=200,user){const body={id:crypto.randomUUID(),mode,warehouseId:receivingFixture.id,...(b.planId?{revision:current(b.planId).revision}:{}),...b};const go=()=>sourcing.POST(request('/api/sourcing','POST',body));const r=user?await context.run(user,go):await go(),d=await r.json();assert.equal(r.status,status,mode+': '+JSON.stringify(d));return {...d,operationId:body.id};}
 async function detail(id,user){const go=()=>sourcing.GET(request('/api/sourcing?id='+id));const r=user?await context.run(user,go):await go();assert.equal(r.status,200);return r.json();}
 
 const suppliers=load('app/api/suppliers/route.ts'),domain=load('lib/suppliers.ts');
@@ -36,6 +37,7 @@ async function supplier(mode,b={},status=200,user=actor('domestic')){const body=
  identity=owner;await auth.session();
  const today=load('lib/duties.ts').dayAt(),later=new Date(Date.now()+10*86400000).toISOString().slice(0,10),future=new Date(Date.now()+20*86400000).toISOString().slice(0,10),now=new Date().toISOString();
  for(const role of ['sales','ceo','inventory','engineering','finance','domestic','foreign']){const a=actor(role);sql.prepare("INSERT INTO app_members(id,email,name,unit,status,subject,permissions,revision,created,updated) VALUES(?,?,?,'test','active',?,?,1,?,?)").run(a.userId,a.email,a.name,a.userId,JSON.stringify(a.permissions),now,now);}
+ sql.prepare("UPDATE app_members SET permissions=? WHERE id='inventoryUser'").run(JSON.stringify({...actor('inventory').permissions,warehouseResponsibilities:[{warehouseId:receivingFixture.id,role:'inventory'}]}));
  const p=await create('product',{code:'SUP',name:'SupplierTest',group:'سایر تجهیزات پزشکی',model:'M',productionMode:'project',warrantyMonths:'12',status:'فعال'});
  await op('material',{code:'01',name:'Part',unit:'عدد',specs:'V1',defaultLocation:'A-1-1-1',reorderPoint:'0',targetStock:'0',fields:[{key:'quality',label:'Quality',type:'number',unit:'%',min:'90',max:'100',required:true}],qcOwner:'',warehouseOwner:'',procurementOwner:'',revision:0});
  const material=entities('material')[0];

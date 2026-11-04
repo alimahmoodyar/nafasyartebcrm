@@ -8,7 +8,7 @@ import {Plus,Trash2,ClipboardCheck,Download,RefreshCw} from 'lucide-react';
 import {Select,SelectTrigger,SelectValue,SelectContent,SelectItem} from '@/components/ui/select';
 import {BatchFilesPanel} from './batch-files-panel';
 import {qualityFields,qualityValues,type QField,type QTemplate,type QReport} from '@/lib/quality';
-const blank=(key:string):QField=>({key,label:'',type:'number',unit:'',min:'',max:'',required:true});
+const blank=(key:string):QField=>({key,label:'',type:'number',unit:'',min:'',max:'',textGuide:'',required:true});
 function Choice({value,onChange,options,label,disabled=false}:{value:string;onChange:(v:string)=>void;options:[string,string][];label:string;disabled?:boolean}){return <Select dir="rtl" value={value||'empty'} onValueChange={v=>onChange(v==='empty'?'':v)} disabled={disabled}><SelectTrigger aria-label={label}><SelectValue/></SelectTrigger><SelectContent><SelectItem value="empty">انتخاب کنید</SelectItem>{options.map(([k,v])=><SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent></Select>;}
 export function QualityPanel({id,mode,demo,write,onSaved,fixedTemplateId}:{fixedTemplateId?:string;id:string;mode:'product'|'device';demo:boolean;write:boolean;onSaved?:()=>void}){
  const [templates,setTemplates]=useState<QTemplate[]>([]),[reports,setReports]=useState<QReport[]>([]),[loading,setLoading]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState(''),[editing,setEditing]=useState(false);

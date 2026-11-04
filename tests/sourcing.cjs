@@ -18,7 +18,7 @@ async function create(kind,data){const r=await recordsApi.POST(request('/api/rec
 async function operate(b,status=200){const r=await production.POST(request('/api/production','POST',{id:crypto.randomUUID(),...b}));const d=await r.json();assert.equal(r.status,status,JSON.stringify(d));return d;}
 
 const flow=load('app/api/flow/route.ts'),templateApi=load('app/api/quality/templates/route.ts'),qualityApi=load('app/api/quality/reports/route.ts');
-async function op(mode,b={},status=200){const r=await flow.POST(request('/api/flow','POST',{id:crypto.randomUUID(),mode,...b}));const d=await r.json();assert.equal(r.status,status,JSON.stringify(d));return d;}
+async function op(mode,b={},status=200){const r=await flow.POST(request('/api/flow','POST',{id:crypto.randomUUID(),mode,warehouseId:receivingFixture.id,...b}));const d=await r.json();assert.equal(r.status,status,JSON.stringify(d));return d;}
 const entities=type=>sql.prepare('SELECT * FROM flow_entities WHERE type=? ORDER BY created,id').all(type).map(x=>({...x,data:JSON.parse(x.data)}));
 const stock=(id,wh)=>sql.prepare('SELECT quantity FROM inventory_balances WHERE item_id=? AND warehouse=?').get(id,wh)?.quantity||0;
 // Serialize test transactions as D1 does; callers may still read the same stale version.
@@ -26,12 +26,14 @@ let batchTail=Promise.resolve();const rawBatch=db.batch.bind(db);db.batch=stmts=
 const sourcing=load('app/api/sourcing/route.ts'),context=load('lib/mcp/context.ts').mcpActor;
 const current=id=>entities('sourcing_plan').find(p=>p.id===id);
 const actor=role=>({userId:role+'User',email:role+'@test.local',name:role,isAdmin:false,permissions:{read:[],write:[],eventStages:[],supplyRoles:[role],flowRoles:role==='inventory'?['inventory']:[],warehouses:role==='inventory'?['quarantine','raw']:[]}});
-async function source(mode,b={},status=200,user){const body={id:crypto.randomUUID(),mode,...(b.planId?{revision:current(b.planId).revision}:{}),...b};const go=()=>sourcing.POST(request('/api/sourcing','POST',body));const r=user?await context.run(user,go):await go(),d=await r.json();assert.equal(r.status,status,mode+': '+JSON.stringify(d));return {...d,operationId:body.id};}
+async function source(mode,b={},status=200,user){const body={id:crypto.randomUUID(),mode,warehouseId:receivingFixture.id,...(b.planId?{revision:current(b.planId).revision}:{}),...b};const go=()=>sourcing.POST(request('/api/sourcing','POST',body));const r=user?await context.run(user,go):await go(),d=await r.json();assert.equal(r.status,status,mode+': '+JSON.stringify(d));return {...d,operationId:body.id};}
 async function detail(id,user){const go=()=>sourcing.GET(request('/api/sourcing?id='+id));const r=user?await context.run(user,go):await go();assert.equal(r.status,200);return r.json();}
+const receivingFixture=require('./helpers/receiving-warehouse.cjs')(sql);
 (async()=>{
  identity=owner;await auth.session();
  const today=load('lib/duties.ts').dayAt(),later=new Date(Date.now()+10*86400000).toISOString().slice(0,10),future=new Date(Date.now()+20*86400000).toISOString().slice(0,10),now=new Date().toISOString();
  for(const role of ['sales','ceo','inventory','engineering','finance','domestic','foreign']){const a=actor(role);sql.prepare("INSERT INTO app_members(id,email,name,unit,status,subject,permissions,revision,created,updated) VALUES(?,?,?,'تست','active',?,?,1,?,?)").run(a.userId,a.email,a.name,a.userId,JSON.stringify(a.permissions),now,now);}
+ sql.prepare("UPDATE app_members SET permissions=? WHERE id='inventoryUser'").run(JSON.stringify({...actor('inventory').permissions,warehouseResponsibilities:[{warehouseId:receivingFixture.id,role:'inventory'}]}));
  const p=await create('product',{code:'SUP',name:'SupplyDevice',group:'سایر تجهیزات پزشکی',model:'M',productionMode:'project',warrantyMonths:'12',status:'فعال'});
  const fields=[{key:'purity',label:'Purity',type:'number',unit:'%',min:'90',max:'96',required:true}];
  await op('material',{code:'01',name:'Part',unit:'عدد',specs:'V1',defaultLocation:'A-1-1-1',reorderPoint:'0',targetStock:'0',fields,qcOwner:'',warehouseOwner:'',procurementOwner:'',revision:0});
@@ -61,8 +63,9 @@ async function detail(id,user){const go=()=>sourcing.GET(request('/api/sourcing?
  await source('approve',{planId:other,count:1,needBy:future,notes:'approved'});await source('calculate',{planId:other,notes:'cannot reserve twice'});assert.equal((await detail(other)).lines[0].stock,0);
  // A generic line request cannot take stock reserved for an approved sourcing plan.
  const rq=await op('request',{materialId:material.id,quantity:'4',notes:'line'});const requestId=entities('request')[0].id;
- await op('issue',{requestId,allocations:[{batchId:stocked.id,location:'A-1-1-1',quantity:'4'}],reason:''},409);assert.equal(stock(stocked.id,'raw'),4000);
- await op('reject',{batchId:stocked.id,quantity:'1',reason:'attempt to consume reservation'},409);assert.equal(stock(stocked.id,'raw'),4000);
+ await op('issue',{requestId,allocations:[{batchId:stocked.id,location:receivingFixture.id+'|A-1-1-1',quantity:'4'}],reason:''});assert.equal(stock(stocked.id,'transit'),4000);assert.equal(stock(stocked.id,'line'),0);
+ await op('confirm_line_receipt',{requestId,notes:'received at line'});assert.equal(stock(stocked.id,'line'),4000);assert.equal(stock(stocked.id,'transit'),0);
+ await op('reject',{batchId:stocked.id,quantity:'1',reason:'attempt to consume reservation'},409);assert.equal(stock(stocked.id,'line'),4000);
  const quote={planId:pid,partCode:'01',supplier:'Domestic',unitPrice:'10',currency:'IRR',fxRate:'1',fxDate:today,fxSource:'approved rate',extrasRial:'0',costNotes:'included',eta:later,validUntil:future,paymentTerms:'cash',specs:'V1',reference:'Q1',unavailable:false};
  const qd=(await source('quote',{...quote,route:'domestic',supplierLinkId:supplierLinks.domestic},200,actor('domestic'))).operationId;
  await source('award',{planId:pid,partCode:'01',quoteId:qd,notes:'selected'},400,actor('ceo'));
@@ -75,7 +78,7 @@ async function detail(id,user){const go=()=>sourcing.GET(request('/api/sourcing?
  const domestic=await detail(pid,actor('domestic'));assert.equal(domestic.quotes.length,1);assert.equal(domestic.quotes[0].data.route,'domestic');
  await source('award',{planId:pid,partCode:'01',quoteId:qd,notes:'x'},400,actor('ceo'));
  const awardBody={id:crypto.randomUUID(),planId:pid,revision:current(pid).revision,partCode:'01',quoteId:qf,notes:'best landed cost, approved technical spec'};
- const race=await Promise.all([awardBody,{...awardBody,id:crypto.randomUUID(),quoteId:qd}].map(body=>context.run(actor('ceo'),()=>sourcing.POST(request('/api/sourcing','POST',{id:body.id,mode:'award',revision:body.revision,...body})))));assert.deepEqual(race.map(r=>r.status).sort(),[200,409]);const winner=entities('purchase_order')[0];const order=winner.id;assert.equal(order,awardBody.id);await source('award',awardBody,200,actor('ceo'));
+ const race=await Promise.all([awardBody,{...awardBody,id:crypto.randomUUID(),quoteId:qd}].map(body=>context.run(actor('ceo'),()=>sourcing.POST(request('/api/sourcing','POST',{id:body.id,mode:'award',revision:body.revision,...body})))));assert.deepEqual(race.map(r=>r.status).sort(),[200,409]);const winner=entities('purchase_order')[0];const order=winner.id;assert.equal(order,awardBody.id);const awardReplay=await context.run(actor('ceo'),()=>sourcing.POST(request('/api/sourcing','POST',{id:awardBody.id,mode:'award',revision:awardBody.revision,...awardBody})));assert.equal(awardReplay.status,200);
  assert.equal(entities('purchase_order').length,1);assert.equal(entities('purchase_order')[0].data.route,'foreign');assert.equal(entities('purchase_order')[0].data.quantity,6000);
  await source('award',{planId:pid,partCode:'01',quoteId:qd,notes:'another purchase route'},409,actor('ceo'));
  await source('issue_order',{planId:pid,orderId:order,reference:'F1'},400,actor('finance'));
@@ -99,7 +102,7 @@ async function detail(id,user){const go=()=>sourcing.GET(request('/api/sourcing?
  arrival=entities('receipt').filter(r=>r.data.purchaseOrderId===order).find(r=>r.data.state==='pending_qc');await op('incoming_qc',{receiptId:arrival.id,accepted:'3',rejected:'0',values:{purity:'94'},notes:'pass'});await op('shelve',{receiptId:arrival.id,location:'A-1-1-3'});
  await source('close_order',{planId:pid,orderId:order,notes:'fully accepted'},200,actor('inventory'));
  assert.equal((await detail(pid)).lines[0].stock,10000);await source('ready',{planId:pid,notes:'all stock checked'},200,actor('inventory'));
- await source('release',{planId:pid,reference:'PRODUCTION-PLAN-1',notes:'handed to production'},200,actor('inventory'));assert.equal(sql.prepare('SELECT COUNT(*) n FROM sourcing_holds WHERE plan_id=?').get(pid).n,0);assert.equal(stock(stocked.id,'raw'),4000);
+ await source('release',{planId:pid,reference:'PRODUCTION-PLAN-1',notes:'handed to production'},200,actor('inventory'));assert.equal(sql.prepare('SELECT COUNT(*) n FROM sourcing_holds WHERE plan_id=?').get(pid).n,0);assert.equal(stock(stocked.id,'line'),4000);
  // Missing BOM goes to R&D and resumes only with a matching real BOM.
  const p2=await create('product',{code:'SUP2',name:'No BOM',group:'سایر تجهیزات پزشکی',model:'M',warrantyMonths:'12',status:'فعال'}),missing=(await source('create',{productId:p2.id,count:1,origin:'customer',needBy:future,reference:'MISSING'})).planId;
  await source('approve',{planId:missing,count:1,needBy:future,notes:'approved'});assert.equal(current(missing).data.state,'waiting_bom');
@@ -140,8 +143,7 @@ async function detail(id,user){const go=()=>sourcing.GET(request('/api/sourcing?
  await op('material',{code:'99',name:'Pending material',unit:'عدد',specs:'QC',fields,revision:0});
  const pendingMaterial=entities('material').find(m=>m.data.code==='99');
  const pendingProduct=await create('product',{code:'PENDING-PRODUCT',name:'Pending test',group:'سایر تجهیزات پزشکی',model:'M',productionMode:'project',status:'فعال'});
- await operate({mode:'bom',productId:pendingProduct.id,previousVersion:0,lines:[{partCode:'99',name:'Pending material',unit:'عدد',quantity:'1'}]});
- await activate(pendingProduct.id,sql.prepare('SELECT id FROM bom_versions WHERE product_id=?').get(pendingProduct.id).id);
+ await operate({mode:'bom',productId:pendingProduct.id,previousVersion:0,lines:[{partCode:'99',name:'Pending material',unit:'عدد',quantity:'1'}]});await activate(pendingProduct.id,sql.prepare('SELECT id FROM bom_versions WHERE product_id=?').get(pendingProduct.id).id);
  await op('receipt',{materialId:pendingMaterial.id,day:today,quantity:'5',supplier:'Pending supplier'});
  const waitingReceipt=entities('receipt').find(r=>r.data.materialId===pendingMaterial.id);
  const pendingPlans=[];for(const ref of ['WAIT-A','WAIT-B'])pendingPlans.push((await source('create',{productId:pendingProduct.id,count:4,origin:'forecast',needBy:future,reference:ref})).planId);

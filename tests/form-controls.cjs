@@ -30,6 +30,7 @@ const snapshot=id=>JSON.parse(sql.prepare("SELECT data FROM flow_entities WHERE 
 async function op(mode,body,u=admin){const id=body.id||crypto.randomUUID(),r=await invoke(u,flow.POST,'/api/flow',{id,mode,...body});assert.equal(r.status,200,JSON.stringify(r));return id;}
 const document=(target,code,revision='00',productId='')=>basic('document',{productId,ownerId:'qa',reviewerId:'qa2',formTarget:target,formRevision:revision,values:{...values('document'),code,effective:'2026-01-01'}});
 async function publish(id){await success(qa,id,'submit');await success(qa2,id,'approve');}
+const receivingFixture=require('./helpers/receiving-warehouse.cjs')(sql);
 (async()=>{
  sql.prepare("INSERT INTO records(id,kind,payload,created) VALUES('p1','product',?,?)").run(JSON.stringify({name:'Synthetic product',code:'P1',status:'فعال'}),now);
  const doc=await ok(qa,document('flow.incoming_qc','QC-F-01'));

@@ -23,8 +23,8 @@ async function profile(admin,id,roles,status='active'){const row=userRow(id),per
 (async()=>{
  identity=owner;const admin=await auth.session(),now=new Date().toISOString();
  for(const id of ['i1','i2','q1','q2','q3'])sql.prepare("INSERT INTO app_members(id,email,name,unit,status,permissions,revision,created,updated) VALUES(?,?,?,'Staff','active',?,1,?,?)").run(id,id+'@test.local',id,JSON.stringify({read:[],write:[],eventStages:[]}),now,now);
- const definition=name=>({revision:0,warehouseId:'',name,locations:['A-1-1-1'],active:true});
- await op(admin,'warehouse',definition('First'));await op(admin,'warehouse',definition('Second'));let [a,b]=entities('material_warehouse');
+ const definition=name=>({revision:0,warehouseId:'',name,warehouseType:'storage',directReceiptEnabled:true,locations:['A-1-1-1'],active:true});
+ await op(admin,'warehouse',definition('First'));await op(admin,'warehouse',definition('Second'));let [a,b]=entities('material_warehouse').filter(w=>!w.data.internalQuarantine);
  assert.equal(a.data.qcOwner,undefined);assert.equal(a.data.warehouseOwner,undefined);
  await profile(admin,'i1',[{warehouseId:a.id,role:'inventory'}]);await profile(admin,'i2',[{warehouseId:b.id,role:'inventory'}]);
  await profile(admin,'q1',[{warehouseId:a.id,role:'qc'}]);await profile(admin,'q3',[{warehouseId:b.id,role:'qc'}]);

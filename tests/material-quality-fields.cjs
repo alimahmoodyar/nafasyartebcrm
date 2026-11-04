@@ -16,6 +16,7 @@ async function mint(scope='read'){return (await (await tokens.POST(request('/api
 const flow=load('app/api/flow/route.ts'),context=load('lib/mcp/context.ts').mcpActor;
 const entities=t=>sql.prepare('SELECT * FROM flow_entities WHERE type=?').all(t).map(r=>({...r,data:JSON.parse(r.data)}));
 async function op(u,mode,args,status=200){const body={id:crypto.randomUUID(),confirmed:true,mode,...args},r=await context.run(u,()=>flow.POST(request('/api/flow','POST',body))),d=await r.json();assert.equal(r.status,status,JSON.stringify(d));return {body,d};}
+const receivingFixture=require('./helpers/receiving-warehouse.cjs')(sql);
 (async()=>{
  identity=owner;const admin=await auth.session(),quality=load('lib/quality.ts');
  const criterion=(label,type='result')=>({label,type,unit:'',min:'',max:'',required:true});
@@ -29,7 +30,7 @@ async function op(u,mode,args,status=200){const body={id:crypto.randomUUID(),con
  await op(admin,'incoming_qc',{receiptId:receipt.id,accepted:'5',values:{[appearance]:'pass',[weight]:'2.2'},notes:'Checked against receipt snapshot'});const checked=entities('receipt')[0];assert.equal(checked.data.qc.values[appearance],'pass');assert.equal(checked.data.qc.values[weight],'2.2');assert.equal(checked.data.state,'awaiting_warehouse');
  const count=entities('material').length;await op(admin,'material',{revision:0,code:'712',name:'Duplicate keys',unit:'عدد',specs:'',fields:[{...criterion('A'),key:'same'},{...criterion('B'),key:'same'}]},400);assert.equal(entities('material').length,count);
  const staff={userId:'viewer',name:'Viewer',isAdmin:false,permissions:{read:[],write:[],eventStages:[],flowRoles:['qc']}};await op(staff,'material',{revision:0,code:'713',name:'Denied',unit:'عدد',specs:'',fields},403);
- token=(await mint('read_write')).token;const params={id:crypto.randomUUID(),confirmed:true,revision:0,code:'714',name:'MCP criterion',unit:'عدد',specs:'',fields:[criterion('کنترل ظاهری')]};const saved=await call('save_material_master',params);assert.ok(!saved.error,JSON.stringify(saved));assert.ok(!(await call('save_material_master',params)).error);const mc=entities('material').find(m=>m.data.code==='714');assert.match(mc.data.fields[0].key,/^[a-z][a-z0-9_]{0,39}$/);assert.equal(mc.revision,1);
+ token=(await mint('read_write')).token;const params={id:crypto.randomUUID(),confirmed:true,revision:0,code:'714',kind:'raw',name:'MCP criterion',unit:'عدد',specs:'',fields:[criterion('کنترل ظاهری')]};const saved=await call('save_material_master',params);assert.ok(!saved.error,JSON.stringify(saved));assert.ok(!(await call('save_material_master',params)).error);const mc=entities('material').find(m=>m.data.code==='714');assert.match(mc.data.fields[0].key,/^[a-z][a-z0-9_]{0,39}$/);assert.equal(mc.revision,1);
  const readOnly=(await mint('read')).token;assert.ok((await call('save_material_master',{...params,id:crypto.randomUUID(),code:'715'},readOnly)).error);assert.equal(entities('material').length,2);
  assert.throws(()=>quality.qualityFields([criterion('Existing product contract')]),/معیار/,'Other quality templates still require their explicit internal keys');
  console.log('PASS material criterion identities: HTTP/MCP without keys, blank keys, uniqueness and retries, retained keys after reorder/rename, immutable receipt snapshots and prior QC results, role/read-scope denial, other template contracts unchanged.');
