@@ -6,7 +6,11 @@ export async function GET(){try{
  const needs:any[]=[],cases:any[]=[],tasks:any[]=[];
  for(const p of plans){const history=quotes.some(q=>q.data.planId===p.id)||orders.some(o=>o.data.planId===p.id);const active=['sourcing','ready'].includes(p.data.state);if(!active&&!history)continue;
   const covered=await coverage(p),lines=covered.filter(l=>l.routes?.includes('domestic'));
-  if(active)for(const step of nextWork(p,allQuotes,allOrders,covered).filter(s=>s.role==='domestic'))tasks.push({id:p.id+':'+step.key,planId:p.id,name:step.title,productName:p.data.productName,reference:p.data.reference,needBy:p.data.needBy});
+  if(active)for(const step of nextWork(p,allQuotes,allOrders,covered).filter(s=>s.role==='domestic')){
+   const line=lines.find(l=>step.key.startsWith('quote:'+l.partCode+':'+l.round+':domestic')),target=line?(p.data.supplierTargets||[]).find((t:any)=>t.partCode===line.partCode&&t.round===line.round&&t.route==='domestic'&&step.key.endsWith(':'+t.supplierId)):null;
+   const quote=line&&!step.key.endsWith(':missing')?{partCode:line.partCode,round:line.round,supplierLinkId:target?.linkId||''}:null;
+   tasks.push({id:p.id+':'+step.key,planId:p.id,name:step.title,productName:p.data.productName,reference:p.data.reference,needBy:p.data.needBy,quote});
+  }
   if(!lines.length&&!history)continue;cases.push({id:p.id,reference:p.data.reference,name:p.data.productName,needBy:p.data.needBy,state:p.data.state});
   if(active)for(const l of lines){if(l.shortage<=0||orders.some(o=>o.data.planId===p.id&&o.data.partCode===l.partCode&&!['closed','cancelled'].includes(o.data.state)))continue;
    needs.push({planId:p.id,reference:p.data.reference,productName:p.data.productName,needBy:p.data.needBy,partCode:l.partCode,name:l.name,unit:l.unit,shortage:l.shortage,round:l.round,quoted:quotes.some(q=>q.data.planId===p.id&&q.data.partCode===l.partCode&&q.data.round===l.round)});
