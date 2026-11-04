@@ -1,0 +1,35 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),ts=require('typescript');
+const {DatabaseSync}=require('node:sqlite');const root=path.resolve(__dirname,'..');const sql=new DatabaseSync(':memory:');sql.exec('PRAGMA foreign_keys=ON');for(const f of fs.readdirSync(path.join(root,'drizzle')).filter(f=>f.endsWith('.sql')&&(!process.env.TEST_PRE_PASSWORD_MIGRATION||f<'0017')).sort())sql.exec(fs.readFileSync(path.join(root,'drizzle',f),'utf8'));
+const db={prepare(q){let args=[];return{bind(...a){args=a;return this},async first(){return sql.prepare(q).get(...args)||null},async all(){return {results:sql.prepare(q).all(...args)}},async run(){return {meta:{changes:sql.prepare(q).run(...args).changes}}}}},async batch(stmts){sql.exec('BEGIN');try{const r=[];for(const s of stmts)r.push(await s.run());sql.exec('COMMIT');return r;}catch(e){sql.exec('ROLLBACK');throw e;}}};
+const objects=new Map();const bucket={async put(k,b){objects.set(k,b.slice(0));return {key:k}},async get(k){const b=objects.get(k);return b?{arrayBuffer:async()=>b.slice(0)}:null},async delete(k){objects.delete(k)}};
+let identity=null;const env={TRACE_OWNER_EMAIL:'owner@example.com',LLM_CONFIG_ENCRYPTION_KEY:require('node:crypto').randomBytes(32).toString('base64'),DB:db,BUCKET:bucket};
+let cookie="";const cache={};function load(file){file=path.resolve(root,file);if(cache[file])return cache[file];const exports={};cache[file]=exports;const source=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+vm.runInNewContext(source,{exports,require:n=>{if(n==='next/headers')return {cookies:async()=>({get:()=>cookie?{value:cookie}:undefined})};if(n==='cloudflare:workers')return {env};if(n==='@/app/chatgpt-auth')return {getChatGPTUser:async()=>identity};if(n.startsWith('@/')||n.startsWith('.')){const p=n.startsWith('@/')?path.join(root,n.slice(2)):path.resolve(path.dirname(file),n);return load(p+(path.extname(p)?'':'.ts'));}return require(n)},Response,Request,URL,URLSearchParams,Error,crypto:globalThis.crypto,Date,Intl,Set,Map,FormData,Blob,File,TextEncoder,TextDecoder,Uint8Array,ArrayBuffer,AbortController,ReadableStream,btoa,atob,setTimeout:(f,n)=>setTimeout(f,Math.min(n,10)),clearTimeout,console},{filename:file});return exports;}
+const auth=load('lib/authorization.ts'),http=load('app/mcp/route.ts'),sse=load('lib/mcp/sse.ts'),tokens=load('app/api/mcp-tokens/route.ts'),configs=load('app/api/llm-config/route.ts'),secrets=load('lib/llm-secrets.ts'),catalog=load('lib/mcp/tools.ts');
+const base='https://test.local';const owner={userId:'owner',email:'owner@example.com',displayName:'Owner',fullName:null};
+const request=(path,method='GET',body,headers={})=>new Request(base+path,{method,headers:{origin:base,...(body?{'Content-Type':'application/json'}:{}),...headers},...(body?{body:JSON.stringify(body)}:{})});
+const rpc=(method,params={},id=1)=>({jsonrpc:'2.0',method,params,id});
+let token;
+async function call(name,args={},key=token){const r=await http.POST(request('/mcp','POST',rpc('tools/call',{name,arguments:args}),key?{authorization:'Bearer '+key}:{}));assert.equal(r.status,200);const d=await r.json();if(d.result?.isError)return {error:d.result.content[0].text};return JSON.parse(d.result.content[0].text);}
+async function mint(scope='read'){return (await (await tokens.POST(request('/api/mcp-tokens','POST',{name:'test',scope,days:1}))).json());}
+
+const userApi=load('app/api/users/route.ts'),login=load('app/api/auth/login/route.ts'),credentials=load('app/api/auth/credentials/route.ts'),pw=load('lib/password-auth.ts');
+const permissions={read:['batch'],write:[],eventStages:[],finance:'none'},password='Test-password-123';
+async function create(username,status=201){cookie='';identity=owner;const r=await userApi.POST(request('/api/users','POST',{username,password,name:'User',status:'active',permissions}));const d=await r.json();assert.equal(r.status,status,JSON.stringify(d));return d.member;}
+async function enter(username,pass=password,status=200){cookie='';identity=null;const r=await login.POST(request('/api/auth/login','POST',{username,password:pass}));assert.equal(r.status,status,await r.clone().text());return r;}
+(async()=>{
+ identity=owner;const admin=await auth.session();
+ for(const name of ['ع','کاربر فارسی','انبار‌مرکزی','+کاربر/۱@دفتر','7','é','漢','Mixed Name','x'.repeat(100)]){const m=await create(name);assert.equal(m.username,pw.username(name));await enter(' '+name+' ');}
+ assert.equal(pw.username('AbC.Name'),'abc.name','Existing ASCII normalization stays compatible');
+ for(const bad of ['', '   ', '\u200c', 'x'.repeat(101),'bad\nname','bad\u0000name','bad\u202ename','@deleted:someone'])assert.throws(()=>pw.username(bad));
+ await create(' کاربر فارسی ',409);await create('E\u0301',409);await create('MIXED NAME',409);
+ const short=await create('_');await enter('_','Wrong-password',401);
+ // The same server validator is used for admin rename and subsequent login.
+ identity=owner;const rename=await userApi.PATCH(request('/api/users','PATCH',{id:short.id,revision:short.revision,username:'نام تازه با فاصله',name:short.name,unit:short.unit,status:'active',permissions:short.permissions,password:''}));assert.equal(rename.status,200,await rename.clone().text());
+ await enter('_',password,401);const signed=await enter('نام تازه با فاصله');cookie=signed.headers.get('set-cookie').match(/session=([^;]+)/)[1];const u=await auth.session();assert.equal(u.userId,'local:'+short.id);const version=sql.prepare('SELECT version FROM password_accounts WHERE member_id=?').get(short.id).version;
+ const own=await credentials.POST(request('/api/auth/credentials','POST',{username:'ف',currentPassword:password,newPassword:'',confirmed:true},{'x-profile-account':u.userId}));assert.equal(own.status,200,await own.clone().text());assert.equal(sql.prepare('SELECT version FROM password_accounts WHERE member_id=?').get(short.id).version,version+1);assert.equal(await pw.localSession(),null,'Renaming still revokes existing sessions');await enter('ف');
+ identity=owner;cookie='';const mc=await catalog.executeTool('create_password_user',{confirmed:true,username:'حساب فارسی MCP با فاصله '+ 'الف'.repeat(15),password,name:'MCP user',unit:'Staff',status:'active',permissions},base,{user:admin,scope:'write',tokenId:null});assert.ok(mc.member);await enter(mc.member.username);
+ assert.equal(catalog.tools.find(t=>t.name==='create_password_user').inputSchema.properties.username.maxLength,100);
+ const leaks=JSON.stringify(sql.prepare('SELECT * FROM access_audit').all());assert.ok(!leaks.includes(password),'Password protections unchanged');
+ console.log('PASS flexible usernames: Persian/single-character/Unicode/spaces/symbols/100 characters, canonical uniqueness, legacy ASCII case folding, correct login, invalid controls/reserved names, admin/self rename revocation, HTTP/MCP parity and no password leakage.');
+})().catch(e=>{console.error(e);process.exitCode=1});

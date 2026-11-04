@@ -776,7 +776,7 @@ export const toolFieldTitles:Record<string,Record<string,string>>={
     "source": "نام سامانه / منبع قبلی",
     "expectedDebt": "جمع بدهی باز در منبع، ریال",
     "expectedCredit": "جمع اعتبار در منبع، ریال",
-    "username": "نام کاربری انگلیسی",
+    "username": "نام کاربری دلخواه",
     "count": "تعداد این حواله",
     "packages": "تعداد بسته دریافت‌شده",
     "result": "نتیجه"

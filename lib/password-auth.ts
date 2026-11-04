@@ -3,7 +3,16 @@ import {cookies} from 'next/headers';
 import {storage} from './storage';
 import {allPermissions,validatePermissions,type Session} from './permissions';
 export const cookieName='__Host-nafasyar-session';
-export function username(value:unknown){const v=typeof value==='string'?value.trim().toLowerCase():'';if(!/^[a-z0-9][a-z0-9._-]{2,39}$/.test(v))throw new Error('نام کاربری باید ۳ تا ۴۰ حرف انگلیسی، عدد، نقطه، خط تیره یا زیرخط باشد.');return v;}
+// The same canonical value is used for creation, edits, uniqueness and login.
+// Keep existing ASCII logins case-insensitive and allow ordinary Unicode names.
+export function username(value:unknown){
+ const v=typeof value==='string'?value.trim().normalize('NFC').toLowerCase():'';
+ if(!v||!v.replace(/[\s\u200c]/g,''))throw new Error('نام کاربری را وارد کنید.');
+ if(v.length>100)throw new Error('نام کاربری حداکثر ۱۰۰ نویسه باشد.');
+ // Persian ZWNJ is valid; control/bidi characters and internal deletion markers are not user names.
+ if(/[\p{Cc}\p{Cf}]/u.test(v.replace(/\u200c/g,''))||v.startsWith('@deleted:'))throw new Error('این نام کاربری قابل استفاده نیست.');
+ return v;
+}
 export function password(value:unknown){if(typeof value!=='string'||value.length<10||value.length>128)throw new Error('رمز عبور باید بین ۱۰ تا ۱۲۸ نویسه باشد.');return value;}
 const hex=(b:ArrayBuffer|Uint8Array)=>Array.from(new Uint8Array(b)).map(n=>n.toString(16).padStart(2,'0')).join('');
 export async function digest(v:string){return hex(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(v)));}

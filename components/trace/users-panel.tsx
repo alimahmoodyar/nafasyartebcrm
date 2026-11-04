@@ -80,7 +80,7 @@ export function UsersPanel({owner}: {owner: Session}) {
     </div>
     <Dialog open={open} onOpenChange={v => {if (!busy) {setOpen(v);if (!v) {setPassword("");setShowPassword(false);}}}}><DialogContent className="modal sm:max-w-2xl"><DialogTitle style={{paddingRight: 24}}>{editing ? "ویرایش حساب" : "تعریف حساب کارکنان"}</DialogTitle><DialogDescription>مشخصات فرد را وارد کنید؛ دسترسی را با انتخاب مسئولیت‌ها یا انتخاب دستی آیکون‌ها و کارهای مجاز تعیین کنید.</DialogDescription><form onSubmit={save}><div className="formgrid">
       <label className="field">نام و نام خانوادگی<NumberInput fieldKey={"name"} required maxLength={100} value={name} onChange={e => setName(e.target.value)}/></label>
-      {(!editing||editing.username)?<><label className="field">نام کاربری<NumberInput fieldKey={"username"} autoComplete="off" required dir="ltr" maxLength={40} value={username} onChange={e=>setUsername(e.target.value)}/></label>
+      {(!editing||editing.username)?<><label className="field">نام کاربری دلخواه<NumberInput fieldKey={"username"} autoComplete="off" required dir="auto" maxLength={100} value={username} onChange={e=>setUsername(e.target.value)}/></label>
         <div className="field">
           <label htmlFor="user-account-password">{editing?"رمز جدید (خالی بماند = بدون تغییر)":"رمز عبور"}</label>
           <div className="account-password-input">
