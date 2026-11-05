@@ -5,6 +5,7 @@ const react={...React,useState:init=>{const i=cursor++;if(!(i in slots))slots[i]
 const user={userId:'real-user',name:'Company user',username:'user',isAdmin:true,authType:'password',permissions:{read:['product','batch'],write:['product'],eventStages:[]}};
 const nav=[{key:'product',title:'Products'},{key:'warehouse',title:'Warehouse'},{key:'device',title:'Devices'}];
 const modules={
+ '@/lib/finance-workspace':{financeHomeApps:a=>a,financeHomeAliases:()=>({})},
  '@/lib/manual-permissions-catalog':{manualPermissionSections:nav},
  '@/lib/navigation-access':{warehouseHomeApps:a=>a,warehouseHomeAliases:()=>({}),canOpenSection:()=>true,sectionDestination:(_u,section,target)=>({section,target}),workflowSectionTitle:(_u,_key,title)=>title},
  '@/lib/service-navigation':{serviceHomeApps:a=>a},'@/lib/financial-access':{financialAccess:()=>false},

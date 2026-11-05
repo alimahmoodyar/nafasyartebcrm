@@ -1,3 +1,4 @@
+import {financeStandaloneSections,financeTarget} from './finance-workspace';
 import {accessPermissions} from './permissions';
 import {programsForRoles,selfServicePrograms} from './workflow-programs';
 import {financialWorkflowRole} from './financial-workflow-roles';
@@ -64,6 +65,7 @@ export function canOpenSection(user:Session,s:string):boolean{
 
 // Hidden personal asset entry points still support authorized task/deep links.
 export function sectionDestination(user:Session,section:string,target=''){
+ if(user.isAdmin&&financeStandaloneSections.includes(section as any)&&canOpenSection(user,section))return {section:'finance',target:financeTarget(section,target)};
  const p=accessPermissions(user.permissions);
  if(warehouseLegacySections.includes(section as any)&&canOpenSection(user,section)&&canOpenSection(user,'warehouse'))return {section:'warehouse',target:warehouseTarget(section,target)};
  if(section==='assets'&&!user.isAdmin&&!p.assetRoles?.includes('custodian')&&!p.hospitalCenterId&&!p.salesAgentId&&!p.serviceAgentId)return {section:'personnel',target:'asset:'+target};
