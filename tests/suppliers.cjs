@@ -149,6 +149,32 @@ async function supplier(mode,b={},status=200,user=actor('domestic')){const body=
  assert.equal(entities('supplier').length,beforeBad);
  assert.ok(catalog.tools.find(t=>t.name==='save_supplier').inputSchema.properties.linkMaterialId);
 
+
+ // A buyer can add a new pending source to this round without rewriting another source or quote.
+ const syncPlan=(await source('direct_request',{materialId:material.id,materialRevision:entities('material').find(x=>x.id===material.id).revision,quantity:'3',needPriority:'normal',needBy:future,confirmed:true},200,actor('inventory'))).planId;
+ const late=await supplier('supplier',{route:'domestic',kind:'manufacturer',active:true,name:'Late RFQ supplier',country:'ایران',contact:'Contact',phone:'02122222222',linkMaterialId:material.id});
+ const lateLink=entities('supplier_material').find(x=>x.data.supplierId===late.id),priorPlan=current(syncPlan),priorRound=priorPlan.data.lines[0].round,priorTargets=priorPlan.data.supplierTargets.filter(t=>!t.missing),beforeQuotes=JSON.stringify(entities('sourcing_quote'));
+ const argsSync={planId:syncPlan,partCode:material.data.code,round:priorRound,route:'domestic',confirmed:true,notes:'New linked source'};
+ await source('sync_rfq_suppliers',{...argsSync,confirmed:false},400,actor('domestic'));
+ await source('sync_rfq_suppliers',argsSync,403,actor('finance'));
+ await source('sync_rfq_suppliers',{...argsSync,round:99},409,actor('domestic'));
+ const resultSync=await source('sync_rfq_suppliers',argsSync,200,actor('domestic'));
+ const afterSync=current(syncPlan);assert.equal(afterSync.data.lines[0].round,priorRound);assert.equal(afterSync.data.supplierTargets.filter(t=>t.linkId===lateLink.id).length,1);for(const old of priorTargets)assert.deepEqual(afterSync.data.supplierTargets.find(t=>t.linkId===old.linkId),old);assert.equal(JSON.stringify(entities('sourcing_quote')),beforeQuotes);assert.equal(entities('supplier_material').find(x=>x.id===lateLink.id).data.status,'pending');
+ const retry=await context.run(actor('domestic'),()=>sourcing.POST(request('/api/sourcing','POST',{id:resultSync.operationId,mode:'sync_rfq_suppliers',warehouseId:receivingFixture.id,revision:priorPlan.revision,...argsSync})));assert.equal(retry.status,200);assert.equal((await retry.json()).repeated,true);
+ const syncToolArgs={id:crypto.randomUUID(),planId:syncPlan,revision:afterSync.revision,partCode:material.data.code,round:priorRound,route:'domestic',confirmed:true,notes:'Same source retry through MCP'};
+ await assert.rejects(()=>catalog.executeTool('sync_rfq_suppliers',syncToolArgs,base,{user:actor('domestic'),scope:'read',tokenId:null}),/read-only/);
+ await catalog.executeTool('sync_rfq_suppliers',syncToolArgs,base,{user:actor('domestic'),scope:'read_write',tokenId:null});assert.equal(current(syncPlan).data.supplierTargets.filter(t=>t.linkId===lateLink.id).length,1);
+
+ await op('material',{code:'02',name:'Unlinked RFQ material',unit:'عدد',specs:'Spec2',fields:[{key:'quality',label:'Quality',type:'number',unit:'%',min:'90',max:'100',required:true}]});const otherMaterial=entities('material').find(m=>m.data.code==='02');
+ await source('routes',{materialId:otherMaterial.id,revision:otherMaterial.revision,routes:['domestic','foreign']},200,actor('engineering'));
+ const emptyPlan=(await source('direct_request',{materialId:otherMaterial.id,materialRevision:entities('material').find(x=>x.id===otherMaterial.id).revision,quantity:'1',needPriority:'normal',confirmed:true},200,actor('inventory'))).planId;
+ const foreignMissing=current(emptyPlan).data.supplierTargets.find(t=>t.route==='foreign');
+ const found=await supplier('supplier',{route:'domestic',kind:'manufacturer',active:true,name:'Found supplier',country:'ایران',contact:'C',phone:'02133333333',linkMaterialId:otherMaterial.id});
+ await source('sync_rfq_suppliers',{planId:emptyPlan,partCode:'02',round:1,route:'domestic',confirmed:true},200,actor('domestic'));
+ assert.ok(!current(emptyPlan).data.supplierTargets.some(t=>t.route==='domestic'&&t.missing));assert.deepEqual(current(emptyPlan).data.supplierTargets.find(t=>t.route==='foreign'),foreignMissing);assert.equal(current(emptyPlan).data.lines[0].round,1);
+ const foundLink=entities('supplier_material').find(l=>l.data.supplierId===found.id);
+ await source('quote',{planId:emptyPlan,partCode:'02',route:'domestic',supplierLinkId:foundLink.id,unitPrice:'100',extrasRial:'0',costNotes:'Included',eta:later,validUntil:future,paymentTerms:'Cash',specs:'Spec2',reference:'NEW-Q'},200,actor('domestic'));
+ await assert.rejects(()=>domain.checkSupplierPurchase(foundLink.id,otherMaterial.id,'domestic',1000),/صلاحیت/);
  assert.equal(sql.prepare('PRAGMA foreign_key_check').all().length,0);
  console.log('Supplier workflow passed: permissions, confirmation, idempotency, unique links, evidence, null ratings, task contacts, real-action completion, all-target responses, finance gate, conditional ceiling, suspension/requalification at issue, receipt metrics, privacy and MCP.');
 })().catch(e=>{console.error(e);process.exit(1)});

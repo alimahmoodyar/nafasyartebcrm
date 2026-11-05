@@ -68,7 +68,7 @@ export async function POST(request:Request){try{checkOrigin(request);const u=awa
  }else{
  plan=await get(req(b.planId),'sourcing_plan');if(b.revision!==plan.revision)fail('پرونده تغییر کرده؛ تازه‌سازی کنید.',409);if(['cancelled','rejected','released','completed'].includes(plan.data.state))fail('پرونده بسته است.');const d=plan.data;
  async function enforceOwner(role:string){if(u.isAdmin||!d.workOwners?.[role])return;const mid=await memberId(u),owner:any=await db.prepare("SELECT * FROM app_members WHERE id=?").bind(d.workOwners[role]).first();if(!owner||!supplyRoleMember(owner,role))fail('مسئول قبلی دیگر مجاز نیست؛ ابتدا مسئولیت مرحله را دوباره تعیین یا بپذیرید.',409);if(owner.id!==mid)fail('این مرحله به مسئول دیگری سپرده شده؛ مدیر می‌تواند مسئول را تغییر دهد.',403);guard("EXISTS(SELECT 1 FROM app_members WHERE id=? AND status='active' AND permissions=?)",owner.id,owner.permissions);}
- const actionRole:Record<string,string>={procurement_progress:'domestic',procurement_decision:'engineering',quote:b.route,technical:'engineering',financial_review:'finance',finance:'finance',issue_order:'finance',repair_supplier:'finance',resolve_order:'ceo',close_order:'inventory',finish_replenishment:'inventory',calculate:'inventory',inventory_confirm:'inventory',award:'ceo',cancel_order:'ceo'};if(actionRole[mode])await enforceOwner(actionRole[mode]);
+ const actionRole:Record<string,string>={procurement_progress:'domestic',procurement_decision:'engineering',sync_rfq_suppliers:b.route,quote:b.route,technical:'engineering',financial_review:'finance',finance:'finance',issue_order:'finance',repair_supplier:'finance',resolve_order:'ceo',close_order:'inventory',finish_replenishment:'inventory',calculate:'inventory',inventory_confirm:'inventory',award:'ceo',cancel_order:'ceo'};if(actionRole[mode])await enforceOwner(actionRole[mode]);
  if(isMaterialSupply(plan)&&['approve','reject','bom','calculate','ready','release'].includes(mode))fail('از تأیید موجودی یا پایان تأمین همین پرونده استفاده کنید.');
  if(mode==='assign_owner'||mode==='claim_work'){
  if(b.confirmed!==true)fail('تأیید مسئولیت لازم است.');
@@ -108,6 +108,21 @@ export async function POST(request:Request){try{checkOrigin(request);const u=awa
  }else if(mode==='finance'){
  needSupply(u,'finance');if(d.state==='pending')fail('ابتدا مدیرعامل برنامه را تأیید کند.');if(!['planned','approved'].includes(b.status))fail('وضعیت مالی معتبر نیست.');const budget=rial(b.budgetRial),orders=(await supplyEntities('purchase_order')).filter(o=>o.data.planId===plan.id&&!['awaiting_funding','cancelled'].includes(o.data.state));const committed=orders.reduce((sum,o)=>sum+BigInt(o.data.totalRial),BigInt(0));if(BigInt(budget)<committed)fail('بودجه کمتر از خریدهای صادرشده است.');d.finance={status:b.status,budgetRial:budget,availableOn:day(b.availableOn),notes:req(b.notes,4000),by:u.userId,at:now};
  }else if(mode==='calculate'){needSupply(u,'inventory');await calculateMaterials(plan,req(b.notes,4000));
+ }else if(mode==='sync_rfq_suppliers'){
+ const route=req(b.route);if(!['domestic','foreign'].includes(route))fail('مسیر معتبر نیست.');needSupply(u,route);
+ if(b.confirmed!==true||d.state!=='sourcing')fail('تأیید به‌روزرسانی منابع در استعلام فعال لازم است.');
+ const l=(await coverage(plan)).find((x:any)=>x.partCode===b.partCode);
+ if(!l||l.shortage<=0||!l.routes.includes(route)||['technical','design'].includes(l.procurement?.status)||b.round!==l.round)fail('ردیف یا دور استعلام تغییر کرده است.',409);
+ if((await supplyEntities('purchase_order')).some(o=>o.data.planId===plan.id&&o.data.partCode===l.partCode&&!['closed','cancelled'].includes(o.data.state)))fail('برای این ردیف سفارش فعال وجود دارد.');
+ const m=await get(l.materialId,'material');if(m.data.unit!==l.unit||(m.data.specs||'')!==(l.specs||'')||(m.data.designVersion||0)!==(l.designVersion||0))fail('مشخصات کالا تغییر کرده؛ مهندسی دور تازه استعلام را ثبت کند.',409);
+ const current=(d.supplierTargets||[]),same=(t:any)=>t.partCode===l.partCode&&t.round===l.round&&t.route===route;
+ const candidates=(await buildSupplierTargets([{...l,routes:[route]}])).filter((t:any)=>!t.missing);
+ const added=[];for(const t of candidates){if(current.some((old:any)=>same(old)&&old.linkId===t.linkId))continue;
+ const link=await get(t.linkId,'supplier_material'),supplier=await get(t.supplierId,'supplier');
+ if(link.data.materialId!==l.materialId||link.data.supplierId!==supplier.id||supplier.data.route!==route||!supplier.data.active||['suspended','rejected'].includes(link.data.status))fail('منبع هم‌زمان تغییر کرده است.',409);
+ added.push({...t,name:supplier.data.name,contact:supplier.data.contact,phone:supplier.data.phone,email:supplier.data.email,messenger:supplier.data.messenger,status:link.data.status});}
+ d.supplierTargets=[...current.filter((t:any)=>!(same(t)&&t.missing&&(added.length||current.some((x:any)=>same(x)&&!x.missing)))),...added];
+ // Add sources only: preserve rounds, quotes, decisions and all unrelated lines/routes.
  }else if(mode==='refresh_suppliers'){
  needSupply(u,'engineering');if(d.state!=='sourcing')fail('پرونده در مرحله استعلام نیست.');if((await supplyEntities('purchase_order')).some(o=>o.data.planId===plan.id&&!['closed','cancelled'].includes(o.data.state)))fail('ابتدا سفارش‌های باز را تعیین تکلیف کنید.');
  const freshLines=await coverage(plan);for(const l of freshLines){const m=await get(l.materialId,'material');if(m.data.unit!==l.unit)fail('واحد کالا تغییر کرده؛ محاسبه نیاز دوباره انجام شود.');l.specs=m.data.specs||'';l.materialRevision=m.revision;l.designVersion=m.data.designVersion||0;l.routes=l.procurement?.routesOverride||m.data.sourcingRoutes||[];l.round=(l.round||0)+1;}d.lines=freshLines;
