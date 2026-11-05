@@ -58,7 +58,7 @@ export function canOpenSection(user:Session,s:string):boolean{
  if(['users','llm','finance','system-reset'].includes(s))return false;
  if(s==='fulfillment')return warehouseAccess(u,'finished')||salesStaff(u)||!!p.salesAgentId||!!p.flowRoles?.some(r=>['inventory','production','sales','logistics'].includes(r));
  if(s==='flow')return !!p.warehouseResponsibilities?.length||!!p.flowRoles?.some(r=>['inventory','qc','production','procurement'].includes(r))||!!p.supplyRoles?.includes('engineering');
- if(s==='finance-control')return financialAccess(u,'control');
+ if(s==='finance-control')return financialAccess(u,'control')||financialAccess(u,'purchase');
  return can(u,(s==='inventory'?'batch':['serials','analytics'].includes(s)?'device':s) as Kind,'read');
 }
 

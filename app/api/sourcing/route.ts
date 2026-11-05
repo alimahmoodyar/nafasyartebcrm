@@ -1,3 +1,4 @@
+import {sourcingReviewInbox} from '@/lib/sourcing-review-inbox';
 import {quoteValidity} from '@/lib/quote-validity';
 import {domesticFreight} from '@/lib/domestic-freight';
 import {addDeliveryDays,deliveryDaysInput,hasDeliveryDays,needsPurchaseConfirmation,quoteEstimatedEta} from '@/lib/sourcing-delivery';
@@ -24,22 +25,7 @@ function requestPriority(value:unknown){if(typeof value!=='string'||!supplyPrior
 function requestNeedBy(priority:typeof supplyPriorities[number],value:unknown){const today=dayAt();if(priority==='planned'){const target=day(value);if(target<today)fail('تاریخ مدنظر تأمین در گذشته نباشد.');return target;}const offset=priority==='critical'?0:priority==='urgent'?3:7;const target=new Date(today+'T12:00:00Z');target.setUTCDate(target.getUTCDate()+offset);return target.toISOString().slice(0,10);}
 export async function GET(request:Request){try{const u=await requireAccess();if(!Object.keys(supplyRoles).some(r=>hasSupply(u,r))&&!productionRequestAccess(u).canCreate&&!technicalAuthorities(u).length)fail('دسترسی برنامه تأمین ندارید.',403);const db=storage(),params=new URL(request.url).searchParams,planId=params.get('id');
  const plans=await supplyEntities('sourcing_plan');
- if(params.get('engineeringInbox')==='1'){
-  needSupply(u,'engineering');
-  const [quotes,orders]=await Promise.all([supplyEntities('sourcing_quote'),supplyEntities('purchase_order')]);
-  const items:any[]=[];
-  for(const p of plans){
-   const pq=quotes.filter(q=>q.data.planId===p.id),po=orders.filter(o=>o.data.planId===p.id),lines=await coverage(p);
-   const steps=nextWork(p,pq,po,lines).filter(step=>step.role==='engineering');
-   for(const step of steps){
-    if(step.key.startsWith('technical:')){
-     const [,partCode,roundValue]=step.key.split(':'),line=lines.find(l=>l.partCode===partCode),round=Number(roundValue);
-     for(const quote of pq.filter(q=>q.data.partCode===partCode&&q.data.round===round&&q.data.technical==='pending'&&!q.data.unavailable))items.push({id:quote.id,planId:p.id,planRevision:p.revision,taskKey:step.key,taskTitle:step.title,productName:p.data.productName,partCode,materialName:line?.name||partCode,unit:line?.unit||quote.data.unit||'',quantity:quote.data.quantity||'',supplier:quote.data.supplier||'',route:quote.data.route,round,technical:'pending',specs:quote.data.specs||line?.specs||'',created:quote.created||''});
-    }else items.push({id:p.id+':'+step.key,planId:p.id,planRevision:p.revision,taskKey:step.key,taskTitle:step.title,productName:p.data.productName,technical:'action'});
-   }
-  }
-  return json({items,count:items.length});
- }
+ if(params.has('reviewInbox')||params.get('engineeringInbox')==='1'){const workspace=params.get('engineeringInbox')==='1'?'engineering':params.get('reviewInbox');if(workspace==='engineering'||workspace==='finance')return json(await sourcingReviewInbox(u,plans,workspace,planId||''));fail('کارتابل بررسی معتبر نیست.');}
  if(!planId){
  const staff=(await db.prepare("SELECT * FROM app_members WHERE status='active'").all()).results as any[],policy=(await replenishmentPolicy()).data,quotes=await supplyEntities('sourcing_quote'),orders=await supplyEntities('purchase_order');
  const staffingWarnings=(u.isAdmin||hasSupply(u,'ceo')||hasSupply(u,'commerce_manager'))?plans.flatMap(p=>nextWork(p,quotes,orders,p.data.lines||[]).filter(step=>supplyAssignment(p,step,staff,policy).missingOwner).map(step=>({planId:p.id,title:p.data.productName,role:step.role,step:step.title}))):[];
