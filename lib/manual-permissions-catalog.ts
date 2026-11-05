@@ -41,6 +41,6 @@ export const manualPermissionSections = [
  {key:'firmware',title:'نسخه‌های نرم‌افزار',icon:FileCode2,group:'trace-firmware'},
  {key:'guarantees',title:'ضمانت‌نامه‌ها',icon:ClipboardCheck,group:'treasury'},
  {key:'finance-control',title:'کنترل مالی',icon:ClipboardCheck,group:'financial-control'},
- {key:'finance',title:'اتصال حسابداری',icon:Link2,ownerOnly:true},
+ {key:'finance',title:'مالی',icon:Link2,ownerOnly:true},
  {key:'users',title:'کاربران و دسترسی‌ها',icon:Users,ownerOnly:true},
 ] as const;

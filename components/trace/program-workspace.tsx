@@ -1,24 +1,25 @@
 "use client";
 import {Fragment,isValidElement,cloneElement,createContext,useCallback,useContext,useEffect,useLayoutEffect,useMemo,useRef,useState,type ReactNode,type ReactElement,type CSSProperties} from 'react';
-import {ArrowRight,Boxes,ClipboardList,ClipboardPlus,History,FileText,Users,Settings2,ChartNoAxesCombined,Wallet,Truck,Wrench,Factory,CalendarDays,BookOpen,Mail,ShieldCheck,type LucideIcon} from 'lucide-react';
+import {ArrowRight,Boxes,ClipboardList,ClipboardPlus,History,FileText,Users,Settings2,ChartNoAxesCombined,Wallet,Truck,Wrench,Factory,CalendarDays,BookOpen,Mail,Inbox,ShieldCheck,type LucideIcon} from 'lucide-react';
 import {PersonalHome} from './personal-home';
 import {createPortal} from 'react-dom';
 import {currentWorkspaceBack,type WorkspaceBackEntry} from '@/lib/workspace-back';
 
 const AccountContext=createContext<string|null>(null);
 const ActiveSectionContext=createContext('');
+const TaskNavigationContext=createContext<(()=>void)|null>(null);
 function publishWorkspaceBreadcrumb(accountId:string|null,section:string,segments:string[]){if(!accountId||!section)return;window.dispatchEvent(new CustomEvent('nafasyar-workspace-breadcrumb',{detail:{accountId,section,segments}}));}
 const RootBackContext=createContext<(()=>void)|null>(null);
 type BackRegistry={register:(entry:Omit<WorkspaceBackEntry,'order'>)=>()=>void;invalidate:()=>void;run:()=>void;entries:Map<number,WorkspaceBackEntry>;version:number};
 const BackRegistryContext=createContext<BackRegistry|null>(null);
-export function LayoutAccountProvider({accountId,children,onBack,activeSection=''}:{accountId:string;children:ReactNode;onBack?:()=>void;activeSection?:string}){
+export function LayoutAccountProvider({accountId,children,onBack,onOpenTasks,activeSection=''}:{accountId:string;children:ReactNode;onBack?:()=>void;onOpenTasks?:()=>void;activeSection?:string}){
  const inheritedBack=useContext(RootBackContext),inheritedRegistry=useContext(BackRegistryContext),entries=useRef(new Map<number,WorkspaceBackEntry>()),sequence=useRef(0),[version,setVersion]=useState(0),back=useRef(onBack||inheritedBack);
  back.current=onBack||inheritedBack;
  const invalidate=useCallback(()=>setVersion(n=>n+1),[]);
  const register=useCallback((entry:Omit<WorkspaceBackEntry,'order'>)=>{const id=++sequence.current;entries.current.set(id,{...entry,order:id});setVersion(n=>n+1);return()=>{entries.current.delete(id);setVersion(n=>n+1);};},[]);
  const run=useCallback(()=>{const current=currentWorkspaceBack([...entries.current.values()]);if(current)current.handler();else back.current?.();},[]);
  const registry=useMemo(()=>({register,invalidate,run,entries:entries.current,version}),[register,invalidate,run,version]);
- return <RootBackContext.Provider value={onBack||inheritedBack}><BackRegistryContext.Provider value={inheritedRegistry||registry}><ActiveSectionContext.Provider value={activeSection}><AccountContext.Provider value={accountId}>{children}</AccountContext.Provider></ActiveSectionContext.Provider></BackRegistryContext.Provider></RootBackContext.Provider>;
+ return <RootBackContext.Provider value={onBack||inheritedBack}><BackRegistryContext.Provider value={inheritedRegistry||registry}><TaskNavigationContext.Provider value={onOpenTasks||null}><ActiveSectionContext.Provider value={activeSection}><AccountContext.Provider value={accountId}>{children}</AccountContext.Provider></ActiveSectionContext.Provider></TaskNavigationContext.Provider></BackRegistryContext.Provider></RootBackContext.Provider>;
 }
 
 function useBackEntry(handler:()=>void,enabled:boolean,priority:number,modal=false){
@@ -63,7 +64,7 @@ export function subprogramIcon(key:string,title:string):LucideIcon{
  return ClipboardList;
 }
 export function ProgramWorkspace({programId,title,direct=false,children,status}:{programId:string;title:string;direct?:boolean;children:ReactNode;status?:ReactNode}){
- const parentNavigation=useContext(NavigationContext),rootBack=useContext(RootBackContext);
+ const parentNavigation=useContext(NavigationContext),rootBack=useContext(RootBackContext),openTasks=useContext(TaskNavigationContext);
  const accountId=useContext(AccountContext),activeSection=useContext(ActiveSectionContext),[menu,setMenu]=useState<Menu|null>(null),[showHome,setShowHome]=useState(!direct);
  const parentPath=useContext(ProgramPathContext),path=parentPath?parentPath+'/'+programId:programId;
  const register=useCallback((next:Menu|null)=>setMenu(next),[]);
@@ -77,7 +78,7 @@ export function ProgramWorkspace({programId,title,direct=false,children,status}:
  const backRef=useWorkspaceBack(()=>setShowHome(true),canLaunch&&!showHome);
  return <NavigationContext.Provider value={navigation}><div className="program-workspace" ref={backRef}>
  {status}
- {canLaunch&&showHome&&<PersonalHome key={accountId+path} accountId={accountId} name="" scope={path} title={title} greeting={false} shortTitles={false} apps={menu!.items.map(([key,label])=>({key,title:label,icon:subprogramIcon(key,label)}))} onNavigate={select}/>}
+ {canLaunch&&showHome&&<PersonalHome key={accountId+path} accountId={accountId} name="" scope={path} title={title} greeting={false} shortTitles={false} apps={[...menu!.items.map(([key,label])=>({key,title:label,icon:subprogramIcon(key,label)})),...(openTasks?[{key:'__role_inbox',title:'کارتابل',icon:Inbox,control:<button type="button" onClick={openTasks}/> }]:[])]} onNavigate={select}/>}
  <ProgramPathContext.Provider value={path+(menu?.value?'/'+menu.value:'')}><div className="program-workspace-content" hidden={canLaunch&&showHome}>{children}</div></ProgramPathContext.Provider>
  </div></NavigationContext.Provider>;
 }

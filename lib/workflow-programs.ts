@@ -13,7 +13,7 @@ export const roleWorkflowPrograms:Record<string,string[]>={
  qc:['qms','sourcing','flow','routine-production','build-projects','action'],
  domestic:['sourcing','transport'],foreign:['sourcing','transport'],commerce:['sourcing','transport'],
  domestic_commerce_lead:['sourcing','transport'],foreign_commerce_lead:['sourcing','transport'],
- purchase_finance:['build-projects','sourcing','treasury'],
+ purchase_finance:['build-projects','sourcing','treasury','finance-control'],
  finance:['costing','pricing','finance-control','transport'],
  ceo:['sales','build-intake','after-sales','hospital','sourcing','qms','routine-production','build-projects','pricing'],
  sales:['build-intake','sales','sourcing','fulfillment','transport'],

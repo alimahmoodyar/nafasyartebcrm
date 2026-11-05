@@ -1,3 +1,4 @@
+import {financeStandaloneSections,financeTarget} from './finance-workspace';
 import {accessPermissions} from './permissions';
 import {programsForRoles,selfServicePrograms} from './workflow-programs';
 import {financialWorkflowRole} from './financial-workflow-roles';
@@ -58,12 +59,13 @@ export function canOpenSection(user:Session,s:string):boolean{
  if(['users','llm','finance','system-reset'].includes(s))return false;
  if(s==='fulfillment')return warehouseAccess(u,'finished')||salesStaff(u)||!!p.salesAgentId||!!p.flowRoles?.some(r=>['inventory','production','sales','logistics'].includes(r));
  if(s==='flow')return !!p.warehouseResponsibilities?.length||!!p.flowRoles?.some(r=>['inventory','qc','production','procurement'].includes(r))||!!p.supplyRoles?.includes('engineering');
- if(s==='finance-control')return financialAccess(u,'control');
+ if(s==='finance-control')return financialAccess(u,'control')||financialAccess(u,'purchase');
  return can(u,(s==='inventory'?'batch':['serials','analytics'].includes(s)?'device':s) as Kind,'read');
 }
 
 // Hidden personal asset entry points still support authorized task/deep links.
 export function sectionDestination(user:Session,section:string,target=''){
+ if(user.isAdmin&&financeStandaloneSections.includes(section as any)&&canOpenSection(user,section))return {section:'finance',target:financeTarget(section,target)};
  const p=accessPermissions(user.permissions);
  if(warehouseLegacySections.includes(section as any)&&canOpenSection(user,section)&&canOpenSection(user,'warehouse'))return {section:'warehouse',target:warehouseTarget(section,target)};
  if(section==='assets'&&!user.isAdmin&&!p.assetRoles?.includes('custodian')&&!p.hospitalCenterId&&!p.salesAgentId&&!p.serviceAgentId)return {section:'personnel',target:'asset:'+target};
