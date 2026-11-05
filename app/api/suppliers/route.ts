@@ -24,7 +24,14 @@ export async function POST(request:Request){try{
  const get=async(eid:string,type:string)=>{const e=await supplierEntity(eid,type);guard('EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)',e.id,e.revision);return e;};
  const put=(eid:string,type:string,data:any,old?:any)=>statements.push(old?db.prepare('UPDATE flow_entities SET data=?,revision=revision+1,updated=? WHERE id=? AND revision=?').bind(JSON.stringify(data),now,eid,old.revision):db.prepare('INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?)').bind(eid,type,JSON.stringify(data),now,now));
  let target=id;
- if(mode==='technical'){
+ if(mode==='archive'||mode==='restore'){
+  const old=await get(req(b.supplierId),'supplier');target=old.id;
+  if(!supplierRoute(u,old.data.route))fail('مجوز مسیر تأمین را ندارید.',403);
+  if(b.revision!==old.revision)fail('پرونده تغییر کرده است.',409);
+  if((mode==='archive')===!!old.data.deletedAt)fail('وضعیت حذف پرونده تغییر کرده است.',409);
+  const reason=req(b.reason,3000),event={action:mode,reason,actor:u.userId,at:now};
+  put(old.id,'supplier',{...old.data,active:false,deletedAt:mode==='archive'?now:null,deletedBy:mode==='archive'?u.userId:null,deletionReason:mode==='archive'?reason:null,lifecycleHistory:[...(old.data.lifecycleHistory||[]),event]},old);
+ }else if(mode==='technical'){
   if(!['material','supplier_material'].includes(b.scope)||!['hold','release','change'].includes(b.decision))fail('دامنه و تصمیم فنی معتبر لازم است.');
   const e=await get(req(b.targetId),b.scope);if(b.revision!==e.revision)fail('نسخه کنترل فنی تغییر کرده است.',409);target=e.id;
   const reason=req(b.reason,3000),evidence=req(b.evidence,3000),controls={...(e.data.technicalControls||{})},previous=controls[b.authority];
@@ -39,13 +46,14 @@ export async function POST(request:Request){try{
   const linkMaterial=b.linkMaterialId?await get(req(b.linkMaterialId),'material'):null;
   if(linkMaterial&&b.supplierId)fail('اتصال هم‌زمان به کالا فقط برای تأمین‌کننده جدید است.');
 
-  const old=b.supplierId?await get(req(b.supplierId),'supplier'):null;if(old&&b.revision!==old.revision)fail('پرونده تغییر کرده است.',409);
+  const old=b.supplierId?await get(req(b.supplierId),'supplier'):null;if(old?.data.deletedAt)fail('برای ویرایش ابتدا پرونده حذف‌شده را بازیابی کنید.',409);if(old&&b.revision!==old.revision)fail('پرونده تغییر کرده است.',409);
   const route=req(b.route);if(!['domestic','foreign'].includes(route)||!supplierRoute(u,route)||old&&!supplierRoute(u,old.data.route))fail('مجوز مسیر تأمین را ندارید.',403);if(old&&old.data.route!==route)fail('مسیر پرونده ثابت است؛ برای مسیر دیگر پرونده جدا بسازید.');
   if(!['manufacturer','trader'].includes(b.kind)||typeof b.active!=='boolean')fail('نوع و وضعیت تأمین‌کننده معتبر نیست.');
-  const phones=Array.isArray(b.phones)?b.phones.map((v:any)=>txt(v||'',100)).filter(Boolean):[txt(b.phone||'',100)].filter(Boolean);if(phones.length>10)fail('حداکثر ۱۰ شماره تلفن می‌توانید ثبت کنید.');const d:any={route,kind:b.kind,active:b.active};for(const k of Object.keys(supplierFields))d[k]=txt(b[k]||'',k==='notes'?3000:500);d.phone=phones[0]||'';d.phones=phones;for(const k of ['name','country','contact','phone'])if(!d[k])fail('نام، کشور، مسئول تماس و تلفن اصلی لازم است.');if(d.email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email))fail('ایمیل معتبر نیست.');target=old?.id||id;put(target,'supplier',d,old);
+  const phones=Array.isArray(b.phones)?b.phones.map((v:any)=>txt(v||'',100)).filter(Boolean):[txt(b.phone||'',100)].filter(Boolean);if(phones.length>10)fail('حداکثر ۱۰ شماره تلفن می‌توانید ثبت کنید.');const d:any={...old?.data,route,kind:b.kind,active:b.active};for(const k of Object.keys(supplierFields))d[k]=txt(b[k]||'',k==='notes'?3000:500);d.phone=phones[0]||'';d.phones=phones;for(const k of ['name','country','contact','phone'])if(!d[k])fail('نام، کشور، مسئول تماس و تلفن اصلی لازم است.');if(d.email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email))fail('ایمیل معتبر نیست.');target=old?.id||id;put(target,'supplier',d,old);
   if(linkMaterial)put('supplier-material:'+id,'supplier_material',{supplierId:target,materialId:linkMaterial.id,partCode:linkMaterial.data.code,supplierCode:txt(b.supplierCode||'',100),status:'pending',specs:linkMaterial.data.specs||'',unit:linkMaterial.data.unit,qualityRisk:'high',supplyRisk:'high',reviewDue:'',supplierRevision:1,notes:txt(b.linkNotes||'',3000)});
  }else if(mode==='link'){
   const s=await get(req(b.supplierId),'supplier'),m=await get(req(b.materialId),'material');if(!supplierRoute(u,s.data.route))fail('مجوز مسیر ندارید.',403);
+  if(s.data.deletedAt)fail('تأمین‌کننده حذف شده است.',409);
   guard("NOT EXISTS(SELECT 1 FROM flow_entities WHERE type='supplier_material' AND json_extract(data,'$.supplierId')=? AND json_extract(data,'$.materialId')=?)",s.id,m.id);
   put(id,'supplier_material',{supplierId:s.id,materialId:m.id,partCode:m.data.code,supplierCode:txt(b.supplierCode||'',100),status:'pending',specs:m.data.specs||'',unit:m.data.unit,qualityRisk:'high',supplyRisk:'high',reviewDue:'',supplierRevision:s.revision,notes:txt(b.notes||'',3000)});
  }else if(mode==='review'){

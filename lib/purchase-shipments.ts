@@ -35,7 +35,7 @@ export async function applyShipment(u:any,b:any){
  }else{
  const old=b.shipmentId?await shipmentBy(u,req(b.shipmentId)):null;if(old&&b.revision!==old.revision)shipmentFail('پرونده تغییر کرده است.',409);if(old){guard(old);target=old.id;}
  if(mode==='create'){
- if(old)shipmentFail('برای ایجاد محموله جدید شناسه پرونده نفرستید.');const {supplier,lines}=await shipmentLines(u,req(b.supplierId),b.lines);if(!shipmentWrite(u,supplier.data.route))shipmentFail('مجوز بازرگانی مسیر لازم است.',403);guard(supplier);for(const l of lines){guard({id:l.linkId,revision:l.linkRevision});guard({id:l.materialId,revision:l.materialRevision});}
+ if(old)shipmentFail('برای ایجاد محموله جدید شناسه پرونده نفرستید.');const {supplier,lines}=await shipmentLines(u,req(b.supplierId),b.lines);if(!shipmentWrite(u,supplier.data.route))shipmentFail('مجوز بازرگانی مسیر لازم است.',403);if(supplier.data.deletedAt)shipmentFail('تأمین‌کننده حذف شده است.',409);guard(supplier);for(const l of lines){guard({id:l.linkId,revision:l.linkRevision});guard({id:l.materialId,revision:l.materialRevision});}
  if(!['IRR','IRT','USD','EUR','CNY'].includes(b.currency))shipmentFail('ارز معتبر لازم است.');put(id,'purchase_shipment',{supplierId:supplier.id,supplierName:supplier.data.name,route:supplier.data.route,currency:b.currency,title:req(b.title,200),reference:req(b.reference,200),state:'draft',initial:{day:date(b.day),lines},history:[{mode,actor:u.userId,at:now,notes}]});
  }else{
  if(!old)shipmentFail('محموله لازم است.');if(!shipmentWrite(u,old.data.route))shipmentFail('مجوز بازرگانی مسیر لازم است.',403);const data={...old.data,history:[...old.data.history,{mode,actor:u.userId,at:now,notes}]},files=[...await supplierRows('shipment_file'),...await supplierRows('foreign_file')];

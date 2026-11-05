@@ -175,6 +175,24 @@ async function supplier(mode,b={},status=200,user=actor('domestic')){const body=
  const foundLink=entities('supplier_material').find(l=>l.data.supplierId===found.id);
  await source('quote',{planId:emptyPlan,partCode:'02',route:'domestic',supplierLinkId:foundLink.id,unitPrice:'100',extrasRial:'0',costNotes:'Included',eta:later,validUntil:future,paymentTerms:'Cash',specs:'Spec2',reference:'NEW-Q'},200,actor('domestic'));
  await assert.rejects(()=>domain.checkSupplierPurchase(foundLink.id,otherMaterial.id,'domestic',1000),/صلاحیت/);
+ // Archiving retains business records, blocks new procurement, and requires explicit restore.
+ const original=entities('supplier').find(s=>s.id===linked.id),counts=['supplier_material','supplier_review','purchase_order'].map(t=>entities(t).length);
+ const archive={supplierId:linked.id,revision:original.revision,reason:'No longer an approved business partner'};
+ await supplier('archive',archive,403,actor('sales'));
+ await supplier('archive',{...archive,confirmed:false},400);
+ await supplier('archive',{...archive,revision:0},409);
+ const deleted=await supplier('archive',archive),archived=entities('supplier').find(s=>s.id===linked.id);
+ assert.ok(archived.data.deletedAt);assert.equal(archived.data.active,false);assert.equal(archived.data.lifecycleHistory[0].actor,actor('domestic').userId);
+ assert.deepEqual(['supplier_material','supplier_review','purchase_order'].map(t=>entities(t).length),counts);
+ assert.equal((await context.run(actor('domestic'),()=>suppliers.POST(request('/api/suppliers','POST',deleted.body)))).status,200);
+ await supplier('supplier',{...supplierBody,supplierId:linked.id,revision:archived.revision},409);
+ assert.match(domain.qualification({data:{}},archived,material),/حذف/);
+ const targets=await domain.buildSupplierTargets([{materialId:material.id,partCode:'01',round:99,routes:['domestic'],shortage:1000,unit:'عدد'}]);assert.ok(!targets.some(t=>t.supplierId===linked.id));
+ await supplier('restore',{supplierId:linked.id,revision:original.revision,reason:'Reviewed restoration'},409);
+ await supplier('restore',{supplierId:linked.id,revision:archived.revision,reason:'Reviewed restoration'});
+ const restored=entities('supplier').find(s=>s.id===linked.id);assert.equal(restored.data.deletedAt,null);assert.equal(restored.data.active,false);assert.equal(restored.data.lifecycleHistory.length,2);
+ await supplier('supplier',{...supplierBody,supplierId:linked.id,revision:restored.revision});assert.equal(entities('supplier').find(s=>s.id===linked.id).data.lifecycleHistory.length,2);
+ assert.ok(catalog.tools.find(t=>t.name==='archive_supplier'));assert.ok(catalog.tools.find(t=>t.name==='restore_supplier'));
  assert.equal(sql.prepare('PRAGMA foreign_key_check').all().length,0);
  console.log('Supplier workflow passed: permissions, confirmation, idempotency, unique links, evidence, null ratings, task contacts, real-action completion, all-target responses, finance gate, conditional ceiling, suspension/requalification at issue, receipt metrics, privacy and MCP.');
 })().catch(e=>{console.error(e);process.exit(1)});
