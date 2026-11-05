@@ -1,3 +1,4 @@
+import {warehouseDisplayName} from '@/lib/warehouse-tree';
 import {requireAccess,can,AccessError,accessResponse} from '@/lib/authorization';
 import {storage} from '@/lib/storage';
 import {warehouseDirectory,warehouseMember} from '@/lib/material-warehouses';
@@ -10,7 +11,7 @@ export async function GET(request:Request){try{
  if(!internalWarehouseUser(u)||!materialRead&&!productRead)throw new AccessError('دسترسی گردش کالا ندارید.',403);
  const p=new URL(request.url).searchParams,filter={query:p.get('query')||'',code:p.get('code')||'',kind:p.get('kind')||'',itemId:p.get('itemId')||''};
  if(Object.values(filter).some(v=>v.length>200)||!['','material','product'].includes(filter.kind))throw new AccessError('جست‌وجوی گردش کالا معتبر نیست.',400);
- const db=storage(),ws=await warehouseDirectory(),own=new Set(ws.filter(w=>w.data.active&&(warehouseMember(u,w,'inventory')||warehouseMember(u,w,'qc'))).map(w=>w.id)),names=new Map(ws.map(w=>[w.id,w.data.name]));
+ const db=storage(),ws=await warehouseDirectory(),own=new Set(ws.filter(w=>(w.data.active||w.data.deletedAt)&&(warehouseMember(u,w,'inventory')||warehouseMember(u,w,'qc'))).map(w=>w.id)),names=new Map(ws.map(w=>[w.id,warehouseDisplayName(w)]));
  const globalRead=u.isAdmin||materialRead&&!u.permissions.warehouseResponsibilities?.length;
  const all=(await db.prepare("SELECT * FROM flow_entities WHERE type IN ('receipt','request','build','warehouse_transfer','material')").all()).results.map(entity),byId=new Map(all.map(e=>[e.id,e]));
  const rows=(await db.prepare("SELECT id,kind,payload,created FROM records WHERE kind IN ('batch','device','product') ORDER BY created DESC,id").all()).results.map((r:any)=>({...r,data:JSON.parse(r.payload)}));
@@ -21,7 +22,7 @@ export async function GET(request:Request){try{
   const b=JSON.parse(e.payload),transfer=b.transferId?byId.get(b.transferId):byId.get(e.operation_id),physical:string[]=[];
   const add=(id:any)=>{if(typeof id==='string'&&id&&!physical.includes(id))physical.push(id)};
   if(e.kind.startsWith('warehouse_')&&transfer?.type==='warehouse_transfer'){add(transfer.data.fromWarehouseId);add(transfer.data.toWarehouseId);}
-  else{for(const a of Array.isArray(b.allocations)?b.allocations:[])if(a.batchId===e.item_id||a.batch===e.item_id)add(slotWarehouse(a.location||''));if(!physical.length){add(b.warehouseId);add(b.fromWarehouseId);add(b.toWarehouseId);if(b.receiptId)add(byId.get(b.receiptId)?.data.warehouseId);if(b.requestId)add(byId.get(b.requestId)?.data.warehouseId);}}
+  else{for(const a of Array.isArray(b.allocations)?b.allocations:[])if(a.batchId===e.item_id||a.batch===e.item_id)add(slotWarehouse(a.location||''));if(!physical.length){add(b.warehouseId);add(b.fromWarehouseId);add(b.toWarehouseId);if(b.receiptId)add(byId.get(b.receiptId)?.data.warehouseId);if(b.requestId)add(byId.get(b.requestId)?.data.warehouseId);}if(!physical.length){const source=byId.get(e.item_id);add(e.warehouse==='quarantine'?source?.data.quarantineWarehouseId||source?.data.warehouseId:source?.data.warehouseId);}}
   const rawStage=e.warehouse.startsWith('warehouse_transit:')?byId.get(e.warehouse.slice(18))?.data.kind==='device'?'finished':'raw':e.warehouse;
   const stageAllowed=u.isAdmin||warehouseAccess(u,rawStage)||materialRead&&!!u.permissions.flowRoles?.some(r=>['qc','production','procurement'].includes(r))||materialRead&&!!u.permissions.warehouseResponsibilities?.some(r=>r.role==='qc');
   if(!stageAllowed||!u.isAdmin&&(physical.length?e.kind.startsWith('warehouse_')?!physical.some(id=>own.has(id)):!physical.every(id=>own.has(id)):!globalRead))continue;

@@ -463,3 +463,5 @@ html,button,input,textarea,select,option,svg text{font-family:"Vazirmatn",sans-s
 .subpage-actions.inline-icon-actions>.btn>span{font-size:13px}
 .subpage-actions.inline-icon-actions>.btn[aria-pressed=true],.subpage-actions.inline-icon-actions>.btn[aria-expanded=true]{border-color:#93a3c4;box-shadow:inset 0 -2px #93a3c4}
 @media(max-width:480px){.subpage-actions.inline-icon-actions{gap:6px}.subpage-actions.inline-icon-actions>.btn{padding:7px 5px;gap:4px}.subpage-actions.inline-icon-actions>.btn>span{font-size:12px}}
+
+.warehouse-delete{grid-column:1/-1;min-width:0;display:grid;gap:12px;margin-top:8px}.warehouse-delete .notice{display:block}.warehouse-delete .notice p{margin-bottom:12px}.warehouse-delete>.btn{justify-self:start}.warehouse-delete .btn{white-space:nowrap}.warehouse-delete .btn.danger{color:#a53838;border-color:#e2b7b7;background:#fff6f6}.warehouse-delete ul{margin:0;padding-inline-start:24px;list-style:disc}
