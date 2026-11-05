@@ -1344,3 +1344,5 @@ Object.assign(toolFieldTitles.personnel_apply,{productionEligible:'قابل تخ
 Object.assign(toolFieldTitles.save_material_warehouse,{warehouseType:'نوع انبار',directReceiptEnabled:'اجازه دریافت مستقیم مواد اولیه',quarantineWarehouseId:'قرنطینه ورودی؛ خالی برای ساخت خودکار'});
 
 Object.assign(toolFieldTitles,{delete_material_warehouse:{warehouseId:'انبار برای حذف',revision:'نسخه انبار'},inspect_material_warehouse_deletion:{warehouseId:'انبار برای بررسی حذف'}});
+
+Object.assign(toolFieldTitles,{save_sourcing_quote:{...toolFieldTitles.save_sourcing_quote,appendSupplier:'افزودن تأمین‌کننده ثبت‌شده به دور جاری استعلام'}});

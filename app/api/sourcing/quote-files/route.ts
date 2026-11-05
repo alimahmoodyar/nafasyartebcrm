@@ -4,7 +4,7 @@ import {firmwareBucket,boundedBody} from '@/lib/firmware-storage';
 import {sha256} from '@/lib/firmware';
 import {needSupply,supplyEntities,decode,coverage} from '@/lib/sourcing';
 
-const fail=(message:string,status=400):never=>{throw new AccessError(message,status)};
+function fail(message:string,status=400):never{throw new AccessError(message,status)}
 const json=(data:any,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'private, no-store','Vary':'Cookie, Authorization'}});
 const uuid=(v:unknown)=>typeof v==='string'&&/^[a-f0-9-]{36}$/i.test(v);
 function mime(bytes:ArrayBuffer,name:string){const b=new Uint8Array(bytes),s=new TextDecoder().decode(b.slice(0,12)),ext=name.split('.').pop()?.toLowerCase();if(['jpg','jpeg'].includes(ext||'')&&b[0]===255&&b[1]===216&&b[2]===255)return'image/jpeg';if(ext==='png'&&[137,80,78,71,13,10,26,10].every((v,i)=>b[i]===v))return'image/png';if(ext==='webp'&&s.startsWith('RIFF')&&s.slice(8,12)==='WEBP')return'image/webp';if(ext==='pdf'&&s.startsWith('%PDF-'))return'application/pdf';return fail('فایل معتبر JPG، PNG، WEBP یا PDF انتخاب کنید.');}
