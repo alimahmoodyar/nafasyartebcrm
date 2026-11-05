@@ -1346,3 +1346,6 @@ Object.assign(toolFieldTitles.save_material_warehouse,{warehouseType:'نوع ا�
 Object.assign(toolFieldTitles,{delete_material_warehouse:{warehouseId:'انبار برای حذف',revision:'نسخه انبار'},inspect_material_warehouse_deletion:{warehouseId:'انبار برای بررسی حذف'}});
 
 Object.assign(toolFieldTitles,{save_sourcing_quote:{...toolFieldTitles.save_sourcing_quote,appendSupplier:'افزودن تأمین‌کننده ثبت‌شده به دور جاری استعلام'}});
+
+Object.assign(toolFieldTitles.save_sourcing_quote,{deliveryDays:'مدت تحویل (روز تقویمی)',deliveryStart:'شروع مهلت تحویل',requiredAdvanceRial:'پیش‌پرداخت لازم برای شروع (ریال)',eta:'موعد قدیمی؛ فقط پیشنهادهای تاریخ‌دار'});
+Object.assign(toolFieldTitles,{confirm_sourcing_purchase:{planId:'پرونده تأمین',revision:'نسخه پرونده',orderId:'سفارش خرید',orderRevision:'نسخه سفارش',reference:'مرجع پذیرش تأمین‌کننده',notes:'توضیح قطعی‌شدن خرید'}});

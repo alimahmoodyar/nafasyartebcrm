@@ -1,14 +1,15 @@
 'use client';
 import {transportMethods,freightStatuses} from '@/lib/domestic-freight-contract';
+import {formatDate} from '@/lib/persian-date';
 import {NumberInput} from './number-input';
 import {SolarDate} from './solar-date';
 import {Select,SelectTrigger,SelectContent,SelectItem,SelectValue} from '@/components/ui/select';
 
 type Props={draft:any;line:any;choices:any[];busy:boolean;notice:string;onPatch:(patch:any)=>void;onNewSupplier:()=>void;onSync:()=>void;onUpload:(files:FileList|null)=>void;onRemove:(file:any)=>void};
 export function SourcingQuoteFields({draft:d,line,choices,busy,notice,onPatch,onNewSupplier,onSync,onUpload,onRemove}:Props){
- const kind=d.procurementStatus||(d.unavailable?'unavailable':'price'),foreign=d.route==='foreign';
+ const kind=d.procurementStatus||(d.unavailable?'unavailable':'price'),foreign=d.route==='foreign',legacy=!!d.quoteId&&(d.deliveryDays===undefined||d.deliveryDays==='')&&!!d.eta;
  const pick=(label:string,value:string,items:[string,string][],onChange:(v:string)=>void)=><label className="field">{label}<Select dir="rtl" required value={value||'none'} onValueChange={v=>onChange(v==='none'?'':v)}><SelectTrigger><SelectValue placeholder="انتخاب کنید"/></SelectTrigger><SelectContent><SelectItem value="none">انتخاب کنید</SelectItem>{items.map(([id,name])=><SelectItem key={id} value={id}>{name}</SelectItem>)}</SelectContent></Select></label>;
- const input=(key:string,label:string,required=true)=><label className="field">{label}<NumberInput fieldKey={key} groupNumber={['unitPrice','extrasRial','fxRate','freightAmount'].includes(key)} required={required} value={d[key]??''} onChange={e=>onPatch({[key]:e.target.value})}/></label>;
+ const input=(key:string,label:string,required=true)=><label className="field">{label}<NumberInput fieldKey={key} type={key==='deliveryDays'?'number':undefined} min={key==='deliveryDays'?0:undefined} max={key==='deliveryDays'?3650:undefined} step={key==='deliveryDays'?1:undefined} groupNumber={['unitPrice','extrasRial','fxRate','deliveryDays','requiredAdvanceRial','freightAmount'].includes(key)} required={required} value={d[key]??''} onChange={e=>onPatch({[key]:e.target.value})}/></label>;
  const note=(key:string,label:string,required=false)=><label className="field">{label}<textarea rows={2} required={required} value={d[key]||''} onChange={e=>onPatch({[key]:e.target.value})}/></label>;
  const setKind=(next:string)=>onPatch({unavailable:next==='unavailable',procurementStatus:['searching','technical'].includes(next)?next:''});
  return <section className="sourcing-quote-form" aria-label="اطلاعات استعلام">
@@ -22,12 +23,15 @@ export function SourcingQuoteFields({draft:d,line,choices,busy,notice,onPatch,on
    <div className="sourcing-quote-grid" data-quote-core>
     {input('unitPrice',foreign?'قیمت واحد در ارز پیشنهاد':'قیمت واحد (ریال)')}
     {input('paymentTerms','شرایط پرداخت')}
-    <SolarDate label="موعد تحویل" value={d.eta} onChange={eta=>onPatch({eta})}/>
+    {input('deliveryDays','مدت تحویل (روز تقویمی)',!legacy)}
     <SolarDate label="اعتبار قیمت تا" value={d.validUntil} onChange={validUntil=>onPatch({validUntil})}/>
    </div>
+   {legacy&&<small>موعد ثبت‌شده قبلی: {formatDate(d.eta)}؛ برای تبدیل این پیشنهاد، مدت تحویل را به روز وارد کنید.</small>}
    {foreign&&<div className="sourcing-quote-grid">{pick('ارز قیمت',d.currency,[['IRR','ریال'],['IRT','تومان'],['USD','دلار'],['CNY','یوان'],['EUR','یورو']],currency=>onPatch({currency,...(currency==='IRR'?{fxRate:'1'}:currency==='IRT'?{fxRate:'10'}:{})}))}{input('fxRate','هر واحد ارز چند ریال؟')}<SolarDate label="تاریخ نرخ تبدیل" value={d.fxDate} onChange={fxDate=>onPatch({fxDate})}/>{input('fxSource','منبع نرخ تبدیل')}</div>}
-   {!foreign&&<div className="sourcing-quote-grid">{pick('روش حمل',d.transportMethod||'',Object.entries(transportMethods),transportMethod=>onPatch({transportMethod}))}{pick('وضعیت هزینه حمل',d.freightStatus||'',Object.entries(freightStatuses),freightStatus=>onPatch({freightStatus}))}{d.freightStatus==='known'&&input('freightAmount','مبلغ حمل همین مقدار (ریال)')}<p>حمل نامشخص صفر قطعی نیست؛ هزینه واقعی بعداً در تسویه همین خرید ثبت می‌شود.</p></div>}
+   {!foreign&&<div className="sourcing-quote-grid">{pick('روش حمل',d.transportMethod||'',Object.entries(transportMethods),transportMethod=>onPatch({transportMethod}))}{pick('وضعیت هزینه حمل',d.freightStatus||'',Object.entries(freightStatuses),freightStatus=>onPatch({freightStatus}))}{d.freightStatus==='known'&&input('freightAmount','مبلغ حمل همین مقدار (ریال)')}<p className="sourcing-quote-freight-note">حمل نامشخص صفر قطعی نیست؛ هزینه واقعی بعداً در تسویه همین خرید ثبت می‌شود.</p></div>}
    <details className="sourcing-quote-disclosure"><summary>جزئیات بیشتر{Number(d.extrasRial)>0?' · هزینه جانبی '+Number(d.extrasRial).toLocaleString('fa-IR')+' ریال':''}</summary><div className="sourcing-quote-grid">
+    {!legacy&&pick('شروع مهلت تحویل',d.deliveryStart||'confirmation',[['confirmation','پس از قطعی‌شدن خرید'],['advance_payment','پس از قطعی‌شدن و پیش‌پرداخت']],deliveryStart=>onPatch({deliveryStart}))}
+    {d.deliveryStart==='advance_payment'&&input('requiredAdvanceRial','پیش‌پرداخت لازم برای شروع (ریال)')}
     {foreign&&<>{input('extrasRial','جمع هزینه جانبی (ریال)')}{note('costNotes','شرح هزینه جانبی',Number(d.extrasRial)>0)}</>}
     {note('specs','مشخصات پیشنهادی؛ در صورت تفاوت با نیاز کالا')}
     {input('reference','شماره پیشنهاد یا پیش‌فاکتور (اختیاری)',false)}
