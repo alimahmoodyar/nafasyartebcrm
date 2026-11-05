@@ -2,12 +2,13 @@
 import {quoteValidity} from '@/lib/quote-validity';
 import {transportMethods} from '@/lib/domestic-freight-contract';
 import {formatDate} from '@/lib/persian-date';
+import {quoteNumber} from '@/lib/sourcing-quote-comparison';
 import {NumberInput} from './number-input';
 import {SolarDate} from './solar-date';
 import {Select,SelectTrigger,SelectContent,SelectItem,SelectValue} from '@/components/ui/select';
 
-type Props={draft:any;line:any;choices:any[];busy:boolean;notice:string;onPatch:(patch:any)=>void;onNewSupplier:()=>void;onSync:()=>void;onUpload:(files:FileList|null)=>void;onRemove:(file:any)=>void};
-export function SourcingQuoteFields({draft:d,line,choices,busy,notice,onPatch,onNewSupplier,onSync,onUpload,onRemove}:Props){
+type Props={draft:any;line:any;choices:any[];submittedQuotes?:any[];busy:boolean;notice:string;onPatch:(patch:any)=>void;onNewSupplier:()=>void;onSync:()=>void;onUpload:(files:FileList|null)=>void;onRemove:(file:any)=>void};
+export function SourcingQuoteFields({draft:d,line,choices,submittedQuotes=[],busy,notice,onPatch,onNewSupplier,onSync,onUpload,onRemove}:Props){
  const kind=d.procurementStatus||(d.unavailable?'unavailable':'price'),foreign=d.route==='foreign',legacy=!!d.quoteId&&(d.deliveryDays===undefined||d.deliveryDays==='')&&!!d.eta;
  const pick=(label:string,value:string,items:[string,string][],onChange:(v:string)=>void)=><label className="field">{label}<Select dir="rtl" required value={value||'none'} onValueChange={v=>onChange(v==='none'?'':v)}><SelectTrigger><SelectValue placeholder="انتخاب کنید"/></SelectTrigger><SelectContent><SelectItem value="none">انتخاب کنید</SelectItem>{items.map(([id,name])=><SelectItem key={id} value={id}>{name}</SelectItem>)}</SelectContent></Select></label>;
  const input=(key:string,label:string,required=true)=><label className="field">{label}<NumberInput fieldKey={key} type={['deliveryDays','validityDays'].includes(key)?'number':undefined} min={key==='validityDays'?1:key==='deliveryDays'?0:undefined} max={['deliveryDays','validityDays'].includes(key)?3650:undefined} step={['deliveryDays','validityDays'].includes(key)?1:undefined} groupNumber={['unitPrice','extrasRial','fxRate','deliveryDays','requiredAdvanceRial','freightAmount','validityDays'].includes(key)} required={required} value={d[key]??''} onChange={e=>onPatch({[key]:e.target.value,...(key==='freightAmount'?{freightStatus:e.target.value.trim()?'known':'pending'}:{})})}/></label>;
@@ -15,8 +16,9 @@ export function SourcingQuoteFields({draft:d,line,choices,busy,notice,onPatch,on
  const setKind=(next:string)=>onPatch({unavailable:next==='unavailable',procurementStatus:['searching','technical'].includes(next)?next:''});
  return <section className="sourcing-quote-form" aria-label="اطلاعات استعلام">
   <div className="sourcing-quote-summary"><strong>{line?.name}</strong><span>کد {d.partCode} · {((line?.shortage||0)/1000).toLocaleString('fa-IR')} {line?.unit}</span></div>
+  {submittedQuotes.length>0&&<details className="sourcing-quote-responses"><summary>استعلام‌های ثبت‌شدهٔ همین کالا ({quoteNumber(submittedQuotes.length)})</summary><ul>{submittedQuotes.map(q=><li key={q.id}><strong>{q.data.supplier}</strong><span>{q.data.unavailable?'پیشنهاد نداد':<>جمع: {quoteNumber(q.data.totalRial)} ریال{q.data.freight?.status==='pending'?'؛ حمل هنوز مشخص نیست':''}</>}</span>{!q.data.unavailable&&<small>{q.data.quantity!==undefined&&<>{quoteNumber(q.data.quantity/1000)} {q.data.unit||line?.unit} · </>}{Number.isInteger(q.data.deliveryDays)?quoteNumber(q.data.deliveryDays)+' روز تقویمی':q.data.eta?formatDate(q.data.eta):''}</small>}</li>)}</ul></details>}
   {!d.procurementStatus&&<>
-   {choices.length?pick('تأمین‌کننده این استعلام',d.supplierLinkId||'',choices.map(t=>[t.linkId,t.name]),v=>{const t=choices.find(t=>t.linkId===v);onPatch({supplierLinkId:v,supplier:t?.name||''})}):<p className="notice error">منبع بدون پاسخ ندارید؛ تأمین‌کننده دیگری اضافه کنید یا پاسخ قبلی را از جدول ویرایش کنید.</p>}
+   {choices.length?pick('تأمین‌کننده این استعلام',d.supplierLinkId||'',choices.map(t=>[t.linkId,t.name]),v=>{const t=choices.find(t=>t.linkId===v);onPatch({supplierLinkId:v,supplier:t?.name||''})}):<div className="sourcing-quote-no-source"><p>تأمین‌کنندهٔ دیگری برای ثبت پاسخ در فهرست نیست. می‌توانید تأمین‌کنندهٔ جدید به همین کالا اضافه کنید.</p><button type="button" className="btn" disabled={busy||!line?.materialId} onClick={onNewSupplier}>افزودن تأمین‌کننده برای استعلام بعدی</button></div>}
    <details className="sourcing-quote-disclosure"><summary>افزودن یا تازه‌سازی تأمین‌کننده</summary><div className="sourcing-quote-supplier-tools"><button type="button" className="btn" disabled={busy||!line?.materialId} onClick={onNewSupplier}>تأمین‌کننده جدید برای این کالا</button><button type="button" className="btn" disabled={busy} onClick={onSync}>به‌روزرسانی تأمین‌کنندگان این کالا</button></div></details>
   </>}
   {notice&&<p className="sourcing-quote-status" role="status">{notice}</p>}
