@@ -22,6 +22,9 @@ const can=(u:Session,kind:Kind,operation:'read'|'write'='read')=>u.isAdmin||u.pe
 export function canOpenSection(user:Session,s:string):boolean{
  const p=accessPermissions(user.permissions),u={...user,permissions:p};
  const internal=!p.hospitalCenterId&&!p.salesAgentId&&!p.serviceAgentId;
+ // The inbox is a shared workspace. Showing its entry does not grant access
+ // to any task or conversation; the corresponding APIs scope each record.
+ if(s==='tasks')return true;
  if(s==='routine-production'&&internal&&u.productionParticipant===true)return true;
  if(s==='warehouse')return internal&&(!!p.supplyRoles?.includes('inventory')||canOpenSection(u,'flow')||canOpenSection(u,'inventory')||canOpenSection(u,'batch')||canOpenSection(u,'fulfillment')&&warehouseAccess(u,'finished')||canOpenSection(u,'after-sales')&&!!p.serviceRoles?.includes('inventory'));
  if(!u.isAdmin&&!selfServicePrograms.includes(s)){
