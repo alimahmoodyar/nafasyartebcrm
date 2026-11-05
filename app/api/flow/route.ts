@@ -67,8 +67,8 @@ export async function POST(request:Request){try{
  async function warehouseAssignment(r:any,key:string){if(!r.data.warehouseId){if(!u.isAdmin&&!u.permissions.flowRoles?.includes(key==='qcOwner'?'qc':'inventory'))fail('این محموله در محدوده مسئولیت انبار شما نیست.',403);if(key==='qcOwner'&&!r.data.qcOwner&&!u.isAdmin)fail('برای این محموله ابتدا مسئول کنترل کیفیت تعیین شود.',403);assigned(r,key);return r.data[key]||'';}const assignedWarehouse=key==='qcOwner'?r.data.quarantineWarehouseId||r.data.warehouseId:r.data.warehouseId;await get(assignedWarehouse,'material_warehouse');const w=(await warehouseDirectory()).find(w=>w.id===assignedWarehouse);if(!w)fail('انبار پیدا نشد.');const role=key==='qcOwner'?'qc':'inventory';if(role==='qc'){const owner=receiptQcOwner(r,w);if(!owner)fail('برای این محموله ابتدا مسئول کنترل کیفیت تعیین شود.');if(!warehouseMember(u,{qcMembers:w.qcMembers.filter((m:any)=>m.id===owner)},'qc'))fail('کنترل این محموله به فرد دیگری ارجاع شده است.',403);await assignee(owner,'qc',w.id);return owner;}if(!warehouseMember(u,w,'inventory'))fail('این مرحله در مسئولیت شما برای این انبار نیست.',403);const member=w.inventoryMembers.find((m:any)=>[m.id,'local:'+m.id,m.subject].includes(u.userId));if(member)await assignee(member.id,'inventory',w.id);return member?.id||'';}
  if(mode==='warehouse'){
  if(!u.isAdmin||b.confirmed!==true)fail('تعریف انبار به تأیید مدیر سامانه نیاز دارد.',403);
- const eid=b.warehouseId?needed(b.warehouseId):'warehouse:'+id,old=b.warehouseId?await get(eid,'material_warehouse'):undefined;if(b.revision!==(old?.revision||0))fail('تعریف انبار تغییر کرده است.',409);
- const name=needed(b.name);guard("NOT EXISTS(SELECT 1 FROM flow_entities WHERE type='material_warehouse' AND json_extract(data,'$.name')=? AND id<>?)",name,eid);if(typeof b.active!=='boolean')fail('وضعیت انبار مشخص شود.');
+ const eid=b.warehouseId?needed(b.warehouseId):'warehouse:'+id,old=b.warehouseId?await get(eid,'material_warehouse'):undefined;if(old?.data.deletedAt)fail('این انبار حذف شده و قابل ویرایش یا فعال‌سازی مجدد نیست.',409);if(b.revision!==(old?.revision||0))fail('تعریف انبار تغییر کرده است.',409);
+ const name=needed(b.name);guard("NOT EXISTS(SELECT 1 FROM flow_entities WHERE type='material_warehouse' AND json_extract(data,'$.name')=? AND COALESCE(json_extract(data,'$.deletedAt'),'')='' AND id<>?)",name,eid);if(typeof b.active!=='boolean')fail('وضعیت انبار مشخص شود.');
  if(!Array.isArray(b.locations)||b.locations.length>500||b.locations.some((l:any)=>typeof l!=='string'||l.length>60||!/^[^\s|]+-[^\s|]+-[^\s|]+-[^\s|]+$/.test(l))||new Set(b.locations).size!==b.locations.length)fail('محل‌های انبار به صورت راهرو-قفسه-طبقه-خانه و بدون تکرار باشند.');
  if(old){const used=(await db.prepare('SELECT location FROM flow_slots WHERE quantity>0 AND location LIKE ?').bind(eid+'|%').all()).results as any[];guard('NOT EXISTS(SELECT 1 FROM flow_slots WHERE quantity>0 AND location LIKE ? AND location NOT IN (SELECT ? || value FROM json_each(?)))',eid+'|%',eid+'|',JSON.stringify(b.locations));if(used.some(l=>!b.locations.includes(displayLocation(l.location))))fail('محل دارای موجودی را حذف نکنید.');}
  const ws=await materialWarehouses(),parentId=b.parentId===undefined?old?.data.parentId||'':text(b.parentId,200);
@@ -76,8 +76,8 @@ export async function POST(request:Request){try{
  const serviceDomain=b.serviceDomain===undefined?old?.data.serviceDomain||'':text(b.serviceDomain,20),serviceOwner=b.serviceOwner===undefined?old?.data.serviceOwner||'':text(b.serviceOwner,200);
  if(!['','home','hospital'].includes(serviceDomain)||!!serviceDomain!==!!serviceOwner)fail('حوزه و مرکز خدمات را با هم انتخاب کنید.');
  if(serviceDomain){if(serviceOwner!=='office'){const agent=await get(serviceOwner,'as_agent');if(agent.data.domain!==serviceDomain||!agent.data.active)fail('نمایندگی فعال همان حوزه خدمات را انتخاب کنید.');}
- const mapped=ws.find(w=>w.id!==eid&&w.data.serviceDomain===serviceDomain&&w.data.serviceOwner===serviceOwner);if(mapped)fail('این مرکز خدمات قبلاً به انبار دیگری متصل است.');
- guard("NOT EXISTS(SELECT 1 FROM flow_entities WHERE type='material_warehouse' AND id<>? AND json_extract(data,'$.serviceDomain')=? AND json_extract(data,'$.serviceOwner')=?)",eid,serviceDomain,serviceOwner);
+ const mapped=ws.find(w=>!w.data.deletedAt&&w.id!==eid&&w.data.serviceDomain===serviceDomain&&w.data.serviceOwner===serviceOwner);if(mapped)fail('این مرکز خدمات قبلاً به انبار دیگری متصل است.');
+ guard("NOT EXISTS(SELECT 1 FROM flow_entities WHERE type='material_warehouse' AND id<>? AND COALESCE(json_extract(data,'$.deletedAt'),'')='' AND json_extract(data,'$.serviceDomain')=? AND json_extract(data,'$.serviceOwner')=?)",eid,serviceDomain,serviceOwner);
  }
  const warehouseType=b.warehouseType===undefined?old?.data.warehouseType||'other':text(b.warehouseType,30),directReceiptEnabled=b.directReceiptEnabled===undefined?old?.data.directReceiptEnabled===true:b.directReceiptEnabled;
  if(!Object.hasOwn(warehouseTypes,warehouseType)||typeof directReceiptEnabled!=='boolean')fail('نوع انبار و اجازه دریافت مستقیم را مشخص کنید.');
@@ -95,7 +95,7 @@ export async function POST(request:Request){try{
    if(q.data.quarantineFor!==eid||q.data.internalQuarantine!==true)put(q.id,'material_warehouse',{...q.data,quarantineFor:eid,internalQuarantine:true,directReceiptEnabled:false},q);
   }else{
    quarantineWarehouseId='warehouse-quarantine:'+id;const qname=('قرنطینه — '+name).slice(0,200);
-   guard("NOT EXISTS(SELECT 1 FROM flow_entities WHERE type='material_warehouse' AND json_extract(data,'$.name')=?)",qname);
+   guard("NOT EXISTS(SELECT 1 FROM flow_entities WHERE type='material_warehouse' AND COALESCE(json_extract(data,'$.deletedAt'),'')='' AND json_extract(data,'$.name')=?)",qname);
    put(quarantineWarehouseId,'material_warehouse',{name:qname,parentId:eid,warehouseType:'quarantine',directReceiptEnabled:false,quarantineFor:eid,internalQuarantine:true,locations:[],active:true,assignmentVersion:2});
   }
  }

@@ -1,3 +1,4 @@
+import {warehouseDisplayName} from './warehouse-tree';
 import {isIsoDay,localDay} from './persian-date';
 import {normalizeStockSearch} from './warehouse-stock';
 export const shippingStatuses:Record<string,string>={all:'همه',open:'باز',reserved:'آماده ارسال',in_transit:'در مسیر',partial:'دریافت ناقص / مغایرت',closed:'بسته‌شده',cancelled:'لغوشده'};
@@ -15,7 +16,7 @@ export function shipmentReportRow(s:any,o:any,t:any,rows:any[],builds:any[],ware
  const d=s.data,od=o?.data||{},td=t?.data||{},product=rows.find(r=>r.id===d.productId&&r.kind==='product')?.data||{},deviceIds:string[]=d.deviceIds||[];
  const serials=deviceIds.map(id=>rows.find(r=>r.id===id)?.data.code||id);
  const sourceIds:string[]=Array.from(new Set<string>(d.sourceWarehouses?.map((w:any)=>w.id)||(d.state==='reserved'?deviceIds.map(id=>builds.find(b=>b.id===id)?.data.warehouseId||'').filter(Boolean):[])));
- const sources=sourceIds.map(id=>({id,name:d.sourceWarehouses?.find((w:any)=>w.id===id)?.name||warehouses.find(w=>w.id===id)?.data.name||'انبار ثبت‌شده'}));
+ const sources=sourceIds.map(id=>({id,name:warehouseDisplayName(warehouses.find(w=>w.id===id),d.sourceWarehouses?.find((w:any)=>w.id===id)?.name)}));
  // A driver's acknowledgement is pickup only, never destination receipt.
  const complete=['delivered','consignment_received'].includes(d.state)||td.state==='delivered'&&td.receipt?.result==='complete';
  const disputed=!complete&&(td.state==='disputed'||td.receipt&&td.receipt.result!=='complete');
