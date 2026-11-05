@@ -60,9 +60,11 @@ async function supplier(mode,b={},status=200,user=actor('domestic')){const body=
  let d=await detail(pid,actor('domestic'));assert.equal(d.work.filter(w=>w.role==='domestic').length,2);assert.ok(d.work.some(w=>w.instructions?.includes('02100000000')&&w.instructions.includes('V1')));
  const task=sql.prepare("SELECT * FROM duty_runs WHERE assignee='domesticUser' AND state='open' LIMIT 1").get();assert.ok(JSON.parse(task.data).sourcingWorkflow);
  const tasks=load('app/api/tasks/route.ts');assert.equal((await context.run(actor('domestic'),()=>tasks.POST(request('/api/tasks','POST',{id:crypto.randomUUID(),mode:'submit',taskId:task.id,revision:task.revision,note:'done'})))).status,400);
- const quote={planId:pid,partCode:'01',route:'domestic',supplierLinkId:l1.id,supplier:'spoof',unitPrice:'100',currency:'IRR',fxRate:'1',fxDate:today,fxSource:'rial',extrasRial:'0',costNotes:'included',eta:later,validUntil:future,paymentTerms:'cash',specs:'V1',reference:'Q-1'};
+ const quote={planId:pid,partCode:'01',route:'domestic',supplierLinkId:l1.id,supplier:'spoof',unitPrice:'100',currency:'IRR',fxRate:'1',fxDate:today,fxSource:'rial',extrasRial:'0',costNotes:'included',eta:later,validUntil:future,paymentTerms:'cash',specs:'V1',reference:'Q-1',transportMethod:'company',freightStatus:'pending'};
  await source('quote',{...quote,supplierLinkId:''},400,actor('domestic'));
- await source('quote',quote,200,actor('domestic'));let q=entities('sourcing_quote')[0];assert.equal(q.data.supplier,'Factory A');
+ await source('quote',{...quote,freightStatus:'known',freightAmount:'0'},400,actor('domestic'));
+ await source('quote',{...quote,transportMethod:'invalid'},400,actor('domestic'));
+ await source('quote',quote,200,actor('domestic'));let q=entities('sourcing_quote')[0];assert.equal(q.data.supplier,'Factory A');assert.equal(q.data.freight.amountRial,null);assert.equal(q.data.freight.status,'pending');
  await source('quote',quote,409,actor('domestic'));
  await source('technical',{planId:pid,quoteId:q.id,quoteRevision:q.revision,result:'pass',notes:'matches'},200,actor('engineering'));
  await source('award',{planId:pid,partCode:'01',quoteId:q.id,notes:'Choose qualified supplier'},400,actor('ceo'));
@@ -92,6 +94,9 @@ async function supplier(mode,b={},status=200,user=actor('domestic')){const body=
  await source('issue_order',{planId:pid,orderId:order.id,reference:'PAY'},409,actor('finance'));
  await tech('supplier_material',l1.id,'quality','release',qa);
  await source('issue_order',{planId:pid,orderId:order.id,reference:'PAY'},200,actor('finance'));
+ await source('track',{planId:pid,orderId:order.id,stage:'shipped',eta:later,notes:'Company collection',reference:'M1'},400,actor('domestic'));
+ await source('track',{planId:pid,orderId:order.id,stage:'shipped',eta:later,notes:'Company collection',reference:'M1',vehicle:'Company van 01',driver:'Actual driver',pickupDay:today,missionReference:'MISSION-1'},200,actor('domestic'));
+ assert.equal(entities('purchase_order').find(o=>o.id===order.id).data.history.at(-1).pickup.missionReference,'MISSION-1');
  await source('receive',{orderId:order.id,day:today,quantity:'10',notes:'received'},200,actor('inventory'));
  const receipt=entities('receipt')[0];await op('incoming_qc',{receiptId:receipt.id,accepted:'9',rejected:'1',values:{quality:'95'},notes:'one rejected'});
  const metrics=await domain.supplierMetrics(link);assert.equal(metrics.quality,90);assert.equal(metrics.delivery,100);

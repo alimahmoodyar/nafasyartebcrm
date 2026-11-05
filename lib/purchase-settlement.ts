@@ -27,6 +27,11 @@ export function settlementPreview(data:any,rows:any[]){
  if(data.currency==='IRR'&&rate!==MICRO||data.currency==='IRT'&&rate!==BigInt(10)*MICRO)settleFail('نرخ تبدیل ریال ۱ و تومان ۱۰ است.');
  const expenses=(data.expenses||[]).reduce((n:bigint,e:any)=>n+settleAmount(e.amountRial),BigInt(0));
  const lines=(data.lines||[]).map((l:any)=>{const r=rows.find(x=>x.id===l.receiptId&&x.type==='receipt');if(!r)settleFail('رسید مرتبط پیدا نشد.');const o=rows.find(x=>x.id===r.data.purchaseOrderId&&x.type==='purchase_order');if(!o||o.data.state==='cancelled')problems.push('سفارش لغو یا حذف شده: '+l.receiptId);
+ if(o?.data.quoteSnapshot?.freight?.status==='pending'){
+ if(!['no_charge','recorded'].includes(data.freightResolution)||!data.freightReference?.trim())problems.push('هزینه حمل نامشخص است؛ نتیجه واقعی و مرجع آن را ثبت کنید.');
+ if(data.freightResolution==='recorded'&&!(data.expenses||[]).some((e:any)=>e.kind==='freight'&&settleAmount(e.amountRial)>BigInt(0)))problems.push('مبلغ واقعی حمل را به عنوان هزینه حمل و با مرجع مدرک ثبت کنید.');
+ if(data.freightResolution==='no_charge'&&(data.expenses||[]).some((e:any)=>e.kind==='freight'&&settleAmount(e.amountRial)>BigInt(0)))problems.push('وضعیت بدون هزینه با مبلغ حمل ثبت‌شده سازگار نیست.');
+ }
  const q=Math.round(Number(l.invoiceQuantity)*1000);if(!Number.isSafeInteger(q)||q<=0||!/^\d{1,9}(\.\d{1,3})?$/.test(l.invoiceQuantity))settleFail('مقدار فاکتور معتبر نیست.');const gross=settleAmount(l.unitPrice)*BigInt(q)/BigInt(1000),discount=settleAmount(l.discount);if(discount>gross)settleFail('تخفیف از مبلغ ردیف بیشتر است.');const net=(gross-discount)*rate/MICRO;const f=(finance.lines||[]).find((x:any)=>x.receiptId===l.receiptId)||{};
  const currentPrice=rows.find(x=>x.type==='cost_price'&&x.data.batchId===r.data.batchId);
  const accepted=r.data.accepted||0,received=r.data.quantity; if(!['stored','rejected'].includes(r.data.state))problems.push('QC و جانمایی تکمیل نشده: '+l.receiptId);

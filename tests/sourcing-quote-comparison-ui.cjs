@@ -31,7 +31,12 @@ let compactDraft={partCode:'41',route:'domestic',supplierLinkId:'l-new',supplier
 const compact=()=>SourcingQuoteFields({draft:compactDraft,line,choices:[{linkId:'l-new',name:'New'}],busy:false,notice:'',onPatch:p=>compactDraft={...compactDraft,...p},onNewSupplier(){},onSync(){},onUpload(){},onRemove(){}});
 let formTree=compact();assert.equal(nodes(formTree).filter(n=>n.type==='details'&&n.props.open).length,0);const core=nodes(formTree).find(n=>n.props['data-quote-core']!==undefined);assert.ok(core);assert.ok(!nodes(core).some(n=>['textarea','button'].includes(n.type)));assert.ok(!nodes(formTree).some(n=>n.type==='input'&&n.props.type==='checkbox'));
 let cost=nodes(formTree).find(n=>n.type==='textarea'&&n.props.value===undefined);assert.ok(!nodes(formTree).filter(n=>n.type==='textarea').some(n=>n.props.required));
-compactDraft.extrasRial='10';assert.ok(nodes(compact()).some(n=>n.type==='textarea'&&n.props.required));
+compactDraft.extrasRial='10';assert.ok(!nodes(compact()).some(n=>n.type==='textarea'&&n.props.required),'Domestic freight does not require customs or ancillary notes');
+compactDraft.freightStatus='pending';compactDraft.transportMethod='company';assert.ok(text(compact()).includes('صفر قطعی نیست'));
+compactDraft.freightStatus='known';assert.ok(nodes(compact()).some(n=>n.type==='label'&&text(n).includes('مبلغ حمل همین مقدار')));
+compactDraft.route='foreign';assert.ok(nodes(compact()).some(n=>n.type==='textarea'&&n.props.required));compactDraft.route='domestic';
+const pendingQuotes=quotes.map(q=>q.id==='b'?{...q,data:{...q.data,freight:{status:'pending',method:'company',amountRial:null}}}:q);assert.notEqual(helper.recommendedQuote(line,pendingQuotes,plan.data.needBy,'2026-11-05')?.id,'b','Unknown freight is never recommended as the lowest final cost');
+
 const outcome=label=>nodes(compact()).find(n=>n.type==='button'&&text(n)===label);outcome('پیشنهاد نداد').props.onClick();assert.equal(compactDraft.unavailable,true);assert.equal(compactDraft.unitPrice,'80');assert.ok(!nodes(compact()).some(n=>n.props['data-quote-core']!==undefined));assert.ok(nodes(compact()).some(n=>n.type==='textarea'&&n.props.required));outcome('جست‌وجوی جایگزین').props.onClick();assert.equal(compactDraft.unavailable,false);assert.equal(compactDraft.procurementStatus,'searching');outcome('ثبت قیمت').props.onClick();assert.equal(compactDraft.procurementStatus,'');assert.equal(compactDraft.unitPrice,'80');
 
 // Real containing form: existing answers are excluded from NEW choices; append flag is sent only for a new registered identity.
