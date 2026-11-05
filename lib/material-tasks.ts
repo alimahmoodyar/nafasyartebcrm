@@ -1,4 +1,5 @@
 import {warehouseDirectory,receiptQcOwner} from './material-warehouses';
+import {receiptQCWarehouse} from './warehouse-receipt-policy';
 import {storedAccessPermissions} from './permissions';
 import {storage} from './storage';
 import {supplyLock} from './sourcing';
@@ -9,11 +10,11 @@ export async function syncMaterialTasks(){
  const warehouses=await warehouseDirectory();
  const old=(await db.prepare("SELECT * FROM duty_runs WHERE template_id LIKE 'material:%'").all()).results as any[],wanted=new Set<string>(),stmts:D1PreparedStatement[]=[];
  for(const r of rows){const d=r.data,isQC=r.type==='receipt'&&d.state==='pending_qc',isShelf=r.type==='receipt'&&d.state==='awaiting_warehouse',isIssue=r.type==='request'&&d.state==='pending';if(!isQC&&!isShelf&&!isIssue)continue;
-  const role=isQC?'qc':'inventory',warehouse=warehouses.find(w=>w.id===d.warehouseId),owner=isQC?(warehouse?receiptQcOwner(r,warehouse):d.qcOwner):d.warehouseOwner,title=isQC?'کنترل کیفیت ورودی محموله':isShelf?'جانمایی محموله تأییدشده':'تحویل مواد به تولید';
-  const eligible=members.filter(m=>m.p.flowRoles?.includes(role)||m.p.warehouseResponsibilities?.some((r:any)=>r.role===role&&r.warehouseId===d.warehouseId));
+  const taskWarehouseId=d.warehouseId;const role=isQC?'qc':'inventory',warehouse=isQC?receiptQCWarehouse(r,warehouses):warehouses.find(w=>w.id===d.warehouseId),owner=isQC?(warehouse?receiptQcOwner(r,warehouse):d.qcOwner):d.warehouseOwner,title=isQC?'کنترل کیفیت ورودی محموله':isShelf?'جانمایی محموله تأییدشده':'تحویل مواد به تولید';
+  const eligible=members.filter(m=>m.p.flowRoles?.includes(role)||m.p.warehouseResponsibilities?.some((r:any)=>r.role===role&&r.warehouseId===taskWarehouseId)||warehouse?.[role+'Members']?.some((person:any)=>person.id===m.id));
   const selected=warehouse?(isQC?eligible.filter(m=>m.id===owner):eligible.filter(m=>warehouse.inventoryMembers.some((x:any)=>x.id===m.id))):owner?eligible.filter(m=>m.id===owner):[];
-  for(const m of selected){const id='material:'+r.id+':'+d.state+':'+m.id;wanted.add(id);const prior=old.find(t=>t.id===id);if(prior&&!['completed','cancelled'].includes(prior.state)){if(JSON.parse(prior.data).warehouseId!==(d.warehouseId||''))stmts.push(db.prepare('UPDATE duty_runs SET data=?,revision=revision+1,updated=? WHERE id=?').bind(JSON.stringify({...JSON.parse(prior.data),warehouseId:d.warehouseId||''}),now,id));continue;}
-   const data={title,warehouseId:d.warehouseId||'',sourceSection:'flow',materialWorkflow:true,workflowRole:role,sourceId:r.id,instructions:title+'؛ پرونده '+r.id+' را در گردش مواد و تولید باز کنید. وظیفه با انجام همان مرحله بسته می‌شود.',positionName:isQC?'کنترل کیفیت':'انبار',evidence:'text',remindHours:24,escalateHours:48,history:[],answer:'',extensionRequested:''};
+  for(const m of selected){const id='material:'+r.id+':'+d.state+':'+m.id;wanted.add(id);const prior=old.find(t=>t.id===id);if(prior&&!['completed','cancelled'].includes(prior.state)){if((JSON.parse(prior.data).warehouseId!==(taskWarehouseId||'')||JSON.parse(prior.data).quarantineWarehouseId!==(isQC?d.quarantineWarehouseId||'':'')))stmts.push(db.prepare('UPDATE duty_runs SET data=?,revision=revision+1,updated=? WHERE id=?').bind(JSON.stringify({...JSON.parse(prior.data),warehouseId:taskWarehouseId||'',quarantineWarehouseId:isQC?d.quarantineWarehouseId||'':''}),now,id));continue;}
+   const data={title,warehouseId:taskWarehouseId||'',quarantineWarehouseId:isQC?d.quarantineWarehouseId||'':'',sourceSection:'flow',materialWorkflow:true,workflowRole:role,sourceId:r.id,instructions:title+'؛ پرونده '+r.id+' را در گردش مواد و تولید باز کنید. وظیفه با انجام همان مرحله بسته می‌شود.',positionName:isQC?'کنترل کیفیت':'انبار',evidence:'text',remindHours:24,escalateHours:48,history:[],answer:'',extensionRequested:''};
    if(prior)stmts.push(db.prepare("UPDATE duty_runs SET state='open',revision=revision+1,updated=? WHERE id=?").bind(now,id));else{
     stmts.push(db.prepare("INSERT INTO duty_runs(id,template_id,period,assignee,due,state,data,revision,created,updated) VALUES(?,?,?,?,?,'open',?,1,?,?)").bind(id,'material:'+r.id+':'+d.state,now.slice(0,10),m.id,new Date(Date.now()+86400000).toISOString(),JSON.stringify(data),now,now));
     stmts.push(db.prepare('INSERT INTO duty_notices(id,task_id,recipient,phase,message,created) VALUES(?,?,?,?,?,?)').bind(id+':notice',id,m.id,'initial',title,now));

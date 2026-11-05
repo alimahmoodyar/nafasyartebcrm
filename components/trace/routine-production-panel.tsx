@@ -1,4 +1,5 @@
 'use client';
+import {RefreshButton} from './refresh-button';
 import {ProductLabelSettings} from './product-label-settings';
 import {workMembers} from '@/lib/routine-planning';
 import {ProductionInbox} from './production-inbox';
@@ -31,7 +32,7 @@ export function RoutineProductionPanel({demo=false,finishedProduction}:{demo?:bo
  const roles=data.roles,lot=data.lots.find((l:any)=>l.id===lotId),jobs=data.jobs.filter((j:any)=>(selectedPlan?j.data.planId===selectedPlan:j.data.day===day)),draftJob=data.jobs.find((j:any)=>j.id===draft?.jobId),draftLot=data.lots.find((l:any)=>l.id===draft?.lotId),route=draftLot?.data.route;
  const routeChoices=data.routes.filter((r:any)=>!r.data.productId).map((r:any)=>({id:r.id,code:r.data.partCode||data.materials.find((m:any)=>m.id===r.data.materialId)?.code||'',name:r.data.name+' · نسخه '+n(r.data.version)})),lotChoices=data.lots.map((l:any)=>({id:l.id,code:l.data.route.partCode||'',name:l.data.route.name+' · '+l.data.title}));
  const daily=Object.values(jobs.flatMap((j:any)=>workMembers(j.data).map((m:any)=>({...j,data:{...j.data,memberId:m.id,memberName:m.name}}))).reduce((a:any,j:any)=>{const d=j.data,r=d.report,v=a[d.memberId]||{name:d.memberName,minutes:0,earned:0,low:0,high:0,provisional:false};v.minutes+=['scheduled','cancelled'].includes(d.state)?0:r.usefulMinutes;v.earned+=r.regular*d.step.minutes;v.low+=r.shortfall;v.provisional||=r.provisional;a[d.memberId]=v;return a;},{})) as any[];
- return <ProgramWorkspace programId="routine-production-panel" title="تولید"><section className="panel routine-production" dir="rtl"><div className="panelhead"><div><h2>{{inbox:'کارتابل تولید',jobs:'برنامه تولید روزانه',lots:'موجودی و سوابق',settings:'تنظیمات و کارسنجی'}[tab]}</h2><p className="subtle">سفارش‌ها، برنامه روزانه و کارهای تولید</p></div><button className="btn" onClick={()=>void load().catch(e=>setError(e.message))}>تازه‌سازی</button></div>
+ return <ProgramWorkspace programId="routine-production-panel" title="تولید"><section className="panel routine-production" dir="rtl"><div className="panelhead"><div><h2>{{inbox:'کارتابل تولید',jobs:'برنامه تولید روزانه',lots:'موجودی و سوابق',settings:'تنظیمات و کارسنجی'}[tab]}</h2><p className="subtle">سفارش‌ها، برنامه روزانه و کارهای تولید</p></div><RefreshButton retry={!!error} className="btn" onRefresh={()=>load().catch(e=>setError(e.message))} /></div>
  <div className="routine-production__body">
  {error&&!draft&&<p className="notice error" role="alert">{error}</p>}{message&&<p role="status">{message}</p>}
  <SubprogramNavigation items={Object.entries({inbox:'کارتابل',jobs:'برنامه تولید روزانه',...(roles.staff?{lots:'موجودی و سوابق',settings:'تنظیمات و کارسنجی'}:{})}).map(([id,title])=>[id,title] as [string,string])} value={tab} onChange={key=>{setTab(key);setSelectedPlan('');setFinishedOrder('');setFinishedDevice('')}}/>

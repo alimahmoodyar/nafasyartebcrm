@@ -1,3 +1,4 @@
+import {warehouseDisplayName} from '@/lib/warehouse-tree';
 import {captureForm} from '@/lib/form-control';
 import {requireAccess,checkOrigin,AccessError,accessResponse} from '@/lib/authorization';
 import {storage} from '@/lib/storage';
@@ -22,8 +23,8 @@ export async function GET(){try{
  stock.push({key:s.location,itemId:r.id,kind:'batch',name:r.data.part,code:r.data.code,itemCode:r.data.partCode||'',unit:r.data.unit,warehouseId:wid,location:s.location,quantity:Math.min(s.quantity,Math.max(0,raw-(held?.n||0)))});
  }
  if(warehouseAccess(u,'finished'))for(const b of all.filter(r=>r.type==='build'&&r.data.state==='finished')){const r=records.find(r=>r.id===b.id&&r.kind==='device');if(!r||!balances.some(x=>x.item_id===r.id&&x.warehouse==='finished'&&x.quantity===1000)||!(ownIds.has(b.data.warehouseId)||u.isAdmin&&!b.data.warehouseId))continue;stock.push({key:r.id,itemId:r.id,kind:'device',name:r.data.productName||r.data.model,code:r.data.code,itemCode:r.data.productCode||records.find(p=>p.kind==='product'&&p.id===r.data.product)?.data.code||'',unit:'دستگاه',warehouseId:b.data.warehouseId||'',location:'',quantity:1000});}
- const transfers=all.filter(r=>r.type==='warehouse_transfer'&&(u.isAdmin||ownIds.has(r.data.fromWarehouseId)||ownIds.has(r.data.toWarehouseId))).map(r=>({...r,canReceive:r.data.state==='pending'&&ownIds.has(r.data.toWarehouseId)&&warehouseAccess(u,r.data.kind==='batch'?'raw':'finished'),canCancel:r.data.state==='pending'&&ownIds.has(r.data.fromWarehouseId)&&warehouseAccess(u,r.data.kind==='batch'?'raw':'finished')}));
- return json({warehouses:ws.filter(w=>w.data.active).map(w=>({id:w.id,name:w.data.name,locations:ownIds.has(w.id)?w.data.locations:[],own:ownIds.has(w.id)})),stock:stock.filter(s=>s.quantity>0),transfers});
+ const historicalIds=new Set(ws.filter(w=>warehouseMember(u,w,'inventory')).map(w=>w.id));const transfers=all.filter(r=>r.type==='warehouse_transfer'&&(u.isAdmin||historicalIds.has(r.data.fromWarehouseId)||historicalIds.has(r.data.toWarehouseId))).map(r=>({...r,canReceive:r.data.state==='pending'&&ownIds.has(r.data.toWarehouseId)&&warehouseAccess(u,r.data.kind==='batch'?'raw':'finished'),canCancel:r.data.state==='pending'&&ownIds.has(r.data.fromWarehouseId)&&warehouseAccess(u,r.data.kind==='batch'?'raw':'finished')}));
+ return json({historicalWarehouses:ws.filter(w=>w.data.deletedAt&&transfers.some(t=>[t.data.fromWarehouseId,t.data.toWarehouseId].includes(w.id))).map(w=>({id:w.id,name:warehouseDisplayName(w),deleted:true})),warehouses:ws.filter(w=>w.data.active).map(w=>({id:w.id,name:w.data.name,locations:ownIds.has(w.id)?w.data.locations:[],own:ownIds.has(w.id)})),stock:stock.filter(s=>s.quantity>0),transfers});
  }catch(e){return accessResponse(e)||Response.json({error:'دریافت عملیات انبار ممکن نشد.'},{status:503});}}
 export async function POST(request:Request){try{
  checkOrigin(request);const u=await requireAccess();if(!internalWarehouseUser(u)||!flowRole(u,'inventory'))fail('دسترسی عملیات انبار ندارید.',403);

@@ -1,4 +1,5 @@
 'use client';
+import {RefreshButton} from './refresh-button';
 import {NumberInput} from '@/components/trace/number-input';
 import {IconSections,IconActions} from "./program-workspace";
 import {useEffect,useState} from 'react';
@@ -24,7 +25,7 @@ export function GuaranteesPanel({demo=false,targetId}:{demo?:boolean;targetId?:s
  const proofModes=['issue','confirm_amendment','demand','collection','resolve_demand','terminate','return_original','release_collateral'];
  const actions=!d?[]:d.state==='draft'?['save','submit']:d.state==='review'?['approve','return_review']:d.state==='approved'?['issue','followup']:d.state==='terminated'?['return_original','release_collateral','resolve_demand','collection','followup','close']:d.state==='active'?['request_extension','request_release','followup',...(d.amendment?[d.amendment.approved?'confirm_amendment':'approve_amendment','cancel_amendment']:['amend']),'demand','collection','resolve_demand','terminate']:[];
  const allowed=actions.filter(a=>['return_review','cancel_amendment','approve','approve_amendment','resolve_demand','close'].includes(a)?data?.roles.manager:a.startsWith('request_')?true:data?.roles.treasury);
- return <div className="panel" dir="rtl" style={{fontSize:16}}><div className="panelhead"><h2>ضمانت‌نامه‌ها</h2><IconActions scope="guarantees-panel-actions-802f2886e7"><button className="btn" disabled={busy||demo} onClick={()=>void load()}>تازه‌سازی</button>{data?.roles.treasury&&<button className="btn primary" disabled={busy} onClick={()=>{setSelected('');start('save',null)}}>ضمانت‌نامه جدید</button>}</IconActions></div>
+ return <div className="panel" dir="rtl" style={{fontSize:16}}><div className="panelhead"><h2>ضمانت‌نامه‌ها</h2><IconActions scope="guarantees-panel-actions-802f2886e7"><RefreshButton retry={!!error} className="btn" disabled={busy||demo} onRefresh={()=>load()} />{data?.roles.treasury&&<button className="btn primary" disabled={busy} onClick={()=>{setSelected('');start('save',null)}}>ضمانت‌نامه جدید</button>}</IconActions></div>
  {demo?<p className="empty">ثبت ضمانت‌نامه فقط در محیط شرکت فعال است.</p>:!data&&!error?<p role="status">در حال دریافت…</p>:null}
  {error&&<p role="alert" className="error">{error}</p>}
  {data&&<><p className="footnote">{data.help}</p><p>مسئولان از جایگاه‌های «خزانه دار» و «مدیر مالی» با دسترسی نوشتن مالی تعیین می‌شوند؛ عضویت را در بخش وظایف و سمت‌ها مدیریت کنید.</p>

@@ -16,10 +16,15 @@ async function mint(scope='read'){return (await (await tokens.POST(request('/api
 const production=load('app/api/production/route.ts'),recordsApi=load('app/api/records/route.ts');
 async function create(kind,data){const r=await recordsApi.POST(request('/api/records','POST',{kind,data}));const d=await r.json();assert.equal(r.status,201,JSON.stringify(d));return d.record;}
 async function operate(b,status=200){const r=await production.POST(request('/api/production','POST',{id:crypto.randomUUID(),warehouseId:'warehouse:user',...b}));const d=await r.json();assert.equal(r.status,status,JSON.stringify(d));return d;}
+
+const receivingFixture=require('./helpers/receiving-warehouse.cjs')(sql,{id:'warehouse:user'}),flow=load('app/api/flow/route.ts');
+async function flowop(mode,args={}){const r=await flow.POST(request('/api/flow','POST',{id:crypto.randomUUID(),confirmed:true,mode,...args}));assert.equal(r.status,200,await r.clone().text());return r.json();}
+async function inspectAndShelve(batch,index){await flowop('incoming_qc',{receiptId:batch.id,accepted:'10',values:{quality:'pass'},notes:'Physical QC passed'});await flowop('shelve',{receiptId:batch.id,location:'A-1-1-'+index});}
+async function issueToLine(batch,index,quantity){const requestId=crypto.randomUUID();await flowop('request',{id:requestId,materialId:'material:'+batch.data.partCode,warehouseId:receivingFixture.id,quantity,notes:'Actual production need'});await flowop('issue',{requestId,allocations:[{batchId:batch.id,location:receivingFixture.id+'|A-1-1-'+index,quantity}],reason:''});await flowop('confirm_line_receipt',{requestId,notes:'Physically received'});}
 (async()=>{
  identity=owner;await auth.session();
  await operate({mode:'opening',batchId:'missing',to:'raw',quantity:'1'},400);
- sql.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'material_warehouse',?,1,'2026-10-17','2026-10-17')").run('warehouse:user',JSON.stringify({name:'User-defined store',active:true,locations:[]}));
+ for(const code of ['01','02','03'])await flowop('material',{revision:0,code,name:'Part '+code,unit:'عدد',specs:'',fields:[{key:'quality',label:'QC',type:'result',required:true,unit:'',min:'',max:''}]});
  const p=await create('product',{code:'P1',name:'Device',group:'اکسیژن‌ساز',model:'M',warrantyMonths:'12',status:'فعال'});
  const devices=[];for(let n=0;n<3;n++)devices.push(await create('device',{code:'D'+n,product:p.id,model:'M',design:'1',date:'2026-10-01'}));
  const batches=[];for(let n=1;n<=2;n++)batches.push(await create('batch',{code:'B'+n,partCode:'0'+n,part:'Part'+n,date:'2026-10-01',supplier:'S',quantity:'10',unit:'عدد',status:'تأیید'}));
@@ -27,15 +32,15 @@ async function operate(b,status=200){const r=await production.POST(request('/api
  await operate({mode:'bom',id:bomId,productId:p.id,previousVersion:0,lines});
  await operate({mode:'opening',batchId:batches[0].id,to:'line',quantity:'10',warehouseId:''},400);
  await operate({mode:'opening',batchId:batches[0].id,to:'semi',quantity:'10'},400);
- await operate({mode:'opening',batchId:batches[0].id,to:'line',quantity:'10'});
+ await operate({mode:'opening',batchId:batches[0].id,to:'line',quantity:'10'},400);await operate({mode:'opening',batchId:batches[0].id,to:'quarantine',quantity:'10'});await inspectAndShelve(batches[0],1);await issueToLine(batches[0],1,'10');
  assert.equal(JSON.parse(sql.prepare('SELECT payload FROM records WHERE id=?').get(batches[0].id).payload).warehouseId,'warehouse:user');
- await operate({mode:'opening',batchId:batches[1].id,to:'raw',quantity:'10'});
- await operate({mode:'move',batchId:batches[1].id,from:'raw',to:'line',quantity:'2'});
+ await operate({mode:'opening',batchId:batches[1].id,to:'raw',quantity:'10'},400);await operate({mode:'opening',batchId:batches[1].id,to:'quarantine',quantity:'10'});await inspectAndShelve(batches[1],2);
+ await operate({mode:'move',batchId:batches[1].id,from:'raw',to:'line',quantity:'2'},400);await issueToLine(batches[1],2,'2');
  const orderId=crypto.randomUUID(),allocations=batches.map((b,n)=>({partCode:'0'+(n+1),batchId:b.id,warehouse:'line'}));
  await operate({mode:'order',id:orderId,deviceId:devices[0].id,bomId,day:'2026-10-01',operator:'Operator',notes:'Test',allocations});
  const stock=()=>JSON.stringify(sql.prepare('SELECT * FROM inventory_balances ORDER BY id').all());const before=stock();
  await operate({mode:'finish',orderId},409);assert.equal(stock(),before);assert.equal(sql.prepare('SELECT COUNT(*) AS n FROM production_receipts').get().n,0);assert.equal(sql.prepare("SELECT COUNT(*) AS n FROM records WHERE kind='event'").get().n,0);
- await operate({mode:'move',batchId:batches[1].id,from:'raw',to:'line',quantity:'4'});
+ await issueToLine(batches[1],2,'4');
  // New BOM version must not alter an existing sheet.
  await operate({mode:'bom',productId:p.id,previousVersion:1,lines:lines.map(l=>({...l,quantity:'9'}))});
  const finishId=crypto.randomUUID();await operate({mode:'finish',id:finishId,orderId});const after=stock();await operate({mode:'finish',id:finishId,orderId});await operate({mode:'finish',orderId});assert.equal(stock(),after);
@@ -47,7 +52,7 @@ async function operate(b,status=200){const r=await production.POST(request('/api
  r=await recordsApi.DELETE(request('/api/records','DELETE',{id:batches[0].id,previous:JSON.stringify(batches[0].data),confirmed:true}));assert.equal(r.status,409);
  const blocked=await create('batch',{code:'Q1',partCode:'03',part:'Quarantine',date:'2026-10-01',supplier:'S',quantity:'10',unit:'عدد',status:'قرنطینه'});
  await operate({mode:'opening',batchId:blocked.id,to:'semi',quantity:'5'},400);await operate({mode:'opening',batchId:blocked.id,to:'raw',quantity:'5'},400);await operate({mode:'opening',batchId:blocked.id,to:'quarantine',quantity:'5'});await operate({mode:'move',batchId:blocked.id,from:'quarantine',to:'line',quantity:'1'},400);
- await operate({mode:'move',batchId:batches[0].id,from:'line',to:'raw',quantity:'100'},409);assert.equal(stock().includes('-100'),false);
+ await operate({mode:'move',batchId:batches[0].id,from:'line',to:'semi',quantity:'100'},400);assert.equal(stock().includes('-100'),false);
  assert.equal((await production.GET()).status,200);
  const ps=await call('get_purchase_settlements');assert.ok(!ps.error,JSON.stringify(ps));assert.ok(Array.isArray(ps.settlements));assert.ok((await call('get_purchase_settlement_guide')).help.length);const cg=await call('get_costing');assert.ok(!cg.error,JSON.stringify(cg));assert.ok(cg.devices.length>0);const cp={id:crypto.randomUUID(),mode:'price',confirmed:true,data:{batchId:batches[0].id,unitCost:'100',reference:'TEST-INVOICE',revision:0,notes:'test purchase evidence'}};const cw=await call('costing_apply',cp);assert.ok(!cw.error,JSON.stringify(cw));assert.equal((await call('get_costing')).batches.find(b=>b.id===batches[0].id).price.data.unitCost,'100');
  identity=null;assert.equal((await production.POST(request('/api/production','POST',{mode:'finish',id:crypto.randomUUID(),orderId}))).status,401);

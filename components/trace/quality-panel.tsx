@@ -1,4 +1,5 @@
 "use client";
+import {RefreshButton} from './refresh-button';
 import {NumberInput} from '@/components/trace/number-input';
 import {IconDisclosure,IconActions} from "./program-workspace";
 import {formatDateTime} from '@/lib/persian-date';
@@ -7,7 +8,7 @@ import {Plus,Trash2,ClipboardCheck,Download,RefreshCw} from 'lucide-react';
 import {Select,SelectTrigger,SelectValue,SelectContent,SelectItem} from '@/components/ui/select';
 import {BatchFilesPanel} from './batch-files-panel';
 import {qualityFields,qualityValues,type QField,type QTemplate,type QReport} from '@/lib/quality';
-const blank=(key:string):QField=>({key,label:'',type:'number',unit:'',min:'',max:'',required:true});
+const blank=(key:string):QField=>({key,label:'',type:'number',unit:'',min:'',max:'',textGuide:'',required:true});
 function Choice({value,onChange,options,label,disabled=false}:{value:string;onChange:(v:string)=>void;options:[string,string][];label:string;disabled?:boolean}){return <Select dir="rtl" value={value||'empty'} onValueChange={v=>onChange(v==='empty'?'':v)} disabled={disabled}><SelectTrigger aria-label={label}><SelectValue/></SelectTrigger><SelectContent><SelectItem value="empty">انتخاب کنید</SelectItem>{options.map(([k,v])=><SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent></Select>;}
 export function QualityPanel({id,mode,demo,write,onSaved,fixedTemplateId}:{fixedTemplateId?:string;id:string;mode:'product'|'device';demo:boolean;write:boolean;onSaved?:()=>void}){
  const [templates,setTemplates]=useState<QTemplate[]>([]),[reports,setReports]=useState<QReport[]>([]),[loading,setLoading]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState(''),[editing,setEditing]=useState(false);
@@ -20,9 +21,9 @@ export function QualityPanel({id,mode,demo,write,onSaved,fixedTemplateId}:{fixed
  const r=await fetch('/api/quality/'+(mode==='product'?'templates':'reports'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),d=await r.json() as {error?:string;template?:QTemplate;report?:QReport};if(!r.ok)throw new Error(d.error);if(mode==='product'&&d.template)setTemplates(p=>[d.template!,...p]);if(mode==='device'&&d.report){setReports(p=>[d.report!,...p.filter(x=>x.id!==d.report!.id)]);onSaved?.();}setEditing(false);setMessage(mode==='product'?'نسخه فرم ذخیره شد.':'برگ کنترل کیفیت و رویداد آزمون نهایی ثبت شد. فایل‌های آزمون را پایین همین برگه پیوست کنید.');}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
  function patch(i:number,data:Partial<QField>){setFields(prev=>prev.map((f,n)=>n===i?{...f,...data}:f));}
  function exportReport(r:QReport){const u=URL.createObjectURL(new Blob([JSON.stringify({format:'nafasyar-quality-report-v1',...r},null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=u;a.download='quality-'+r.id+'.json';a.click();URL.revokeObjectURL(u);}
- return <section className="detailsection"><IconActions scope="quality-panel-actions-f2f68f72ac"><h2><ClipboardCheck size={18} style={{display:'inline',marginLeft:8}}/>{mode==='product'?'فرم کنترل کیفیت محصول':'برگ‌های کنترل کیفیت دستگاه'}</h2>{!demo&&<button type="button" className="btn" disabled={loading||busy||editing} onClick={load}><RefreshCw size={16}/>تازه‌سازی</button>}</IconActions>
+ return <section className="detailsection"><IconActions scope="quality-panel-actions-f2f68f72ac"><h2><ClipboardCheck size={18} style={{display:'inline',marginLeft:8}}/>{mode==='product'?'فرم کنترل کیفیت محصول':'برگ‌های کنترل کیفیت دستگاه'}</h2>{!demo&&<RefreshButton retry={!!error} type="button" className="btn" disabled={loading||busy||editing} onRefresh={load} />}</IconActions>
  {demo?<p className="subtle">در اطلاعات شرکت، فرم را در شناسنامه محصول تعریف کنید و برای هر دستگاه تکمیل و عکس یا فایل آزمون را پیوست کنید.</p>:<>
- {mode==='product'&&<p className="subtle">معیارها و حدود پذیرش را تعریف کنید. تغییر فرم، نسخه جدید می‌سازد و برگه‌های قبلی حفظ می‌شوند.</p>}
+ {mode==='product'&&<p className="subtle">{write?'معیارها و حدود پذیرش را تعریف کنید. تغییر فرم، نسخه جدید می‌سازد و برگه‌های قبلی حفظ می‌شوند.':'فرم‌ها و نسخه‌های کنترل کیفیت ثبت‌شدهٔ این محصول'}</p>}
  {loading&&<p role="status">در حال دریافت فرم‌ها…</p>}{error&&<p className="notice error" role="alert">{error}</p>}{message&&<p className="notice" role="status">{message}</p>}
  {!loading&&!editing&&write&&<button className="btn primary" type="button" style={{marginTop:12}} disabled={mode==='device'&&!templates.length||!!error} onClick={begin}><Plus size={16}/>{mode==='product'?(templates.length?'تعریف نسخه جدید فرم':'تعریف فرم کنترل کیفیت'):'ثبت آزمون جدید'}</button>}
  {!loading&&!templates.length&&!error&&<p className="subtle">{mode==='product'?'هنوز فرم کنترل کیفیت تعریف نشده است.':'ابتدا در بخش تعریف محصولات، فرم کنترل کیفیت این محصول را تعریف کنید.'}</p>}

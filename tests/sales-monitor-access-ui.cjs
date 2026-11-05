@@ -8,7 +8,7 @@ const fixture=(manager,reader,canFollowup)=>({today:'2026-10-13',manager,reportR
 const metrics={newOrders:0,newOrderAmount:'0',invoices:0,invoiced:'100',cancelled:0,netSales:'100',collections:'20',discounts:'0',returns:'0'},report={id:'archive',data:{kind:'daily',start:'2026-10-12',end:'2026-10-12',asOf:'2026-10-13',previousStart:'2026-10-05',previousEnd:'2026-10-05',summary:['MANAGEMENT_REPORT_CONTENT'],current:metrics,previous:metrics,concentration:[],inactive:[],priority:[],byAgent:[],products:[],team:[],pipeline:[],due:[],checksDue:[],pastAlerts:[],notes:[]}};
 const tick=()=>new Promise(r=>setImmediate(r));
 function tree(){cursor=0;return SalesMonitorPanel({workspace,onOpenAgent(){},onTasks(){}})}
-function button(label){return nodes(tree()).find(n=>n.type==='button'&&text(n)===label)}
+function button(label){if(label==='تازه‌سازی'){const control=nodes(tree()).find(n=>n.type===leaves.RefreshButton);return control?{props:{onClick:control.props.onRefresh}}:undefined;}return nodes(tree()).find(n=>n.type==='button'&&text(n)===label)}
 async function mount(data,mode){slots=[];effects=[];requests=[];workspace=mode;reply={ok:true,json:async()=>data};preview={ok:true,json:async()=>({report})};tree();effects.splice(0).forEach(f=>f());await tick();tree();effects=[]}
 (async()=>{
  await mount(fixture(false,true,false),'alerts');assert.ok(!nodes(tree()).some(n=>n.type===leaves.SubprogramNavigation),'Embedded reporting does not duplicate its parent navigation');for(const label of ['ثبت نتیجه و اقدام بعدی','مسئول و مهلت','بررسی الآن و تهیه گزارش‌های سررسیده','ثبت وصول جایگزین چک'])assert.equal(button(label),undefined,'Read-only manager report hides '+label);assert.ok(button('پرونده نماینده'));

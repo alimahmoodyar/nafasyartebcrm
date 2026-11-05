@@ -51,7 +51,7 @@ const alloc=c.data.allocations[0];await action('void',{kind:'allocations',itemId
 user={userId:'other',permissions:{supplyRoles:['foreign']}};assert.equal((await get()).cases.length,0);assert.equal((await filesApi.GET(new Request('https://test.local/api/purchase-payables/files?id='+fileId))).status,404);
 await post(body('hold',{caseId:cid,revision:c.revision,itemId:iid}),404);
 user={userId:'rep',permissions:{finance:'write',salesAgentId:'r'}};assert.equal((await api.GET()).status,403);
-user={userId:'read',permissions:{finance:'read'}};assert.equal((await api.GET()).status,200);await action('hold',{itemId:iid},403);
+user={userId:'read',permissions:{finance:'read'}};assert.equal((await api.GET()).status,403);await post(body('hold',{caseId:cid,revision:c.revision,itemId:iid}),403);
 user=finance;
 // Idempotent atomic transaction and freeze / reset rollback.
 const a=body('hold',{caseId:cid,revision:(await current()).revision,itemId:iid});await post(a);await post(a);assert.equal(sql.prepare('SELECT COUNT(*) n FROM inventory_operations WHERE id=?').get(a.id).n,1);

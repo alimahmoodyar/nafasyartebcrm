@@ -1,6 +1,6 @@
 "use client";
 import {Fragment,isValidElement,cloneElement,createContext,useCallback,useContext,useEffect,useLayoutEffect,useMemo,useRef,useState,type ReactNode,type ReactElement,type CSSProperties} from 'react';
-import {ArrowRight,Boxes,ClipboardList,FileText,Users,Settings2,ChartNoAxesCombined,Wallet,Truck,Wrench,Factory,CalendarDays,BookOpen,Mail,ShieldCheck,type LucideIcon} from 'lucide-react';
+import {ArrowRight,Boxes,ClipboardList,ClipboardPlus,History,FileText,Users,Settings2,ChartNoAxesCombined,Wallet,Truck,Wrench,Factory,CalendarDays,BookOpen,Mail,ShieldCheck,type LucideIcon} from 'lucide-react';
 import {PersonalHome} from './personal-home';
 import {createPortal} from 'react-dom';
 import {currentWorkspaceBack,type WorkspaceBackEntry} from '@/lib/workspace-back';
@@ -44,6 +44,8 @@ type WorkspaceContext={register:(menu:Menu|null)=>void;showHome:boolean;open:()=
 const NavigationContext=createContext<WorkspaceContext|null>(null);
 export function subprogramIcon(key:string,title:string):LucideIcon{
  const text=key+' '+title;
+ if(/history|سوابق|تاریخچه|پیگیری/.test(text))return History;
+ if(/request|درخواست/.test(text))return ClipboardPlus;
  if(/\bterms\b|template|الگو/.test(text))return FileText;
  if(/settings|polic|تنظیم|قواعد|استاندارد/.test(text))return Settings2;
  if(/report|analysis|overview|گزارش|تحلیل/.test(text))return ChartNoAxesCombined;
@@ -79,14 +81,14 @@ export function ProgramWorkspace({programId,title,direct=false,children,status}:
  <ProgramPathContext.Provider value={path+(menu?.value?'/'+menu.value:'')}><div className="program-workspace-content" hidden={canLaunch&&showHome}>{children}</div></ProgramPathContext.Provider>
  </div></NavigationContext.Provider>;
 }
-export function SubprogramNavigation({items,value,onChange}:{items:[string,string][];value:string;onChange:(key:string)=>void|boolean}){
+export function SubprogramNavigation({items,value,onChange,showLabel=true}:{items:[string,string][];value:string;onChange:(key:string)=>void|boolean;showLabel?:boolean}){
  const context=useContext(NavigationContext),change=useRef(onChange),previous=useRef(value);change.current=onChange;
  const accountId=useContext(AccountContext),activeSection=useContext(ActiveSectionContext),breadcrumbFor=context?.breadcrumb;const itemsRef=useRef(items);itemsRef.current=items;const select=useCallback((key:string)=>{const result=change.current(key);if(result!==false){window.dispatchEvent(new CustomEvent('nafasyar-program-navigation',{detail:{accountId}}));const currentItems=itemsRef.current;publishWorkspaceBreadcrumb(accountId,activeSection,breadcrumbFor?.(currentItems,key)||[currentItems.find(([id])=>id===key)?.[1]||'']);}return result;},[accountId,activeSection,breadcrumbFor]);
  const signature=JSON.stringify(items),register=context?.register;
  useLayoutEffect(()=>{if(!register)return;register({items:JSON.parse(signature),value,onChange:select});return()=>register(null)},[register,signature,value,select]);
  useEffect(()=>{if(previous.current!==value){previous.current=value;context?.reveal()}},[value,context?.reveal]);
  if(!context)return <nav className="tools" aria-label="زیر‌برنامه‌ها">{items.map(([key,title])=><button className={'btn '+(value===key?'primary':'')} key={key} onClick={()=>select(key)}>{title}</button>)}</nav>;
- const title=items.find(([key])=>key===value)?.[1];return title?<p className="subtle" aria-label="مسیر زیر‌برنامه">{title}</p>:null;
+ const title=items.find(([key])=>key===value)?.[1];return showLabel&&title?<p className="subtle" aria-label="مسیر زیر‌برنامه">{title}</p>:null;
 }
 
 export function IconSections({scope,title='برنامه‌های این بخش',items}:{scope:string;title?:string;items:{key:string;title:string;content:ReactNode}[]}){

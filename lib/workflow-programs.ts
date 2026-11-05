@@ -9,7 +9,7 @@ export const roleWorkflowPrograms:Record<string,string[]>={
  production:['build-intake','build-projects','routine-production','sourcing','flow','fulfillment','event','device','serials','analytics'],
  production_worker:['routine-production'],
  planning:['sourcing'],
- engineering:['build-intake','qms','sourcing','routine-production','build-projects'],
+ engineering:['build-intake','qms','sourcing','routine-production','build-projects','flow'],
  qc:['qms','sourcing','flow','routine-production','build-projects','action'],
  domestic:['sourcing','transport'],foreign:['sourcing','transport'],commerce:['sourcing','transport'],
  domestic_commerce_lead:['sourcing','transport'],foreign_commerce_lead:['sourcing','transport'],

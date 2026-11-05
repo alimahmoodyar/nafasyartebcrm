@@ -6,7 +6,7 @@ import type {Session} from './permissions';
 // mirrored inventory_balances service buckets to the same report.
 export const stockServiceDomains=(u:Session)=>['home','hospital'].filter(d=>domainAccess(u,d)&&role(u,'inventory'));
 export async function serviceWarehouseStock(u:Session,warehouses:any[]){
- const entries:any[]=[],visible=new Set<string>(),db=storage();
+ warehouses=warehouses.filter(w=>!w.data.deletedAt);const entries:any[]=[],visible=new Set<string>(),db=storage();
  for(const domain of stockServiceDomains(u)){
   const lots=(await db.prepare("SELECT l.id,l.owner,l.batch_id,l.quantity,r.payload,json_extract(receipt.data,'$.materialId') material_id,COALESCE((SELECT SUM(s.quantity) FROM service_reservations s WHERE s.lot_id=l.id),0) reserved FROM service_lots l JOIN records r ON r.id=l.batch_id LEFT JOIN flow_entities receipt ON receipt.id=l.batch_id AND receipt.type='receipt' WHERE l.domain=? AND l.quantity>0").bind(domain).all()).results as any[];
   const agents=(await db.prepare("SELECT id,data FROM flow_entities WHERE type='as_agent' AND json_extract(data,'$.domain')=?").bind(domain).all()).results.map((r:any)=>({id:r.id,data:JSON.parse(r.data)}));

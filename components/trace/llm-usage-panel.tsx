@@ -1,4 +1,5 @@
 'use client';
+import {RefreshButton} from './refresh-button';
 import {IconDisclosure} from "./program-workspace";
 import {IconSections} from "./program-workspace";
 import {useEffect,useState} from 'react';
@@ -19,7 +20,7 @@ export function LlmUsagePanel({demo,accountId}:{demo:boolean;accountId:string}){
  if(demo)return <div className="panel empty">گزارش مصرف واقعی مدل در بخش اطلاعات شرکت در دسترس است.</div>;
  const summary=data?.summary;
  return <section className="llm-usage" aria-labelledby="usage-title">
- <div className="usage-heading"><div><h2 id="usage-title">گزارش مصرف هوش مصنوعی</h2><p className="subtle">توکن‌های ورودی، خروجی و مجموع هر فراخوانی سرویس</p></div><button className="btn" disabled={busy} onClick={()=>setRefresh(n=>n+1)}>تازه‌سازی</button></div>
+ <div className="usage-heading"><div><h2 id="usage-title">گزارش مصرف هوش مصنوعی</h2><p className="subtle">توکن‌های ورودی، خروجی و مجموع هر فراخوانی سرویس</p></div><RefreshButton retry={!!error} className="btn" disabled={busy} onRefresh={()=>setRefresh(n=>n+1)} /></div>
  <form className="panel usage-filters" onSubmit={e=>{e.preventDefault();setQuery(q=>({...q,from:start,to:end,page:1,userPage:1}));setRefresh(n=>n+1);}}>
  <SolarDate label="از تاریخ" value={start} onChange={setStart}/><SolarDate label="تا تاریخ" value={end} onChange={setEnd}/>
  <label className="field">تعداد ردیف در صفحه<select value={query.pageSize} onChange={e=>setQuery(q=>({...q,pageSize:Number(e.target.value),page:1,userPage:1}))}>{[10,25,50,100].map(n=><option key={n} value={n}>{number(n)}</option>)}</select></label>

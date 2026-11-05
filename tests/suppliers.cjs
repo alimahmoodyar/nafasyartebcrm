@@ -23,10 +23,11 @@ const entities=type=>sql.prepare('SELECT * FROM flow_entities WHERE type=? ORDER
 const stock=(id,wh)=>sql.prepare('SELECT quantity FROM inventory_balances WHERE item_id=? AND warehouse=?').get(id,wh)?.quantity||0;
 // Serialize test transactions as D1 does; callers may still read the same stale version.
 let batchTail=Promise.resolve();const rawBatch=db.batch.bind(db);db.batch=stmts=>{const next=batchTail.then(()=>rawBatch(stmts));batchTail=next.catch(()=>{});return next};
+const receivingFixture=require('./helpers/receiving-warehouse.cjs')(sql);
 const sourcing=load('app/api/sourcing/route.ts'),context=load('lib/mcp/context.ts').mcpActor;
 const current=id=>entities('sourcing_plan').find(p=>p.id===id);
 const actor=role=>({userId:role+'User',email:role+'@test.local',name:role,isAdmin:false,permissions:{read:[],write:[],eventStages:[],supplyRoles:[role],flowRoles:role==='inventory'?['inventory']:[],warehouses:role==='inventory'?['quarantine','raw']:[]}});
-async function source(mode,b={},status=200,user){const body={id:crypto.randomUUID(),mode,...(b.planId?{revision:current(b.planId).revision}:{}),...b};const go=()=>sourcing.POST(request('/api/sourcing','POST',body));const r=user?await context.run(user,go):await go(),d=await r.json();assert.equal(r.status,status,mode+': '+JSON.stringify(d));return {...d,operationId:body.id};}
+async function source(mode,b={},status=200,user){const body={id:crypto.randomUUID(),mode,warehouseId:receivingFixture.id,...(b.planId?{revision:current(b.planId).revision}:{}),...b};const go=()=>sourcing.POST(request('/api/sourcing','POST',body));const r=user?await context.run(user,go):await go(),d=await r.json();assert.equal(r.status,status,mode+': '+JSON.stringify(d));return {...d,operationId:body.id};}
 async function detail(id,user){const go=()=>sourcing.GET(request('/api/sourcing?id='+id));const r=user?await context.run(user,go):await go();assert.equal(r.status,200);return r.json();}
 
 const suppliers=load('app/api/suppliers/route.ts'),domain=load('lib/suppliers.ts');
@@ -36,11 +37,13 @@ async function supplier(mode,b={},status=200,user=actor('domestic')){const body=
  identity=owner;await auth.session();
  const today=load('lib/duties.ts').dayAt(),later=new Date(Date.now()+10*86400000).toISOString().slice(0,10),future=new Date(Date.now()+20*86400000).toISOString().slice(0,10),now=new Date().toISOString();
  for(const role of ['sales','ceo','inventory','engineering','finance','domestic','foreign']){const a=actor(role);sql.prepare("INSERT INTO app_members(id,email,name,unit,status,subject,permissions,revision,created,updated) VALUES(?,?,?,'test','active',?,?,1,?,?)").run(a.userId,a.email,a.name,a.userId,JSON.stringify(a.permissions),now,now);}
- const p=await create('product',{code:'SUP',name:'SupplierTest',group:'G',model:'M',productionMode:'project',warrantyMonths:'12',status:'فعال'});
+ sql.prepare("UPDATE app_members SET permissions=? WHERE id='inventoryUser'").run(JSON.stringify({...actor('inventory').permissions,warehouseResponsibilities:[{warehouseId:receivingFixture.id,role:'inventory'}]}));
+ const p=await create('product',{code:'SUP',name:'SupplierTest',group:'سایر تجهیزات پزشکی',model:'M',productionMode:'project',warrantyMonths:'12',status:'فعال'});
  await op('material',{code:'01',name:'Part',unit:'عدد',specs:'V1',defaultLocation:'A-1-1-1',reorderPoint:'0',targetStock:'0',fields:[{key:'quality',label:'Quality',type:'number',unit:'%',min:'90',max:'100',required:true}],qcOwner:'',warehouseOwner:'',procurementOwner:'',revision:0});
  const material=entities('material')[0];
  await source('routes',{materialId:material.id,revision:material.revision,routes:['domestic']},200,actor('engineering'));
  await operate({mode:'bom',productId:p.id,previousVersion:0,lines:[{partCode:'01',name:'Part',unit:'عدد',quantity:'2'}]});
+ const effectivity=load('app/api/bom-effectivity/route.ts'),effectBody={mode:'preview',productId:p.id,bomId:sql.prepare('SELECT id FROM bom_versions WHERE product_id=?').get(p.id).id,scope:'future',notes:'approved QA release'};let effectResponse=await effectivity.POST(request('/api/bom-effectivity','POST',effectBody)),effect=await effectResponse.json();effectResponse=await effectivity.POST(request('/api/bom-effectivity','POST',{...effectBody,mode:'apply',id:crypto.randomUUID(),confirmed:true,qualityConfirmed:true,token:effect.token}));assert.equal(effectResponse.status,200);
  const supplierBody={name:'Factory A',country:'ایران',phone:'02100000000',contact:'Contact',route:'domestic',kind:'manufacturer',active:true};
  await supplier('supplier',supplierBody,403,actor('sales'));
  await supplier('supplier',{...supplierBody,confirmed:false},400);
@@ -53,13 +56,19 @@ async function supplier(mode,b={},status=200,user=actor('domestic')){const body=
  await supplier('review',review,403,actor('ceo'));await supplier('review',{...review,scores:{quality:101}},400,qc);
  await supplier('review',review,200,qc);assert.equal(entities('supplier_review')[0].data.score,null);
  const pid=(await source('create',{productId:p.id,count:5,origin:'forecast',needBy:future,reference:'RFQ',notes:'test'},200,actor('sales'))).planId;
- await source('approve',{planId:pid,count:5,needBy:future,notes:'approved'},200,actor('ceo'));await source('calculate',{planId:pid,notes:'start'},200,actor('inventory'));
+ await source('approve',{planId:pid,count:5,needBy:future,notes:'approved'},200,actor('ceo'));await source('calculate',{planId:pid,notes:'start'},200,actor('inventory'));await source('inventory_confirm',{planId:pid,confirmed:true,inventoryToken:(await detail(pid)).inventoryToken,notes:'warehouse reviewed'},200,actor('inventory'));
  let d=await detail(pid,actor('domestic'));assert.equal(d.work.filter(w=>w.role==='domestic').length,2);assert.ok(d.work.some(w=>w.instructions?.includes('02100000000')&&w.instructions.includes('V1')));
  const task=sql.prepare("SELECT * FROM duty_runs WHERE assignee='domesticUser' AND state='open' LIMIT 1").get();assert.ok(JSON.parse(task.data).sourcingWorkflow);
  const tasks=load('app/api/tasks/route.ts');assert.equal((await context.run(actor('domestic'),()=>tasks.POST(request('/api/tasks','POST',{id:crypto.randomUUID(),mode:'submit',taskId:task.id,revision:task.revision,note:'done'})))).status,400);
- const quote={planId:pid,partCode:'01',route:'domestic',supplierLinkId:l1.id,supplier:'spoof',unitPrice:'100',currency:'IRR',fxRate:'1',fxDate:today,fxSource:'rial',extrasRial:'0',costNotes:'included',eta:later,validUntil:future,paymentTerms:'cash',specs:'V1',reference:'Q-1'};
+ const quote={planId:pid,partCode:'01',route:'domestic',supplierLinkId:l1.id,supplier:'spoof',unitPrice:'100',currency:'IRR',fxRate:'1',fxDate:today,fxSource:'rial',extrasRial:'0',costNotes:'included',eta:later,validUntil:future,paymentTerms:'cash',specs:'V1',reference:'Q-1',validityDays:20,quoteDate:today,transportMethod:'company',freightStatus:'pending'};
  await source('quote',{...quote,supplierLinkId:''},400,actor('domestic'));
- await source('quote',quote,200,actor('domestic'));let q=entities('sourcing_quote')[0];assert.equal(q.data.supplier,'Factory A');
+ await source('quote',{...quote,validityDays:0},400,actor('domestic'));
+ await source('quote',{...quote,validityDays:1.5},400,actor('domestic'));
+ await source('quote',{...quote,quoteDate:future},400,actor('domestic'));
+ await source('quote',{...quote,quoteDate:'2020-01-01',validityDays:1},400,actor('domestic'));
+ await source('quote',{...quote,transportMethod:'seller',freightStatus:'known',freightAmount:'0'},400,actor('domestic'));
+ await source('quote',{...quote,transportMethod:'invalid'},400,actor('domestic'));
+ await source('quote',quote,200,actor('domestic'));let q=entities('sourcing_quote')[0];assert.equal(q.data.supplier,'Factory A');assert.equal(q.data.freight.amountRial,null);assert.equal(q.data.freight.status,'pending');assert.equal(q.data.validityDays,20);assert.equal(q.data.quoteDate,today);assert.equal(q.data.validUntil,load('lib/quote-validity.ts').quoteValidity(today,20).validUntil);
  await source('quote',quote,409,actor('domestic'));
  await source('technical',{planId:pid,quoteId:q.id,quoteRevision:q.revision,result:'pass',notes:'matches'},200,actor('engineering'));
  await source('award',{planId:pid,partCode:'01',quoteId:q.id,notes:'Choose qualified supplier'},400,actor('ceo'));
@@ -89,6 +98,9 @@ async function supplier(mode,b={},status=200,user=actor('domestic')){const body=
  await source('issue_order',{planId:pid,orderId:order.id,reference:'PAY'},409,actor('finance'));
  await tech('supplier_material',l1.id,'quality','release',qa);
  await source('issue_order',{planId:pid,orderId:order.id,reference:'PAY'},200,actor('finance'));
+ await source('track',{planId:pid,orderId:order.id,stage:'shipped',eta:later,notes:'Company collection',reference:'M1'},400,actor('domestic'));
+ await source('track',{planId:pid,orderId:order.id,stage:'shipped',eta:later,notes:'Company collection',reference:'M1',vehicle:'Company van 01',driver:'Actual driver',pickupDay:today,missionReference:'MISSION-1'},200,actor('domestic'));
+ assert.equal(entities('purchase_order').find(o=>o.id===order.id).data.history.at(-1).pickup.missionReference,'MISSION-1');
  await source('receive',{orderId:order.id,day:today,quantity:'10',notes:'received'},200,actor('inventory'));
  const receipt=entities('receipt')[0];await op('incoming_qc',{receiptId:receipt.id,accepted:'9',rejected:'1',values:{quality:'95'},notes:'one rejected'});
  const metrics=await domain.supplierMetrics(link);assert.equal(metrics.quality,90);assert.equal(metrics.delivery,100);
@@ -97,7 +109,7 @@ async function supplier(mode,b={},status=200,user=actor('domestic')){const body=
  const reviewNow=entities('supplier_material').find(l=>l.id===l1.id);
  const mcpReview=await catalog.executeTool('review_material_supplier',{id:crypto.randomUUID(),linkId:l1.id,revision:reviewNow.revision,status:'approved',qualityRisk:'low',supplyRisk:'medium',reviewDue:future,rationale:'review via same handler',evidence:'QC-MCP',restrictions:'',maxQuantity:'',scores:{},confirmed:true},base,{user:qc,scope:'read_write',tokenId:null});assert.equal(mcpReview.saved,true);
  const pid2=(await source('create',{productId:p.id,count:1,origin:'forecast',needBy:future,reference:'RFQ-2'})).planId;
- await source('approve',{planId:pid2,count:1,needBy:future,notes:'approved'});await source('calculate',{planId:pid2,notes:'start'});
+ await source('approve',{planId:pid2,count:1,needBy:future,notes:'approved'});await source('calculate',{planId:pid2,notes:'start'});await source('inventory_confirm',{planId:pid2,confirmed:true,inventoryToken:(await detail(pid2)).inventoryToken,notes:'warehouse reviewed'});
  const oldRound=current(pid2).data.lines[0].round;await source('quote',{...quote,planId:pid2});
  await source('refresh_suppliers',{planId:pid2,notes:'new round after supplier change'},200,actor('engineering'));
  assert.equal(current(pid2).data.lines[0].round,oldRound+1);assert.equal((await detail(pid2,actor('domestic'))).work.filter(w=>w.role==='domestic').length,2);
@@ -134,6 +146,69 @@ async function supplier(mode,b={},status=200,user=actor('domestic')){const body=
  await assert.rejects(()=>catalog.executeTool('control_purchase_technical',{...args,id:crypto.randomUUID()},base,{...mp,scope:'read'}),/read-only/);
  const reset=load('lib/reset-contract.ts');assert.ok(reset.resetFlowCatalog.includes('material'));assert.ok(reset.resetFlowCatalog.includes('supplier_material'));
  sql.exec("UPDATE reset_control SET phase='maintenance'");await tech('material',material.id,'quality','hold',qa,{},423);sql.exec("UPDATE reset_control SET phase='testing'");
+ const linked=await supplier('supplier',{route:'domestic',kind:'manufacturer',active:true,name:'RFQ shortcut',country:'ایران',contact:'Contact',phone:'02112345678',linkMaterialId:material.id});
+ const shortcut=entities('supplier_material').find(l=>l.data.supplierId===linked.id);
+ assert.equal(shortcut.data.materialId,material.id);assert.equal(shortcut.data.status,'pending');assert.equal(shortcut.data.partCode,material.data.code);assert.equal(shortcut.data.unit,material.data.unit);assert.ok(domain.qualification(shortcut,entities('supplier').find(x=>x.id===linked.id),material),'No automatic qualification');
+ const repeat=await context.run(actor('domestic'),()=>suppliers.POST(request('/api/suppliers','POST',linked.body)));assert.equal(repeat.status,200);assert.equal(entities('supplier_material').filter(l=>l.data.supplierId===linked.id).length,1);
+ const beforeBad=entities('supplier').length;
+ await supplier('supplier',{route:'domestic',kind:'manufacturer',active:true,name:'Invalid',country:'ایران',contact:'Contact',phone:'02112345678',linkMaterialId:'missing'},404);
+ assert.equal(entities('supplier').length,beforeBad);
+ await supplier('supplier',{route:'foreign',kind:'manufacturer',active:true,name:'Wrong route',country:'ایران',contact:'Contact',phone:'02112345678',linkMaterialId:material.id},403);
+ await supplier('supplier',{route:'domestic',kind:'manufacturer',active:true,name:'Denied',country:'ایران',contact:'Contact',phone:'02112345678',linkMaterialId:material.id},403,qc);
+ assert.equal(entities('supplier').length,beforeBad);
+ assert.ok(catalog.tools.find(t=>t.name==='save_supplier').inputSchema.properties.linkMaterialId);
+
+
+ // A buyer can add a new pending source to this round without rewriting another source or quote.
+ const syncPlan=(await source('direct_request',{materialId:material.id,materialRevision:entities('material').find(x=>x.id===material.id).revision,quantity:'3',needPriority:'normal',needBy:future,confirmed:true},200,actor('inventory'))).planId;
+ const late=await supplier('supplier',{route:'domestic',kind:'manufacturer',active:true,name:'Late RFQ supplier',country:'ایران',contact:'Contact',phone:'02122222222',linkMaterialId:material.id});
+ const lateLink=entities('supplier_material').find(x=>x.data.supplierId===late.id),priorPlan=current(syncPlan),priorRound=priorPlan.data.lines[0].round,priorTargets=priorPlan.data.supplierTargets.filter(t=>!t.missing),beforeQuotes=JSON.stringify(entities('sourcing_quote'));
+ const argsSync={planId:syncPlan,partCode:material.data.code,round:priorRound,route:'domestic',confirmed:true,notes:'New linked source'};
+ await source('sync_rfq_suppliers',{...argsSync,confirmed:false},400,actor('domestic'));
+ await source('sync_rfq_suppliers',argsSync,403,actor('finance'));
+ await source('sync_rfq_suppliers',{...argsSync,round:99},409,actor('domestic'));
+ const resultSync=await source('sync_rfq_suppliers',argsSync,200,actor('domestic'));
+ const afterSync=current(syncPlan);assert.equal(afterSync.data.lines[0].round,priorRound);assert.equal(afterSync.data.supplierTargets.filter(t=>t.linkId===lateLink.id).length,1);for(const old of priorTargets)assert.deepEqual(afterSync.data.supplierTargets.find(t=>t.linkId===old.linkId),old);assert.equal(JSON.stringify(entities('sourcing_quote')),beforeQuotes);assert.equal(entities('supplier_material').find(x=>x.id===lateLink.id).data.status,'pending');
+ const retry=await context.run(actor('domestic'),()=>sourcing.POST(request('/api/sourcing','POST',{id:resultSync.operationId,mode:'sync_rfq_suppliers',warehouseId:receivingFixture.id,revision:priorPlan.revision,...argsSync})));assert.equal(retry.status,200);assert.equal((await retry.json()).repeated,true);
+ const syncToolArgs={id:crypto.randomUUID(),planId:syncPlan,revision:afterSync.revision,partCode:material.data.code,round:priorRound,route:'domestic',confirmed:true,notes:'Same source retry through MCP'};
+ await assert.rejects(()=>catalog.executeTool('sync_rfq_suppliers',syncToolArgs,base,{user:actor('domestic'),scope:'read',tokenId:null}),/read-only/);
+ await catalog.executeTool('sync_rfq_suppliers',syncToolArgs,base,{user:actor('domestic'),scope:'read_write',tokenId:null});assert.equal(current(syncPlan).data.supplierTargets.filter(t=>t.linkId===lateLink.id).length,1);
+
+ await op('material',{code:'02',name:'Unlinked RFQ material',unit:'عدد',specs:'Spec2',fields:[{key:'quality',label:'Quality',type:'number',unit:'%',min:'90',max:'100',required:true}]});const otherMaterial=entities('material').find(m=>m.data.code==='02');
+ await source('routes',{materialId:otherMaterial.id,revision:otherMaterial.revision,routes:['domestic','foreign']},200,actor('engineering'));
+ const emptyPlan=(await source('direct_request',{materialId:otherMaterial.id,materialRevision:entities('material').find(x=>x.id===otherMaterial.id).revision,quantity:'1',needPriority:'normal',confirmed:true},200,actor('inventory'))).planId;
+ const foreignMissing=current(emptyPlan).data.supplierTargets.find(t=>t.route==='foreign');
+ const found=await supplier('supplier',{route:'domestic',kind:'manufacturer',active:true,name:'Found supplier',country:'ایران',contact:'C',phone:'02133333333',linkMaterialId:otherMaterial.id});
+ await source('sync_rfq_suppliers',{planId:emptyPlan,partCode:'02',round:1,route:'domestic',confirmed:true},200,actor('domestic'));
+ assert.ok(!current(emptyPlan).data.supplierTargets.some(t=>t.route==='domestic'&&t.missing));assert.deepEqual(current(emptyPlan).data.supplierTargets.find(t=>t.route==='foreign'),foreignMissing);assert.equal(current(emptyPlan).data.lines[0].round,1);
+ const foundLink=entities('supplier_material').find(l=>l.data.supplierId===found.id);
+ await source('quote',{planId:emptyPlan,partCode:'02',route:'domestic',supplierLinkId:foundLink.id,unitPrice:'100',extrasRial:'0',costNotes:'Included',eta:later,validUntil:future,paymentTerms:'Cash',specs:'Spec2',reference:'NEW-Q'},200,actor('domestic'));
+ await assert.rejects(()=>domain.checkSupplierPurchase(foundLink.id,otherMaterial.id,'domestic',1000),/صلاحیت/);
+ // Archiving retains business records, blocks new procurement, and requires explicit restore.
+ const validity=load('lib/quote-validity.ts');assert.equal(validity.quoteValidity('2028-02-28',1).validUntil,'2028-02-29');assert.equal(validity.quoteValidity('2026-12-31',2).validUntil,'2027-01-02');assert.throws(()=>validity.quoteValidity('2026-02-30',2));
+ const freightRules=load('lib/domestic-freight.ts');
+ assert.equal(freightRules.domesticFreight({transportMethod:'company',freightStatus:'known',freightAmount:'5000'}).amountRial,null);
+ assert.equal(freightRules.domesticFreight({transportMethod:'carrier'}).status,'pending');
+ assert.equal(freightRules.domesticFreight({transportMethod:'carrier',freightAmount:'5000'}).amountRial,'5000');
+ assert.equal(freightRules.domesticFreight({transportMethod:'seller',freightStatus:'no_charge'}).amountRial,'0');
+ assert.throws(()=>freightRules.domesticFreight({transportMethod:'seller'}));
+ const original=entities('supplier').find(s=>s.id===linked.id),counts=['supplier_material','supplier_review','purchase_order'].map(t=>entities(t).length);
+ const archive={supplierId:linked.id,revision:original.revision,reason:'No longer an approved business partner'};
+ await supplier('archive',archive,403,actor('sales'));
+ await supplier('archive',{...archive,confirmed:false},400);
+ await supplier('archive',{...archive,revision:0},409);
+ const deleted=await supplier('archive',archive),archived=entities('supplier').find(s=>s.id===linked.id);
+ assert.ok(archived.data.deletedAt);assert.equal(archived.data.active,false);assert.equal(archived.data.lifecycleHistory[0].actor,actor('domestic').userId);
+ assert.deepEqual(['supplier_material','supplier_review','purchase_order'].map(t=>entities(t).length),counts);
+ assert.equal((await context.run(actor('domestic'),()=>suppliers.POST(request('/api/suppliers','POST',deleted.body)))).status,200);
+ await supplier('supplier',{...supplierBody,supplierId:linked.id,revision:archived.revision},409);
+ assert.match(domain.qualification({data:{}},archived,material),/حذف/);
+ const targets=await domain.buildSupplierTargets([{materialId:material.id,partCode:'01',round:99,routes:['domestic'],shortage:1000,unit:'عدد'}]);assert.ok(!targets.some(t=>t.supplierId===linked.id));
+ await supplier('restore',{supplierId:linked.id,revision:original.revision,reason:'Reviewed restoration'},409);
+ await supplier('restore',{supplierId:linked.id,revision:archived.revision,reason:'Reviewed restoration'});
+ const restored=entities('supplier').find(s=>s.id===linked.id);assert.equal(restored.data.deletedAt,null);assert.equal(restored.data.active,false);assert.equal(restored.data.lifecycleHistory.length,2);
+ await supplier('supplier',{...supplierBody,supplierId:linked.id,revision:restored.revision});assert.equal(entities('supplier').find(s=>s.id===linked.id).data.lifecycleHistory.length,2);
+ assert.ok(catalog.tools.find(t=>t.name==='archive_supplier'));assert.ok(catalog.tools.find(t=>t.name==='restore_supplier'));
  assert.equal(sql.prepare('PRAGMA foreign_key_check').all().length,0);
  console.log('Supplier workflow passed: permissions, confirmation, idempotency, unique links, evidence, null ratings, task contacts, real-action completion, all-target responses, finance gate, conditional ceiling, suspension/requalification at issue, receipt metrics, privacy and MCP.');
 })().catch(e=>{console.error(e);process.exit(1)});

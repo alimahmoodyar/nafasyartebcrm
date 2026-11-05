@@ -1,0 +1,20 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),ts=require('typescript'),React=require('react');
+const root=path.resolve(__dirname,'..'),cache={};
+function load(file){file=path.resolve(root,file);if(cache[file])return cache[file];const exports={};cache[file]=exports;vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText,{exports,require:n=>n.startsWith('@/')?load(n.slice(2)+'.ts'):require(n)},{filename:file});return exports;}
+const {WarehouseReceiptPolicyFields,ReceiptWarehouseFields}=load('components/trace/warehouse-receipt-fields.tsx');
+const nodes=x=>Array.isArray(x)?x.flatMap(nodes):React.isValidElement(x)?[x,...nodes(x.props.children)]:[],text=x=>Array.isArray(x)?x.map(text).join(''):React.isValidElement(x)?text(x.props.children):x==null?'':String(x);
+const select=(tree,label)=>nodes(tree).find(n=>n.type==='label'&&text(n).startsWith(label))?.props.children;
+let patch;
+let t=WarehouseReceiptPolicyFields({draft:{warehouseType:'production_line',directReceiptEnabled:true},warehouses:[],onChange:v=>patch=v});
+assert.equal(nodes(t).find(n=>n.type==='input').props.disabled,true);assert.equal(nodes(t).find(n=>n.type==='input').props.checked,false);assert.ok(text(t).includes('ورود مستقیم خرید مجاز نیست'));
+nodes(t).find(n=>n.type==='select').props.onChange({target:{value:'other'}});assert.equal(patch.directReceiptEnabled,false);
+const parent={id:'main',canReceive:true,data:{name:'مواد اولیه',active:true},receiptQuarantine:{id:'q',name:'قرنطینه مواد'},receiptQcMembers:[{id:'qc-a',name:'کارشناس کیفیت'}]},line={id:'line',canReceive:false,data:{name:'خط تولید',active:true}},inactive={...parent,id:'inactive',data:{name:'غیرفعال',active:false}};
+t=WarehouseReceiptPolicyFields({draft:{warehouseId:'main',warehouseType:'storage',directReceiptEnabled:true},warehouses:[{id:'q',data:{name:'قرنطینه مواد',active:true,parentId:'main',warehouseType:'quarantine'}},{id:'foreign-q',data:{name:'قرنطینه دیگر',active:true,parentId:'other',warehouseType:'quarantine'}}],onChange:v=>patch=v});
+const qs=nodes(t).filter(n=>n.type==='select')[1];assert.deepEqual(nodes(qs).filter(n=>n.type==='option').map(n=>n.props.value),['','q']);assert.ok(text(qs).includes('ساخت خودکار'));
+let chosen='';t=ReceiptWarehouseFields({warehouses:[parent,line,inactive],value:'main',onChange:v=>chosen=v,onQcChange(){}});
+assert.deepEqual(nodes(t).filter(n=>n.type==='option').map(n=>n.props.value),['','main']);assert.ok(text(t).includes('محل ورود خودکار: قرنطینه مواد'));assert.ok(text(t).includes('ارجاع خودکار کنترل کیفیت به کارشناس کیفیت'));
+nodes(t).find(n=>n.type==='select').props.onChange({target:{value:'main'}});assert.equal(chosen,'main');
+t=ReceiptWarehouseFields({warehouses:[{...parent,receiptQcMembers:[]}],value:'main',onChange(){},onQcChange(){}});assert.ok(text(t).includes('تا تعیین مسئول و انجام کنترل کیفیت در قرنطینه می‌ماند'));
+t=ReceiptWarehouseFields({warehouses:[{...parent,receiptQcMembers:[{id:'a',name:'الف'},{id:'b',name:'ب'}]}],value:'main',onChange(){},onQcChange:v=>chosen=v});const qcSelect=nodes(t).filter(n=>n.type==='select')[1];assert.equal(qcSelect.props.required,true);qcSelect.props.onChange({target:{value:'b'}});assert.equal(chosen,'b');
+t=ReceiptWarehouseFields({warehouses:[line],value:'',onChange(){},onQcChange(){}});assert.ok(nodes(t).some(n=>n.props.role==='alert'));assert.ok(text(t).includes('مدیر باید قانون دریافت'));
+console.log('PASS receiving UI: explicit warehouse type and opt-in, line disabled, own-child/automatic quarantine, authorized destinations only, automatic/explicit/pending QC and missing-configuration guidance.');

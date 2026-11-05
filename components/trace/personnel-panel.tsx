@@ -1,4 +1,5 @@
 'use client';
+import {RefreshButton} from './refresh-button';
 import {NumberInput} from '@/components/trace/number-input';
 import {AssetsPanel} from './assets-panel';
 import {MemberContactForm} from './member-contact-form';
@@ -50,7 +51,7 @@ export function PersonnelPanel({demo=false,targetId=''}:{demo?:boolean;targetId?
  const date=(k:string,label:string,required=true)=><SolarDate label={label} value={form[k]||''} required={required} onChange={v=>change(k,v)}/>;
  const check=(k:string,label:string)=><label className="field"><span><Checkbox checked={!!form[k]} onCheckedChange={v=>change(k,v===true)}/> {label}</span></label>;
  if(demo)return <div className="panel inside">پرتال پرسنلی فقط در محیط شرکت در دسترس است.</div>;
- if(!data)return <div className="panel inside"><p role={error?'alert':'status'}>{error||'در حال دریافت پرتال…'}</p><button className="btn" onClick={()=>void load().catch(e=>setError(e.message))}>تازه‌سازی</button></div>;
+ if(!data)return <div className="panel inside"><p role={error?'alert':'status'}>{error||'در حال دریافت پرتال…'}</p><RefreshButton retry={!!error} className="btn" onRefresh={()=>load().catch(e=>setError(e.message))} /></div>;
  const self=data.records.find((x:any)=>x.type==='hr_employee'&&x.data.memberId===data.me),balance=data.balances.find((x:any)=>x.memberId===data.me),summary=data.summaries.find((x:any)=>x.memberId===(owner==='all'?data.me:owner)),leaveSummary=data.leaveSummary?.memberId===data.me?data.leaveSummary:undefined;
  const personal=view.startsWith('personal_'),ownRequests=data.records.filter((x:any)=>x.type==='hr_request'&&x.data.memberId===data.me),canManage=data.admin||data.roles.length>0||data.managementInbox?.enabled;
  const managementAccess:Record<string,string[]>={assets:['hr'],advances:['hr','payroll','finance','treasury'],hr_employee:['hr','payroll'],hr_request:['hr','payroll','finance','treasury','executive_viewer','reporter'],hr_punch:['hr','payroll'],hr_assignment:['hr','payroll'],hr_shift:['hr','payroll'],hr_delegate:['hr'],hr_ruling:['hr','payroll','approver'],hr_document:['hr','approver'],hr_policy:['hr','payroll','approver'],hr_period:['hr','payroll','approver'],hr_payroll:['payroll','approver','finance','treasury']};

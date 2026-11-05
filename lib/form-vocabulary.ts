@@ -776,7 +776,7 @@ export const toolFieldTitles:Record<string,Record<string,string>>={
     "source": "نام سامانه / منبع قبلی",
     "expectedDebt": "جمع بدهی باز در منبع، ریال",
     "expectedCredit": "جمع اعتبار در منبع، ریال",
-    "username": "نام کاربری انگلیسی",
+    "username": "نام کاربری دلخواه",
     "count": "تعداد این حواله",
     "packages": "تعداد بسته دریافت‌شده",
     "result": "نتیجه"
@@ -1340,3 +1340,12 @@ Object.assign(toolFieldTitles.routine_production_apply,{method:'روش برنا�
 toolFieldTitles.estimate_routine_production={routeId:'قطعه نیمه‌آماده / مسیر ساخت',method:'روش برنامه‌ریزی',count:'تعداد موردنیاز تولید',memberIds:'افراد قابل تخصیص',day:'روز شروع',days:'تعداد روز تقویمی',start:'شروع کار روزانه',end:'پایان کار روزانه'};
 
 Object.assign(toolFieldTitles.personnel_apply,{productionEligible:'قابل تخصیص به عملیات تولید'});
+
+Object.assign(toolFieldTitles.save_material_warehouse,{warehouseType:'نوع انبار',directReceiptEnabled:'اجازه دریافت مستقیم مواد اولیه',quarantineWarehouseId:'قرنطینه ورودی؛ خالی برای ساخت خودکار'});
+
+Object.assign(toolFieldTitles,{delete_material_warehouse:{warehouseId:'انبار برای حذف',revision:'نسخه انبار'},inspect_material_warehouse_deletion:{warehouseId:'انبار برای بررسی حذف'}});
+
+Object.assign(toolFieldTitles,{save_sourcing_quote:{...toolFieldTitles.save_sourcing_quote,appendSupplier:'افزودن تأمین‌کننده ثبت‌شده به دور جاری استعلام'}});
+
+Object.assign(toolFieldTitles.save_sourcing_quote,{deliveryDays:'مدت تحویل (روز تقویمی)',deliveryStart:'شروع مهلت تحویل',requiredAdvanceRial:'پیش‌پرداخت لازم برای شروع (ریال)',eta:'موعد قدیمی؛ فقط پیشنهادهای تاریخ‌دار'});
+Object.assign(toolFieldTitles,{confirm_sourcing_purchase:{planId:'پرونده تأمین',revision:'نسخه پرونده',orderId:'سفارش خرید',orderRevision:'نسخه سفارش',reference:'مرجع پذیرش تأمین‌کننده',notes:'توضیح قطعی‌شدن خرید'}});

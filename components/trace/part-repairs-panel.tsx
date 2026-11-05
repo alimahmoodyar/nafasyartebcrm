@@ -1,4 +1,5 @@
 'use client';
+import {RefreshButton} from './refresh-button';
 import {useEffect,useRef,useState,type FormEvent} from 'react';
 import {Dialog,DialogContent,DialogTitle,DialogDescription} from '@/components/ui/dialog';
 import {IconActions,IconDisclosure} from './program-workspace';
@@ -26,7 +27,7 @@ export function PartRepairsPanel({domain,accountId}:{domain:string;accountId:str
  const fields=visiblePartRepairFields(draft?.mode,draft||{}).filter(f=>f.key!=='repairId');
  const rows=info.rows.filter((r:any)=>(!state||r.data.state===state)&&[r.data.partName,r.data.serial,r.data.receiptCode,r.data.agentName].join(' ').toLocaleLowerCase().includes(search.toLocaleLowerCase()));
  return <section><h3>قطعات تعمیری نمایندگان</h3><p className="subtle">هر رسید برای یک قطعه است. اطلاعات دریافت، اقدام و ارسال در مرحلهٔ مربوط تکمیل می‌شود.</p>
-  <IconActions scope="representative-part-repairs-actions">{info.canCreate&&<button className="btn primary" onClick={()=>start('create')}>دریافت قطعهٔ نماینده</button>}<button className="btn" disabled={busy} onClick={()=>void refresh()}>تازه‌سازی</button></IconActions>
+  <IconActions scope="representative-part-repairs-actions">{info.canCreate&&<button className="btn primary" onClick={()=>start('create')}>دریافت قطعهٔ نماینده</button>}<RefreshButton retry={!!error} className="btn" disabled={busy} onRefresh={()=>refresh()} /></IconActions>
   <div className="formgrid"><label className="field">جست‌وجوی رسید، قطعه، سریال یا نماینده<input value={search} onChange={e=>setSearch(e.target.value)}/></label><label className="field">وضعیت<select value={state} onChange={e=>setState(e.target.value)}><option value="">همه</option>{Object.entries(partRepairStates).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label></div>
   {error&&<p role="alert" className="notice">{error}</p>}
   {!rows.length&&<p className="empty">قطعه‌ای با این شرایط ثبت نشده است.</p>}

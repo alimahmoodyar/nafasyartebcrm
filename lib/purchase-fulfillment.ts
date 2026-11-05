@@ -1,3 +1,4 @@
+import {currentRemainderResolution} from './sourcing-workflow';
 import {moneyMicro,moneyText} from './costing';
 const active=(a:any[]=[])=>a.filter(x=>!x.voided);
 export const serviceStates:Record<string,string>={open:'منتظر تحویل',submitted:'خروجی ارائه‌شده؛ منتظر تأیید دریافت',returned:'نیازمند اصلاح خروجی',accepted:'دریافت خدمت تأییدشده'};
@@ -11,7 +12,7 @@ export function purchaseCompletion(c:any,rows:any[]){const d=c.data,delivery:str
  if(!invoices.length){financial.push('فاکتور خرید ثبت نشده');if(!rows.some(r=>r.type==='purchase_service'&&r.data.caseId===c.id)){delivery.push('کالا یا خدمت مرتبط با پرداخت هنوز مشخص نشده');cost.push('مقصد هزینه هنوز مشخص نشده');}}
  for(const i of invoices){const paid=allocations.filter((a:any)=>a.invoiceId===i.id).reduce((n:bigint,a:any)=>n+moneyMicro(a.amount),BigInt(0));if(!i.recognition||paid!==moneyMicro(i.amount))financial.push('بدهی یا تسویه فاکتور '+i.reference+' کامل نیست');
  for(const l of i.lines){if(l.serviceId){const s=rows.find(r=>r.id===l.serviceId&&r.type==='purchase_service');if(!s||s.data.state!=='accepted')delivery.push('خدمت فاکتور '+i.reference+' تأیید دریافت ندارد');if(!s?.data.costApproval)cost.push('تخصیص هزینه خدمت '+i.reference+' کامل نیست');continue;}
- const rs=l.receiptIds.map((id:string)=>rows.find(r=>r.id===id&&r.type==='receipt'));const accepted=rs.reduce((n:number,r:any)=>n+(r?.data.accepted||0),0);if(!rs.length||rs.some((r:any)=>!r||r.data.state!=='stored')||accepted!==l.quantity||rs.some((r:any)=>r.data.rejected))delivery.push('تعداد / کیفیت / جانمایی فاکتور '+i.reference+' کامل نیست');
+ const rs=l.receiptIds.map((id:string)=>rows.find(r=>r.id===id&&r.type==='receipt'));const accepted=rs.reduce((n:number,r:any)=>n+(r?.data.accepted||0),0);if(!rs.length||rs.some((r:any)=>!r||r.data.state!=='stored')||accepted!==l.quantity||rs.some((r:any)=>r.data.rejected)&&!currentRemainderResolution(rows.find(o=>o.type==='purchase_order'&&o.id===l.orderId),rows))delivery.push('تعداد / کیفیت / جانمایی فاکتور '+i.reference+' کامل نیست');
  for(const r of rs.filter(Boolean)){const st=rows.find(x=>x.type==='purchase_settlement'&&x.data.state==='approved'&&x.data.lines.some((v:any)=>v.receiptId===r.id));const priced=rows.find(x=>x.type==='cost_price'&&x.data.batchId===r.data.batchId);if(!st||priced?.data.settlementId!==st.id||priced?.data.settlementRevision!==st.revision||st.data.approvals?.at(-1)?.preview?.lines.find((x:any)=>x.receiptId===r.id)?.receiptRevision!==r.revision)cost.push('بهای نهایی بچ '+r.id+' تأیید نشده یا نیازمند بازبینی است');}
  }}
  for(const p of payments)if(allocations.filter((a:any)=>a.paymentId===p.id).reduce((n:bigint,a:any)=>n+moneyMicro(a.amount),BigInt(0))!==moneyMicro(p.amount))financial.push('پرداخت تخصیص‌نیافته: '+p.reference);

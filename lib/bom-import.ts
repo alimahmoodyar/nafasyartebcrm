@@ -9,7 +9,7 @@ export type ImportMapping={partCode:number;name:number;quantity:number;unit:numb
 export function guessImportMapping(row:unknown[]):ImportMapping{
  const values=row.map(clean);
  const find=(names:string[])=>values.findIndex(v=>names.includes(v));
- return {partCode:find(['کد کالا','کد قطعه','کد','کد مواد']),name:find(['عنوان کالا','نام کالا','نام قطعه','نام','شرح کالا']),quantity:find(['مقدار واحد اصلی','مقدار','تعداد','مصرف یک دستگاه','مصرف']),unit:find(['واحد','واحد اصلی','واحد سنجش'])};
+ return {partCode:find(['کد کالا','کد قطعه','کد','کد مواد']),name:find(['عنوان کالا','نام کالا','نام قطعه','نام','شرح کالا']),quantity:find(['مقدار واحد اصلی','مقدار مصرف','مقدار','تعداد','مصرف یک دستگاه','مصرف']),unit:find(['واحد','واحد اصلی','واحد سنجش'])};
 }
 export function parseMappedBomGrid(grid:unknown[][],header:number,mapping:ImportMapping):ImportDraft{
  if(grid.length>5000||grid.some(r=>r.length>200))throw Error('ابعاد فایل بیش از حد مجاز است.');

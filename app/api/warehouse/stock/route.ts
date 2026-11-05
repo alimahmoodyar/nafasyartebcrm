@@ -19,7 +19,7 @@ export async function GET(request:Request){try{
  const visibleIds=new Set<string>([...warehouses.map((w:any)=>w.id),...service.warehouseIds]);
  // Add only ancestor labels for grouping; parent visibility grants no child stock.
  for(const id of [...visibleIds]){let w=allWarehouses.find(w=>w.id===id);const seen=new Set<string>();while(w?.data.parentId&&!seen.has(w.id)){seen.add(w.id);const parent=allWarehouses.find(v=>v.id===w.data.parentId);if(!parent)break;visibleIds.add(parent.id);w=parent;}}
- const directory=allWarehouses.filter(w=>visibleIds.has(w.id)).map(w=>({id:w.id,data:{name:w.data.name,parentId:w.data.parentId||'',active:w.data.active}}));
+ const directory=allWarehouses.filter(w=>visibleIds.has(w.id)).map(w=>({id:w.id,data:{name:w.data.name,parentId:w.data.parentId||'',active:w.data.active,deletedAt:w.data.deletedAt||''}}));
  if(warehouseAccess(u,'finished')){
   const db=storage(),builds=(await db.prepare("SELECT * FROM flow_entities WHERE type='build'").all()).results.map(entity),products=(data.rows||[]).filter((r:any)=>r.kind==='product');
   const finished=(await db.prepare("SELECT r.id,r.kind,r.payload,r.created,b.quantity FROM records r JOIN inventory_balances b ON b.item_id=r.id WHERE r.kind='device' AND b.warehouse='finished' AND b.quantity>0").all()).results;

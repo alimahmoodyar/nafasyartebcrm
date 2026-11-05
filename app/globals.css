@@ -405,7 +405,80 @@ html,button,input,textarea,select,option,svg text{font-family:"Vazirmatn",sans-s
 
 .routine-plans__people-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px;max-height:240px;overflow-y:auto;margin:10px 0}.routine-plans__person{display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:12px;padding:10px;cursor:pointer}.routine-plans__person input{width:18px;height:18px;flex:none;accent-color:#16804d}.routine-plans__person span{display:grid;gap:3px}.routine-plans__person small{font-size:12px}
 
+/* Warehouse location in the application; separate from inventory workflow stages. */
+.warehouse-page-path { margin-block: 0 1rem; overflow-x: auto; }
+.warehouse-page-path ol { display: flex; align-items: center; gap: .65rem; list-style: none; margin: 0; padding: .4rem 0; white-space: nowrap; }
+.warehouse-page-path li { display: flex; align-items: center; gap: .65rem; color: var(--muted-foreground, #64748b); }
+.warehouse-page-path [aria-current="page"] { color: var(--foreground, #24304f); font-weight: 700; }
+.warehouse-page-path__separator { font-weight: 400; }
+
+.refresh-button { padding: .45rem !important; min-width: 2.25rem; min-height: 2.25rem; gap: .35rem; flex-shrink: 0; }
+.refresh-button[aria-busy="true"] > svg { animation: refresh-spin 1s linear infinite; }
+@keyframes refresh-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .refresh-button[aria-busy="true"] > svg { animation: none; } }
+.material-catalog-search { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .65rem; margin-block: 1rem; }
+.material-catalog-search > .field { flex: 1 1 18rem; }
+.bomline-edit{display:grid;grid-template-columns:minmax(250px,2fr) minmax(190px,1fr) auto auto;align-items:end;gap:14px}.bomline-edit>.field{min-width:0;margin:0}.bomline-edit .bomline-picker{min-width:0}.bomline-quantity input{box-sizing:border-box}.bomline-unit{align-self:end;min-height:46px;display:flex;align-items:center;gap:6px;padding:0 12px;border:1px solid var(--border);border-radius:8px;white-space:nowrap}.bomline-actions{display:flex;align-items:center;justify-content:flex-start;gap:8px;flex-wrap:wrap}@media(max-width:760px){.bomline-edit{grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:end}.bomline-edit .bomline-picker{grid-column:1/-1}.bomline-unit{min-height:44px}.bomline-actions{grid-column:1/-1}}
+
+.material-catalog-import fieldset { display: grid; gap: 14px; }
+.material-catalog-import .stocktable { min-width: 580px; table-layout: fixed; }
+.material-catalog-import .stocktable th:nth-child(1) { width: 23%; }
+.material-catalog-import .stocktable th:nth-child(2) { width: 51%; }
+.material-catalog-import .stocktable input, .material-catalog-import .stocktable select { width: 100%; min-width: 0; font: inherit; padding: 8px 10px; border: 1px solid var(--input); border-radius: 8px; background: white; color: inherit; }
+.material-catalog-import .stocktable thead { position: sticky; top: 0; background: var(--background); z-index: 1; }
+.material-catalog-import .notice { display: block; }
+.material-catalog-import .notice p { margin-block: 8px; }
+.material-catalog-import summary { cursor: pointer; }
+
+.material-catalog-import__header, .material-catalog-import__footer { flex: 0 0 auto; }
+.material-catalog-import__body { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.material-catalog-import__footer { border-top: 1px solid var(--border); padding-top: 12px; background: var(--background); display: grid; gap: 10px; }
+.material-catalog-import__actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+@media (max-width: 640px) { .material-catalog-import__actions > button { flex: 1 1 100%; } }
+
 .material-catalog-item-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.material-catalog-item-heading h3{margin:0}.material-catalog-item-heading .btn{flex-shrink:0}
 
+/* Keep the product BOM editor within its wide passport, with one editable list. */
+.product-passport-modal > *, .bom-import-panel { min-width: 0; }
+.bom-import-mapping { margin-block: 16px; }
+.bom-import-mapping > summary { cursor: pointer; font-weight: 600; padding: 10px; }
+.bom-import-mapping .notice { margin-top: 8px; }
+.bom-import-table-scroll { max-height: 60dvh; overflow: auto; width: 100%; min-width: 0; }
+.bom-import-table { table-layout: fixed; min-width: 1080px; }
+.bom-import-table th, .bom-import-table td { white-space: normal; overflow-wrap: anywhere; vertical-align: top; padding: 8px; }
+.bom-import-table th:nth-child(1) { width: 12%; }
+.bom-import-table th:nth-child(2) { width: 26%; }
+.bom-import-table th:nth-child(3), .bom-import-table th:nth-child(4) { width: 10%; }
+.bom-import-table th:nth-child(5), .bom-import-table th:nth-child(6) { width: 14%; }
+.bom-import-table input, .bom-import-table textarea, .bom-import-table select { width: 100% !important; min-width: 0; box-sizing: border-box; }
+.bom-import-table textarea { min-height: 70px; resize: vertical; }
+.bom-import-table thead { position: sticky; top: 0; background: var(--background); z-index: 1; }
 /* One compact, single-line route from the home menu to the open section. */
 .workspace-breadcrumb{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;white-space:nowrap;overflow:hidden;min-width:0}.workspace-crumb-link{border:0;background:transparent;color:#53658a;font:inherit;padding:4px 2px;cursor:pointer;flex:0 0 auto}.workspace-crumb-part{display:inline-flex;align-items:center;gap:8px;min-width:0;white-space:nowrap}.workspace-crumb-part strong{display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}.workspace-breadcrumb>svg{flex:0 0 auto}.workspace-crumb-part>svg{flex:0 0 auto}
+
+/* Consistent compact icon controls for actions within a subpage. */
+.subpage-actions.inline-icon-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;width:100%;max-width:560px;margin-block:14px;align-items:stretch}
+.subpage-actions.inline-icon-actions>.btn{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:6px;min-height:44px;width:100%;padding:8px 10px;border-radius:10px;text-align:center;line-height:1.6;background:#f4f6fb;color:#34456b;border-color:#dce2ef;box-shadow:none}
+.subpage-actions.inline-icon-actions>.btn>svg{width:18px;height:18px}
+.subpage-actions.inline-icon-actions>.btn>span{font-size:13px}
+.subpage-actions.inline-icon-actions>.btn[aria-pressed=true],.subpage-actions.inline-icon-actions>.btn[aria-expanded=true]{border-color:#93a3c4;box-shadow:inset 0 -2px #93a3c4}
+@media(max-width:480px){.subpage-actions.inline-icon-actions{gap:6px}.subpage-actions.inline-icon-actions>.btn{padding:7px 5px;gap:4px}.subpage-actions.inline-icon-actions>.btn>span{font-size:12px}}
+
+.warehouse-delete{grid-column:1/-1;min-width:0;display:grid;gap:12px;margin-top:8px}.warehouse-delete .notice{display:block}.warehouse-delete .notice p{margin-bottom:12px}.warehouse-delete>.btn{justify-self:start}.warehouse-delete .btn{white-space:nowrap}.warehouse-delete .btn.danger{color:#a53838;border-color:#e2b7b7;background:#fff6f6}.warehouse-delete ul{margin:0;padding-inline-start:24px;list-style:disc}
+
+/* Supplier material details keep readable rows instead of sharing notice flex layout. */
+.supplier-material-card{display:block;min-width:0;margin-block:16px;padding:20px;border:1px solid #d8e0f5;border-radius:16px;background:#edf1fd;overflow-wrap:anywhere}
+.supplier-material-card>h4{margin-block:12px;font-size:1.05rem}
+.supplier-material-card>p{margin-block:12px;line-height:1.9}
+.supplier-material-card>.btn,.supplier-material-card>span{display:inline-block;max-width:100%;margin:4px}
+.supplier-material-card .btn{white-space:normal;line-height:1.7}
+.supplier-material-card>.inline-icon-disclosure{display:block;width:100%;margin-block-start:16px}
+@media(max-width:640px){.supplier-material-card{padding:14px}.supplier-material-card>.btn,.supplier-material-card>span{display:block;margin:8px 0}.supplier-material-card>span>.btn{width:100%}}
+
+.sourcing-quotes{min-width:0;display:grid;gap:16px}.sourcing-quotes .flow-card{min-width:0;margin:0}.sourcing-quotes__scroll{max-width:100%;overflow-x:auto;margin-block:14px}.sourcing-quotes table{width:100%;min-width:1150px;border-collapse:collapse;font-size:14px}.sourcing-quotes caption{caption-side:top;text-align:right;padding:10px;background:#f4f6fb}.sourcing-quotes th,.sourcing-quotes td{padding:12px;text-align:right;vertical-align:top;border-bottom:1px solid var(--border)}.sourcing-quotes th{background:#eef2f8;white-space:nowrap}.sourcing-quotes td small{display:block;margin-top:6px}.sourcing-quotes td .badge{white-space:normal;margin-top:8px}.sourcing-quotes td details{min-width:150px}.sourcing-quotes td .btn{white-space:nowrap;margin-block:6px}.sourcing-quotes td details p{margin-block:6px}
+
+.sourcing-quote-dialog{width:calc(100vw - 32px);max-width:760px!important;padding:24px}.sourcing-quote-dialog .formgrid{grid-template-columns:minmax(0,1fr);padding:0}.sourcing-quote-form{display:grid;gap:14px;min-width:0;font-size:15px}.sourcing-quote-form .field{margin:0;min-width:0;font-size:14px;gap:6px}.sourcing-quote-form .field input,.sourcing-quote-form .field textarea{box-sizing:border-box;width:100%;min-width:0;font-size:16px;padding:10px 12px;line-height:1.5}.sourcing-quote-form .field input{min-height:44px}.sourcing-quote-form .solar-date{margin:0;padding:0;border:0}.sourcing-quote-summary{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 14px;border-radius:10px;background:#eef2f8}.sourcing-quote-summary span{font-size:13px;color:#586b85}.sourcing-quote-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.sourcing-quote-disclosure{border-top:1px solid var(--border);padding-top:10px}.sourcing-quote-disclosure>summary{cursor:pointer;color:#485d7a;font-size:14px;line-height:1.7}.sourcing-quote-disclosure[open]>summary{margin-bottom:12px}.sourcing-quote-disclosure>.field{margin-top:14px}.sourcing-quote-supplier-tools,.sourcing-quote-outcomes{display:flex;gap:8px;flex-wrap:wrap}.sourcing-quote-form .btn{font-size:14px;padding:8px 12px;min-height:40px;white-space:normal}.sourcing-quote-outcomes{margin-bottom:12px}.sourcing-quote-outcomes .active{background:#e6edf9;border-color:#5277a1}.sourcing-quote-status{margin:0;font-size:13px;color:#326456}.sourcing-quote-footer{position:sticky;bottom:-24px;background:var(--background,#fff);padding-block:14px;border-top:1px solid var(--border);z-index:1}.sourcing-quote-dialog .notice{margin:0;padding:10px;font-size:14px;display:block}.sourcing-quote-dialog [data-slot=select-trigger]{width:100%;min-height:44px;height:auto;font-size:15px}.sourcing-quote-form small{font-size:12px;color:#64748b}@media(max-width:560px){.sourcing-quote-dialog{padding:18px}.sourcing-quote-grid{grid-template-columns:minmax(0,1fr)}.sourcing-quote-footer{bottom:-18px}.sourcing-quote-summary{align-items:start;flex-direction:column}}
+
+.sourcing-quote-freight-note{grid-column:1/-1;font-size:12px;color:#64748b;margin:0}
+
+.sourcing-quote-responses{border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:#fff}.sourcing-quote-responses>summary{cursor:pointer;font-size:14px;color:#485d7a}.sourcing-quote-responses ul{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:8px}.sourcing-quote-responses li{display:flex;gap:6px 14px;flex-wrap:wrap;align-items:center;padding-block:8px;border-top:1px solid var(--border);font-size:13px}.sourcing-quote-responses li strong{flex:1;min-width:120px}.sourcing-quote-no-source{padding:12px;border:1px solid var(--border);border-radius:10px}.sourcing-quote-no-source p{margin:0 0 10px;font-size:14px}.sourcing-quote-footer{flex-wrap:wrap}

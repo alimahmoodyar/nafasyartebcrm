@@ -1,3 +1,16 @@
+// Proforma quoteDate/validityDays/derived validUntil use existing sourcing_quote and order snapshots; existing backup/reset and 0016 freeze cover them. No new table/entity/blob.
+// Day-based sourcing_quote/purchase_order deliveryDays, deliveryStart, requiredAdvanceRial, purchaseConfirmedAt/By/reference, deliveryStartedOn, immutable promisedEta and advanceEvidence remain in existing operational JSON. Tracking/task due changes append history. Both reset scopes/backup and migration 0016 flow/inventory freeze cover quote, confirmation, tasks and audit atomically; no new table/FK/blob. Legacy absolute-date orders are preserved.
+// Additional supplier RFQs append snapshot entries to existing sourcing_plan.supplierTargets and create independent operational sourcing_quote JSON; old quotes/approvals stay unchanged. Existing scopes back up/delete both and their history/tasks, existing 0016 freeze guards atomic writes. No new table/FK/blob.
+// Domestic freight terms remain in sourcing_quote/order snapshots; pickup evidence in immutable order history and actual freight resolution/expenses in purchase_settlement JSON. Existing backup/reset and 0016 freeze cover all atomically; no new entity/table/blob.
+// Supplier deletion metadata and immutable lifecycleHistory remain in supplier flow_entities JSON; existing backup/reset and migration 0016 freeze cover archive/restore atomically. No physical deletion or new table.
+// Empty warehouse deletion stores deletedAt/deletedBy/deletionOperationId in catalog material_warehouse JSON; IDs/names/history remain. Operations reset preserves tombstones and full reset backs up/deletes them. inventory_operations/access_audit record deletion; existing 0016 flow/inventory freeze guards parent+managed-quarantine+unlink writes. No new table/FK/blob.
+// Project-material sourcing cases/source links, workOwners and order remainder/identity decisions use existing operational flow_entities JSON; holds transfer atomically to original projects. Existing reset scopes, backups and 0016 generic freeze cover these, their duties/notices and audit. No new table/FK/blob.
+
+// Receiving permission/type and linked managed quarantine children live in catalog material_warehouse JSON: operations preserve both, full backs up/deletes both. Receipt policy/QC/location snapshots are operational receipt JSON in both scopes. Existing 0016 flow/inventory freeze guards the atomic parent/child definition and all ingress. No new table/FK/blob or data rewrite.
+// Per-line procurement search/escalation/decision history remains operational sourcing_plan JSON; existing backups, both reset scopes and 0016 freeze cover it. No new table/FK/blob. Design edits still use existing technical controls; frozen serial BOMs are untouched.
+// Pre-finance purchase-request deletion removes existing sourcing_plan/quotes/unissued orders and holds atomically, cancels (preserves) duty evidence, and retains access_audit/inventory_operations. Existing reset scopes and 0016 freeze cover every write; no new table, FK or blob.
+// Manual warehouse supply requests, review/return/confirmation history and snapshots stay in operational sourcing_plan JSON. Both reset scopes back up/delete these and existing sourcing_holds/duty_runs. Generic 0016 flow/inventory freeze covers the atomic transaction; no new table, FK or blob.
+// bom_effectivity stores execution policy/history in flow_entities: backed up and removed in both reset scopes. Generic 0016 flow/inventory freeze covers atomic writes; no new table, FK or blob. Existing builds and BOM snapshots are never rewritten.
 // hr_employee.productionEligible is an audited operational profile flag. Both reset scopes back up/delete it with hr_employee under existing flow_entities freeze; no new table/FK/blob. Production-role defaults are derived from preserved accounts after reset.
 // routine_plan and scheduled/cancelled routine_job live in operational flow_entities. Both reset scopes back up/delete them with routine_lot; generic 0016 freeze covers atomic plans, worker/QC audit and line inventory writes. No new table/FK/blob or preservation exemption.
 // sale.sourceWarehouses is the dispatch-time origin snapshot in existing operational sale JSON;
@@ -94,6 +107,9 @@ export const resetHelp=['قطعات و قیمت مصرف‌کننده واردش
 
 // BOM imports use existing bom_versions, material flow_entities and inventory_operations;
 // existing freeze triggers and catalog/full reset semantics apply without new tables.
+// Catalog-only material_import creates existing material flow_entities plus inventory_operations/access_audit.
+// Operations reset preserves material passports; full reset backs up/deletes them. Existing 0016 freeze triggers
+// cover the atomic import and its audit. No new table, FK, blob, stock or preservation exception.
 
 // sales_* flow entities use the generic freeze triggers (0016); sales_file is included in reset file manifests. No separate ledger tables.
 

@@ -1,4 +1,5 @@
 "use client";
+import {RefreshButton} from './refresh-button';
 import {NumberInput} from '@/components/trace/number-input';
 import {WarehouseResponsibilityPicker} from './warehouse-responsibility-picker';
 import {JobRolePicker} from "./job-role-picker";
@@ -72,7 +73,7 @@ export function UsersPanel({owner}: {owner: Session}) {
   }
   return <section>
     <div className="notice"><div><strong>مدیریت حساب‌ها · نام کاربری و رمز عبور</strong><p>برای همکاران نام کاربری و رمز عبور بسازید و دسترسی واحدشان را مشخص کنید. نام، نام کاربری، واحد، دسترسی و رمز جدید قابل ویرایش است. تغییر نام کاربری یا رمز، ورود دوباره می‌خواهد. حذف حساب، دسترسی را قطع می‌کند و سوابق فعالیت را نگه می‌دارد.</p></div></div>
-    <div className="panel" style={{marginTop: 18}}><div className="panelhead"><div><h2>کاربران و دسترسی‌ها</h2><p className="subtle">دسترسی در سطح بخش؛ مجوز ثبت شامل ویرایش‌های مجاز همان بخش است.</p></div><IconActions scope="users-panel-actions-d78178440c"><button className="btn" onClick={load} disabled={loading}><RefreshCw size={16}/>تازه‌سازی</button><button className="btn primary" onClick={() => start()}><Plus size={17}/>تعریف حساب</button></IconActions></div>
+    <div className="panel" style={{marginTop: 18}}><div className="panelhead"><div><h2>کاربران و دسترسی‌ها</h2><p className="subtle">دسترسی در سطح بخش؛ مجوز ثبت شامل ویرایش‌های مجاز همان بخش است.</p></div><IconActions scope="users-panel-actions-d78178440c"><RefreshButton retry={!!error} className="btn" onRefresh={load} disabled={loading} /><button className="btn primary" onClick={() => start()}><Plus size={17}/>تعریف حساب</button></IconActions></div>
       <div className="owner-account"><ShieldCheck size={22}/><div><strong>{owner.name} · مدیر اصلی</strong><p className="subtle" dir="ltr">{owner.email}</p></div><span className="badge good">دسترسی کامل · محافظت‌شده</span></div>
       {error && <p className="notice error" role="alert">{error}</p>}{message && <p className="notice" role="status">{message}</p>}
       <div className="search" style={{margin:"18px 0"}}><Search size={18} aria-hidden="true"/><input type="search" aria-label="جست‌وجوی اشخاص بر اساس نام یا نقش" placeholder="جست‌وجو بر اساس نام، نام کاربری یا نقش" value={memberSearch} onChange={e=>setMemberSearch(e.target.value)}/></div>
@@ -80,7 +81,7 @@ export function UsersPanel({owner}: {owner: Session}) {
     </div>
     <Dialog open={open} onOpenChange={v => {if (!busy) {setOpen(v);if (!v) {setPassword("");setShowPassword(false);}}}}><DialogContent className="modal sm:max-w-2xl"><DialogTitle style={{paddingRight: 24}}>{editing ? "ویرایش حساب" : "تعریف حساب کارکنان"}</DialogTitle><DialogDescription>مشخصات فرد را وارد کنید؛ دسترسی را با انتخاب مسئولیت‌ها یا انتخاب دستی آیکون‌ها و کارهای مجاز تعیین کنید.</DialogDescription><form onSubmit={save}><div className="formgrid">
       <label className="field">نام و نام خانوادگی<NumberInput fieldKey={"name"} required maxLength={100} value={name} onChange={e => setName(e.target.value)}/></label>
-      {(!editing||editing.username)?<><label className="field">نام کاربری<NumberInput fieldKey={"username"} autoComplete="off" required dir="ltr" maxLength={40} value={username} onChange={e=>setUsername(e.target.value)}/></label>
+      {(!editing||editing.username)?<><label className="field">نام کاربری دلخواه<NumberInput fieldKey={"username"} autoComplete="off" required dir="auto" maxLength={100} value={username} onChange={e=>setUsername(e.target.value)}/></label>
         <div className="field">
           <label htmlFor="user-account-password">{editing?"رمز جدید (خالی بماند = بدون تغییر)":"رمز عبور"}</label>
           <div className="account-password-input">

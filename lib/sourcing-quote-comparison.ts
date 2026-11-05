@@ -1,0 +1,6 @@
+import {quoteEstimatedEta} from './sourcing-delivery';
+// Shared by the read-only comparison and final award validation. No auto-award.
+export function compareQuotePrice(a:any,b:any){const x=BigInt(a.data.totalRial),y=BigInt(b.data.totalRial);return x<y?-1:x>y?1:String(a.id).localeCompare(String(b.id));}
+export function comparableQuote(q:any,line:any,today:string){const d=q.data;return d.partCode===line.partCode&&d.round===line.round&&!d.unavailable&&d.quantity===line.shortage&&d.validUntil>=today&&typeof d.totalRial==='string'&&/^\d+$/.test(d.totalRial);}
+export function recommendedQuote(line:any,quotes:any[],needBy:string,today:string){return quotes.filter(q=>comparableQuote(q,line,today)&&q.data.freight?.status!=='pending'&&q.data.supplierLinkId&&!q.data.supplierBlock&&q.data.technical==='pass'&&q.data.financial==='pass'&&quoteEstimatedEta(q.data,today)!==''&&quoteEstimatedEta(q.data,today)<=needBy).sort(compareQuotePrice)[0]||null;}
+export function quoteNumber(value:any){if(value===undefined||value===null||value==='')return '—';const s=String(value);if(!/^\d+(\.\d+)?$/.test(s))return s;const [whole,fraction]=s.split('.');return BigInt(whole).toLocaleString('fa-IR')+(fraction?'٫'+fraction.replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[Number(d)]):'');}

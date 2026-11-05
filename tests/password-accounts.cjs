@@ -14,7 +14,7 @@ async function call(name,args={},key=token){const r=await http.POST(request('/mc
 async function mint(scope='read'){return (await (await tokens.POST(request('/api/mcp-tokens','POST',{name:'test',scope,days:1}))).json());}
 
 const userApi=load('app/api/users/route.ts'),login=load('app/api/auth/login/route.ts'),logout=load('app/api/auth/logout/route.ts');
-const permissions={read:['batch'],write:[],eventStages:[],finance:'none'};
+const permissions={read:['batch'],write:[],eventStages:[],finance:'none',warehouseResponsibilities:[]};
 async function enter(pass='Test-password-123'){return login.POST(request('/api/auth/login','POST',{username:'worker01',password:pass}));}
 (async()=>{
  identity=owner;await auth.session();
