@@ -96,7 +96,7 @@ presets['بازرگانی خارجی']={read:[],write:[],eventStages:[],supplyRo
 
 // Versioned, explicit workflow dependencies. Assignments store both intent and the
 // validated effective snapshot; editing unrelated account fields never infers roles.
-export const rolePolicyVersion=9;
+export const rolePolicyVersion=10;
 export type JobRole={id:string;label:string;group:string;actions:string;programs:string[];grants:Permissions;scope?:'warehouses'|'services'|'salesAgent'|'serviceAgent'};
 const emptyGrants=():Permissions=>({read:[],write:[],eventStages:[]});
 const job=(id:string,label:string,group:string,actions:string,grants:Partial<Permissions>,scope?:JobRole['scope']):JobRole=>({id,label,group,actions,programs:roleWorkflowPrograms[id]||[],grants:{...emptyGrants(),...grants},scope});
@@ -168,8 +168,17 @@ export function resolveRoleAssignment(value:RoleAssignment):Permissions {
  const result:Permissions=emptyGrants();if(warehouseResponsibilities!==undefined){assignment.warehouseResponsibilities=warehouseResponsibilities;result.warehouseResponsibilities=warehouseResponsibilities;}
  const arrays=['financialRead','financialWrite','treasuryWorkflowRoles','read','write','eventStages','assetRoles','qmsRoles','personnelRoles','salesRoles','transportRoles','serviceRoles','supplyRoles','flowRoles'] as const;
  for(const role of roles){for(const key of arrays)(result as any)[key]=[...new Set([...(result[key]||[]),...(role.grants[key]||[])])];if(role.grants.finance==='write'||role.grants.finance==='read'&&result.finance!=='write')result.finance=role.grants.finance;}
- const wh=scope('warehouses',['raw','semi','line','quarantine','nonconforming','finished'],roles.some(r=>r.scope==='warehouses'));
- if(wh){if(roles.some(r=>r.id==='production_store_assistant')&&wh.some(w=>w!=='line')&& !roles.some(r=>r.id==='inventory'||r.id==='warehouse_supervisor'))throw Error('کمک‌انباردار تولید فقط به انبار خط دسترسی دارد.');result.warehouses=wh;assignment.warehouses=wh;}
+ const needsInventory=roles.some(r=>r.scope==='warehouses');
+ const lineOnly=roles.some(r=>r.id==='production_store_assistant')&&!roles.some(r=>r.id==='inventory'||r.id==='warehouse_supervisor');
+ // Exact warehouse responsibilities replace the legacy warehouse-class picker.
+ // Inventory roles require an explicit inventory selection; QC alone does not satisfy it.
+ const wh=scope('warehouses',['raw','semi','line','quarantine','nonconforming','finished'],needsInventory&&warehouseResponsibilities===undefined);
+ if(warehouseResponsibilities!==undefined){
+  if(needsInventory&&!warehouseResponsibilities.some(r=>r.role==='inventory'))throw Error('انبارهای تحت مسئولیت را انتخاب کنید.');
+  if(lineOnly)result.warehouses=['line'];
+  // Existing category limits remain an operation ceiling when a legacy profile is edited.
+  else if(needsInventory&&value.warehouses?.length){result.warehouses=[...new Set(value.warehouses)];assignment.warehouses=result.warehouses;}
+ }else if(wh){if(lineOnly&&wh.some(w=>w!=='line'))throw Error('کمک‌انباردار تولید فقط به انبار خط دسترسی دارد.');result.warehouses=wh;assignment.warehouses=wh;}
  const domains=scope('serviceDomains',['home','hospital'],roles.some(r=>r.scope==='services'||r.scope==='serviceAgent'));
  if(domains){result.serviceDomains=domains;assignment.serviceDomains=domains;}
  for(const [kind,key] of [['salesAgent','salesAgentId'],['serviceAgent','serviceAgentId']] as const)if(roles.some(r=>r.scope===kind)){
