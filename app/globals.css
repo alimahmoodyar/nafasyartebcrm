@@ -465,3 +465,12 @@ html,button,input,textarea,select,option,svg text{font-family:"Vazirmatn",sans-s
 @media(max-width:480px){.subpage-actions.inline-icon-actions{gap:6px}.subpage-actions.inline-icon-actions>.btn{padding:7px 5px;gap:4px}.subpage-actions.inline-icon-actions>.btn>span{font-size:12px}}
 
 .warehouse-delete{grid-column:1/-1;min-width:0;display:grid;gap:12px;margin-top:8px}.warehouse-delete .notice{display:block}.warehouse-delete .notice p{margin-bottom:12px}.warehouse-delete>.btn{justify-self:start}.warehouse-delete .btn{white-space:nowrap}.warehouse-delete .btn.danger{color:#a53838;border-color:#e2b7b7;background:#fff6f6}.warehouse-delete ul{margin:0;padding-inline-start:24px;list-style:disc}
+
+/* Supplier material details keep readable rows instead of sharing notice flex layout. */
+.supplier-material-card{display:block;min-width:0;margin-block:16px;padding:20px;border:1px solid #d8e0f5;border-radius:16px;background:#edf1fd;overflow-wrap:anywhere}
+.supplier-material-card>h4{margin-block:12px;font-size:1.05rem}
+.supplier-material-card>p{margin-block:12px;line-height:1.9}
+.supplier-material-card>.btn,.supplier-material-card>span{display:inline-block;max-width:100%;margin:4px}
+.supplier-material-card .btn{white-space:normal;line-height:1.7}
+.supplier-material-card>.inline-icon-disclosure{display:block;width:100%;margin-block-start:16px}
+@media(max-width:640px){.supplier-material-card{padding:14px}.supplier-material-card>.btn,.supplier-material-card>span{display:block;margin:8px 0}.supplier-material-card>span>.btn{width:100%}}
