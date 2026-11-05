@@ -6,15 +6,26 @@ import {getChatGPTUser} from "@/app/chatgpt-auth";
 import {storage} from "@/lib/storage";
 import {allPermissions, validatePermissions, type Session} from "@/lib/permissions";
 import type {Kind} from "@/lib/model";
+import {cookies} from 'next/headers';
+import {digest} from '@/lib/password-auth';
 
 export class AccessError extends Error { constructor(message: string, public status: number) {super(message);} }
-async function currentSession(): Promise<Session> {
+export const rolePreviewCookie='__Host-nafasyar-role-preview';
+export async function realSession(): Promise<Session> {
   const actor = mcpActor.getStore();
   if (actor) return actor;
   const local=await localSession();
   if(local!==undefined){if(!local)throw new AccessError("نشست شما منقضی یا غیرفعال شده است؛ دوباره وارد شوید.",401);return local;}
   const identity = await getChatGPTUser();
   return resolveIdentity(identity);
+}
+async function currentSession():Promise<Session>{
+ const user=await realSession();if(!user.isAdmin)return user;
+ let token:string|undefined;try{token=(await cookies()).get(rolePreviewCookie)?.value;}catch{return user;}
+ if(!token||!/^[a-f0-9]{64}$/.test(token))return user;
+ const row:any=await storage().prepare("SELECT m.*,r.admin_name FROM role_preview_sessions r JOIN app_members m ON m.id=r.member_id WHERE r.token_hash=? AND r.expires>? AND m.status='active'").bind(await digest(token),new Date().toISOString()).first();
+ if(!row)return user;
+ return {userId:'local:'+row.id,email:row.email,name:row.name,isAdmin:false,permissions:validatePermissions(JSON.parse(row.permissions)),authType:row.username?'password':undefined,username:row.username||undefined,rolePreview:{adminName:row.admin_name,memberId:row.id}};
 }
 export async function resolveIdentity(identity: Awaited<ReturnType<typeof getChatGPTUser>>): Promise<Session> {
   if (!identity) throw new AccessError("با نام کاربری و رمز عبور یا از بخش ورود مدیر وارد شوید.", 401);
@@ -49,6 +60,7 @@ export async function requireAccess(kind?: Kind, operation: "read" | "write" = "
   return user;
 }
 export async function requireAdmin() {const user = await session(); if (!user.isAdmin) throw new AccessError("مدیریت کاربران فقط برای مدیر سامانه مجاز است.", 403); return user;}
+export async function requireRealAdmin(){const user=await realSession();if(!user.isAdmin)throw new AccessError('این بخش فقط برای مدیر سامانه مجاز است.',403);return user;}
 export function checkOrigin(request: Request) {
   const origin = request.headers.get("origin");
   if (!origin) throw new AccessError("درخواست نامعتبر است؛ صفحه را دوباره باز کنید.", 403);

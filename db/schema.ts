@@ -4,6 +4,7 @@ export const records=sqliteTable("records",{id:text("id").primaryKey(),kind:text
 
 export const appIdentity=sqliteTable("app_identity",{id:text("id").primaryKey(),subject:text("subject").notNull().unique()});
 export const appMembers=sqliteTable("app_members",{id:text("id").primaryKey(),email:text("email").notNull().unique(),name:text("name").notNull(),unit:text("unit").notNull(),status:text("status").notNull(),subject:text("subject").unique(),permissions:text("permissions").notNull(),revision:integer("revision").notNull().default(1),created:text("created").notNull(),updated:text("updated").notNull()});
+export const rolePreviewSessions=sqliteTable("role_preview_sessions",{tokenHash:text("token_hash").primaryKey(),adminId:text("admin_id").notNull(),adminName:text("admin_name").notNull(),memberId:text("member_id").notNull().references(()=>appMembers.id),created:text("created").notNull(),expires:text("expires").notNull()},t=>[index("role_preview_sessions_expiry_idx").on(t.expires),index("role_preview_sessions_member_idx").on(t.memberId)]);
 export const accessAudit=sqliteTable("access_audit",{id:text("id").primaryKey(),actor:text("actor").notNull(),target:text("target").notNull(),action:text("action").notNull(),before:text("before"),after:text("after").notNull(),at:text("at").notNull()});
 
 export const firmwareFiles=sqliteTable("firmware_files",{

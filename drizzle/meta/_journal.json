@@ -155,6 +155,13 @@
       "when": 1791676800000,
       "tag": "0021_release_deleted_usernames",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "6",
+      "when": 1793872000000,
+      "tag": "0022_role_preview_sessions",
+      "breakpoints": true
     }
   ]
 }
