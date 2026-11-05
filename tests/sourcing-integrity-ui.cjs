@@ -18,3 +18,10 @@ button(tree,'تعیین تکلیف مانده سفارش').props.onClick();tree=
 state[5]=null;tree=renderSource();button(tree,'گزارش مرحله').props.onClick();html=renderToStaticMarkup(renderSource());assert.ok(!html.includes('گزارش پرداخت'),'Manual paid option removed');
 state[5]=null;tree=renderSource();button(tree,'تعیین مسئول').props.onClick();html=renderToStaticMarkup(renderSource());assert.ok(html.includes('First buyer')&&html.includes('Second buyer'));assert.equal(state[5].role,'domestic');
 console.log('PASS sourcing UI: active requests remain open, terminal-only history, document-based payment summary, project source link, explicit remainder confirmation/current quantity/revision, eligible-owner picker and no manual paid option.');
+
+state[5]={id:'keep-draft',mode:'quote',partCode:'41',route:'domestic',supplier:'',unitPrice:'123',extrasRial:'456',unavailable:true};detail.lines=[{partCode:'41',materialId:'material-current',name:'Current part',shortage:1000,unit:'عدد',routes:['domestic']}];plan.data.supplierTargets=[];
+tree=renderSource();const quoteDraft=state[5];button(tree,'تأمین‌کننده جدید برای این کالا').props.onClick();tree=renderSource();assert.equal(state[10].materialId,'material-current');assert.equal(state[10].route,'domestic');assert.equal(state[5],quoteDraft);
+function findProps(x,key){if(Array.isArray(x))return x.map(v=>findProps(v,key)).find(Boolean);if(!React.isValidElement(x))return null;if(x.props[key])return x.props;return findProps(x.props.children,key);}
+let quick=findProps(tree,'createFor');assert.ok(quick);quick.onCancel();assert.equal(state[10],null);assert.equal(state[5],quoteDraft);
+button(renderSource(),'تأمین‌کننده جدید برای این کالا').props.onClick();quick=findProps(renderSource(),'createFor');quick.onCreated();assert.equal(state[10],null);assert.equal(state[5],quoteDraft);assert.ok(state[11].includes('ارزیابی'));
+console.log('PASS inline RFQ supplier shortcut: exact material/route, cancel and save preserve the quote draft; qualification remains explicit.');

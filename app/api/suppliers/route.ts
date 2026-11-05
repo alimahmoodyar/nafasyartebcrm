@@ -35,10 +35,15 @@ export async function POST(request:Request){try{
   next.technicalHistory=[...(e.data.technicalHistory||[]),{authority:b.authority,decision:b.decision,reason,evidence,actor:u.userId,at:now,previousSpecs:e.data.specs,specs:next.specs}];put(e.id,b.scope,next,e);
  }else if(mode==='supplier'){
 
+  // Optional RFQ shortcut: create the identity and its pending material link atomically.
+  const linkMaterial=b.linkMaterialId?await get(req(b.linkMaterialId),'material'):null;
+  if(linkMaterial&&b.supplierId)fail('اتصال هم‌زمان به کالا فقط برای تأمین‌کننده جدید است.');
+
   const old=b.supplierId?await get(req(b.supplierId),'supplier'):null;if(old&&b.revision!==old.revision)fail('پرونده تغییر کرده است.',409);
   const route=req(b.route);if(!['domestic','foreign'].includes(route)||!supplierRoute(u,route)||old&&!supplierRoute(u,old.data.route))fail('مجوز مسیر تأمین را ندارید.',403);if(old&&old.data.route!==route)fail('مسیر پرونده ثابت است؛ برای مسیر دیگر پرونده جدا بسازید.');
   if(!['manufacturer','trader'].includes(b.kind)||typeof b.active!=='boolean')fail('نوع و وضعیت تأمین‌کننده معتبر نیست.');
   const phones=Array.isArray(b.phones)?b.phones.map((v:any)=>txt(v||'',100)).filter(Boolean):[txt(b.phone||'',100)].filter(Boolean);if(phones.length>10)fail('حداکثر ۱۰ شماره تلفن می‌توانید ثبت کنید.');const d:any={route,kind:b.kind,active:b.active};for(const k of Object.keys(supplierFields))d[k]=txt(b[k]||'',k==='notes'?3000:500);d.phone=phones[0]||'';d.phones=phones;for(const k of ['name','country','contact','phone'])if(!d[k])fail('نام، کشور، مسئول تماس و تلفن اصلی لازم است.');if(d.email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email))fail('ایمیل معتبر نیست.');target=old?.id||id;put(target,'supplier',d,old);
+  if(linkMaterial)put('supplier-material:'+id,'supplier_material',{supplierId:target,materialId:linkMaterial.id,partCode:linkMaterial.data.code,supplierCode:txt(b.supplierCode||'',100),status:'pending',specs:linkMaterial.data.specs||'',unit:linkMaterial.data.unit,qualityRisk:'high',supplyRisk:'high',reviewDue:'',supplierRevision:1,notes:txt(b.linkNotes||'',3000)});
  }else if(mode==='link'){
   const s=await get(req(b.supplierId),'supplier'),m=await get(req(b.materialId),'material');if(!supplierRoute(u,s.data.route))fail('مجوز مسیر ندارید.',403);
   guard("NOT EXISTS(SELECT 1 FROM flow_entities WHERE type='supplier_material' AND json_extract(data,'$.supplierId')=? AND json_extract(data,'$.materialId')=?)",s.id,m.id);

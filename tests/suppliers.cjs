@@ -137,6 +137,18 @@ async function supplier(mode,b={},status=200,user=actor('domestic')){const body=
  await assert.rejects(()=>catalog.executeTool('control_purchase_technical',{...args,id:crypto.randomUUID()},base,{...mp,scope:'read'}),/read-only/);
  const reset=load('lib/reset-contract.ts');assert.ok(reset.resetFlowCatalog.includes('material'));assert.ok(reset.resetFlowCatalog.includes('supplier_material'));
  sql.exec("UPDATE reset_control SET phase='maintenance'");await tech('material',material.id,'quality','hold',qa,{},423);sql.exec("UPDATE reset_control SET phase='testing'");
+ const linked=await supplier('supplier',{route:'domestic',kind:'manufacturer',active:true,name:'RFQ shortcut',country:'ایران',contact:'Contact',phone:'02112345678',linkMaterialId:material.id});
+ const shortcut=entities('supplier_material').find(l=>l.data.supplierId===linked.id);
+ assert.equal(shortcut.data.materialId,material.id);assert.equal(shortcut.data.status,'pending');assert.equal(shortcut.data.partCode,material.data.code);assert.equal(shortcut.data.unit,material.data.unit);assert.ok(domain.qualification(shortcut,entities('supplier').find(x=>x.id===linked.id),material),'No automatic qualification');
+ const repeat=await context.run(actor('domestic'),()=>suppliers.POST(request('/api/suppliers','POST',linked.body)));assert.equal(repeat.status,200);assert.equal(entities('supplier_material').filter(l=>l.data.supplierId===linked.id).length,1);
+ const beforeBad=entities('supplier').length;
+ await supplier('supplier',{route:'domestic',kind:'manufacturer',active:true,name:'Invalid',country:'ایران',contact:'Contact',phone:'02112345678',linkMaterialId:'missing'},404);
+ assert.equal(entities('supplier').length,beforeBad);
+ await supplier('supplier',{route:'foreign',kind:'manufacturer',active:true,name:'Wrong route',country:'ایران',contact:'Contact',phone:'02112345678',linkMaterialId:material.id},403);
+ await supplier('supplier',{route:'domestic',kind:'manufacturer',active:true,name:'Denied',country:'ایران',contact:'Contact',phone:'02112345678',linkMaterialId:material.id},403,qc);
+ assert.equal(entities('supplier').length,beforeBad);
+ assert.ok(catalog.tools.find(t=>t.name==='save_supplier').inputSchema.properties.linkMaterialId);
+
  assert.equal(sql.prepare('PRAGMA foreign_key_check').all().length,0);
  console.log('Supplier workflow passed: permissions, confirmation, idempotency, unique links, evidence, null ratings, task contacts, real-action completion, all-target responses, finance gate, conditional ceiling, suspension/requalification at issue, receipt metrics, privacy and MCP.');
 })().catch(e=>{console.error(e);process.exit(1)});
