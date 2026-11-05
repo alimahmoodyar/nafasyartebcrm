@@ -62,7 +62,7 @@ async function supplier(mode,b={},status=200,user=actor('domestic')){const body=
  const tasks=load('app/api/tasks/route.ts');assert.equal((await context.run(actor('domestic'),()=>tasks.POST(request('/api/tasks','POST',{id:crypto.randomUUID(),mode:'submit',taskId:task.id,revision:task.revision,note:'done'})))).status,400);
  const quote={planId:pid,partCode:'01',route:'domestic',supplierLinkId:l1.id,supplier:'spoof',unitPrice:'100',currency:'IRR',fxRate:'1',fxDate:today,fxSource:'rial',extrasRial:'0',costNotes:'included',eta:later,validUntil:future,paymentTerms:'cash',specs:'V1',reference:'Q-1',transportMethod:'company',freightStatus:'pending'};
  await source('quote',{...quote,supplierLinkId:''},400,actor('domestic'));
- await source('quote',{...quote,freightStatus:'known',freightAmount:'0'},400,actor('domestic'));
+ await source('quote',{...quote,transportMethod:'seller',freightStatus:'known',freightAmount:'0'},400,actor('domestic'));
  await source('quote',{...quote,transportMethod:'invalid'},400,actor('domestic'));
  await source('quote',quote,200,actor('domestic'));let q=entities('sourcing_quote')[0];assert.equal(q.data.supplier,'Factory A');assert.equal(q.data.freight.amountRial,null);assert.equal(q.data.freight.status,'pending');
  await source('quote',quote,409,actor('domestic'));
@@ -181,6 +181,12 @@ async function supplier(mode,b={},status=200,user=actor('domestic')){const body=
  await source('quote',{planId:emptyPlan,partCode:'02',route:'domestic',supplierLinkId:foundLink.id,unitPrice:'100',extrasRial:'0',costNotes:'Included',eta:later,validUntil:future,paymentTerms:'Cash',specs:'Spec2',reference:'NEW-Q'},200,actor('domestic'));
  await assert.rejects(()=>domain.checkSupplierPurchase(foundLink.id,otherMaterial.id,'domestic',1000),/صلاحیت/);
  // Archiving retains business records, blocks new procurement, and requires explicit restore.
+ const freightRules=load('lib/domestic-freight.ts');
+ assert.equal(freightRules.domesticFreight({transportMethod:'company',freightStatus:'known',freightAmount:'5000'}).amountRial,null);
+ assert.equal(freightRules.domesticFreight({transportMethod:'carrier'}).status,'pending');
+ assert.equal(freightRules.domesticFreight({transportMethod:'carrier',freightAmount:'5000'}).amountRial,'5000');
+ assert.equal(freightRules.domesticFreight({transportMethod:'seller',freightStatus:'no_charge'}).amountRial,'0');
+ assert.throws(()=>freightRules.domesticFreight({transportMethod:'seller'}));
  const original=entities('supplier').find(s=>s.id===linked.id),counts=['supplier_material','supplier_review','purchase_order'].map(t=>entities(t).length);
  const archive={supplierId:linked.id,revision:original.revision,reason:'No longer an approved business partner'};
  await supplier('archive',archive,403,actor('sales'));

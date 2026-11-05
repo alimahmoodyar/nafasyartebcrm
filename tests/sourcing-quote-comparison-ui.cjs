@@ -33,8 +33,12 @@ const compact=()=>SourcingQuoteFields({draft:compactDraft,line,choices:[{linkId:
 let formTree=compact();assert.equal(nodes(formTree).filter(n=>n.type==='details'&&n.props.open).length,0);const core=nodes(formTree).find(n=>n.props['data-quote-core']!==undefined);assert.ok(core);assert.ok(!nodes(core).some(n=>['textarea','button'].includes(n.type)));assert.ok(!nodes(formTree).some(n=>n.type==='input'&&n.props.type==='checkbox'));
 let cost=nodes(formTree).find(n=>n.type==='textarea'&&n.props.value===undefined);assert.ok(!nodes(formTree).filter(n=>n.type==='textarea').some(n=>n.props.required));
 compactDraft.extrasRial='10';assert.ok(!nodes(compact()).some(n=>n.type==='textarea'&&n.props.required),'Domestic freight does not require customs or ancillary notes');
-compactDraft.freightStatus='pending';compactDraft.transportMethod='company';assert.ok(text(compact()).includes('صفر قطعی نیست'));
-compactDraft.freightStatus='known';assert.ok(nodes(compact()).some(n=>n.type==='label'&&text(n).includes('مبلغ حمل همین مقدار')));
+compactDraft.freightStatus='pending';compactDraft.transportMethod='company';assert.ok(text(compact()).includes('بعداً در تسویه تعیین می‌شود'));
+assert.ok(!text(compact()).includes('وضعیت هزینه حمل'));assert.ok(!nodes(compact()).some(n=>n.type==='label'&&text(n).includes('مبلغ حمل همین مقدار')));
+compactDraft.transportMethod='carrier';assert.ok(nodes(compact()).some(n=>n.type==='label'&&text(n).includes('مبلغ حمل همین مقدار')));
+compactDraft.transportMethod='seller';compactDraft.freightStatus='';assert.ok(text(compact()).includes('فروشنده کرایه جداگانه دریافت می‌کند؟'));
+compactDraft.freightStatus='no_charge';assert.ok(!nodes(compact()).some(n=>n.type==='label'&&text(n).includes('مبلغ حمل همین مقدار')));
+
 compactDraft.route='foreign';assert.ok(nodes(compact()).some(n=>n.type==='textarea'&&n.props.required));compactDraft.route='domestic';
 const savedCompact={...compactDraft};compactDraft={...compactDraft,quoteId:'legacy',deliveryDays:'',eta:'2026-12-01'};assert.ok(!text(compact()).includes('شروع مهلت تحویل'));compactDraft.deliveryDays='7';assert.ok(text(compact()).includes('شروع مهلت تحویل'));compactDraft=savedCompact;
 const pendingQuotes=quotes.map(q=>q.id==='b'?{...q,data:{...q.data,freight:{status:'pending',method:'company',amountRial:null}}}:q);assert.notEqual(helper.recommendedQuote(line,pendingQuotes,plan.data.needBy,'2026-11-05')?.id,'b','Unknown freight is never recommended as the lowest final cost');
