@@ -5,7 +5,7 @@ import {qmsRoles} from './qms-contract';
 export const roleWorkflowPrograms:Record<string,string[]>={
  inventory:['build-projects','flow','inventory','sourcing','fulfillment','sales'],
  warehouse_supervisor:['build-projects','flow','inventory','sourcing','fulfillment','sales'],
- production_store_assistant:['flow','inventory'],
+ production_store_assistant:['flow','inventory','routine-production'],
  production:['build-intake','build-projects','routine-production','sourcing','flow','fulfillment','event','device','serials','analytics'],
  production_worker:['routine-production'],
  planning:['sourcing'],

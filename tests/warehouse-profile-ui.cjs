@@ -16,6 +16,15 @@ function button(label){const node=nodes(tree()).find(n=>n.type==='button'&&text(
 async function mount(next,data){kind=next;slots=[];effects=[];calls=[];reply={ok:true,json:async()=>data};tree();effects.splice(0).forEach(fn=>fn());await new Promise(r=>setImmediate(r));tree();}
 (async()=>{
  const checkbox=label=>nodes(tree()).find(n=>n.type==='input'&&n.props['aria-label']===label);
+ for(const role of ['inventory','warehouse_supervisor','production_store_assistant']){
+  permissions={read:[],write:[],eventStages:[],roleAssignment:{roles:[role]}};
+  checkbox('مسئول انبار انبار اول').props.onChange({target:{checked:true}});
+  checkbox('مسئول انبار انبار دوم').props.onChange({target:{checked:true}});
+  const saved=policy.validatePermissions(permissions);assert.equal(JSON.stringify(saved.roleAssignment.warehouseResponsibilities.map(r=>r.warehouseId)),JSON.stringify(['a','b']));assert.equal(saved.warehouseResponsibilities.some(r=>r.role==='qc'),false);if(role==='production_store_assistant')assert.equal(JSON.stringify(saved.warehouses),JSON.stringify(['line']));
+  checkbox('مسئول انبار انبار اول').props.onChange({target:{checked:false}});assert.equal(policy.validatePermissions(permissions).warehouseResponsibilities.length,1);
+  checkbox('مسئول انبار انبار دوم').props.onChange({target:{checked:false}});assert.throws(()=>policy.validatePermissions(permissions),/انبارهای تحت مسئولیت/);
+ }
+ permissions={read:[],write:[],eventStages:[],roleAssignment:{roles:[]}};
  checkbox('مسئول کنترل کیفیت انبار اول').props.onChange({target:{checked:true}});policy.validatePermissions(permissions);assert.equal(permissions.roleAssignment.roles.length,0);assert.ok(nav.canOpenSection({isAdmin:false,permissions},'warehouse'));assert.ok(!nav.canOpenSection({isAdmin:false,permissions},'qms'));
  checkbox('مسئول انبار انبار دوم').props.onChange({target:{checked:true}});assert.equal(permissions.warehouseResponsibilities.length,2);checkbox('مسئول کنترل کیفیت انبار اول').props.onChange({target:{checked:false}});assert.equal(permissions.warehouseResponsibilities[0].warehouseId,'b');
  permissions={read:[],write:[],eventStages:[],manualPrograms:[]};checkbox('مسئول کنترل کیفیت انبار اول').props.onChange({target:{checked:true}});assert.ok(permissions.manualPrograms.includes('flow'));

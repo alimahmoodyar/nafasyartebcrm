@@ -1,3 +1,4 @@
+import {assertWarehouseNotCounting} from './stocktake-lock';
 import {storage} from './storage';
 import {AccessError} from './authorization';
 import {flowRole,warehouseAccess} from './material-flow';
@@ -11,7 +12,8 @@ export function warehouseResponsibilities(member:any,warehouses:any[]):Warehouse
  // Preserve old assignments until that profile is explicitly saved, including an empty selection.
  return warehouses.flatMap(w=>([['qc','qcOwner'],['inventory','warehouseOwner']] as const).filter(([role,key])=>w.data[key]===member.id&&p.flowRoles?.includes(role)).map(([role])=>({warehouseId:w.id,role})));
 }
-export function warehouseProfilePermissions(member:any,warehouses:any[]){const p:Permissions=typeof member.permissions==='string'?storedAccessPermissions(member.permissions):member.permissions,roles=warehouseResponsibilities(member,warehouses).filter(r=>warehouses.some(w=>w.id===r.warehouseId&&!w.data.deletedAt));return {...p,warehouseResponsibilities:roles,...(p.roleAssignment?{roleAssignment:{...p.roleAssignment,warehouseResponsibilities:roles}}:{})};}
+// A read must not turn an untouched legacy scope into an explicit empty removal.
+export function warehouseProfilePermissions(member:any,warehouses:any[]){const p:Permissions=typeof member.permissions==='string'?storedAccessPermissions(member.permissions):member.permissions,roles=warehouseResponsibilities(member,warehouses).filter(r=>warehouses.some(w=>w.id===r.warehouseId&&!w.data.deletedAt));if(p.warehouseResponsibilities===undefined&&!roles.length)return p;return {...p,warehouseResponsibilities:roles,...(p.roleAssignment?{roleAssignment:{...p.roleAssignment,warehouseResponsibilities:roles}}:{})};}
 export async function warehouseDirectory(warehouses?:any[],members?:any[]){
  const ws=warehouses||await materialWarehouses(),ms=members||(await storage().prepare("SELECT id,name,subject,permissions FROM app_members WHERE status='active'").all()).results as any[];
  const directory=ws.map(w=>({...w,...Object.fromEntries((['qc','inventory'] as const).map(role=>[role+'Members',ms.filter(m=>warehouseResponsibilities(m,ws).some(r=>r.warehouseId===w.id&&r.role===role)).map(m=>({id:m.id,name:m.name,subject:m.subject||''}))]))}));
@@ -22,6 +24,7 @@ export async function warehouseDirectory(warehouses?:any[],members?:any[]){
 }
 export function warehouseMember(u:Session,w:any,role:'inventory'|'qc'){return u.isAdmin||!!w?.[role+'Members']?.some((m:any)=>[m.id,'local:'+m.id,m.subject].filter(Boolean).includes(u.userId));}
 export function canReceiveWarehouse(u:Session,w:any){return !!receiptPolicyEnabled(w)&&flowRole(u,'inventory')&&warehouseAccess(u,'quarantine')&&warehouseMember(u,w,'inventory');}
+export function receiptQcOwners(receipt:any,w:any):string[]{const candidates=w?.qcMembers||[];const selected=Array.isArray(receipt.data.qcOwners)?receipt.data.qcOwners:receipt.data.qcOwner?[receipt.data.qcOwner]:candidates.map((m:any)=>m.id);return candidates.filter((m:any)=>selected.includes(m.id)).map((m:any)=>m.id);}
 export function receiptQcOwner(receipt:any,w:any){const candidates=w?.qcMembers||[];return candidates.some((m:any)=>m.id===receipt.data.qcOwner)?receipt.data.qcOwner:candidates.length===1?candidates[0].id:'';}
 export async function receiptWarehouse(u:Session,warehouseId:any,qcOwner?:unknown){
  const rows=await warehouseDirectory();
@@ -29,12 +32,13 @@ export async function receiptWarehouse(u:Session,warehouseId:any,qcOwner?:unknow
  const eligible=rows.filter(w=>w.data.active&&canReceiveWarehouse(u,w)),w=warehouseId?rows.find(w=>w.id===warehouseId):eligible.length===1?eligible[0]:null;
  if(!w||!w.data.active)throw new AccessError('انبار مقصد فعال را انتخاب کنید.',400);
  if(!receiptPolicyEnabled(w))throw new AccessError('ورود مستقیم به این انبار مجاز نیست؛ انبار دریافت دارای قرنطینه فعال را انتخاب کنید. ورود مستقیم به خط تولید ممنوع است.',400);
+ await assertWarehouseNotCounting(storage(),w.id);
  if(!canReceiveWarehouse(u,w))throw new AccessError('دریافت در این انبار در مسئولیت شما نیست.',403);
- if(qcOwner!==undefined&&typeof qcOwner!=='string')throw new AccessError('مسئول کیفیت معتبر انتخاب کنید.',400);
- const candidates=w.receiptQcMembers,selected=String(qcOwner||'');if(selected&&!candidates.some((m:any)=>m.id===selected))throw new AccessError('مسئول کنترل کیفیت از افراد فعال قرنطینه همین انبار انتخاب شود.',400);
- if(candidates.length>1&&!selected)throw new AccessError('برای این محموله یکی از مسئولان کنترل کیفیت قرنطینه را انتخاب کنید.',400);
- const owner=selected||candidates[0]?.id||'';
- return {warehouseId:w.id,warehouseRevision:w.revision,quarantineWarehouseId:w.receiptQuarantine.id,quarantineWarehouseRevision:w.receiptQuarantine.revision,quarantineWarehouseName:w.receiptQuarantine.name,receiptPolicyVersion:1,warehouseOwner:w.inventoryMembers.length===1?w.inventoryMembers[0].id:'',qcOwner:owner,qcAssignment:owner?'assigned':'unassigned'};
+ if(qcOwner!==undefined&&typeof qcOwner!=='string'&&(!Array.isArray(qcOwner)||qcOwner.some(v=>typeof v!=='string')))throw new AccessError('مسئول کیفیت معتبر انتخاب کنید.',400);
+ const candidates=w.receiptQcMembers,selectedIds=Array.isArray(qcOwner)?qcOwner:qcOwner?[String(qcOwner)]:[];if(new Set(selectedIds).size!==selectedIds.length||selectedIds.some(id=>!candidates.some((m:any)=>m.id===id)))throw new AccessError('مسئول کنترل کیفیت از افراد فعال قرنطینه همین انبار انتخاب شود.',400);
+
+ const qcOwners=selectedIds.length?selectedIds:candidates.map((m:any)=>m.id),owner=qcOwners.length===1?qcOwners[0]:'';
+ return {warehouseId:w.id,warehouseRevision:w.revision,quarantineWarehouseId:w.receiptQuarantine.id,quarantineWarehouseRevision:w.receiptQuarantine.revision,quarantineWarehouseName:w.receiptQuarantine.name,receiptPolicyVersion:1,warehouseOwner:w.inventoryMembers.length===1?w.inventoryMembers[0].id:'',qcOwner:owner,qcOwners,qcAssignment:qcOwners.length?'assigned':'unassigned'};
 }
 export async function warehouseResponsibilityGuards(permissions:string,op:string){const p=storedAccessPermissions(permissions),db=storage(),statements:D1PreparedStatement[]=[];for(const r of p.warehouseResponsibilities||[]){const w:any=await db.prepare("SELECT revision,data FROM flow_entities WHERE id=? AND type='material_warehouse'").bind(r.warehouseId).first();if(!w||JSON.parse(w.data).deletedAt)throw new AccessError('انبار انتخاب‌شده دیگر وجود ندارد یا حذف شده است؛ فهرست را تازه کنید.',409);statements.push(db.prepare("UPDATE inventory_operations SET guard=CASE WHEN EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND type='material_warehouse' AND revision=?) THEN guard ELSE 0 END WHERE id=?").bind(r.warehouseId,w.revision,op));}return statements;}
 export const storageLocation=(warehouseId:string,location:string)=>warehouseId?warehouseId+'|'+location:location;

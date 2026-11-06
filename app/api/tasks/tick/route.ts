@@ -1,3 +1,4 @@
+import {syncInventoryCounts} from '@/lib/inventory-counts';
 import {syncReminders} from '@/lib/reminders';
 import {syncTreasuryTasks} from '@/lib/treasury-tasks';
 import {syncPurchaseInvoiceTasks} from '@/lib/purchase-invoice-tasks';
@@ -35,7 +36,7 @@ export async function POST(request:Request){try{
  await scanReplenishment();
  await syncSourcingFollowups();
  await syncSupplierQuality();
- await syncSalesTasks();
+ await syncInventoryCounts();await syncSalesTasks();
  await syncLeadTasks();
  await syncPurchaseInvoiceTasks();
  await syncAssetTasks();await syncPersonnelTasks();await syncForeignTasks();

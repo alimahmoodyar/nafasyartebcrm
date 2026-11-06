@@ -1,4 +1,4 @@
-export const warehouseTypes:Record<string,string>={storage:'انبار مواد و کالا',production_line:'پای کار / خط تولید',quarantine:'قرنطینه ورودی',other:'سایر محل‌ها'};
+export const warehouseTypes:Record<string,string>={storage:'انبار مواد و کالا',production_line:'پای کار / خط تولید',quarantine:'قرنطینه ورودی',scrap:'انبار داغی و ضایعات',other:'سایر محل‌ها'};
 export function receiptQuarantine(warehouse:any,warehouses:any[]){
  const q=warehouses.find(q=>q.id===warehouse?.data.quarantineWarehouseId);
  return q&&q.data.active&&q.data.warehouseType==='quarantine'&&q.data.parentId===warehouse.id&&q.data.quarantineFor===warehouse.id?q:null;

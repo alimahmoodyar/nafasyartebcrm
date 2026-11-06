@@ -162,6 +162,13 @@
       "when": 1793872000000,
       "tag": "0022_role_preview_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1793930733991,
+      "tag": "0023_inventory_count_locks",
+      "breakpoints": true
     }
   ]
 }

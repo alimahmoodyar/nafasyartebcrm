@@ -27,6 +27,7 @@ async function part(u,id,index,bytes,op=crypto.randomUUID()){const r=await ctx.r
 (async()=>{
  sql.prepare("INSERT INTO records(id,kind,payload,created) VALUES('p1','product',?,?)").run(JSON.stringify({name:'Product',code:'P1',status:'فعال'}),now);
  assert.equal((await get(ordinary)).status,403);assert.equal((await get(external)).status,403);
+ assert.equal((await get(eng)).data.canReviewSupply,true);assert.equal((await get(admin)).data.canReviewSupply,true);assert.equal((await get(qa)).data.canReviewSupply,false);assert.equal((await get(ceo)).data.canReviewSupply,false);
  const create={...basic('design'),id:crypto.randomUUID()};const design=await ok(eng,create);assert.equal((await post(eng,create)).data.repeated,true);assert.equal((await post(eng,{...create,title:'changed'})).status,409);
  assert.equal(row(design).data.private,true);assert.equal((await get(admin)).data.records.some(r=>r.id===design),false);assert.equal((await get(qa)).data.records.some(r=>r.id===design),false);assert.ok((await get(ceo)).data.records.some(r=>r.id===design));
  assert.equal((await apply(admin,design,'save',{...basic('design')})).status,404);assert.equal((await apply(qa,design,'approve')).status,404);
