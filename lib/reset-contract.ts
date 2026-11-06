@@ -224,3 +224,7 @@ resetHelp.push('راهنماهای عیب‌یابی محصول، تاریخچه
 // Receipt purchase completion/resolution, registeredBy/time and resulting inbox closure
 // remain inside receipt/receipt_observation/inbox flow_entities and records payloads.
 // No new tables/blobs: existing full flow backup, delete order and reset freeze apply.
+
+// Incoming identity correction history and relabel confirmations remain in receipt JSON,
+// the existing records/inventory_batches rows, form archive and existing inbox cases.
+// Full backups, existing delete order and generic reset freeze cover all of them.

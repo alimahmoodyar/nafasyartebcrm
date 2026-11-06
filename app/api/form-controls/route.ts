@@ -1,19 +1,19 @@
 import {requireAccess,accessResponse,AccessError} from '@/lib/authorization';
 import {qactor,qtoday} from '@/lib/qms';
 import {controlledForms} from '@/lib/form-control-contract';
-import {controlledDocuments,documentControl,formRecordAccess,receiptFormScope,receiptFormTargets} from '@/lib/form-control';
+import {controlledDocuments,documentControl,formRecordAccess,receiptFormCodes,receiptFormTargets} from '@/lib/form-control';
 import {formHeaders,escapeForm as e,printableForm} from '@/lib/form-control-print';
 import {storage} from '@/lib/storage';
 import {formatDate,formatDateTime} from '@/lib/persian-date';
 export async function GET(request:Request){try{
  const u=await requireAccess(),q=new URL(request.url).searchParams,print=q.get('format')==='print';
  if(q.get('view')==='records'){
-  const batchId=q.get('batchId')||'';const code=batchId?await receiptFormScope(u,batchId):'';
+  const batchId=q.get('batchId')||'';const codes=batchId?await receiptFormCodes(u,batchId):[];
   const targets=Object.keys(controlledForms).filter(t=>batchId?receiptFormTargets.includes(t):formRecordAccess(u,t));if(!targets.length)throw new AccessError('دسترسی سوابق فرم‌ها ندارید.',403);
   const offset=Number(q.get('offset')||0);if(!Number.isInteger(offset)||offset<0||offset>1000000)throw new AccessError('صفحه معتبر انتخاب کنید.',400);
   let filter='',args:any[]=[];
   if(batchId){
-   filter=" AND ((json_extract(f.data,'$.target')='flow.receipt' AND EXISTS(SELECT 1 FROM json_each(f.data,'$.rows') row WHERE json_extract(row.value,'$.label')='شماره بچ ثبت‌شده' AND json_extract(row.value,'$.value')=?)) OR EXISTS(SELECT 1 FROM inventory_operations op WHERE op.id=substr(f.id,13) AND json_extract(op.payload,'$.receiptId')=?))";args=[code,batchId];
+   filter=" AND ((json_extract(f.data,'$.target')='flow.receipt' AND EXISTS(SELECT 1 FROM json_each(f.data,'$.rows') row WHERE json_extract(row.value,'$.label')='شماره بچ ثبت‌شده' AND json_extract(row.value,'$.value') IN (SELECT value FROM json_each(?)))) OR EXISTS(SELECT 1 FROM inventory_operations op WHERE op.id=substr(f.id,13) AND json_extract(op.payload,'$.receiptId')=?))";args=[JSON.stringify(codes),batchId];
   }
   const rows=(await storage().prepare("SELECT f.id,f.data FROM flow_entities f WHERE f.type='form_record' AND json_extract(f.data,'$.target') IN ("+targets.map(()=>'?').join(',')+")"+filter+" ORDER BY f.created DESC,f.id DESC LIMIT 101 OFFSET ?").bind(...targets,...args,offset).all()).results as any[];
   const hasMore=rows.length>100,records=rows.slice(0,100).map(r=>{const d=JSON.parse(r.data);return {id:r.id.slice('form-report:'.length),title:d.title,target:d.target,control:d.control,at:d.at,by:d.by};});

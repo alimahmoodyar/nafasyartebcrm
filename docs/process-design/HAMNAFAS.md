@@ -472,3 +472,7 @@
 
 ### 2026-11-06 — Corrected phone QR destination
 The approved public label fields must appear immediately when a phone opens the QR link, not only inside the raw QR text. The existing batch link shows a narrow public label projection without login. Private current inventory, QC, location, supplier and histories remain in the existing authorized receipt report. Login returns to that private view; membership alone does not bypass record access. Old link-bearing QR labels work after deployment without reprinting. No extra public business fields were approved.
+
+
+### 2026-11-06 — Approved correction of mistaken receiving identity by incoming QC
+Assigned QC selects the correct existing catalog item before inspection completion. Load that item’s own criteria/version and finish QC there. Keep the original physical quantity and internal lot identity, correct the printed human code/material, retain old/new identity and actor/reason history, invalidate and reserve every old printed number. Detach the incorrect purchase and restore its procurement claims; supply identifies the correct purchase in parallel. Once QC approves, warehouse must print/physically replace old labels and scan/confirm the current code, then proceed directly to shelving without another inspection. No correct template means wait in quarantine. Same-unit correction is implemented; different-unit recount is a separate open design question, not an automatic numeric conversion.

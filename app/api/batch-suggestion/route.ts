@@ -1,5 +1,5 @@
+import {reservedBatchCodes} from '@/lib/batch-code-reservations';
 import {requireAccess, accessResponse} from "@/lib/authorization";
-import {storage} from "@/lib/storage";
 import {normalizePartCode, receiptDay, suggestBatchNumber} from "@/lib/batch-number";
 
 export async function GET(request: Request) {
@@ -9,8 +9,7 @@ export async function GET(request: Request) {
   try { normalizePartCode(part); receiptDay(date); }
   catch (error) { return Response.json({error: (error as Error).message}, {status: 400}); }
   try {
-    const rows = await storage().prepare("SELECT json_extract(payload, '$.code') AS code FROM records WHERE kind = ?").bind("batch").all<{code: string}>();
-    return Response.json(suggestBatchNumber(part, date, rows.results.map(r => r.code)), {headers: {"Cache-Control": "no-store"}});
+    return Response.json(suggestBatchNumber(part, date, await reservedBatchCodes()), {headers: {"Cache-Control": "no-store"}});
   } catch (error) {
     console.error(error);
     return Response.json({error: "بررسی بچ‌های ثبت‌شده ممکن نشد. دوباره تلاش کنید."}, {status: 503});

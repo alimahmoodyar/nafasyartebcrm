@@ -38,3 +38,7 @@
 - مشاهدات هنگام دریافت: یادداشت و عکس کاملاً اختیاری‌اند. بدون مخاطب در سابقه می‌مانند؛ با انتخاب تأمین، مالی یا همکار داخلی به کارتابل مخاطب می‌روند. ارجاع خودکار اختلاف تعداد، مستقل از متن و عکس یادداشت اختیاری است.
 - تأمین‌کننده سفارش فقط‌خواندنی است. گفته راننده در سرنخ جدا و تأییدنشده ثبت می‌شود و نام تأمین‌کننده خرید را تغییر نمی‌دهد.
 - تشخیص مشخصات یا تغییر فنی وظیفه انباردار نیست؛ شماره مدرک، سازنده و لات تنها در صورت اطلاع اختیاری هستند.
+
+
+### Open — Receiving identity correction when units differ
+When QC identifies a different catalog item with another unit, who recounts the physical goods, which quantity/evidence is confirmed, and how are the original count and purchase allocation reconciled? Current same-unit correction refuses to guess a conversion. Resolve with the receiving/QC process owner before extending this case.
