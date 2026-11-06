@@ -1,3 +1,11 @@
+## 2026-11-06 — Catalog reference photo and storage address in receiving and QR labels
+
+- Receiving immediately shows the selected material’s reference photo with a zoom link. Changing selection removes the old photo before the next fetch; stale responses cannot replace the current selection. Missing photos and load failures are explicit and do not create stock or block counting.
+- The owner-approved public QR page now shows the active catalog reference image, live master default location and the actual batch placement separately. No placement yet shows quarantine/unplaced, not the suggested address. Master edits refresh default information without pretending a physical move.
+- Public photo responses are bound to the exact batch material and selected active catalog photo, with existing JPEG/hash validation. The full protected gallery, other-material images, receiving evidence, internal notes, QC results, stock quantities and prices remain protected.
+- Printable labels include the master address as “محل پیش‌فرض نگهداری”, selected for the receiving warehouse. Current location remains on the online page. Barcode label defaults are now 70×40 mm, QR 60×75 mm, combined 100×80 mm; smaller/long-address layouts fail explicitly rather than silently dropping the address.
+- Read-only MCP summary/photo parity, display-only changes, no migration or reset. Existing link-bearing QR labels gain the new online display; paper needs reprinting to add or update the address.
+
 ## 2026-11-06 — Incoming QC material identification and mandatory relabel
 
 - Assigned incoming inspector/admin can correct an accidentally selected material while the entire lot remains quarantined and inspection is not yet completed. The correct existing same-unit master, criteria/specification version, human batch code and inventory material are updated atomically; physical count and internal receipt identity remain unchanged.

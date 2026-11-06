@@ -1,0 +1,15 @@
+import {storage} from './storage';
+/** Owner-approved public context only. No members, quantities, QC results or business files. */
+export async function batchLabelContext(batchId:string,partCode:string){
+ const db=storage(),receipt:any=await db.prepare("SELECT json_extract(data,'$.materialId') materialId,json_extract(data,'$.warehouseId') warehouseId,json_extract(data,'$.quarantineWarehouseId') quarantineId,json_extract(data,'$.state') state FROM flow_entities WHERE type='receipt' AND id=?").bind(batchId).first();
+ const materials=(await db.prepare("SELECT id,json_extract(data,'$.defaultLocations') defaults FROM flow_entities WHERE type='material' AND ((?<>'' AND id=?) OR (?='' AND json_extract(data,'$.code')=?)) LIMIT 2").bind(receipt?.materialId||'',receipt?.materialId||'',receipt?.materialId||'',partCode).all()).results as any[];
+ const material=materials.length===1?materials[0]:null;
+ const warehouses=(await db.prepare("SELECT id,json_extract(data,'$.name') name,json_extract(data,'$.parentId') parentId FROM flow_entities WHERE type='material_warehouse'").all()).results as any[],names=new Map(warehouses.map(w=>[w.id,w]));
+ const warehouseName=(id:string)=>{const parts:string[]=[],seen=new Set<string>();let current=id;while(current&&names.has(current)&&!seen.has(current)){seen.add(current);const w=names.get(current)!;parts.unshift(w.name||'انبار');current=w.parentId||'';}return parts.join(' / ')||'انبار ثبت‌شده';};
+ const defaults=material?.defaults?JSON.parse(material.defaults):{},entries=Object.entries(defaults).filter(([id,value])=>typeof value==='string'&&value.trim()&&(!receipt?.warehouseId||id===receipt.warehouseId)),defaultLocations=entries.map(([id,value])=>({warehouse:warehouseName(id),location:String(value)}));
+ const slots=(await db.prepare('SELECT location FROM flow_slots WHERE batch_id=? AND quantity>0 ORDER BY location').bind(batchId).all()).results as any[],actualLocations=slots.map(s=>{const raw=String(s.location),index=raw.indexOf('|'),id=index<0?receipt?.warehouseId||'':raw.slice(0,index);return {warehouse:warehouseName(id),location:index<0?raw:raw.slice(index+1)};});
+ const locationNotice=actualLocations.length?'محل واقعی ثبت‌شده برای همین بچ':receipt&&['pending_qc','awaiting_qc_template','awaiting_relabel','awaiting_warehouse','rejected'].includes(receipt.state)?'در قرنطینه؛ هنوز جانمایی نشده است.':'محل فعلیِ نگهداری برای این بچ ثبت نشده است.';
+ const photo:any=material?await db.prepare("SELECT id FROM flow_entities WHERE type='material_photo' AND json_extract(data,'$.materialId')=? AND json_extract(data,'$.active')=1 ORDER BY created,id LIMIT 1").bind(material.id).first():null;
+ const printDefaultLocation=defaultLocations.length===1?(names.get(entries[0][0])?.name||defaultLocations[0].warehouse)+' · '+defaultLocations[0].location:defaultLocations.length>1?'چند محل پیش‌فرض؛ جزئیات در QR':'در شناسنامه ثبت نشده است';
+ return {materialId:material?.id||'',photoId:photo?.id||'',defaultLocations,actualLocations,locationNotice,printDefaultLocation};
+}

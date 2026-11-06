@@ -1,0 +1,9 @@
+'use client';
+import {useEffect,useState} from 'react';
+export function MaterialReferencePhoto({materialId,name,code}:{materialId:string;name:string;code:string}){
+ const [loaded,setLoaded]=useState<{materialId:string;photoId:string;error:string}|null>(null);
+ useEffect(()=>{if(!materialId){setLoaded(null);return;}let active=true;setLoaded(null);void(async()=>{try{const r=await fetch('/api/material-photos?materialId='+encodeURIComponent(materialId),{cache:'no-store'}),d:any=await r.json();if(!r.ok)throw Error(d.error||'دریافت تصویر انجام نشد.');if(active)setLoaded({materialId,photoId:d.files?.[0]?.id||'',error:''});}catch(e:any){if(active)setLoaded({materialId,photoId:'',error:e.message})}})();return()=>{active=false}},[materialId]);
+ if(!materialId)return null;
+ const current=loaded?.materialId===materialId?loaded:null,base='/api/material-photos?materialId='+encodeURIComponent(materialId)+'&id='+encodeURIComponent(current?.photoId||'');
+ return <section className="wide notice" aria-label="تصویر مرجع کالای انتخاب‌شده" style={{display:'flex',gap:16,alignItems:'center',flexWrap:'wrap'}}><div><strong>{name} · <bdi>{code}</bdi></strong><p>تصویر مرجع شناسنامه؛ ظاهر و کد را با کالای تحویلی تطبیق دهید.</p>{!current?<p role="status">در حال دریافت تصویر کالا…</p>:current.error?<p role="status">دریافت تصویر کالا انجام نشد: {current.error}</p>:!current.photoId?<p role="status">برای این کالا تصویر مرجع ثبت نشده است.</p>:<small>برای بزرگ‌نمایی روی عکس بزنید.</small>}</div>{current?.photoId&&<a href={base} target="_blank" rel="noopener noreferrer"><img src={base+'&thumb=1'} alt={'تصویر مرجع '+name} style={{width:160,height:160,objectFit:'contain',background:'white',borderRadius:8}} onError={()=>setLoaded(previous=>previous?.materialId===materialId?{materialId,photoId:'',error:'تصویر موقتاً در دسترس نیست.'}:previous)}/></a>}</section>;
+}
