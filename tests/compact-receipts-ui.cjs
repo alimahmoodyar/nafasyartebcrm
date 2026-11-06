@@ -20,14 +20,12 @@ function tree(){cursor=0;return MaterialFlow({initialTab:'receipts',embedded:tru
  // Item selection must never carry a previous supplier/order into another lot.
  fixture.entities.push({id:'material:12',type:'material',data:{name:'Valve',code:'12',unit:'عدد'}},{id:'material:13',type:'material',data:{name:'No order',code:'13',unit:'عدد'}});
  fixture.purchaseOrders=[{id:'PO-A',materialId:'material:11',supplier:'Supplier A',quantity:10000,received:2000,remaining:8000,unit:'عدد'},{id:'PO-B',materialId:'material:11',supplier:'Supplier B',quantity:5000,received:0,remaining:5000,unit:'عدد'},{id:'PO-C',materialId:'material:12',supplier:'Supplier C',quantity:3000,received:0,remaining:3000,unit:'عدد'}];
- const material=()=>nodes(tree()).find(n=>n.type===leaves.MaterialSelect),purchases=()=>nodes(tree()).find(n=>n.type===leaves.ReceiptPurchaseOrders),input=label=>nodes(tree()).find(n=>n.props.label===label);
- assert.equal(material().props.value,'','Generic receiving does not choose the first material silently');
- material().props.onChange('material:11');assert.deepEqual(purchases().props.orders.map(o=>o.id),['PO-A','PO-B']);assert.equal(purchases().props.value,'','Several orders need explicit selection');
- purchases().props.onChange('PO-B');assert.equal(input('تأمین‌کننده').props.value,'Supplier B');assert.equal(input('تأمین‌کننده').props.disabled,true);
- input('مقدار واقعی دریافت‌شده توسط انبار').props.onChange('9');
- material().props.onChange('material:12');assert.equal(purchases().props.value,'PO-C','A sole same-item order is preselected for review');assert.equal(input('تأمین‌کننده').props.value,'Supplier C');assert.equal(input('مقدار واقعی دریافت‌شده توسط انبار').props.value,'','Actual quantities are never inferred from a purchase order or another material');
- purchases().props.onChange('');assert.equal(input('تأمین‌کننده').props.value,'');assert.equal(input('تأمین‌کننده').props.disabled,false);
- material().props.onChange('material:13');assert.equal(purchases().props.orders.length,0);assert.equal(purchases().props.value,'');assert.equal(input('تأمین‌کننده').props.value,'');assert.ok(calls.every(c=>!c.method),'Selecting or preselecting a purchase never posts a receipt');
+ const entry=()=>nodes(tree()).find(n=>n.type===leaves.ReceiptEntryFields).props;
+ assert.equal(entry().draft.materialId,'','Generic receiving does not choose the first material silently');
+ entry().onMaterial('material:11');assert.deepEqual(entry().orders.map(o=>o.id),['PO-A','PO-B']);assert.equal(entry().draft.purchaseOrderId,'','Several orders need explicit selection');
+ entry().onOrder('PO-B');assert.equal(entry().draft.supplier,'Supplier B');assert.equal(entry().draft.receiptVersion,2);entry().onChange({quantity:'9'});
+ entry().onMaterial('material:12');assert.equal(entry().draft.purchaseOrderId,'PO-C','Sole same-item order preselected for review');assert.equal(entry().draft.supplier,'Supplier C');assert.equal(entry().draft.quantity,'','Never carry actual counts between materials');
+ entry().onOrder('');assert.equal(entry().draft.supplier,'');entry().onMaterial('material:13');assert.equal(entry().orders.length,0);assert.equal(entry().draft.purchaseOrderId,'');assert.equal(entry().draft.supplier,'');assert.ok(calls.every(c=>!c.method),'Order selection never posts a receipt');
  const {ReceiptPurchaseOrders}=load('components/trace/receipt-purchase-orders.tsx');let chosen='';const rendered=ReceiptPurchaseOrders({orders:fixture.purchaseOrders.slice(0,2),value:'PO-B',onChange:id=>chosen=id});assert.ok(text(rendered).includes('Supplier A'));assert.ok(text(rendered).includes('۸'));nodes(rendered).find(n=>n.type==='input'&&n.props['aria-label'].includes('PO-A')).props.onChange();assert.equal(chosen,'PO-A');
  console.log('PASS receipt purchase choices: same-item list, sole preselection, explicit multiple selection, supplier binding/clear, quantity reset, no write before confirmation and readable received/remaining amounts.');
  console.log('PASS compact receipts: one entry action, no repeated heading/process/global archive, closed per-receipt details, scoped print link, real QC actions and read-only form opening.');

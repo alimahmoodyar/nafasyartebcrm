@@ -12,7 +12,7 @@ export async function GET(request:Request){try{
  const json=(value:unknown)=>Response.json(value,{headers:{'Cache-Control':'private, no-store','Vary':'Cookie, Authorization'}});
  if(!profile)return json({profiles:roleProfiles});
  if(!profile.operational)return json({profile,work:[],unverified:[],personalPreview:true});
- const db=storage(),rows=(await db.prepare("SELECT id,type,data FROM flow_entities WHERE type IN ('receipt','request','sourcing_plan','sourcing_quote','purchase_order','worker_output','scrap_transfer','scrap_sale_request','build','inventory_count','build_project','handoff','worker_nonconforming','line_return','worker_count_round') ORDER BY id").all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}));
+ const db=storage(),rows=(await db.prepare("SELECT id,type,data FROM flow_entities WHERE type IN ('receipt','request','sourcing_plan','sourcing_quote','purchase_order','worker_output','scrap_transfer','scrap_sale_request','build','inventory_count','build_project','handoff','worker_nonconforming','line_return','worker_count_round','receipt_observation') ORDER BY id").all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}));
  const work:ProfileWork[]=materialProfileWork(profile.id,rows);
  if(profile.workflowRoles.length){for(const plan of rows.filter(r=>r.type==='sourcing_plan')){
   const steps=nextWork(plan,rows.filter(r=>r.type==='sourcing_quote'&&r.data.planId===plan.id),rows.filter(r=>r.type==='purchase_order'&&r.data.planId===plan.id),await coverage(plan));

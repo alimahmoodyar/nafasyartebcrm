@@ -1,3 +1,8 @@
+// Receipt observation/note responses, shipment comparison and unverified delivery clue
+// are operational receipt/receipt_observation JSON; inbox threads use existing cleanup.
+// Staged/attached receipt_evidence manifests use flow_entities + R2; resetFiles includes
+// all their blobs in backup/deletion for both scopes. Existing generic 0016 freeze
+// guards receipt, evidence linkage, inbox and stock atomically. No new tables/FKs.
 // Person-independent production_position, worker_buffer, worker_count_policy/round,
 // worker_output/worker_finished_receipt/worker_nonconforming/worker_count, line_return,
 // scrap_transfer/scrap_sale_request, project_final_bom, stock_discrepancy,
