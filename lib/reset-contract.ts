@@ -1,3 +1,5 @@
+// Shelving placementConfirmation is receipt JSON in flow_entities; existing
+// operational backup/delete and 0016 freeze cover it and stock atomically.
 // Receipt observation/note responses, shipment comparison and unverified delivery clue
 // are operational receipt/receipt_observation JSON; inbox threads use existing cleanup.
 // Staged/attached receipt_evidence manifests use flow_entities + R2; resetFiles includes
