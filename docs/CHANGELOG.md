@@ -1,3 +1,11 @@
+## 2026-11-06 — Incoming QC material identification and mandatory relabel
+
+- Assigned incoming inspector/admin can correct an accidentally selected material while the entire lot remains quarantined and inspection is not yet completed. The correct existing same-unit master, criteria/specification version, human batch code and inventory material are updated atomically; physical count and internal receipt identity remain unchanged.
+- Retain auditable before/after identity and original form records. Retired label numbers are permanently reserved across every batch-number generator; old linked labels report invalidation instead of ever identifying another lot.
+- Release wrong purchase claims back to their original order and open correctly routed supply identification without blocking physical QC. Prior automatic purchase reviews close with a correction explanation; manual notes/evidence remain historical.
+- Once QC approves, warehouse receives a relabel task. Scan the corrected code and explicitly confirm physical replacement of old labels before shelving; no duplicate QC or stock creation. Missing target templates stay quarantined. Different units require recount rather than guessed conversion.
+- UI, HTTP, controlled archives, role profiles, actual-member cartables and MCP share state/role/replay/concurrency checks. Existing backup/reset freeze covers added JSON history; no migration.
+
 ## 2026-11-06 — Show fixed batch information on the QR destination
 
 - Opening an existing QR link now immediately displays the approved public label fields without login: item/name/code, batch, receipt date, initial quantity/unit and optional known expiry. Existing link-bearing labels do not require reprinting.

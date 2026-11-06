@@ -1,3 +1,4 @@
+import {reservedBatchCodes} from '@/lib/batch-code-reservations';
 import {batchScanCode} from '@/lib/batch-qr';
 import {syncWorkerCounts} from '@/lib/inventory-counts';
 import {assertWarehouseNotCounting} from '@/lib/stocktake-lock';
@@ -81,7 +82,7 @@ export async function POST(request:Request){try{
    for(const c of consumed){entry(c.batchId,wh,-c.quantity);lot.movements.push({...c,jobId:o.jobId,stage:j.stage,operationId:b.id,...stamp});}
    j.remaining-=o.good;j.outputs.push({id:b.id,good:o.good,scrap:0,rework:0,overtime:false,consumed,physicalOutputId:id,...stamp});
    if(j.stage===lot.route.steps.length-1){
-    const batchId='worker-batch:'+id,code=suggestBatchNumber(lot.route.partCode,tehranDay(),s.records.filter((r:any)=>r.kind==='batch').map((r:any)=>JSON.parse(r.payload).code||'')).code;
+    const batchId='worker-batch:'+id,code=suggestBatchNumber(lot.route.partCode,tehranDay(),await reservedBatchCodes()).code;
     guard("NOT EXISTS(SELECT 1 FROM records WHERE kind='batch' AND json_extract(payload,'$.code')=?)",code);
     const data={code,part:lot.route.name,partCode:lot.route.partCode,unit:lot.route.unit||'عدد',quantity:String(o.good),status:'تأیید',date:tehranDay(),supplier:'ساخت داخل',workerPositionId:o.positionId,workerName:o.positionName,routineJobId:o.jobId,bomSnapshot:o.bom,routeVersion:o.routeVersion};
     stmts.push(db.prepare("INSERT INTO records(id,kind,payload,created) VALUES(?,'batch',?,?)").bind(batchId,JSON.stringify(data),now),db.prepare('INSERT INTO inventory_batches(batch_id,part_code,unit,created) VALUES(?,?,?,?)').bind(batchId,lot.route.partCode,data.unit,now));

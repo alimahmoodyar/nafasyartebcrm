@@ -32,7 +32,7 @@ export async function completeReceiptPurchase(u:any,b:any){
  if(remaining!==r.quantity){const review=await prepareReceiptObservation(u,{id:b.id},receipt.id,r.warehouseId,d.materialName,choice.route,{kind:'quantity_review',...rd.receiptComparison,message:'ارتباط خرید مشخص شد؛ تفاوت دریافت واقعی با مانده سفارش همچنان نیازمند بررسی تأمین است و به معنی کسری قطعی محموله نیست.'});rd.quantityObservationId=review.id;stmts.push(...review.statements);}
  for(const [id,revision] of [[note.id,note.revision],[receipt.id,receipt.revision],[order.id,order.revision]])stmts.push(db.prepare('UPDATE inventory_operations SET guard=CASE WHEN EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?) THEN guard ELSE 0 END WHERE id=?').bind(id,revision,b.id));
  stmts.push(db.prepare('UPDATE inventory_operations SET guard=CASE WHEN EXISTS(SELECT 1 FROM records WHERE id=? AND payload=?) THEN guard ELSE 0 END WHERE id=?').bind(batch.id,batch.payload,b.id));
- const inspected=['stored','awaiting_warehouse','rejected'].includes(r.state);
+ const inspected=['stored','awaiting_relabel','awaiting_warehouse','rejected'].includes(r.state);
  let cover=inspected?r.accepted:r.quantity;
  if(r.state==='stored'){const stock:any=await db.prepare("SELECT COALESCE(SUM(quantity),0) n FROM inventory_balances WHERE item_id=? AND warehouse IN ('raw','line','transit')").bind(receipt.id).first(),held:any=await db.prepare("SELECT COALESCE(SUM(quantity),0) n FROM sourcing_holds WHERE source_type='stock' AND source_id=?").bind(receipt.id).first();cover=Math.min(cover,Math.max(0,stock.n-held.n));}
  stmts.push(...await allocatePurchaseReceipt(choice.id,receipt.id,cover,r.state==='stored'?'stock':'receipt'));

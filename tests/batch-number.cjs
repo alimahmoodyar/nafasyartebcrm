@@ -30,9 +30,11 @@ const sqlite = new DatabaseSync(':memory:');
 for(const file of fs.readdirSync(path.join(root,'drizzle')).filter(f=>f.endsWith('.sql')).sort())sqlite.exec(fs.readFileSync(path.join(root,'drizzle',file),'utf8'));
 const storage = {async batch(statements){sqlite.exec('BEGIN');try{const results=[];for(const statement of statements)results.push(await statement.run());sqlite.exec('COMMIT');return results;}catch(error){sqlite.exec('ROLLBACK');throw error;}},prepare(query) {let args = []; return {bind(...values) {args = values; return this;}, async all() {return {results: sqlite.prepare(query).all(...args)};}, async first() {return sqlite.prepare(query).get(...args) || null;}, async run() {return {meta: {changes: sqlite.prepare(query).run(...args).changes}};}};}};
 const distribution=load('lib/distribution.ts',{'./batch-number':numbers,'./persian-date':load('lib/persian-date.ts')});
-const model = load('lib/model.ts', {'./batch-number': numbers,'./distribution':distribution});
-const auth={requireAccess:async()=>({userId:'owner',isAdmin:true,permissions:{read:['batch','device','event','service','action']}}),can:()=>true,checkOrigin:()=>{},accessResponse:()=>null,AccessError:Error};
-const imports = {'@/lib/authorization':auth,'@/lib/storage': {storage: () => storage}, '@/lib/model': model, '@/lib/batch-number': numbers};
+const model = load('lib/model.ts', {'./batch-number': numbers,'./distribution':distribution,'./material-units':load('lib/material-units.ts'),'./product-families':load('lib/product-families.ts')});
+class AccessError extends Error{constructor(message,status){super(message);this.status=status;}}
+const auth={requireAccess:async()=>({userId:'owner',isAdmin:true,permissions:{read:['batch','device','event','service','action']}}),can:()=>true,checkOrigin:()=>{},accessResponse:e=>e instanceof AccessError?Response.json({error:e.message},{status:e.status}):null,AccessError};
+const imports = {'@/lib/authorization':auth,'@/lib/storage': {storage: () => storage}, '@/lib/model': model, '@/lib/batch-number': numbers,'@/lib/product-family-catalog':{validateProductFamily:async()=>{}}};
+imports['@/lib/batch-code-reservations']=load('lib/batch-code-reservations.ts',{'./storage':imports['@/lib/storage']});
 const api = load('app/api/records/route.ts', imports);
 const suggestion = load('app/api/batch-suggestion/route.ts', imports);
 const request = (method, body) => new Request('https://test.local/api/records', {method, headers: {'Content-Type': 'application/json', Origin: 'https://test.local'}, body: JSON.stringify(body)});
@@ -52,6 +54,10 @@ const request = (method, body) => new Request('https://test.local/api/records', 
   const changed = await api.PATCH(request('PATCH', {id: row.id, data: {...row.data, code: 'NEW'}, previous: JSON.stringify(row.data)})); assert.equal(changed.status, 400);
   const records = (await (await api.GET()).json()).records;
   assert.equal(records.length, 3); assert.ok(records.some(r => r.data.code === 'LEGACY-A'));
+  sqlite.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES('retired-code-test','receipt',?,1,'now','now')").run(JSON.stringify({identityHistory:[{from:{code:'1023-14050622-009'}},{from:{code:'MANUAL-RETIRED'}}]}));
+  const retiredCandidate=await (await suggestion.GET(new Request(url))).json();assert.equal(retiredCandidate.code,'1023-14050622-010','Retired printed numbers stay reserved');
+  assert.equal((await api.POST(request('POST',{kind:'batch',data:{...data,code:'1023-14050622-009'}}))).status,409,'Retired generated code cannot be manually recreated');
+  assert.equal((await api.POST(request('POST',{kind:'batch',data:{...data,code:'MANUAL-RETIRED',batchScheme:''}}))).status,409,'Manual naming cannot revive a retired label');
   const invalid = await suggestion.GET(new Request(url.replace('1023', 'invalid'))); assert.equal(invalid.status, 400);
   console.log('Batch numbering checks passed: Jalali boundaries, invalid dates, digit normalization, sequences, read-only suggestions, persistence, collision/stale rejection, manual and legacy compatibility.');
 })().catch(err => {console.error(err); process.exitCode = 1;});
