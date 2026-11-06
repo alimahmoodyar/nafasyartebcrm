@@ -28,7 +28,8 @@ entity('job','routine_job',{custodyVersion:2,memberId:position,memberName:'Produ
 sql.prepare("INSERT INTO records(id,kind,payload,created) VALUES('raw','batch',?,'2026-11-06')").run(JSON.stringify({code:'RAW',partCode:'11',unit:'عدد',status:'تأیید'}));
 sql.prepare("INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES('opening','opening','{}','owner','2026-11-06',1)").run();
 sql.prepare("INSERT INTO inventory_balances(id,item_id,warehouse,quantity) VALUES('raw@line','raw','line',15000)").run();sql.prepare("INSERT INTO inventory_entries(id,operation_id,item_id,warehouse,delta) VALUES('opening','opening','raw','line',15000)").run();
-const wh='worker:'+position,allocation=body('allocate',{positionId:position,batchId:'raw',quantity:'8',scannedCode:'RAW'});
+const qrScan=load('lib/batch-qr.ts').batchQrText({id:'raw',data:JSON.parse(sql.prepare('SELECT payload FROM records WHERE id=?').get('raw').payload)},'https://test.local');
+const wh='worker:'+position,allocation=body('allocate',{positionId:position,batchId:'raw',quantity:'8',scannedCode:qrScan});
 await post({...allocation,scannedCode:'wrong'},400);assert.equal(balance('raw','line'),15000);
 await post(allocation);await post(allocation);assert.equal(balance('raw',wh),8000);assert.equal(balance('raw','line'),7000);
 const physical=body('physical_output',{jobId:'job',revision:1,good:10});await post(physical);const output='worker-output:'+physical.id;

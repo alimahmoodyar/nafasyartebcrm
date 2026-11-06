@@ -1,3 +1,11 @@
+## 2026-11-06 — Receipt handoff, purchase completion and printable entry receipt
+
+- Successful receiving now opens that exact batch’s details and label action; errors preserve the draft. Printing remains an explicit action.
+- Added non-financial, scoped “رسید ورود کالا به انبار” with actual count, batch barcode, warehouse, current status, entry date, registration timestamp/actor, purchase identity, delivery clues and authorized notes/photo links. Original controlled-form archive remains unchanged.
+- Missing-order review routes to the material’s domestic/foreign sourcing paths. Supply links an existing issued matching purchase with exact case/order revisions; one finalizer closes all recipient copies with an attributable result. The original batch/stock is retained, purchasing coverage reconciled and any quantity difference remains a separate review.
+- UI, HTTP and MCP share authorization, confirmation, idempotency, revision guards and audit. Existing reset/freeze coverage applies; no migration or reset is needed.
+- QR now contains the approved public offline label snapshot plus an authenticated same-origin batch-details link. Code128 remains the exact batch number; warehouse scan validation accepts either. Signed-out scans reveal no server data. QR modes recommend larger labels for readability.
+
 ## 2026-11-06 — ساده‌سازی دریافت و یادداشت قابل ارجاع
 
 - انباردار فقط تعداد واقعی را وارد می‌کند؛ تعداد فاکتور، شرح اجباری مغایرت و ورودی تشخیص مشخصات فنی از فرم جدید حذف شدند. اطلاعات اختیاری بسته/مدرک در بخش جمع‌شونده و تأمین‌کننده سفارش فقط‌خواندنی است.

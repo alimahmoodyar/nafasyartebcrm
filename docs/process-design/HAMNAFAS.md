@@ -461,3 +461,10 @@
 فرم دریافت مشترک در هر دو ورودی ساده شد: تعداد فاکتور و تشخیص مشخصات فنی حذف، تأمین‌کننده خرید فقط‌خواندنی، مقدار واقعی تنها ورودی اجباری تعدادی، اطلاعات بسته/مدرک اختیاری، سرنخ تحویل‌دهنده مستقل و چیدمان انقضا اصلاح شد. مقایسه فعلی با مانده سفارش صریح نمایش داده می‌شود؛ مقدار اعلامی مستقل محموله و تلورانس خرید هنوز موضوع باز تأمین‌اند. اختلاف و دریافت بدون اتصال به خرید، گزارش جدا برای بررسی تأمین می‌سازند؛ این گزارش یادداشت شخصیِ بدون مخاطب را ارسال نمی‌کند.
 
 آزمون‌های receipt-observations و receipt-entry-ui، تکرار رسید بدون دوباره‌شماری، عدم افشای عکس به مخاطب غیرمجاز، ارجاع به هر دو کارتابل و فرد داخلی، پاسخ، پشتیبان فایل و برگشت اتمی زمان پاک‌سازی را پوشش می‌دهند. ثبت طراحی قبلی به معنی اجرای قبلی نبود؛ این بند وضعیت اجرای جدید را مشخص می‌کند.
+
+
+### 2026-11-06 — Approved receiving follow-up and label scan
+- Successful receipt opens the same batch details, with explicit label printing. Errors keep entered data.
+- Missing purchase identity routes by the material sourcing routes. One shared case, first authorized finalizer; other copies close with route and actor attribution. Link an existing issued matching purchase and its source documents, retaining the original batch. Quantity reviews remain separate and QC/shelving proceeds independently.
+- Standard non-financial entry receipt includes original quantity, batch barcode, current warehouse/QC status and location, entry day, registration time/actor, purchase identity when known, unverified delivery clues and authorized receipt notes/evidence links. Original controlled records are not rewritten.
+- QR text exposes only fixed approved label information: name/code, batch, entry date, initial receipt quantity explicitly not current stock, optional known expiry. Includes an authenticated details URL. No supplier, costs, mutable location/QC/current stock in offline text. Code128 stays the original batch code. Access to server details requires the same receipt authorization after login.
