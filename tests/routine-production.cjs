@@ -19,7 +19,7 @@ const row=id=>{const x=sql.prepare('SELECT * FROM flow_entities WHERE id=?').get
 async function change(mode,id,x={},status=200){return post(body(mode,{[mode==='assign'||mode==='quality'||mode==='cost'?'lotId':'jobId']:id,revision:row(id).revision,...x}),status);}
 const stock=(id,code,wh,q)=>{sql.prepare("INSERT INTO records(id,kind,payload,created) VALUES(?,'batch',?,'2026-10-01')").run(id,JSON.stringify({partCode:code,unit:'عدد',status:'تأیید',quantity:String(q/1000)}));sql.prepare("INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,'opening','{}','owner','2026-10-01',1)").run(id);sql.prepare('INSERT INTO inventory_entries(id,operation_id,item_id,warehouse,delta) VALUES(?,?,?,?,?)').run(id,id,id,wh,q);sql.prepare('INSERT INTO inventory_balances(id,item_id,warehouse,quantity) VALUES(?,?,?,?)').run(id+'@'+wh,id,wh,q);entity('price:'+id,'cost_price',{batchId:id,unitCost:'100'});};
 (async()=>{
-member('worker',{});member('worker2',{});member('foreman',{flowRoles:['production']});member('qc',{flowRoles:['qc']});
+member('worker',{roleAssignment:{roles:['production_worker']}});member('worker2',{roleAssignment:{roles:['production_worker']}});member('foreman',{flowRoles:['production']});member('qc',{flowRoles:['qc']});
 entity('m','material',{code:'11',name:'Raw',unit:'عدد'});entity('part','material',{code:'22',name:'Intermediate',unit:'عدد'});stock('raw','11','line',10000);
 let route=body('route',{materialId:'part',steps:[{title:'Cut',seconds:60,allowancesIncluded:false,bom:[{materialId:'m',quantity:'1'}]},{title:'Assemble',seconds:120,allowancesIncluded:true,bom:[]}]});await post(route);assert.equal(row(route.id).data.name,'Intermediate');await post(route);await post({...route,notes:'different'},409);
 const lot=body('lot',{routeId:route.id,title:'Lot 1',count:10});await post(lot);
@@ -35,7 +35,7 @@ await change('close',a.id,{actualMinutes:60,overtimeMinutes:0});const frozen=JSO
 await post(body('policy',{effective:'2026-10-07',restMinutes:20,setupMinutes:10,efficiencyPercent:100,lowerPercent:80,upperPercent:120}));assert.equal(JSON.stringify(row(a.id).data.closedReport),frozen);
 const rw=(await change('assign',lot.id,{...assign(),start:'10:00',end:'10:30',count:1,rework:true})).id;
 assert.equal(row(rw).data.policy.restMinutes,10);await change('output',rw,{good:1,scrap:0,reworkCount:0,overtime:false,allocations:[]});await change('close',rw,{actualMinutes:10,overtimeMinutes:0});assert.equal(row(lot.id).data.ready[1],9);
-const second=(await change('assign',lot.id,{...assign(),memberId:'worker2',stage:1,count:9})).id;const report=(await get()).jobs.find(j=>j.id===second).data.report;assert.equal(report.usefulMinutes,115);assert.equal(report.provisional,false);
+const second=(await change('assign',lot.id,{...assign(),memberId:'worker2',stage:1,count:9})).id;const report=(await get()).jobs.find(j=>j.id===second).data.report;assert.equal(report.usefulMinutes,105,'120 minutes less daily rest 10 and setup 5');assert.equal(report.provisional,false);
 await change('output',second,{good:9,scrap:0,reworkCount:0,overtime:false,allocations:[]});await change('close',second,{actualMinutes:60,overtimeMinutes:0});
 const withoutWarehouse=body('quality',{lotId:lot.id,revision:row(lot.id).revision,good:8,scrap:0,reworkCount:1,reference:'QC1'});await post(withoutWarehouse,400);assert.equal(row(lot.id).data.pending,9);
 entity('warehouse:user','material_warehouse',{name:'My workshop store',active:true,locations:['A-1-1-1']});
@@ -58,7 +58,8 @@ assert.equal(balance('raw'),9000);assert.equal(balance('quarantine'),0);
 const request=await flowPost('request',{materialId:'part',warehouseId:'warehouse:user',quantity:'3',planId:'',notes:'Line requirement'});
 const requestId=sql.prepare("SELECT id FROM flow_entities WHERE type='request' ORDER BY created DESC").get().id;
 await flowPost('issue',{requestId,allocations:[{batchId:bid,location:'warehouse:user|A-1-1-1',quantity:'3'}],reason:''});
-assert.equal(balance('raw'),6000);assert.equal(balance('line'),3000);
+assert.equal(balance('raw'),6000);assert.equal(balance('line'),0);assert.equal(balance('transit'),3000);
+await flowPost('confirm_line_receipt',{requestId,notes:'Physically scanned at line'});assert.equal(balance('line'),3000);assert.equal(balance('transit'),0);
 const prod=load('app/api/production/route.ts');
 async function move(x={},status=200){const r=await ctx.run(user,()=>prod.POST(new Request('https://test.local/api/production',{method:'POST',headers:{origin:'https://test.local'},body:JSON.stringify({id:crypto.randomUUID(),mode:'move',batchId:bid,from:'raw',to:'semi',quantity:'1',...x})})));const d=await r.json();assert.equal(r.status,status,JSON.stringify(d));return d;}
 await move({},400);assert.equal(balance('semi'),0);

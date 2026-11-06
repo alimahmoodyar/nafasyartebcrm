@@ -141,6 +141,15 @@ const p=await create('product',{code:'FLOW',name:'FlowDevice',group:'سایر ت
  const unitMcp=await call('save_material_master',{id:crypto.randomUUID(),code:'9405',name:'MCP pair',kind:'raw',unit:'جفت',specs:'',fields,revision:0,confirmed:true});assert.ok(!unitMcp.error,JSON.stringify(unitMcp));
  assert.equal(entities('material').find(m=>m.data.code==='9405').data.unit,'جفت');
  console.log('Set/pair units passed: HTTP and MCP master, immutable unit, receipt quantity and canonical centimetre spelling.');
+
+ await op('material',{code:'9499',name:'Awaiting technical criteria',kind:'raw',unit:'عدد',specs:'',fields:[],revision:0});
+ await op('receipt',{materialId:'material:9499',day:'2026-10-05',quantity:'3',supplier:'Supplier'});
+ const waiting=entities('receipt').find(r=>r.data.materialId==='material:9499');
+ assert.equal(waiting.data.state,'awaiting_qc_template');assert.equal(stock(waiting.id,'quarantine'),3000);assert.equal(stock(waiting.id,'raw'),0);
+ await op('incoming_qc',{receiptId:waiting.id,accepted:'3',values:{},notes:'No template'},400);
+ await op('material',{code:'9499',name:'Awaiting technical criteria',kind:'raw',unit:'عدد',specs:'',fields,revision:1});
+ const activated=entities('receipt').find(r=>r.id===waiting.id);assert.equal(activated.data.state,'pending_qc');assert.deepEqual(activated.data.fields,fields.map(f=>({...f,textGuide:f.textGuide||''})));assert.equal(activated.data.materialRevision,2);
+ console.log('Missing QC template: receipt quarantined, QC blocked, technical form activation preserves lot/count and activates QC.');
  identity=null;assert.equal((await flow.GET()).status,401);
  const suggest=load('lib/material-flow.ts').suggestion,sm={id:'suggest-material',data:{code:'S',unit:'عدد'}},sr={id:'suggest-batch',data:{batchId:'suggest-batch',materialId:'suggest-material',state:'pending_qc',accepted:0}},sb=[{item_id:'suggest-batch',warehouse:'quarantine',quantity:5000}],sd=[{data:{state:'planned',bomId:'suggest-bom'}}],sBoms=[{id:'suggest-bom',lines:JSON.stringify([{partCode:'S',unit:'عدد',quantity:'4'}])}];
  let sg=suggest(sm,sb,[sr],sd,sBoms);assert.equal(sg.pending,5000);assert.equal(sg.proposed,0);assert.equal(sg.available,-4000,'Pending only covers purchasing, never consumable availability');

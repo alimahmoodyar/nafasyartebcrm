@@ -1,3 +1,4 @@
+import {syncInventoryCounts} from '@/lib/inventory-counts';
 import {guidanceOutline} from '@/lib/workflow-guidance';
 import {syncForeignTasks} from '@/lib/foreign-purchase-tasks';
 import {installForeignPosition} from '@/lib/foreign-purchase';
@@ -19,6 +20,7 @@ export async function GET(request?:Request){try{const u=await requireAccess(),db
   const position=u.isAdmin?role:{id:role.id,data:{name:role.data.name,unit:role.data.unit,active:role.data.active,...Object.fromEntries(positionProfileFields.map(k=>[k,role.data[k]||'']))}};
   return json({position,templates:plans});
  }
+ if(u.isAdmin||u.permissions.flowRoles?.includes('inventory')||u.permissions.supplyRoles?.some((r:string)=>['finance','ceo'].includes(r)))await syncInventoryCounts();
  const purchaseServices=await import('@/lib/purchase-services');await purchaseServices.syncServiceFinanceTasks();
  const canPurchaseServices=await purchaseServices.purchaseServicesAvailable(u);
  const tasks=(await db.prepare("SELECT * FROM duty_runs WHERE ?=1 OR assignee=? OR supervisor=? ORDER BY CASE WHEN state IN ('completed','cancelled') THEN 1 ELSE 0 END,due,id LIMIT 300").bind(u.isAdmin?1:0,mid,mid).all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}));

@@ -1,3 +1,11 @@
+// Person-independent production_position, worker_buffer, worker_count_policy/round,
+// worker_output/worker_finished_receipt/worker_nonconforming/worker_count, line_return,
+// scrap_transfer/scrap_sale_request, project_final_bom, stock_discrepancy,
+// inventory_count_policy/inventory_count/stocktake_authorization are operational
+// flow_entities: both reset scopes back up/delete them. Worker/line transit, scrap,
+// disputed and line_finished balances use existing inventory_* cleanup. Generic
+// 0016 reset freeze guards their atomic writes; 0023 adds stocktake holds only,
+// no new tables, FKs, blobs or preservation exemption. Role profile catalog is code.
 // Approval inbox routing changes only existing duty_runs.data sourceSection/sourceId/history; sourcePlanId and workflow flags remain authoritative for deletion. Existing full-JSON backup/reset and duty freeze triggers cover routing updates; no new table/entity/FK/blob.
 // Proforma quoteDate/validityDays/derived validUntil use existing sourcing_quote and order snapshots; existing backup/reset and 0016 freeze cover them. No new table/entity/blob.
 // Day-based sourcing_quote/purchase_order deliveryDays, deliveryStart, requiredAdvanceRial, purchaseConfirmedAt/By/reference, deliveryStartedOn, immutable promisedEta and advanceEvidence remain in existing operational JSON. Tracking/task due changes append history. Both reset scopes/backup and migration 0016 flow/inventory freeze cover quote, confirmation, tasks and audit atomically; no new table/FK/blob. Legacy absolute-date orders are preserved.

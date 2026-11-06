@@ -67,6 +67,7 @@ let chain=Promise.resolve();const batch=db.batch.bind(db);db.batch=s=>{const p=c
  sql.prepare("INSERT INTO batch_files(id,batch_id,object_key,filename,byte_size,sha256,uploaded_at,uploaded_by) VALUES('file','batch','batch-files/file','photo.txt',?,?,?,'owner')").run(fileBytes.length,hash,now);
  let id=crypto.randomUUID();r=await post({mode:'prepare',id,scope:'operations',password:'incorrect-password'});assert.equal(r.status,403);assert.equal(count('records'),5);assert.equal(control().phase,'testing');
  failPut=true;r=await post({mode:'prepare',id,scope:'operations',password:secret});assert.equal(r.status,409);assert.equal(count('records'),5);assert.equal(control().phase,'testing');assert.equal(sql.prepare('SELECT state FROM reset_jobs WHERE id=?').get(id).state,'failed');failPut=false;
+ seed('new-worker-output','worker_output',{state:'awaiting_materials'});seed('new-role-position','production_position',{title:'Virtual worker'});seed('new-inventory-count','inventory_count',{kind:'cycle',state:'review',items:[]});
  id=crypto.randomUUID();r=await post({mode:'prepare',id,scope:'operations',password:secret});assert.equal(r.status,200,JSON.stringify(r));let job=r.data.job;assert.equal(job.state,'ready');assert.equal(control().phase,'maintenance');assert.equal(count('records'),5,'prepare never deletes');
  assert.throws(()=>sql.exec("UPDATE flow_entities SET data='{}' WHERE id='driver-mission'"),/RESET_MAINTENANCE/);
  assert.throws(()=>sql.exec("UPDATE flow_entities SET data='{}' WHERE id='replenishment-policy'"),/RESET_MAINTENANCE/);

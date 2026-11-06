@@ -1,0 +1,13 @@
+import {workerStock} from './production-positions';
+
+/** Net demand by material, preserving worker buffers and existing open requests. */
+export function lineMaterialDemand(entities:any[],balances:any[],records:any[]){
+ const materialByCode=new Map(entities.filter(e=>e.type==='material').map(e=>[e.data.code+'|'+e.data.unit,e]));
+ const batches=new Map(records.filter(r=>r.kind==='batch').map(r=>[r.id,JSON.parse(r.payload)] as const).filter(([,d])=>d.status==='تأیید'&&(!d.expiry||d.expiry>=new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Tehran'}))));
+ const demand=new Map<string,number>(),workerNeeds=new Map<string,{positionId:string;key:string;quantity:number;reserve:number}>();
+ for(const j of entities.filter(e=>e.type==='routine_job'&&e.data.custodyVersion===2&&['open','scheduled'].includes(e.data.state))){for(const l of j.data.step.bom){const key=l.partCode+'|'+l.unit,k=j.data.memberId+'|'+key,old=workerNeeds.get(k)||{positionId:j.data.memberId,key,quantity:0,reserve:0};old.quantity+=l.quantity*(j.data.state==='scheduled'?j.data.plannedCount:j.data.remaining);workerNeeds.set(k,old);}}
+ for(const b of entities.filter(e=>e.type==='worker_buffer')){const key=b.data.partCode+'|'+b.data.unit,k=b.data.positionId+'|'+key,old=workerNeeds.get(k)||{positionId:b.data.positionId,key,quantity:0,reserve:0};old.reserve=b.data.quantity;workerNeeds.set(k,old);}
+ for(const b of entities.filter(e=>e.type==='build'&&e.data.workflowVersion===3&&!e.data.materialsConsumed)){for(const l of b.data.bomSnapshot||[]){const key=l.partCode+'|'+l.unit,k=b.data.assemblerId+'|'+key,old=workerNeeds.get(k)||{positionId:b.data.assemblerId,key,quantity:0,reserve:0};old.quantity+=Math.round(Number(l.quantity)*1000);workerNeeds.set(k,old);}}
+ for(const w of workerNeeds.values()){const held=balances.filter(b=>b.warehouse===workerStock(w.positionId)&&batches.get(b.item_id)&&batches.get(b.item_id).partCode+'|'+batches.get(b.item_id).unit===w.key).reduce((n,b)=>n+b.quantity,0);demand.set(w.key,(demand.get(w.key)||0)+Math.max(0,w.quantity+w.reserve-held));}
+ return [...demand].flatMap(([key,required])=>{const material=materialByCode.get(key);if(!material)return [];const available=balances.filter(b=>b.warehouse==='line'&&batches.get(b.item_id)&&batches.get(b.item_id).partCode+'|'+batches.get(b.item_id).unit===key).reduce((n,b)=>n+b.quantity,0),pending=entities.filter(e=>e.type==='request'&&e.data.materialId===material.id&&['line_review','pending','awaiting_line_receipt','line_discrepancy'].includes(e.data.state)).reduce((n,e)=>n+e.data.quantity,0),quantity=Math.max(0,required-available-pending);return quantity?[{materialId:material.id,name:material.data.name,quantity,required,available,pending}]:[];});
+}
