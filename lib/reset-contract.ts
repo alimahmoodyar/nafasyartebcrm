@@ -220,3 +220,7 @@ resetHelp.push('راهنماهای عیب‌یابی محصول، تاریخچه
 // Reviewed final schedules/worker identities are embedded in operational plan/build;
 // generic flow_entities freeze, all-row backup and both resets already include them.
 // No new table, FK or blob. Operations reset preserves work-study/time/label catalogs.
+
+// Receipt purchase completion/resolution, registeredBy/time and resulting inbox closure
+// remain inside receipt/receipt_observation/inbox flow_entities and records payloads.
+// No new tables/blobs: existing full flow backup, delete order and reset freeze apply.
