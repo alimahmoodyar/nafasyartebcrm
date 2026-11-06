@@ -1,3 +1,4 @@
+import {profileReviewCookie,profileSession} from './profile-review';
 import {financialAccess} from './financial-access';
 import {localSession} from "@/lib/password-auth";
 import {mcpActor} from "@/lib/mcp/context";
@@ -21,7 +22,8 @@ export async function realSession(): Promise<Session> {
 }
 async function currentSession():Promise<Session>{
  const user=await realSession();if(!user.isAdmin)return user;
- let token:string|undefined;try{token=(await cookies()).get(rolePreviewCookie)?.value;}catch{return user;}
+ let token:string|undefined;let profile:string|undefined;try{const jar=await cookies();token=jar.get(rolePreviewCookie)?.value;profile=jar.get(profileReviewCookie)?.value;}catch{return user;}
+ if(profile){try{const ws=(await storage().prepare("SELECT id,data FROM flow_entities WHERE type='material_warehouse'").all()).results.map((w:any)=>({...w,data:JSON.parse(w.data)}));return profileSession(user,profile,ws);}catch{throw new AccessError('پروفایل آزمایشی معتبر نیست؛ از انتخاب پروفایل خارج شوید.',403);}}
  if(!token||!/^[a-f0-9]{64}$/.test(token))return user;
  const row:any=await storage().prepare("SELECT m.*,r.admin_name FROM role_preview_sessions r JOIN app_members m ON m.id=r.member_id WHERE r.token_hash=? AND r.expires>? AND m.status='active'").bind(await digest(token),new Date().toISOString()).first();
  if(!row)return user;
@@ -60,7 +62,7 @@ export async function requireAccess(kind?: Kind, operation: "read" | "write" = "
   return user;
 }
 export async function requireAdmin() {const user = await session(); if (!user.isAdmin) throw new AccessError("مدیریت کاربران فقط برای مدیر سامانه مجاز است.", 403); return user;}
-export async function requireRealAdmin(){const user=await realSession();if(!user.isAdmin)throw new AccessError('این بخش فقط برای مدیر سامانه مجاز است.',403);return user;}
+export async function requireRealAdmin(){const user=await currentSession();if(!user.isAdmin)throw new AccessError('این بخش فقط برای مدیر سامانه مجاز است.',403);return user;}
 export function checkOrigin(request: Request) {
   const origin = request.headers.get("origin");
   if (!origin) throw new AccessError("درخواست نامعتبر است؛ صفحه را دوباره باز کنید.", 403);
@@ -81,3 +83,6 @@ export function accessResponse(error: unknown): Response | null {
 }
 
 export async function requireFinance(write=false){const user=await session();if(!user.isAdmin&&!financialAccess(user,'control',write))throw new AccessError('دسترسی کنترل مالی برای شما فعال نیست.',403);return user;}
+
+/** Only profile selection/exit may inspect the underlying administrator during a profile test. */
+export async function requireProfileAdmin(){const u=await realSession();if(!u.isAdmin)throw new AccessError('انتخاب پروفایل فقط برای مدیر است.',403);return u;}

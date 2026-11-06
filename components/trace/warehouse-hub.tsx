@@ -21,10 +21,10 @@ export function WarehouseHub({user,records,demo,onSaved,onOpen,onNavigate,target
  const groups=warehouseNavigation(user),[group,setGroup]=useState(''),[leaf,setLeaf]=useState(''),[focus,setFocus]=useState('');
  const available=Object.entries(groups).filter(([,items])=>items.length);
  useEffect(()=>{
-  const target=parseWarehouseTarget(targetId);setFocus('');
+  const target=parseWarehouseTarget(targetId);setFocus('');if(target?.source==='flow'&&target.view==='shelving')target.view='receipts';if(target?.source==='sourcing'&&target.view==='supply')target.view='warehouse-supply';
   if(!target){setGroup('');setLeaf('');return;}
   const entries=available.flatMap(([group,items])=>items.map(item=>({group,item})));
-  const preferred=target.source==='after-sales'&&['home:stock','hospital:stock'].includes(target.view)?'material-stock':!target.view&&(target.source==='flow'&&target.target?(records.some(r=>r.id===target.target&&r.kind==='device')?'production':'receipts'):target.source==='inventory'?'material-stock':target.source==='fulfillment'?'dispatch':'');
+  const preferred=target.source==='inventory'&&['material-stock','report','stock'].includes(target.view)?'material-stock':target.source==='after-sales'&&['home:stock','hospital:stock'].includes(target.view)?'material-stock':!target.view&&(target.source==='flow'&&target.target?(records.some(r=>r.id===target.target&&r.kind==='device')?'production':'receipts'):target.source==='inventory'?'material-stock':target.source==='fulfillment'?'dispatch':'');
   const match=(preferred?entries.find(({item})=>item.key===preferred):undefined)||entries.find(({group,item})=>(!target.view.startsWith('operation:')||group==='operations')&&item.source===target.source&&(!target.view||item.view===target.view.replace(/^operation:/,'')));
   if(match){setGroup(match.group);setLeaf(match.item.key);setFocus(target.target);if(target.source==='batch'&&target.target){const row=records.find(row=>row.id===target.target&&row.kind==='batch');if(row)onOpen(row);}}else{setGroup('');setLeaf('');}
  },[targetId]);

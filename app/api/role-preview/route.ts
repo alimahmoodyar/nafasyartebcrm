@@ -1,4 +1,4 @@
-import {AccessError,accessResponse,checkOrigin,requireRealAdmin} from '@/lib/authorization';
+import {AccessError,accessResponse,checkOrigin,requireProfileAdmin,requireRealAdmin} from '@/lib/authorization';
 import {digest,newToken} from '@/lib/password-auth';
 import {jobRoles,storedAccessPermissions} from '@/lib/permissions';
 import {storage} from '@/lib/storage';
@@ -30,7 +30,7 @@ export async function POST(request:Request){try{
  return Response.json({ok:true},{headers:{'Cache-Control':'no-store','Set-Cookie':`__Host-nafasyar-role-preview=${token}; Path=/; Max-Age=14400; HttpOnly; Secure; SameSite=Lax`}});
  }catch(e){return failure(e)}}
 export async function DELETE(request:Request){try{
- checkOrigin(request);const admin=await requireRealAdmin();let token='';try{token=(await (await import('next/headers')).cookies()).get('__Host-nafasyar-role-preview')?.value||''}catch{}
+ checkOrigin(request);const admin=await requireProfileAdmin();let token='';try{token=(await (await import('next/headers')).cookies()).get('__Host-nafasyar-role-preview')?.value||''}catch{}
  const db=storage(),now=new Date().toISOString();
  if(token&&/^[a-f0-9]{64}$/.test(token)){
   const row:any=await db.prepare('SELECT member_id FROM role_preview_sessions WHERE token_hash=? AND admin_id=?').bind(await digest(token),admin.userId).first();
