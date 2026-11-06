@@ -100,7 +100,7 @@ function Workspace(){
  const [loginScreen,setLoginScreen]=useState(false);
  const [deleteError,setDeleteError]=useState("");
  const [identity,setIdentity]=useState<Session|null>(null),[authLoading,setAuthLoading]=useState(true);
- useEffect(()=>{if(!identity)return;const code=new URLSearchParams(window.location.search).get('batch');if(code&&code.length<=100)window.location.replace('/b/'+encodeURIComponent(code));},[identity?.userId]);
+ useEffect(()=>{if(!identity)return;const code=new URLSearchParams(window.location.search).get('batch');if(code&&code.length<=100)window.location.replace('/b/'+encodeURIComponent(code)+'?details=1');},[identity?.userId]);
  const canRead=(kind:Kind)=>!!identity?.permissions.read.includes(kind);const canWrite=(kind:Kind)=>!!identity?.permissions.write.includes(kind);
  const sessionRequest=useRef(0),principal=useRef<Session|null>(null);principal.current=identity;
  const accessVersion=identity?JSON.stringify(identity.permissions):'';

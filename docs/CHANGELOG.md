@@ -1,3 +1,9 @@
+## 2026-11-06 — Show fixed batch information on the QR destination
+
+- Opening an existing QR link now immediately displays the approved public label fields without login: item/name/code, batch, receipt date, initial quantity/unit and optional known expiry. Existing link-bearing labels do not require reprinting.
+- Private live information remains behind the original receipt authorization. Signed-out users can read the fixed fields while signing in; authenticated accounts without receipt access cannot obtain stock, QC, location, supplier, prices, notes or attachments.
+- Added the matching read-only MCP summary tool. Public summary selects an explicit field allowlist, not the batch payload. No new persisted data, stock movement or migration.
+
 ## 2026-11-06 — Receipt handoff, purchase completion and printable entry receipt
 
 - Successful receiving now opens that exact batch’s details and label action; errors preserve the draft. Printing remains an explicit action.
