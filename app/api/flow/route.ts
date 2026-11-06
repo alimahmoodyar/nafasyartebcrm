@@ -1,3 +1,4 @@
+import {syncReceiptTemplates} from '@/lib/receipt-template-sync';
 import {materialCatalogEngineer,canEditMaterialCatalog} from '@/lib/material-catalog-access';
 import {reservedBatchCodes} from '@/lib/batch-code-reservations';
 import {batchScanCode} from '@/lib/batch-qr';
@@ -37,6 +38,7 @@ const json=(data:unknown)=>Response.json(data,{headers:{'Cache-Control':'no-stor
 export async function GET(request?:Request){try{
  const purchaseMaterialId=request?new URL(request.url).searchParams.get('materialId')||'':'';if(purchaseMaterialId.length>200)fail('شناسه کالا معتبر نیست.');
  const u=await requireAccess();if(!['inventory','qc','production','procurement'].some(r=>flowRole(u,r))&&!materialCatalogEngineer(u)&&!u.isAdmin)fail('دسترسی گردش مواد ندارید.',403);const engineeringCatalogOnly=!u.isAdmin&&materialCatalogEngineer(u)&&!u.permissions.flowRoles?.some(r=>['inventory','qc','production','procurement'].includes(r));const db=storage();if(!u.isAdmin&&!u.permissions.flowRoles?.some(r=>['inventory','qc','production','procurement'].includes(r))){const ws=await materialWarehouses();if(!u.permissions.warehouseResponsibilities?.some(r=>ws.some(w=>w.id===r.warehouseId&&w.data.active))&&!engineeringCatalogOnly)fail('مسئولیت انبار فعالی ندارید.',403);}
+ const templateSync=await syncReceiptTemplates(u);if(templateSync.needsTaskSync)await syncMaterialTasks();
  const all=(await db.prepare("SELECT * FROM flow_entities WHERE type NOT GLOB 'qms_*' AND type<>'form_record' ORDER BY created DESC,id").all()).results.map(entity);
  const rows=(await db.prepare("SELECT * FROM records WHERE kind IN ('batch','product','device')").all()).results.map((r:any)=>({...r,data:JSON.parse(r.payload),payload:undefined}));
  const balances=(await db.prepare('SELECT * FROM inventory_balances').all()).results;

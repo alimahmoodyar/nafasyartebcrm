@@ -1,0 +1,4 @@
+import {GET as flowGet} from '../flow/route';
+import {receiptList,receiptStates} from '@/lib/receipt-list';
+/** Reuse the domain's existing authenticated projection; this endpoint adds no grants. */
+export async function GET(request:Request){const q=new URL(request.url).searchParams,view=q.get('view')||'open',state=q.get('state')||'',search=q.get('q')||'',page=q.get('page')||'1';if(!['open','history'].includes(view)||state&&!receiptStates[state]||search.length>200||!/^\d{1,6}$/.test(page))return Response.json({error:'فیلتر رسید معتبر نیست.'},{status:400});const response=await flowGet();if(!response.ok)return response;const data=await response.json() as any,result=receiptList(data.entities,data.rows,{view,state,q:search,page:Number(page)});return Response.json({...result,items:result.items.map(r=>({...r,batch:data.rows.find((b:any)=>b.id===r.id)?.data||null}))},{headers:{'Cache-Control':'private, no-store',Vary:'Cookie, Authorization'}});}

@@ -1,3 +1,5 @@
+import {syncReceiptTemplates} from '@/lib/receipt-template-sync';
+import {syncMaterialTasks} from '@/lib/material-tasks';
 import {profileReviewCookie,profileJobRoles} from '@/lib/profile-review';
 import {syncInventoryCounts} from '@/lib/inventory-counts';
 import {requireAdmin,session,requireProfileAdmin,accessResponse,AccessError,checkOrigin} from '@/lib/authorization';
@@ -6,7 +8,7 @@ import {roleProfiles,materialProfileWork,type ProfileWork} from '@/lib/role-prof
 import {coverage,nextWork} from '@/lib/sourcing';
 
 export async function GET(request:Request){try{
- await requireProfileAdmin();await syncInventoryCounts();
+ const admin=await requireProfileAdmin();const templateSync=await syncReceiptTemplates(admin);if(templateSync.needsTaskSync)await syncMaterialTasks();await syncInventoryCounts();
  const id=new URL(request.url).searchParams.get('profile');
  const profile=id?roleProfiles.find(p=>p.id===id):undefined;
  if(id&&!profile)throw new AccessError('پروفایل جایگاه پیدا نشد.',404);

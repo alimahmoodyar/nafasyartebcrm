@@ -10,7 +10,7 @@ const anchor={closest:()=>hidden?{}:null,getClientRects:()=>hidden?[]:[{}]};
 function render(){cursor=0;const tree=output.RefreshButton(props);tree.props.ref.current=anchor;return tree}
 const settle=async()=>{await Promise.resolve();await Promise.resolve()};
 async function flush(){now+=2000;const pending=[...timers.values()];timers.clear();pending.forEach(fn=>fn());await settle()}
-function emit(scope,name){listeners[scope].get(name)?.()}
+function emit(scope,name,event){listeners[scope].get(name)?.(event)}
 (async()=>{
  render();cleanup=effects.shift()();assert.equal(calls,0,'Mount must not duplicate the page entry load');
  emit('window','focus');emit('document','visibilitychange');assert.equal(timers.size,1);await flush();assert.equal(calls,1,'Returning to an idle page refreshes once');
@@ -24,5 +24,6 @@ function emit(scope,name){listeners[scope].get(name)?.()}
  props={onRefresh:async()=>{calls++}};render().props.onClick();await settle();assert.equal(calls,3);assert.equal(render().props['aria-label'],'تازه‌سازی اطلاعات','Latest callback is used and retry recovers');
  props={onRefresh:async()=>{calls++},quiet:true,pauseAuto:true};assert.equal(render().props.children,null,'Quiet idle refresh has no visible button');emit('window','focus');await flush();assert.equal(calls,3,'Draft notes pause automatic refresh');props={...props,pauseAuto:false};render();emit('window','focus');await flush();assert.equal(calls,4,'Quiet refresh still reloads an idle visible page');props={...props,retry:true};assert.ok(render().props.children,'Retry appears after a page error');
  emit('window','focus');cleanup();assert.equal(timers.size,0);assert.equal(listeners.window.size,0);assert.equal(listeners.document.size,0,'Unmount removes refresh listeners');
+ slots=[];effects=[];props={onRefresh:async()=>{calls++},catalogUpdates:true,label:'تازه‌سازی'};render();cleanup=effects.shift()();assert.ok(JSON.stringify(render().props.children).includes('تازه‌سازی'));emit('window','storage',{key:'other'});assert.equal(timers.size,0);emit('window','storage',{key:'nafasyar-catalog-change'});await flush();assert.equal(calls,5,'A master edit in another browser tab refreshes this visible receipt');emit('window','nafasyar-materials-changed');await flush();assert.equal(calls,6,'Same-page catalog notification refreshes once');editors=[{getClientRects:()=>[{}]}];emit('window','nafasyar-materials-changed');await flush();assert.equal(calls,6,'Catalog events do not disturb an open editor');editors=[];cleanup();assert.equal(listeners.window.size,0);
  console.log('PASS refresh: no duplicate entry fetch, debounced focus/visibility, hidden/background/busy and editor guards, no overlapping calls, retry recovery, latest callback and cleanup.');
 })().catch(e=>{console.error(e);process.exitCode=1});
