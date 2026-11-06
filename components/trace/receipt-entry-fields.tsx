@@ -1,4 +1,5 @@
 'use client';
+import {MaterialReferencePhoto} from './material-reference-photo';
 import {useState} from 'react';
 import {ReceiptWarehouseFields} from './warehouse-receipt-fields';
 import {ReceiptPurchaseOrders} from './receipt-purchase-orders';
@@ -18,6 +19,7 @@ export function ReceiptEntryFields({draft,warehouses,materials,orders,missions,o
  return <>
  <ReceiptWarehouseFields warehouses={warehouses} value={draft.warehouseId||''} qcOwner={draft.qcOwner||''} onChange={warehouseId=>onChange({warehouseId,qcOwner:''})} onQcChange={qcOwner=>onChange({qcOwner})}/>
  <MaterialSelect title="کالا" value={draft.materialId} onChange={onMaterial} choices={materials.map(m=>({id:m.id,code:m.data.code||'',name:m.data.name||''}))} required/>
+ {draft.materialId&&<MaterialReferencePhoto key={draft.materialId} materialId={draft.materialId} name={materials.find(m=>m.id===draft.materialId)?.data.name||''} code={materials.find(m=>m.id===draft.materialId)?.data.code||''}/>}
  <SolarDate label="تاریخ ورود" value={draft.day} onChange={day=>onChange({day})}/>
  {draft.materialId&&<ReceiptPurchaseOrders orders={orders} value={draft.purchaseOrderId} onChange={onOrder}/>}
  <label className="field"><span>تأمین‌کننده سفارش</span><input readOnly value={selected?.supplier||'سفارش خرید مرتبط انتخاب نشده است'}/></label>
