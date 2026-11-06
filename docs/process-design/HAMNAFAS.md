@@ -480,3 +480,7 @@ Assigned QC selects the correct existing catalog item before inspection completi
 
 ### 2026-11-06 — Approved public storage context and catalog reference image
 Show the material master reference image immediately after receiving selection, with zoom and explicit missing/error states. On the public online QR page, expose that reference image and both the live default master address and separately recorded actual batch location. Before shelving, indicate quarantine/unplaced rather than presenting the default as current. Print the relevant master warehouse default address on the physical label with the explicit default-location title. Master edits update the online default, not physical placement or already printed paper. Public photo access must be limited to the selected active reference for that exact batch material; other catalog files, receipt evidence, stock quantities, QC results and financial data remain private.
+
+
+### 2026-11-06 — اختیار مسئول فنی در شناسنامه کالا
+مسئول فنی داخلی می‌تواند شناسنامه موجود، مشخصات، معیارهای کنترل، عکس، نقشه و محل پیش‌فرض کالا را از همان فرم‌های اصلی ویرایش کند. این اختیار مستقل از نقش انبار است؛ دریافت و انتقال موجودی و تأیید نتیجه کنترل کیفیت را مجاز نمی‌کند. کد و واحد موجود و محدودیت تغییر طراحی حفظ می‌شوند.

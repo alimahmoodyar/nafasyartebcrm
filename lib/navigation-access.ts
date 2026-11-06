@@ -87,7 +87,7 @@ export function warehouseNavigation(user:Session){
   if(quality||p.warehouseResponsibilities?.some(r=>r.role==='qc')||inventory&&warehouseAccess(u,'quarantine')){add('receive','receipts','رسید، کنترل ورودی و جانمایی','flow','receipts');}
   if(production||inventory&&warehouseAccess(u,'raw')){add('issue','requests','درخواست و تحویل مواد به خط','flow','requests');}
   if(production)add('returns','nonconforming','ثبت قطعه نامنطبق خط','flow','nonconforming');
-  if(inventory&&materialScope.length)add('settings','materials','شناسنامه کالاها','flow','materials');
+  if(inventory&&materialScope.length||p.supplyRoles?.includes('engineering'))add('settings','materials','شناسنامه کالاها','flow','materials');
   if(u.isAdmin)add('settings','warehouses','انبارها و محل‌های نگهداری','flow','warehouses');
  }
  if(canOpenSection(u,'inventory')&&(!inventory||materialScope.length)){
