@@ -232,3 +232,7 @@ resetHelp.push('راهنماهای عیب‌یابی محصول، تاریخچه
 // Receipt qcStartedAt/By, editRequests and extended identityHistory use existing operational receipt JSON.
 // Both scopes back up/delete these with receipt observations/inbox, stock, forms and audit.
 // Existing 0016 flow/inventory freeze protects atomic edits; no new schema, files or reset category.
+
+// Exact-master receipt template synchronization uses existing operational receipt JSON,
+// inventory_operations and access_audit. Both reset scopes cover these; existing 0016
+// freeze prevents partial activation. Read filters/history and catalog storage events add no business table or blob.

@@ -37,3 +37,5 @@ export async function prepareReceiptObservation(u:any,b:any,receiptId:string,war
 }
 
 export async function receiptEditReviewer(u:any,d:any){if(d.reviewKind!=='receipt_edit')return false;const w=(await warehouseDirectory()).find(w=>w.id===d.warehouseId),q=(await warehouseDirectory()).find(w=>w.id===d.quarantineWarehouseId)||w;return u.isAdmin||!!w&&(warehouseMember(u,w,'inventory')||warehouseMember(u,q,'qc'));}
+
+export async function receiptNoteResponder(u:any,n:any){const d=n.data,me=await inboxIdentity(u);return u.isAdmin||d.personRecipients.includes(me)||d.roleRecipients.some((r:string)=>receiptNoteRole(u,r,d.route))||await receiptEditReviewer(u,d);}
