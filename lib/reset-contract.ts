@@ -228,3 +228,7 @@ resetHelp.push('راهنماهای عیب‌یابی محصول، تاریخچه
 // Incoming identity correction history and relabel confirmations remain in receipt JSON,
 // the existing records/inventory_batches rows, form archive and existing inbox cases.
 // Full backups, existing delete order and generic reset freeze cover all of them.
+
+// Receipt qcStartedAt/By, editRequests and extended identityHistory use existing operational receipt JSON.
+// Both scopes back up/delete these with receipt observations/inbox, stock, forms and audit.
+// Existing 0016 flow/inventory freeze protects atomic edits; no new schema, files or reset category.

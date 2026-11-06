@@ -2,10 +2,11 @@ import {serviceCosts,serviceSummary} from './purchase-fulfillment';
 import {costRead,costWrite,moneyMicro,moneyText} from './costing';
 export function projectRoles(u:any){const p=u.permissions,internal=!p.salesAgentId&&!p.serviceAgentId&&!p.hospitalCenterId;
  const manager=internal&&(u.isAdmin||p.supplyRoles?.includes('ceo')),engineering=internal&&(manager||p.supplyRoles?.includes('engineering')),
+ lineWarehouse=internal&&!!p.flowRoles?.includes('inventory')&&!!p.warehouses?.includes('line'),
  warehouse=internal&&(u.isAdmin||p.flowRoles?.includes('inventory')||p.supplyRoles?.includes('inventory'))&&(u.isAdmin||!p.warehouses||p.warehouses.includes('raw')),
  production=internal&&(manager||p.flowRoles?.includes('production')||p.serviceRoles?.includes('technician')&&p.serviceDomains?.includes('hospital')),
  quality=internal&&(u.isAdmin||p.flowRoles?.includes('qc')),finance=internal&&costWrite(u),financial=internal&&(costRead(u)||manager);
- return {manager:!!manager,engineering:!!engineering,warehouse:!!warehouse,production:!!production,quality:!!quality,finance:!!finance,financial:!!financial,read:!!(internal&&(manager||engineering||warehouse||production||quality||costRead(u)))};
+ return {lineWarehouse:!!lineWarehouse,manager:!!manager,engineering:!!engineering,warehouse:!!warehouse,production:!!production,quality:!!quality,finance:!!finance,financial:!!financial,read:!!(internal&&(manager||engineering||warehouse||lineWarehouse||production||quality||costRead(u)))};
 }
 export const projectHelp=[
  'گارانتی محصولات بیمارستانی متعلق به قرارداد همین پروژه است؛ مدت محصول مبنا نیست. ماه‌های توافق‌شده در سفارش ساخت و پروژه ثبت می‌شوند؛ مقدار نامشخص صفر نیست. شناسنامه نصب‌شده از همین توافق استفاده می‌کند.',

@@ -55,7 +55,7 @@ export async function captureForm(op:string,target:string,body:any,u:Session,pro
  const guardId='form-control:'+op;
  return [db.prepare("INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,'form_control','{}',?,?,CASE WHEN (SELECT COUNT(*) FROM flow_entities WHERE type='qms_record' AND json_extract(data,'$.kind')='document')=? AND (SELECT COALESCE(SUM(revision),0) FROM flow_entities WHERE type='qms_record' AND json_extract(data,'$.kind')='document')=? THEN 1 ELSE 0 END)").bind(guardId,u.userId,at,docs.length,docs.reduce((n,r)=>n+r.revision,0)),db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'form_record',?,1,?,?)").bind('form-report:'+op,JSON.stringify(data),at,at)];
 }
-export const receiptFormTargets=['flow.receipt','flow.assign_qc','flow.correct_receipt_material','flow.confirm_receipt_relabel','flow.incoming_qc','flow.shelve'];
+export const receiptFormTargets=['flow.receipt','flow.edit_receipt','flow.request_receipt_edit','flow.start_incoming_qc','flow.assign_qc','flow.correct_receipt_material','flow.confirm_receipt_relabel','flow.incoming_qc','flow.shelve'];
 /** Narrow receipt context lets scoped warehouse staff print their own receipts without granting the global archive. */
 export async function receiptFormScope(u:Session,batchId:string){
  if(!u.isAdmin&&!['inventory','qc','production'].some(r=>flowRole(u,r)))throw new AccessError('دسترسی سوابق رسید ندارید.',403);

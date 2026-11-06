@@ -7,7 +7,7 @@ import type {Session} from './permissions';
 import {AsyncLocalStorage} from 'node:async_hooks';
 export const inboxAssistantExecution=new AsyncLocalStorage<boolean>();
 export const inboxDecode=(r:any)=>r?({...r,data:JSON.parse(r.data)}):null;
-export async function inboxIdentity(u:Session){const id=await memberId(u);if(id)return id;if(u.isAdmin)return '@owner';throw new AccessError('حساب فعال برای مکاتبه یافت نشد.',403);}
+export async function inboxIdentity(u:Session){const id=await memberId(u);if(id)return id;if(u.isAdmin||u.profileReview)return '@owner';throw new AccessError('حساب فعال برای مکاتبه یافت نشد.',403);}
 export async function inboxDirectory(u:Session){const me=await inboxIdentity(u),db=storage();let users=(await db.prepare("SELECT id,name,unit,permissions FROM app_members WHERE status='active' ORDER BY name,id").all()).results as any[];
  if(!u.isAdmin&&u.permissions.serviceAgentId)users=users.filter(r=>{const p=storedAccessPermissions(r.permissions);return !p.serviceAgentId&&p.serviceRoles?.some((x:string)=>['manager','coordinator'].includes(x))&&p.serviceDomains?.some((x:string)=>u.permissions.serviceDomains?.includes(x));});
  if(!u.isAdmin&&u.permissions.salesAgentId){await salesScope(u,u.permissions.salesAgentId);users=users.filter(r=>{const p=storedAccessPermissions(r.permissions),actor={isAdmin:false,permissions:p} as Session;return !p.salesAgentId&&!p.serviceAgentId&&(salesStaff(actor)||salesFinance(actor));});}
