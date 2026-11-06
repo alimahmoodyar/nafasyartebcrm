@@ -1,3 +1,10 @@
+## 2026-11-06 — کارتابل نقش و تأیید جانمایی
+
+- ورود واضح کارتابل در همه پروفایل‌ها؛ پیام مستقیم و کارهای فرایندی در کارتابل مشترک. صف نقش آزمایشی از مراحل واقعی و محدوده انبار خوانده می‌شود؛ بدون ساخت فرد یا ارجاع جعلی.
+- حذف آیکون مستقل جانمایی؛ بازشدن مستقیم کار از کارتابل، نمایش نشانی شناسنامه و تأیید فیزیکی. کنترل سمت سرور برای محل، نسخه شناسنامه، مجوز، کیفیت، تعویض لیبل، تکرار و تغییر هم‌زمان؛ ثبت عامل واقعی. محل مفقود یا اشغال‌شده با بچ دیگر مانع تأیید است؛ محل تصادفی انتخاب نمی‌شود. ساختار قدیمی تک‌بچ در هر محل در این انتشار تغییر نکرده است.
+- QR ترکیبی روی رسید چاپی جایگزین بارکد بزرگ شد؛ قالب لیبل عملیاتی حفظ شد.
+- آزمون‌های صف نقش، دسترسی حساب‌های واقعی آزمایشی، جانمایی، قفل نگهداری، رقابت، اصلاح هویت و رسید، جزئیات فهرست و همگام‌سازی کیفیت اجرا شدند. داده جدید فقط در JSON رسید است؛ مهاجرت جدید ندارد.
+
 ## 2026-11-06 — Open receipt queue, searchable history and coherent incoming-QC state
 
 - Receipt pages default to unfinished cases. Shelved receipts leave the queue and remain searchable/printable in history; fully rejected lots still quarantined remain open. Add state/name/code/batch filters, 20-row display pages and direct access to historical receipts. No deletion or new read grants. HTTP/MCP list uses the same authorized flow projection and filter helper.

@@ -1,3 +1,6 @@
+import {profileWork} from '@/lib/profile-work';
+import {syncReceiptTemplates} from '@/lib/receipt-template-sync';
+import {syncMaterialTasks} from '@/lib/material-tasks';
 import {syncInventoryCounts} from '@/lib/inventory-counts';
 import {guidanceOutline} from '@/lib/workflow-guidance';
 import {syncForeignTasks} from '@/lib/foreign-purchase-tasks';
@@ -23,7 +26,7 @@ export async function GET(request?:Request){try{const u=await requireAccess(),db
  if(u.isAdmin||u.permissions.flowRoles?.includes('inventory')||u.permissions.supplyRoles?.some((r:string)=>['finance','ceo'].includes(r)))await syncInventoryCounts();
  const purchaseServices=await import('@/lib/purchase-services');await purchaseServices.syncServiceFinanceTasks();
  const canPurchaseServices=await purchaseServices.purchaseServicesAvailable(u);
- const tasks=(await db.prepare("SELECT * FROM duty_runs WHERE ?=1 OR assignee=? OR supervisor=? ORDER BY CASE WHEN state IN ('completed','cancelled') THEN 1 ELSE 0 END,due,id LIMIT 300").bind(u.isAdmin?1:0,mid,mid).all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}));
+ const tasks=u.profileReview?[]:(await db.prepare("SELECT * FROM duty_runs WHERE ?=1 OR assignee=? OR supervisor=? ORDER BY CASE WHEN state IN ('completed','cancelled') THEN 1 ELSE 0 END,due,id LIMIT 300").bind(u.isAdmin?1:0,mid,mid).all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}));
  const allowedTasks:any[]=[];for(const t of tasks){if(!dutyVisible(u,t.data))continue;if(t.data.materialWorkflow||t.data.purchaseServiceWorkflow||t.data.purchaseInvoiceWorkflow||t.data.assetWorkflow||t.data.qmsWorkflow||t.data.foreignPurchaseWorkflow||t.data.personnelWorkflow||t.data.salesLeadWorkflow||t.data.treasuryWorkflow||t.data.guaranteeWorkflow||t.data.replenishmentWorkflow||t.data.buildIntakeWorkflow){try{await taskAccess(t.id,u);}catch{continue;}}if(t.data.transportWorkflow){try{const {transportAccess}=await import('@/lib/transport');await transportAccess(u,t.data.transportMissionId);}catch{continue;}}allowedTasks.push(t);}
  // Keep the personal counter private. Escalations for the admin are returned separately.
  const notifications=(await db.prepare("SELECT n.* FROM duty_notices n JOIN duty_runs t ON t.id=n.task_id WHERE n.recipient=? ORDER BY n.created DESC LIMIT 100").bind(mid).all()).results;
@@ -34,7 +37,9 @@ export async function GET(request?:Request){try{const u=await requireAccess(),db
  const members=u.isAdmin?(await db.prepare("SELECT id,name,unit,status FROM app_members ORDER BY name").all()).results:[];
  const scheduler:any=u.isAdmin?await db.prepare("SELECT data FROM flow_entities WHERE id='duty_scheduler'").first():null;
  const activeTaskIds=new Set(allowedTasks.filter(t=>!['completed','cancelled'].includes(t.state)).map(t=>t.id));
- return json({accountId:u.userId,memberId:mid,isAdmin:u.isAdmin,receiptNotesAvailable:!u.permissions.salesAgentId&&!u.permissions.serviceAgentId&&!u.permissions.hospitalCenterId,canPurchaseServices,tasks:allowedTasks.map(t=>{const g=guidanceOutline(t);return {...t,guidance:{kind:g.kind,steps:g.steps,evidence:g.evidence}};}),limited:tasks.length===300,notifications:notifications.filter((n:any)=>activeTaskIds.has(n.task_id)),managementNotifications:managementNotifications.filter((n:any)=>activeTaskIds.has(n.task_id)),definitions:definitions.filter((p:any)=>!p.data.mergedInto),ownPositions,starterInstalled,members,scheduler:scheduler?JSON.parse(scheduler.data):null});
+ const templateSync=await syncReceiptTemplates(u);if(templateSync.needsTaskSync)await syncMaterialTasks();
+ const positionQueue=u.profileReview?await profileWork(u):{work:[],pendingQuality:0};
+ return json({profileReview:u.profileReview||null,positionWork:positionQueue.work,pendingQuality:positionQueue.pendingQuality,accountId:u.userId,memberId:mid,isAdmin:u.isAdmin,receiptNotesAvailable:!u.permissions.salesAgentId&&!u.permissions.serviceAgentId&&!u.permissions.hospitalCenterId,canPurchaseServices,tasks:allowedTasks.map(t=>{const g=guidanceOutline(t);return {...t,guidance:{kind:g.kind,steps:g.steps,evidence:g.evidence}};}),limited:tasks.length===300,notifications:notifications.filter((n:any)=>activeTaskIds.has(n.task_id)),managementNotifications:managementNotifications.filter((n:any)=>activeTaskIds.has(n.task_id)),definitions:definitions.filter((p:any)=>!p.data.mergedInto),ownPositions:u.profileReview?[]:ownPositions,starterInstalled,members,scheduler:scheduler?JSON.parse(scheduler.data):null});
  }catch(e){return accessResponse(e)||Response.json({error:'کارتابل در دسترس نیست؛ نصب مهاجرت 0013 را بررسی کنید.'},{status:503})}}
 export async function POST(request:Request){try{checkOrigin(request);const u=await requireAccess(),db=storage(),b=JSON.parse(new TextDecoder().decode(await boundedBody(request,80000))),mode=required(b.mode),id=required(b.id),now=new Date().toISOString();if(!/^[a-f0-9-]{36}$/i.test(id))fail('شناسه عملیات معتبر نیست.');const signature=JSON.stringify(b),oldOp:any=await db.prepare('SELECT payload,actor FROM inventory_operations WHERE id=?').bind(id).first();if(oldOp){if(oldOp.actor!==u.userId||oldOp.payload!==signature)fail('شناسه عملیات تکراری است.',409);return json({saved:true,repeated:true});}
  if(mode==='install_starter')return json(await installDutyStarter(u,id,signature));

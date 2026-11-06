@@ -1,3 +1,5 @@
+import {profileWork} from '@/lib/profile-work';
+import {profileSession} from '@/lib/profile-review';
 import {syncReceiptTemplates} from '@/lib/receipt-template-sync';
 import {syncMaterialTasks} from '@/lib/material-tasks';
 import {profileReviewCookie,profileJobRoles} from '@/lib/profile-review';
@@ -15,12 +17,8 @@ export async function GET(request:Request){try{
  const json=(value:unknown)=>Response.json(value,{headers:{'Cache-Control':'private, no-store','Vary':'Cookie, Authorization'}});
  if(!profile)return json({profiles:roleProfiles});
  if(!profile.operational)return json({profile,work:[],activeProfile:(await session()).profileReview?.id||'',unverified:[],personalPreview:true});
- const db=storage(),rows=(await db.prepare("SELECT id,type,data FROM flow_entities WHERE type IN ('receipt','request','sourcing_plan','sourcing_quote','purchase_order','worker_output','scrap_transfer','scrap_sale_request','build','inventory_count','build_project','handoff','worker_nonconforming','line_return','worker_count_round','receipt_observation') ORDER BY id").all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}));
- const work:ProfileWork[]=materialProfileWork(profile.id,rows);
- if(profile.workflowRoles.length){for(const plan of rows.filter(r=>r.type==='sourcing_plan')){
-  const steps=nextWork(plan,rows.filter(r=>r.type==='sourcing_quote'&&r.data.planId===plan.id),rows.filter(r=>r.type==='purchase_order'&&r.data.planId===plan.id),await coverage(plan));
-  for(const step of steps.filter(s=>profile.workflowRoles.includes(s.role)))work.push({id:plan.id+':'+step.key,title:step.title,section:step.sourceSection||'sourcing',target:step.sourceId||plan.id,sourceId:plan.id,state:plan.data.state});
- }}
+ const position=profileSession(admin,profile.id,(await storage().prepare("SELECT id,data FROM flow_entities WHERE type='material_warehouse'").all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)})));
+ const {work}=await profileWork(position);
  return json({profile,work,activeProfile:(await session()).profileReview?.id||'',unverified:[],personalPreview:false});
  }catch(e){return accessResponse(e)||Response.json({error:'دریافت پروفایل نقش انجام نشد.'},{status:500,headers:{'Cache-Control':'no-store'}})}}
 
