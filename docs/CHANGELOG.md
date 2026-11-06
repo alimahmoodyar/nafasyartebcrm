@@ -1,3 +1,9 @@
+## 2026-11-06 — Technical role edits existing material masters
+
+- Internal technical engineering can edit existing material names, specifications, QC templates, reference photos, drawings and default storage addresses through the existing UI, HTTP and MCP handlers. No personal inventory role is needed.
+- Preserve immutable code/unit, revision checks, held-design controls, actual actor audit and reset freeze. This does not grant new-material creation, stock receiving/movement, QC-result approval or finance access. Catalog-only reads exclude warehouse staff, stock, orders and private prices. No migration.
+- Verified with an ordinary engineering account, including image/PDF upload, read/removal, MCP parity and denied external/removed-role/stock/QC operations.
+
 ## 2026-11-06 — Catalog reference photo and storage address in receiving and QR labels
 
 - Receiving immediately shows the selected material’s reference photo with a zoom link. Changing selection removes the old photo before the next fetch; stale responses cannot replace the current selection. Missing photos and load failures are explicit and do not create stock or block counting.
