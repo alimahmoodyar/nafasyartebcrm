@@ -35,6 +35,23 @@ const profilesApi=load('app/api/role-profiles/route.ts');let profile=await ctx.r
 const linkedThreads=sql.prepare("SELECT data FROM flow_entities WHERE type='inbox_thread'").all().map(r=>JSON.parse(r.data));assert.ok(linkedThreads.some(t=>t.recipientId==='finance'&&t.link.id==='receipt-note:'+receipt.observationId));assert.ok(linkedThreads.some(t=>t.recipientId==='buyer'&&t.link.id==='receipt-note:'+receipt.quantityObservationId));
 
 const personal=await post(flow,{...op,id:crypto.randomUUID(),quantity:'42',evidenceIds:[],noteRoles:[],notePeople:['other'],receiptNote:'Inform other internal colleague'});assert.equal(personal.quantityReview,false);user={userId:'other',name:'other',isAdmin:false,permissions:{read:[],write:[],eventStages:[]}};res=await ctx.run(user,()=>notes.GET(new Request('https://test.local/api/receipt-observations?id='+encodeURIComponent(personal.observationId))));assert.equal(res.status,200);user=admin;
+entity('shipment-order','purchase_order',{materialId:'material',partCode:'10100021',quantity:10000,unit:'unit',state:'shipped',supplier:'Supplier',route:'domestic',shipments:[{id:'first-load',declaredQuantity:5000,expectedDay:op.day},{id:'next-load',declaredQuantity:2000,expectedDay:op.day}]});
+const shipmentDraft={...op,id:crypto.randomUUID(),purchaseOrderId:'shipment-order',purchaseShipmentId:'first-load',quantity:'5',truckPlate:'Truck 42',evidenceIds:[],noteRoles:[],notePeople:[],receiptNote:''};
+const shipment=await post(flow,shipmentDraft);assert.equal(row(shipment.receiptId).data.receiptComparison.basis,'shipment_declared');assert.equal(row(shipment.receiptId).data.receiptComparison.expected,5000);assert.equal(shipment.quantityReview,false);
+await post(flow,{...shipmentDraft,id:crypto.randomUUID()},409);
+const second=await post(flow,{...shipmentDraft,id:crypto.randomUUID(),quantity:'2',truckPlate:'',purchaseShipmentId:'next-load',truckArrivalReceiptId:shipment.receiptId});
+assert.equal(row(second.receiptId).data.truckArrival.plate,'Truck 42');
+const rejected={...row(shipment.receiptId).data,state:'rejected',accepted:0,rejected:5000,qc:{by:'QC'}};
+sql.prepare('UPDATE flow_entities SET data=?,revision=revision+1 WHERE id=?').run(JSON.stringify(rejected),shipment.receiptId);
+const shipmentOrder=row('shipment-order').data;
+sql.prepare('UPDATE flow_entities SET data=?,revision=revision+1 WHERE id=?').run(JSON.stringify({...shipmentOrder,supplierReturns:{[shipment.receiptId]:{reference:'Supplier pickup',expectedDay:op.day}}}),'shipment-order');
+const ret={id:crypto.randomUUID(),mode:'return_rejected_purchase',receiptId:shipment.receiptId,revision:row(shipment.receiptId).revision,confirmed:true,day:op.day,quantity:'2',reference:'Actual pickup receipt'};
+await post(flow,ret);await post(flow,ret);
+assert.equal(row(shipment.receiptId).data.supplierReturns[0].quantity,2000);
+assert.equal(sql.prepare("SELECT quantity FROM inventory_balances WHERE item_id=? AND warehouse='quarantine'").get(shipment.receiptId).quantity,3000);
+const replacement=await post(flow,{...shipmentDraft,id:crypto.randomUUID(),quantity:'3',truckPlate:'',purchaseShipmentId:'',replacementFor:shipment.receiptId});
+assert.equal(row(replacement.receiptId).data.replacementFor,shipment.receiptId);
+await post(flow,{...shipmentDraft,id:crypto.randomUUID(),quantity:'3',truckPlate:'',purchaseShipmentId:'',replacementFor:shipment.receiptId},409);
 const frozenDraft={...op,id:crypto.randomUUID(),evidenceIds:[],noteRoles:[],quantity:'2',receiptNote:'History only'};sql.exec("UPDATE reset_control SET phase='maintenance'");await post(flow,frozenDraft,423);sql.exec("UPDATE reset_control SET phase='testing'");assert.equal(sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE id=?").get('receipt-observation:'+frozenDraft.id).n,0,'Reset freeze rolls receipt, notes and inbox back together');
 const manifest=load('lib/system-reset.ts').resetFiles({flow_entities:sql.prepare("SELECT * FROM flow_entities WHERE type='receipt_evidence'").all()});assert.equal(manifest.length,1);assert.equal(manifest[0].size,photo.length);
 console.log('PASS simplified receipt: actual count only, immutable order supplier/specs, unverified delivery clues, automatic supply comparison, optional finance/individual observation, evidence staging/read scopes/immutability, inbox links, UUID replay, file backup and atomic reset rollback.');

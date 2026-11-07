@@ -6,8 +6,20 @@ export function addDeliveryDays(start:string,days:number){
  date.setUTCDate(date.getUTCDate()+days);return date.toISOString().slice(0,10);
 }
 export function quoteEstimatedEta(d:any,today:string){return hasDeliveryDays(d)?addDeliveryDays(today,d.deliveryDays):d?.eta||'';}
-export function needsPurchaseConfirmation(d:any){return hasDeliveryDays(d)&&!d.purchaseConfirmedAt;}
+export function needsPurchaseConfirmation(d:any){return (hasDeliveryDays(d)||!!d?.termsAmendment)&&!d.purchaseConfirmedAt;}
 export function deliveryDaysInput(value:unknown){
  if(typeof value!=='number'&&typeof value!=='string'||!/^\d{1,4}$/.test(String(value)))throw Error('مدت تحویل باید تعداد روز صحیح از صفر تا ۳۶۵۰ باشد.');
  const n=Number(value);if(!hasDeliveryDays({deliveryDays:n}))throw Error('مدت تحویل باید تعداد روز صحیح از صفر تا ۳۶۵۰ باشد.');return n;
+}
+
+export function purchaseDeliveryStatus(order:any,receipts:any[],today:string){
+ const data=order.data,due=data.approvedDeliveryDue||data.promisedEta;
+ if(!due||data.pendingSupplierCredit||needsPurchaseConfirmation(data)||!['issued','paid','preparing','shipped','closed'].includes(data.state))return null;
+ const arrivals=receipts.filter(r=>r.data.purchaseOrderId===order.id);
+ const effectiveQuantity=(r:any)=>Math.max(0,r.data.quantity-(r.data.rejected||0));
+ const received=arrivals.reduce((sum,r)=>sum+effectiveQuantity(r),0);
+ const receivedOnTime=arrivals.filter(r=>r.data.day<=due).reduce((sum,r)=>sum+effectiveQuantity(r),0);
+ const missing=Math.max(0,data.quantity-received);
+ const untilDue=(Date.parse(due)-Date.parse(today))/86400000;
+ return {due,missing,reminder:data.state!=='closed'&&missing>0&&untilDue<=3,late:untilDue<0&&receivedOnTime<data.quantity};
 }

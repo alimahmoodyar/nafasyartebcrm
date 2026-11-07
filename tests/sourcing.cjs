@@ -20,6 +20,12 @@ async function operate(b,status=200){const r=await production.POST(request('/api
 const flow=load('app/api/flow/route.ts'),templateApi=load('app/api/quality/templates/route.ts'),qualityApi=load('app/api/quality/reports/route.ts');
 async function op(mode,b={},status=200){const r=await flow.POST(request('/api/flow','POST',{id:crypto.randomUUID(),mode,warehouseId:receivingFixture.id,...b}));const d=await r.json();assert.equal(r.status,status,JSON.stringify(d));return d;}
 const entities=type=>sql.prepare('SELECT * FROM flow_entities WHERE type=? ORDER BY created,id').all(type).map(x=>({...x,data:JSON.parse(x.data)}));
+async function shelveReceipt(receiptId,location){
+ const receipt=entities('receipt').find(r=>r.id===receiptId);
+ const material=entities('material').find(m=>m.id===receipt.data.materialId);
+ await op('material_location',{materialId:material.id,revision:material.revision,warehouseId:receipt.data.warehouseId,location});
+ return op('shelve',{receiptId,location,materialRevision:material.revision+1,placed:true,confirmed:true});
+}
 const stock=(id,wh)=>sql.prepare('SELECT quantity FROM inventory_balances WHERE item_id=? AND warehouse=?').get(id,wh)?.quantity||0;
 // Serialize test transactions as D1 does; callers may still read the same stale version.
 let batchTail=Promise.resolve();const rawBatch=db.batch.bind(db);db.batch=stmts=>{const next=batchTail.then(()=>rawBatch(stmts));batchTail=next.catch(()=>{});return next};
@@ -43,7 +49,7 @@ const receivingFixture=require('./helpers/receiving-warehouse.cjs')(sql);
  const supplierLinks={};for(const route of ['domestic','foreign']){const sid=crypto.randomUUID(),lid=crypto.randomUUID();sql.prepare('INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?)').run(sid,'supplier',JSON.stringify({name:route,active:true,route}),now,now);sql.prepare('INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?)').run(lid,'supplier_material',JSON.stringify({supplierId:sid,materialId:entities('material')[0].id,status:'approved',unit:'عدد',specs:'V1',supplierRevision:1,reviewDue:future}),now,now);supplierLinks[route]=lid;}
  let material=entities('material')[0];await source('routes',{materialId:material.id,revision:material.revision,routes:['domestic','foreign']},403,actor('sales'));
  await source('routes',{materialId:material.id,revision:material.revision,routes:['domestic','foreign']},200,actor('engineering'));
- await op('receipt',{materialId:material.id,day:today,quantity:'4',supplier:'Stock'});const stocked=entities('receipt')[0];await op('incoming_qc',{receiptId:stocked.id,accepted:'4',rejected:'0',values:{purity:'92'},notes:'pass'});await op('shelve',{receiptId:stocked.id,location:'A-1-1-1'});
+ await op('receipt',{materialId:material.id,day:today,quantity:'4',supplier:'Stock'});const stocked=entities('receipt')[0];await op('incoming_qc',{receiptId:stocked.id,accepted:'4',rejected:'0',values:{purity:'92'},notes:'pass'});await shelveReceipt(stocked.id,'A-1-1-1');
  const created=await source('create',{productId:p.id,count:5,origin:'forecast',needBy:future,reference:'FORECAST-1',notes:'sales forecast'},200,actor('sales')),pid=created.planId;
  assert.equal(current(pid).data.state,'pending');assert.ok(sql.prepare("SELECT 1 FROM duty_runs WHERE assignee='ceoUser' AND state='open'").get());
  await source('calculate',{planId:pid,notes:'not approved'},400,actor('inventory'));
@@ -95,12 +101,12 @@ const receivingFixture=require('./helpers/receiving-warehouse.cjs')(sql);
  let arrival=entities('receipt').find(r=>r.data.purchaseOrderId===order);assert.ok(arrival);assert.equal(stock(arrival.id,'quarantine'),4000);assert.equal((await detail(pid)).lines[0].stock,4000);assert.equal((await detail(pid)).lines[0].pending,4000);assert.equal((await detail(pid)).lines[0].pipeline,2000);assert.equal((await detail(pid)).lines[0].shortage,0);
  await source('ready',{planId:pid,notes:'not QC yet'},400,actor('inventory'));
  await source('receive',{planId:pid,orderId:order,day:today,quantity:'3',notes:'overpending'},400,actor('inventory'));
- await op('incoming_qc',{receiptId:arrival.id,accepted:'3',rejected:'1',values:{purity:'93'},notes:'1 rejected'});assert.equal((await detail(pid)).lines[0].pending,3000);assert.equal((await detail(pid)).lines[0].shortage,1000);await op('shelve',{receiptId:arrival.id,location:'A-1-1-2'});
+ await op('incoming_qc',{receiptId:arrival.id,accepted:'3',rejected:'1',values:{purity:'93'},notes:'1 rejected'});assert.equal((await detail(pid)).lines[0].pending,3000);assert.equal((await detail(pid)).lines[0].shortage,1000);await shelveReceipt(arrival.id,'A-1-1-2');
  d=await detail(pid);assert.equal(d.lines[0].stock,7000);assert.equal(d.lines[0].pipeline,2000);assert.equal(d.lines[0].shortage,1000,'Rejected quantity is shortage, never assumed replacement');
- await source('close_order',{planId:pid,orderId:order,notes:'incomplete'},400,actor('inventory'));
+ await source('close_order',{planId:pid,orderId:order,notes:'incomplete'},409,actor('inventory'));
  await source('receive',{planId:pid,orderId:order,day:today,quantity:'3',invoiceQuantity:'3',discrepancyNotes:'Replacement for one quality-rejected unit plus balance',notes:'balance plus replacement'},200,actor('inventory'));
- arrival=entities('receipt').filter(r=>r.data.purchaseOrderId===order).find(r=>r.data.state==='pending_qc');await op('incoming_qc',{receiptId:arrival.id,accepted:'3',rejected:'0',values:{purity:'94'},notes:'pass'});await op('shelve',{receiptId:arrival.id,location:'A-1-1-3'});
- await source('close_order',{planId:pid,orderId:order,notes:'fully accepted'},200,actor('inventory'));
+ arrival=entities('receipt').filter(r=>r.data.purchaseOrderId===order).find(r=>r.data.state==='pending_qc');await op('incoming_qc',{receiptId:arrival.id,accepted:'3',rejected:'0',values:{purity:'94'},notes:'pass'});await shelveReceipt(arrival.id,'A-1-1-3');
+ await source('close_order',{planId:pid,orderId:order,notes:'fully accepted, payment still outstanding'},409,actor('inventory'));
  assert.equal((await detail(pid)).lines[0].stock,10000);await source('ready',{planId:pid,notes:'all stock checked'},200,actor('inventory'));
  await source('release',{planId:pid,reference:'PRODUCTION-PLAN-1',notes:'handed to production'},200,actor('inventory'));assert.equal(sql.prepare('SELECT COUNT(*) n FROM sourcing_holds WHERE plan_id=?').get(pid).n,0);assert.equal(stock(stocked.id,'line'),4000);
  // Missing BOM goes to R&D and resumes only with a matching real BOM.
@@ -163,7 +169,7 @@ const receivingFixture=require('./helpers/receiving-warehouse.cjs')(sql);
  sql.prepare("UPDATE reset_control SET phase='testing' WHERE id=1").run();
  await op('incoming_qc',{receiptId:waitingReceipt.id,accepted:'3',values:{purity:'92'},notes:'2 rejected'});
  pendingLines=await Promise.all(pendingPlans.map(async id=>(await detail(id)).lines[0]));assert.equal(pendingLines.reduce((n,l)=>n+l.pending,0),3000);assert.equal(pendingLines.reduce((n,l)=>n+l.shortage,0),5000);
- await op('shelve',{receiptId:waitingReceipt.id,location:'P-1-1-1'});
+ await shelveReceipt(waitingReceipt.id,'P-1-1-1');
  pendingLines=await Promise.all(pendingPlans.map(async id=>(await detail(id)).lines[0]));assert.equal(pendingLines.reduce((n,l)=>n+l.stock,0),3000);assert.equal(pendingLines.reduce((n,l)=>n+l.pending,0),0);assert.equal(pendingLines.reduce((n,l)=>n+l.shortage,0),5000);
  assert.equal(stock(waitingReceipt.id,'quarantine'),2000);assert.equal((await repl.shortageSnapshot(pendingMaterial)).quarantine,0,'Rejected remainder never covers purchases');
  const snapshotViaMcp=await catalog.executeTool('get_sourcing_plan',{planId:pendingPlans[0]},base,{user:actor('inventory'),scope:'read',tokenId:null});assert.equal(snapshotViaMcp.lines[0].pending,0);

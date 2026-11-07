@@ -42,6 +42,8 @@ export function orderFinancialSummary(order:any,cases:any[]){
    const lines=i.lines||[],total=lines.reduce((n:bigint,l:any)=>n+moneyMicro(l.amount),BigInt(0));
    const part=lines.filter((l:any)=>l.orderId===order.id).reduce((n:bigint,l:any)=>n+moneyMicro(l.amount),BigInt(0));invoiced+=part;
    if(!part||!total)continue;
+   const offset:bigint=(d.creditOffsets||[]).filter((x:any)=>x.invoiceId===i.id).reduce((sum:bigint,x:any)=>sum+moneyMicro(x.amount),BigInt(0));
+   paid+=offset*part/total;
    for(const a of allocations.filter((a:any)=>a.invoiceId===i.id)){
     const p=payments.find((p:any)=>p.id===a.paymentId);if(!p)continue;
     const direct=p.orderId||valid(d.advances).find((x:any)=>x.id===p.advanceId)?.orderId;if(direct)continue;
@@ -62,7 +64,17 @@ export function orderDelivery(order:any,receipts:any[]){
 
 /** A later receipt/QC correction invalidates the disposition; nothing is assumed accepted. */
 export function currentRemainderResolution(order:any,rows:any[]){
- const decision=order?.data?.remainderResolution;if(!decision?.receipts||order.data.state!=='closed')return false;
+ const decision=order?.data?.remainderResolution;if(!decision?.receipts||order.data.state!=='closed'&&!order.data.pendingSupplierCredit)return false;
  const receipts=rows.filter(r=>r.type==='receipt'&&r.data.purchaseOrderId===order.id),d=orderDelivery(order,receipts);
  return !d.pending&&d.accepted===decision.accepted&&d.remaining===decision.remaining&&receipts.length===decision.receipts.length&&receipts.every(r=>decision.receipts.some((s:any)=>s.id===r.id&&s.revision===r.revision));
+}
+
+export function orderAdvancePaid(order:any,cases:any[]){
+ let paid=BigInt(0);
+ for(const {data} of cases){
+  if(data.supplierId!==order.data.supplierId||data.route!==order.data.route)continue;
+  const advances=new Set((data.advances||[]).filter((a:any)=>!a.voided&&a.orderId===order.id).map((a:any)=>a.id));
+  for(const payment of data.payments||[])if(!payment.voided&&advances.has(payment.advanceId))paid+=moneyMicro(payment.amount);
+ }
+ return paid;
 }

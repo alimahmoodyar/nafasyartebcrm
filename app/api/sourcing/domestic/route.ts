@@ -7,10 +7,11 @@ import {needSupply,supplyEntities,coverage,nextWork} from '@/lib/sourcing';
 export async function GET(){try{
  const u=await requireAccess();needSupply(u,'domestic');
  const plans=await supplyEntities('sourcing_plan'),allQuotes=await supplyEntities('sourcing_quote'),allOrders=await supplyEntities('purchase_order'),quotes=allQuotes.filter(q=>q.data.route==='domestic'),orders=allOrders.filter(o=>o.data.route==='domestic');
+ const receipts=await supplyEntities('receipt');
  const needs:any[]=[],cases:any[]=[],tasks:any[]=[],members=(await storage().prepare("SELECT * FROM app_members WHERE status='active'").all()).results as any[],mid=await memberId(u),policy=(await replenishmentPolicy()).data;
  for(const p of plans){const history=p.data.lines?.some((l:any)=>l.procurement?.history?.length)||quotes.some(q=>q.data.planId===p.id)||orders.some(o=>o.data.planId===p.id);const active=['sourcing','ready'].includes(p.data.state);if(!active&&!history)continue;
   const covered=await coverage(p),lines=covered.filter(l=>l.routes?.includes('domestic'));
-  if(active)for(const step of nextWork(p,allQuotes,allOrders,covered).filter(s=>s.role==='domestic')){
+  if(active)for(const step of nextWork(p,allQuotes,allOrders,covered,receipts).filter(s=>s.role==='domestic')){
    const assignment=supplyAssignment(p,step,members,policy);if(!u.isAdmin&&assignment.owner&&assignment.owner.id!==mid)continue;
    const line=lines.find(l=>(step.key.startsWith('quote:'+l.partCode+':'+l.round+':domestic')||step.key.startsWith('search:'+l.partCode+':'))),target=line?(p.data.supplierTargets||[]).find((t:any)=>t.partCode===line.partCode&&t.round===line.round&&t.route==='domestic'&&step.key.endsWith(':'+t.supplierId)):null;
    const quote=line&&!step.key.endsWith(':missing')?{partCode:line.partCode,round:line.round,supplierLinkId:target?.linkId||''}:null;

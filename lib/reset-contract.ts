@@ -1,3 +1,5 @@
+// Payment requests, supplier credits/offsets, shipment manifests, receipt links, return movements and delivery decisions are JSON on existing purchase_payable, purchase_order and receipt entities. Existing operational backup/reset and freeze also cover linked files and inventory movements.
+// Contractual delivery extension decisions and deadlines stay inside existing purchase_order JSON; backup, reset and 0016 freeze already cover them.
 // CEO quote returns and order terms amendments use existing operational quote/order JSON; 0016 freeze and both backup/reset scopes cover them and their history.
 // Shelving placementConfirmation is receipt JSON in flow_entities; existing
 // operational backup/delete and 0016 freeze cover it and stock atomically.

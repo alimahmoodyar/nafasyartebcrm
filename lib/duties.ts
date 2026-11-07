@@ -30,7 +30,7 @@ export async function tickDuties(nowDate=new Date(),source='server'){
  }
  const active=(await db.prepare("SELECT * FROM duty_runs WHERE state IN ('open','blocked','submitted')").all()).results;
  for(const r of active as any[]){const d=JSON.parse(r.data);if(d.salesMonitorWorkflow||d.salesReport)continue;const due=Date.parse(r.due),late=nowDate.getTime()-due;const statements:D1PreparedStatement[]=[];
- if(d.foreignPurchaseWorkflow)statements.push(...foreignTaskNotices(r,nowDate));else if(d.replenishmentWorkflow)statements.push(...replenishmentNotices(r,nowDate));else if(r.state==='submitted')statements.push(notice(r.id,r.supervisor||'@admin','review:'+r.revision,'پاسخ «'+d.title+'» در انتظار بررسی است.',now));else{
+ if(d.deliveryReminder||d.deliveryAlert)statements.push(notice(r.id,r.assignee,'assigned',d.title,now));else if(d.foreignPurchaseWorkflow)statements.push(...foreignTaskNotices(r,nowDate));else if(d.replenishmentWorkflow)statements.push(...replenishmentNotices(r,nowDate));else if(r.state==='submitted')statements.push(notice(r.id,r.supervisor||'@admin','review:'+r.revision,'پاسخ «'+d.title+'» در انتظار بررسی است.',now));else{
  statements.push(notice(r.id,r.assignee,'assigned','وظیفه: '+d.title,now));
  if(late>=-2*3600000&&late<0)statements.push(notice(r.id,r.assignee,'near:'+r.due,'مهلت «'+d.title+'» نزدیک است.',now));
  if(late>=0){const bucket=Math.min(6,Math.floor(late/(d.remindHours*3600000)));statements.push(notice(r.id,r.assignee,'late:'+r.due+':'+bucket,'مهلت «'+d.title+'» گذشته است؛ پاسخ یا علت تأخیر را ثبت کنید.',now));if(late>=d.escalateHours*3600000)statements.push(notice(r.id,r.supervisor||'@admin','escalate:'+r.due,'وظیفه «'+d.title+'» از مهلت پیگیری عبور کرده است.',now));}

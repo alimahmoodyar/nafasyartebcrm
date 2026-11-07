@@ -18,7 +18,11 @@ export const apHelp=[
  'ثبت در این بخش دفتر کنترلی بدهی و پرداخت است؛ پرداخت بانکی و سند سپیدار ایجاد نمی‌شود و بهای بچ فقط از تسویه خرید موجود تأیید می‌شود. اصلاح اشتباه با ابطال مستند و حفظ سابقه است؛ حذف مالی انجام نمی‌شود.'
 ];
 export const active=(a:any[])=>a.filter(x=>!x.voided);
-export function applied(c:any,kind:'invoiceId'|'paymentId',id:string){return active(c.allocations).filter((x:any)=>x[kind]===id).reduce((n:bigint,x:any)=>n+moneyMicro(x.amount),BigInt(0));}
+export function applied(c:any,kind:'invoiceId'|'paymentId',id:string){
+ const allocations=active(c.allocations).filter((x:any)=>x[kind]===id).reduce((n:bigint,x:any)=>n+moneyMicro(x.amount),BigInt(0));
+ const credit=kind==='invoiceId'?(c.creditOffsets||[]).filter((x:any)=>x.invoiceId===id).reduce((n:bigint,x:any)=>n+moneyMicro(x.amount),BigInt(0)):BigInt(0);
+ return allocations+credit;
+}
 export function invoiceMatch(c:any,i:any,rows:any[]){
  const blockers:string[]=[],lines=i.lines.map((l:any)=>{if(l.serviceId){const service=rows.find(r=>r.type==='purchase_service'&&r.id===l.serviceId);const accepted=service?.data.state==='accepted';if(!accepted)blockers.push('دریافت خدمت هنوز توسط مسئول تأیید نشده');return {serviceId:l.serviceId,orderId:'',partCode:service?.data.title||'خدمت',ordered:1000,invoice:1000,received:service?.data.delivery?1000:0,accepted:accepted?1000:0,rejected:0,receipts:[],serviceRevision:service?.revision};}const o=rows.find(x=>x.type==='purchase_order'&&x.id===l.orderId);const receipts=l.receiptIds.map((id:string)=>rows.find(x=>x.type==='receipt'&&x.id===id));
  if(!o||o.data.state==='cancelled')blockers.push('سفارش نامعتبر یا لغوشده');
