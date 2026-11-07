@@ -1,3 +1,4 @@
+// CEO quote returns and order terms amendments use existing operational quote/order JSON; 0016 freeze and both backup/reset scopes cover them and their history.
 // Shelving placementConfirmation is receipt JSON in flow_entities; existing
 // operational backup/delete and 0016 freeze cover it and stock atomically.
 // Receipt observation/note responses, shipment comparison and unverified delivery clue

@@ -20,10 +20,16 @@ export async function sourcingReviewInbox(u:any,plans:any[],workspace:SourcingRe
    const base={planId:p.id,planRevision:p.revision,taskKey:step.key,taskTitle:step.title,productName:p.data.productName,needBy:p.data.needBy,ownerName:assignment.owner?.name||'',ownerId:assignment.owner?.id||'',canAct,canClaim:!assignment.owner&&assignment.candidates.some(m=>m.id===mid),candidates:canAssign?assignment.candidates:[],role:workspace};
    if(step.key.startsWith('technical:')||step.key.startsWith('financial:')){
     const line=lines.find(l=>step.key===(workspace==='engineering'?'technical:':'financial:')+l.partCode+':'+l.round);if(!line)continue;
-    for(const q of pq.filter(q=>q.data.partCode===line.partCode&&q.data.round===line.round&&!q.data.unavailable&&(workspace==='engineering'?q.data.technical==='pending':q.data.technical==='pass'&&q.data.financial!=='pass'))){
+    for(const q of pq.filter(q=>q.data.partCode===line.partCode&&q.data.round===line.round&&!q.data.unavailable&&(workspace==='engineering'?q.data.technical==='pending':q.data.technical==='pass'&&!['pass','fail'].includes(q.data.financial)))){
      const d=q.data;
      items.push({...base,id:q.id,mode:workspace==='engineering'?'technical':'financial_review',quoteId:q.id,quoteRevision:q.revision,partCode:line.partCode,materialName:line.name,unit:line.unit,quantity:d.quantity,supplier:d.supplier,route:d.route,round:d.round,specs:d.specs||'',requiredSpecs:line.specs||'',technical:d.technical,technicalNote:d.technicalNote||'',...(workspace==='finance'?{unitPrice:d.unitPrice,currency:d.currency,extrasRial:d.extrasRial,totalRial:d.totalRial,freight:d.freight,paymentTerms:d.paymentTerms,deliveryDays:d.deliveryDays,eta:d.eta,validUntil:d.validUntil,financial:d.financial,financialNote:d.financialNote||'',files:files.filter(f=>f.data.state==='attached'&&f.data.quoteId===q.id).map(f=>({id:f.id,filename:f.data.filename}))}:{})});
     }
+   }else if(workspace==='finance'&&step.key.startsWith('ceo_return:')){
+    const q=pq.find(q=>step.key==='ceo_return:'+q.id+':finance');
+    if(q)items.push({...base,id:step.key,mode:'answer_quote_review',quoteId:q.id,quoteRevision:q.revision,supplier:q.data.supplier,unitPrice:q.data.unitPrice,currency:q.data.currency,totalRial:q.data.totalRial,reviewNote:q.data.ceoReturn.note});
+   }else if(workspace==='finance'&&step.key.startsWith('order_terms:')){
+    const o=po.find(o=>step.key==='order_terms:'+o.id+':finance');
+    if(o)items.push({...base,id:step.key,mode:'review_order_terms',orderId:o.id,orderRevision:o.revision,supplier:o.data.supplier,unit:o.data.unit,...o.data.termsAmendment.terms,reviewNote:o.data.termsAmendment.proposal.notes});
    }else if(workspace==='finance'&&step.key==='budget')items.push({...base,id:p.id+':budget',mode:'finance',finance:p.data.finance});
    else if(workspace==='finance'){
     const order=po.find(o=>step.key==='po:'+o.id&&o.data.state==='awaiting_funding');

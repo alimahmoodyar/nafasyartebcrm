@@ -7,5 +7,6 @@ export function sourcingStepDestination(step:any,planId:string){
  if(step.key?.startsWith('technical:')||step.role==='finance'){
   const d=sourcingReviewDestination(step.role,planId);return {...step,sourceSection:d.section,sourceId:d.target};
  }
+ if(['financial_return:','ceo_return:','order_terms:'].some(prefix=>step.key?.startsWith(prefix)))return {...step,sourceSection:'sourcing',sourceId:planId};
  return step;
 }
