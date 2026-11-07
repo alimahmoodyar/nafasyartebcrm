@@ -2,12 +2,12 @@ import {storedAccessPermissions} from './permissions';
 import {storage} from './storage';
 import {AccessError} from './authorization';
 import {allPermissions,validatePermissions,type Session} from './permissions';
-import {inboxDirectory,inboxIdentity,prepareInboxCreate,inboxCreateGuards} from './inbox';
+import {accountInboxDirectory,inboxIdentity,prepareInboxCreate,inboxCreateGuards} from './inbox';
 import {reminderNavigation} from './reminder-contract';
 import {env} from 'cloudflare:workers';
 export async function reminderRecipients(u:Session){
  if(u.permissions.hospitalCenterId)throw new AccessError('این حساب به صندوق ارجاع همکاران دسترسی ندارد.',403);
- const dir=await inboxDirectory(u),rows=(await storage().prepare("SELECT id,permissions FROM app_members WHERE status='active'").all()).results as any[];
+ const dir=await accountInboxDirectory(u),rows=(await storage().prepare("SELECT id,permissions FROM app_members WHERE status='active'").all()).results as any[];
  return dir.people.filter(p=>p.id!==dir.me&&(p.id==='@owner'||rows.some(m=>m.id===p.id&&!storedAccessPermissions(m.permissions).hospitalCenterId)));
 }
 /** Read-only principal for applying the recipient's existing record visibility. Never grants new rights. */

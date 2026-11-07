@@ -1,5 +1,5 @@
 import {assistantStorageError} from '@/lib/assistant-storage-errors';
-import {inboxAssistantExecution} from '@/lib/inbox';
+import {inboxAssistantExecution,inboxMailbox,checkInboxMailbox} from '@/lib/inbox';
 import {password as validatePassword} from '@/lib/password-auth';
 import {requireAccess,checkOrigin,accessResponse,AccessError} from '@/lib/authorization';
 import {storage} from '@/lib/storage';
@@ -13,6 +13,11 @@ export async function POST(request:Request){let admin=false;try{
  checkOrigin(request);const u=await requireAccess();admin=u.isAdmin;const expected=request.headers.get('x-assistant-account');if(expected&&expected!==u.userId)throw new AccessError('حساب ورود تغییر کرده است؛ گفتگو را دوباره باز کنید.',409);
  const b=JSON.parse(new TextDecoder().decode(await boundedBody(request,2000)));if(typeof b.id!=='string'||!['confirm','cancel'].includes(b.decision))throw new AccessError('فرمان معتبر لازم است.',400);
  const db=storage();let a:any=await db.prepare('SELECT * FROM assistant_actions WHERE id=? AND owner=?').bind(b.id,u.userId).first();if(!a)throw new AccessError('فرمان یافت نشد.',404);
+ if(a.tool==='inbox_apply'){
+  const expected=JSON.parse(a.args).data?.expectedMailbox;
+  if(u.profileReview&&!expected)throw new AccessError('پیام را در صندوق همین پروفایل دوباره آماده کنید.',409);
+  checkInboxMailbox(expected,(await inboxMailbox(u)).id);
+ }
  if(a.state==='succeeded'||a.state==='cancelled')return json({accountId:u.userId,action:publicAction(a)});
  if(a.state!=='pending')throw new AccessError('وضعیت اجرای قبلی قطعی نیست یا اجرای آن پایان نیافته؛ قبل از فرمان جدید سابقه بخش مربوطه را بررسی کنید.',409);
  if(b.decision==='cancel')await db.prepare("UPDATE assistant_actions SET state='cancelled' WHERE id=? AND owner=? AND state='pending'").bind(a.id,u.userId).run();
