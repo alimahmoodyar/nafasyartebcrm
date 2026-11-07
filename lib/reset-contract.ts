@@ -202,6 +202,9 @@ resetHelp.push('نوع رسمی یا غیررسمی، سند متصل و ساب�
 
 // personal_reminders: private owner-facing reminders and captured event facts; both reset scopes, backup and 0020 maintenance freeze apply. No new foreign keys.
 
+// Test profile messages use reserved sender/recipient addresses in the existing inbox entities.
+// Both reset scopes and backups include them, and generic 0016 freeze triggers also protect their attachments.
+
 // Scheduled delegation configuration is in personal_reminders; resulting inbox_thread/message/state are operational flow_entities. Existing 0020/0016 freeze and both reset backups/deletions cover them; no new table or migration.
 
 // Job-role assignments are embedded in preserved app_members.permissions; no new table or reset deletion is introduced.

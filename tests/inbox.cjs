@@ -76,5 +76,73 @@ let chain=Promise.resolve();const batch=db.batch.bind(db);db.batch=s=>{const p=c
  await run(b,()=>actions.POST(request('/api/assistant/actions','POST',{id:aid,decision:'confirm',confirmed:true})));
  const msg=(await get(a,message)).data.messages.filter(m=>m.body==='APPROVED_RESPONSE');assert.equal(msg.length,1);assert.equal(msg[0].viaAssistant,true);
  assert.equal((await run(c,()=>actions.POST(request('/api/assistant/actions','POST',{id:aid,decision:'confirm',confirmed:true})))).status,404);
- console.log('Inbox passed: private participant-only access including admin, active positions/claim race/reassignment, read vs reply vs completion, approvals, idempotency, stale revisions, snooze, private attachments, linked-record isolation, restricted agents, MCP scopes and confirmed assistant attribution.');
+
+ // Profile previews share the real administrator actor but have independent mailboxes.
+ const {profileSession}=load('lib/profile-review.ts');
+ const store=profileSession(admin,'central-store',[]);
+ const quality=profileSession(admin,'quality',[]);
+ const line=profileSession(admin,'line-store',[]);
+ const storeBox=(await get(store,'','&view=directory')).data;
+ const qualityBox=(await get(quality,'','&view=directory')).data;
+ assert.equal(storeBox.profileTitle,'مسئول انبار مرکزی');
+ assert.notEqual(storeBox.me,qualityBox.me);
+ assert.ok(storeBox.people.some(p=>p.id===qualityBox.me));
+ assert.ok(storeBox.people.every(p=>p.id.startsWith('@profile:')&&p.id!==storeBox.me));
+ assert.equal(storeBox.positions.length,0);
+ assert.equal((await get(admin,'','&view=directory')).data.people.some(p=>p.id===qualityBox.me),false);
+ assert.ok((await get(admin)).data.threads.length>0,'Existing administrator mailbox still has its sent message');
+ assert.equal((await get(store)).data.threads.length,0,'Administrator messages do not enter the preview');
+
+ const previewRequest={id:crypto.randomUUID(),mode:'create',title:'Test receipt review',body:'Inspect the test receipt',kind:'request',priority:'normal',due:future,recipientType:'person',recipientId:qualityBox.me};
+ assert.equal((await post(store,{...previewRequest,id:crypto.randomUUID(),recipientId:'bob'})).status,400);
+ assert.equal((await post(admin,{...previewRequest,id:crypto.randomUUID()})).status,400);
+ const created=await post(store,previewRequest);
+ assert.equal(created.status,200,JSON.stringify(created.data));
+ const testThread=created.data.threadId;
+ assert.equal((await post(store,previewRequest)).data.repeated,true);
+ assert.equal((await post(line,previewRequest)).status,409,'Same admin cannot replay a create from another profile');
+ assert.equal((await post(line,{...previewRequest,id:crypto.randomUUID(),expectedMailbox:storeBox.me})).status,409);
+ assert.equal(entity(testThread).data.sender,storeBox.me);
+ assert.equal((await get(quality)).data.summary.unread,1);
+ assert.equal((await get(store)).data.threads[0].isSender,true);
+ for(const actor of [admin,b,line]){
+  assert.equal((await get(actor,testThread)).status,404);
+  assert.equal((await get(actor)).data.threads.some(t=>t.id===testThread),false);
+ }
+ assert.equal((await act(quality,testThread,'start')).status,200);
+ assert.equal((await act(quality,testThread,'submit')).status,200);
+ assert.equal((await act(quality,testThread,'approve')).status,403);
+ const previewFile=await upload(quality,testThread);
+ assert.equal(previewFile.status,201);
+ assert.equal(previewFile.data.file.author,qualityBox.me);
+ const previewFilePath='/api/inbox/files?thread='+testThread+'&id='+previewFile.data.file.id;
+ assert.equal((await run(admin,()=>files.GET(request(previewFilePath)))).status,404);
+ assert.equal((await run(store,()=>files.GET(request(previewFilePath)))).status,200);
+ const profilePrincipal={user:store,scope:'read_write',tokenId:null};
+ const profileDirectory=await catalog.executeTool('get_inbox_directory',{},base,profilePrincipal);
+ assert.equal(profileDirectory.me,storeBox.me);
+ const profileRead=await catalog.executeTool('get_message_inbox',{thread:testThread},base,profilePrincipal);
+ assert.equal(profileRead.thread.recipientId,qualityBox.me);
+ const profileApproval={id:crypto.randomUUID(),mode:'approve',confirmed:true,data:{threadId:testThread,revision:entity(testThread).revision,expectedMailbox:storeBox.me,body:'Test result confirmed'}};
+ await catalog.executeTool('inbox_apply',profileApproval,base,profilePrincipal);
+ assert.equal(entity(testThread).data.state,'completed');
+ const finalAction=sql.prepare("SELECT actor,after FROM access_audit WHERE target=? AND action='inbox_approve'").get(testThread);
+ assert.equal(finalAction.actor,admin.userId);
+ assert.equal(JSON.parse(finalAction.after).profileMailbox,storeBox.me);
+
+ const scopedAction=crypto.randomUUID(),scopedArgs={id:crypto.randomUUID(),mode:'create',data:{title:'Scoped proposal',body:'Test only',kind:'message',priority:'normal',recipientType:'person',recipientId:qualityBox.me,expectedMailbox:storeBox.me}};
+ sql.prepare("INSERT INTO assistant_actions(id,owner,turn_id,tool,args,state,created,expires) VALUES(?,?,?,'inbox_apply',?,'pending',?,?)").run(scopedAction,admin.userId,turn,JSON.stringify(scopedArgs),now,new Date(Date.now()+3600000).toISOString());
+ const confirmProfile=()=>actions.POST(request('/api/assistant/actions','POST',{id:scopedAction,decision:'confirm',confirmed:true}));
+ assert.equal((await run(line,confirmProfile)).status,409);
+ assert.equal(entity(scopedArgs.id),null);
+ assert.equal((await run(store,confirmProfile)).status,200);
+ assert.equal(entity(scopedArgs.id).data.sender,storeBox.me);
+ sql.exec("UPDATE reset_control SET phase='maintenance'");
+ const frozenId=crypto.randomUUID();
+ try{
+  assert.ok((await post(store,{...previewRequest,id:frozenId})).status>=400);
+  assert.equal(entity(frozenId),null);
+ }finally{sql.exec("UPDATE reset_control SET phase='testing'");}
+ assert.equal(sql.prepare('PRAGMA foreign_key_check').all().length,0);
+ console.log('Inbox passed: isolated test profiles with real audit actors, approval and attachment flow, profile-bound assistant actions, MCP and maintenance; private participant-only access including admin, active positions/claim race/reassignment, read vs reply vs completion, approvals, idempotency, stale revisions, snooze, private attachments, linked-record isolation, restricted agents, MCP scopes and confirmed assistant attribution.');
 })().catch(e=>{console.error(e);process.exit(1)});

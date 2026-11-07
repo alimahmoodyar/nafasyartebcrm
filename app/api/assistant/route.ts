@@ -4,7 +4,7 @@ import {sha256} from '@/lib/firmware';
 import {operationForm,requestedOperationForm,retainAssistantWorkspace,requestsAssistantRead,requestsAssistantClose,requestsMaterialDefinitionForm,requestsProductDefinitionForm,requestsFormDisplay,requestsBuyerAssignment,requestsOperation,operationChoices,operationPicker,matchedOperationForm,cleanFormArgs,type OperationForm} from '@/lib/assistant-workspace';
 import {assistantResponseText,assistantEmptyResponseError} from '@/lib/assistant-response';
 import {assistantProfiles} from '@/lib/assistant-profiles';
-import {inboxAccess,inboxDirectory} from '@/lib/inbox';
+import {inboxAccess,inboxDirectory,inboxMailbox} from '@/lib/inbox';
 import {username as validateUsername} from '@/lib/password-auth';
 import {validatePermissions,type Session} from '@/lib/permissions';
 import {assistantStorageError,type AssistantStage} from '@/lib/assistant-storage-errors';
@@ -121,7 +121,7 @@ export async function POST(request:Request){let started=false,id='',owner='';let
  if(name==='after_sales_apply')args=await prepareServiceDiagnosisArgs(u,args);
  // A model never supplies approval; only the separate owner-bound confirmation endpoint can execute.
  delete args.confirmed;
- if(name==='inbox_apply'){if(!args.data||typeof args.data!=='object')throw new Error('اطلاعات پیام لازم است.');if(args.mode==='create'){const directory=await inboxDirectory(u),recipient=(args.data.recipientType==='position'?directory.positions:directory.people).find((p:any)=>p.id===args.data.recipientId);if(!recipient)throw new Error('گیرنده را از فهرست کاربران و سمت‌ها انتخاب کن.');args.data.recipientName=recipient.name;}else{const thread=await inboxAccess(args.data.threadId,u);args.data.recipientName=thread.isSender?thread.data.recipientName:thread.data.senderName;args.data.title=thread.data.title;}navigation='tasks';}
+ if(name==='inbox_apply'){if(!args.data||typeof args.data!=='object')throw new Error('اطلاعات پیام لازم است.');if(args.mode==='create'){const directory=await inboxDirectory(u),recipient=(args.data.recipientType==='position'?directory.positions:directory.people).find((p:any)=>p.id===args.data.recipientId);if(!recipient)throw new Error('گیرنده را از فهرست کاربران و سمت‌ها انتخاب کن.');args.data.recipientName=recipient.name;}else{const thread=await inboxAccess(args.data.threadId,u);args.data.recipientName=thread.isSender?thread.data.recipientName:thread.data.senderName;args.data.title=thread.data.title;}args.data.expectedMailbox=(await inboxMailbox(u)).id;navigation='tasks';}
  if(['update_user','delete_user'].includes(name)){delete args.password;navigation='users';if(name==='delete_user'){const target=await db.prepare("SELECT name FROM app_members WHERE id=? AND status!='deleted'").bind(typeof args.id==='string'?args.id:'').first<{name:string}>();if(!target)throw new Error('حساب را از list_users انتخاب کن.');args.accountName=target.name;}}
  if(name==='create_password_user'){delete args.password;args.username=validateUsername(args.username);args.permissions=validatePermissions(args.permissions);if(!args.name?.trim())throw new Error('نام دقیق کاربر را بپرس.');navigation='users';}
  if(tool.inputSchema.properties.requestId&&!['issue_production_material','review_development_request','close_development_request','clarify_development_request','respond_development_request','acknowledge_development_request'].includes(name))args.requestId=crypto.randomUUID();
