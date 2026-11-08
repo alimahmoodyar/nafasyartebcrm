@@ -6,7 +6,7 @@ import {tehranDay} from '@/lib/serials';
 import {SolarDate} from './solar-date';
 
 const titles:Record<string,string>={...materialProcesses,'task:duty':'وظایف سازمانی','task:flow':'گردش مواد','task:sourcing':'تأمین','task:transport':'حمل‌ونقل','task:fulfillment':'ارسال و تحویل محصول','task:sales':'فروش','task:qms':'مدیریت کیفیت'};
-const title=(key:string)=>titles[key]||key.replace(/^task:/,'');
+const title=(key:string)=>titles[key]||(/^line[\s_-]*receipt$/i.test(key)?materialProcesses.lineReceipt:'سایر کارهای فرایندی');
 const normalize=(value:string)=>value.toLowerCase().replace(/[يى]/g,'ی').replace(/ك/g,'ک').replace(/[۰-۹]/g,c=>String(c.charCodeAt(0)-1776)).replace(/[٠-٩]/g,c=>String(c.charCodeAt(0)-1632)).replace(/‌/g,' ').trim();
 type Row=ProcessRow&{task?:unknown};
 const num=(v:number|undefined)=>v==null?'—':v.toLocaleString('fa-IR');
@@ -63,7 +63,7 @@ export function ProcessHistory({waiting,revision,onOpen}:{waiting:boolean;revisi
  const textField=(label:string,value:string,change:(value:string)=>void)=><label className="field" key={label}>{label}<input value={value} onChange={e=>{change(e.target.value);setPage(0)}}/></label>;
  const shownPage=Math.min(page,Math.max(0,Math.ceil(filtered.length/25)-1));
  return <section className="process-history">
-  <div className="formgrid">
+  <div className="formgrid" lang="fa" translate="no">
    <label className="field">نوع فرایند<select value={process} onChange={e=>{setProcess(e.target.value);setExtra({});setStatus('');setPage(0)}}><option value="">همهٔ فرایندها</option>{types.map(key=><option key={key} value={key}>{title(key)}</option>)}</select></label>
    {textField('جست‌وجوی عنوان، کالا، بچ یا شماره پرونده',query,setQuery)}
    {process==='issue'&&!waiting&&<label className="field">مبنای تاریخ<select value={dateBasis} onChange={e=>{setDateBasis(e.target.value);setPage(0)}}><option value="sent">ارسال از انبار</option><option value="received">تأیید دریافت در خط</option></select></label>}
@@ -78,7 +78,7 @@ export function ProcessHistory({waiting,revision,onOpen}:{waiting:boolean;revisi
    <div className="tools"><span>{num(filtered.length)} نتیجه</span><button className="btn" type="button" disabled={!filtered.length} onClick={()=>void download()}>خروجی اکسل</button></div>
    {totals.size>0&&<details open><summary>جمع تحویل به تفکیک کالا</summary>{[...totals.values()].map(r=><p key={JSON.stringify([r.material,r.unit])}>{r.material} · ارسال {num(r.sent)} {r.unit} · تأیید دریافت {num(r.received)} {r.unit}</p>)}</details>}
    {filtered.slice(shownPage*25,(shownPage+1)*25).map(row=><article className="flow-card" key={row.id}>
-    <h3>{row.title}</h3><p>{title(row.process)} · {formatDateTime(row.date)} · {row.status}</p>
+    <h3>{row.title}</h3><p><span lang="fa" translate="no">{title(row.process)}</span> · {formatDateTime(row.date)} · {row.status}</p>
     {row.receivedAt&&<p>تأیید دریافت خط · {formatDateTime(row.receivedAt)}</p>}
     <p>{[row.reference,row.batches,row.place,row.actor,row.supplier,row.order].filter(Boolean).join(' · ')}</p>
     {row.quantity!=null&&<p>مقدار {num(row.quantity)} {row.unit}{row.process==='issue'&&row.received!=null&&' · دریافت خط '+num(row.received)}</p>}
