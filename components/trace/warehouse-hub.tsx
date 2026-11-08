@@ -43,6 +43,11 @@ export function WarehouseHub({user,records,demo,onSaved,onOpen,onNavigate,target
   if(item.source==='build-projects')return <BuildProjectsPanel key={key} warehouseOnly initialTab="materials" onNavigate={onNavigate} demo={demo} targetId={focus}/>;
   return null;
  }
+ if(active?.source==='flow'&&active.view==='requests'&&focus&&parseWarehouseTarget(targetId)?.target===focus){
+  return <ProgramWorkspace programId="warehouse" title="انبار" direct>
+   <MaterialFlow key={'request:'+focus} initialTab="requests" embedded targetId={focus} demo={demo} onSaved={onSaved} onOpen={onOpen}/>
+  </ProgramWorkspace>;
+ }
  return <ProgramWorkspace programId="warehouse" title="انبار" direct={!!active&&!!targetId}>
   <SubprogramNavigation showLabel={false} items={available.map(([key])=>[key,warehouseGroupTitles[key]])} value={group} onChange={openGroup}/>
   {group&&<ProgramWorkspace key={group+(active||taskOverview?'leaf':'menu')} programId={'warehouse-'+group} title={warehouseGroupTitles[group]} direct={group==='operations'||!!active||taskOverview}>
