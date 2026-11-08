@@ -1,6 +1,6 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
-import {ArrowLeftRight,Boxes,ClipboardList,Mail,Search,UserRound} from 'lucide-react';
+import {ArrowLeftRight,Boxes,ClipboardList,Search,UserRound} from 'lucide-react';
 import {batchScanCode} from '@/lib/batch-qr';
 import type {RoleProfile,ProfileWork} from '@/lib/role-profiles';
 
@@ -44,8 +44,7 @@ export function RoleTestingPanel({targetId='',onNavigate,onProfile,onAccessChang
  {!id&&!loading&&<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:16}}>{profiles.map(p=><button key={p.id} disabled={loading} className="panel inside" style={{textAlign:'right',cursor:'pointer'}} onClick={()=>open(p)}><UserRound size={26}/><h3>پروفایل نقش {p.title}</h3><p className="subtle">{p.group} · {p.operational?'کارتابل و عملیات':'پروفایل شخصی'}</p><span>باز کردن پروفایل</span></button>)}</div>}
  {snapshot&&<>
   {snapshot.profile.id==='central-store'&&<BatchLookup/>}
-  <button className="panel inside" style={{cursor:"pointer",textAlign:"right",width:"100%"}} onClick={()=>onNavigate("tasks")}><ClipboardList size={28}/><h3>کارتابل ({snapshot.work.length.toLocaleString("fa-IR")})</h3><p>پیام‌های مستقیم و کارهای فرایندی این جایگاه</p><span>باز کردن کارتابل</span></button>
-  <button type="button" className="btn" onClick={()=>onNavigate("tasks","inbox")}><Mail size={18}/>صندوق پیام آزمایشی</button>
+  <button className="panel inside" style={{cursor:"pointer",textAlign:"right",width:"100%"}} onClick={()=>onNavigate("tasks")}><ClipboardList size={28}/><h3>کارتابل ({snapshot.work.length.toLocaleString("fa-IR")})</h3><p>پیام‌های مستقیم و کارهای فرایندی این جایگاه</p></button>
   {!snapshot.profile.operational?<div className="inside"><h3>پروفایل شخصی</h3><p>کارکرد، فیش حقوقی، مرخصی، مساعده، شرح وظایف و اموال امانی در این پروفایل قرار می‌گیرند. نمایش اطلاعات شخصی پس از اتصال فرد انجام می‌شود؛ برای این جایگاه فعلاً کارتابل عملیاتی تعریف نشده است.</p></div>:<>
   <h3><Boxes size={20} style={{display:'inline',marginLeft:8}}/>عملیات و فرم‌ها</h3><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:12}}>{snapshot.profile.links.map((a,i)=><button className="btn" key={i} onClick={()=>onNavigate(a.section,a.target)}>{a.title}<ArrowLeftRight size={16}/></button>)}</div>
   </>}
