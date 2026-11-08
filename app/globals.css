@@ -497,3 +497,8 @@ html,button,input,textarea,select,option,svg text{font-family:"Vazirmatn",sans-s
 .direct-chat-compose{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
 .direct-chat-compose textarea{flex:1;min-width:12rem;border:1px solid var(--border);border-radius:.75rem;padding:.6rem;background:var(--background)}
 .direct-chat-compose input[type=file]{max-width:8rem}
+
+.direct-chat-identity{display:flex;align-items:center;gap:.65rem;min-width:0}
+.direct-chat-identity small{display:block;color:var(--muted-foreground);font-weight:normal}
+.direct-chat-identity img,.direct-chat-avatar{width:2rem;height:2rem;border-radius:50%;object-fit:cover;flex-shrink:0}
+.direct-chat-avatar{display:grid;place-items:center;background:#d9f1eb;color:#24685c}

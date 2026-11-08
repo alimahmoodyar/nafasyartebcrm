@@ -21,12 +21,20 @@ export async function inboxMailbox(u:Session){
 export function checkInboxMailbox(expected:unknown,actual:string){
  if(expected!=null&&expected!==actual)throw new AccessError('صندوق پیام عوض شده است. صفحه را دوباره باز کنید.',409);
 }
-export async function accountInboxDirectory(u:Session){const me=await inboxIdentity(u),db=storage();let users=(await db.prepare("SELECT id,name,unit,permissions FROM app_members WHERE status='active' ORDER BY name,id").all()).results as any[];
+export async function accountInboxDirectory(u:Session){const me=await inboxIdentity(u),db=storage();let users=(await db.prepare("SELECT m.id,m.name,m.unit,m.permissions,EXISTS(SELECT 1 FROM flow_entities f WHERE f.type='account_profile' AND f.id='profile:'||CASE WHEN EXISTS(SELECT 1 FROM password_accounts a WHERE a.member_id=m.id) THEN 'local:'||m.id ELSE m.subject END AND COALESCE(json_extract(f.data,'$.image'),'')<>'') AS hasPhoto FROM app_members m WHERE m.status='active' ORDER BY m.name,m.id").all()).results as any[];
  if(!u.isAdmin&&u.permissions.serviceAgentId)users=users.filter(r=>{const p=storedAccessPermissions(r.permissions);return !p.serviceAgentId&&p.serviceRoles?.some((x:string)=>['manager','coordinator'].includes(x))&&p.serviceDomains?.some((x:string)=>u.permissions.serviceDomains?.includes(x));});
  if(!u.isAdmin&&u.permissions.salesAgentId){await salesScope(u,u.permissions.salesAgentId);users=users.filter(r=>{const p=storedAccessPermissions(r.permissions),actor={isAdmin:false,permissions:p} as Session;return !p.salesAgentId&&!p.serviceAgentId&&(salesStaff(actor)||salesFinance(actor));});}
- const people=users.map(({id,name,unit})=>({id,name,unit}));if(await db.prepare("SELECT subject FROM app_identity WHERE id='owner'").first())people.unshift({id:'@owner',name:'مدیر سامانه',unit:'مدیریت'});
+ const photoUrl=(id:string)=>'/api/inbox?avatar='+encodeURIComponent(id);
+ const people=users.map(({id,name,unit,hasPhoto})=>({id,name,unit,avatarUrl:hasPhoto?photoUrl(id):null}));
+ const owner=await db.prepare("SELECT EXISTS(SELECT 1 FROM flow_entities f WHERE f.type='account_profile' AND f.id='profile:'||i.subject AND COALESCE(json_extract(f.data,'$.image'),'')<>'') AS hasPhoto FROM app_identity i WHERE i.id='owner'").first<{hasPhoto:number}>();
+ if(owner)people.unshift({id:'@owner',name:'مدیر سامانه',unit:'مدیریت',avatarUrl:owner.hasPhoto?photoUrl('@owner'):null});
  const positions=(await db.prepare("SELECT * FROM flow_entities WHERE type='position' AND json_extract(data,'$.active')=1 ORDER BY created,id").all()).results.map(inboxDecode).filter((r:any)=>!u.permissions.serviceAgentId||r.data.members.some((id:string)=>people.some(p=>p.id===id))).map((r:any)=>({id:r.id,name:r.data.name,unit:r.data.unit,members:r.data.members.filter((id:string)=>people.some(p=>p.id===id))}));
- return {me,people,positions:!u.isAdmin&&(u.permissions.serviceAgentId||u.permissions.salesAgentId)?[]:positions};}
+ const titles=new Map<string,string[]>();
+ for(const position of positions)for(const id of position.members){
+  const names=titles.get(id)||[];
+  if(position.name&&!names.includes(position.name))titles.set(id,[...names,position.name]);
+ }
+ return {me,people:people.map(person=>({...person,positions:titles.get(person.id)||[]})),positions:!u.isAdmin&&(u.permissions.serviceAgentId||u.permissions.salesAgentId)?[]:positions};}
 export async function inboxDirectory(u:Session){
  const mailbox=await inboxMailbox(u);
  if(!mailbox.profileTitle)return {...await accountInboxDirectory(u),mailboxName:mailbox.name,profileTitle:null};
@@ -34,6 +42,17 @@ export async function inboxDirectory(u:Session){
   .filter(p=>profileAddress(p.id)!==mailbox.id)
   .map(p=>({id:profileAddress(p.id),name:p.title,unit:'آزمایشی'}));
  return {me:mailbox.id,mailboxName:mailbox.name,profileTitle:mailbox.profileTitle,people,positions:[]};
+}
+export async function inboxContactAvatar(u:Session,id:string){
+ const directory=await inboxDirectory(u);
+ if(directory.profileTitle||!directory.people.some(p=>p.id===id&&'avatarUrl' in p&&p.avatarUrl))throw new AccessError('عکس مخاطب در دسترس نیست.',404);
+ const db=storage();
+ const account=id==='@owner'
+  ?await db.prepare("SELECT subject AS account FROM app_identity WHERE id='owner'").first<{account:string|null}>()
+  :await db.prepare("SELECT CASE WHEN EXISTS(SELECT 1 FROM password_accounts a WHERE a.member_id=m.id) THEN 'local:'||m.id ELSE m.subject END AS account FROM app_members m WHERE m.id=? AND m.status='active'").bind(id).first<{account:string|null}>();
+ const row=account?.account?await db.prepare("SELECT json_extract(data,'$.image') AS image FROM flow_entities WHERE id=? AND type='account_profile'").bind('profile:'+account.account).first<{image:string|null}>():null;
+ if(!row?.image)throw new AccessError('عکس مخاطب در دسترس نیست.',404);
+ return Uint8Array.from(atob(row.image),c=>c.charCodeAt(0));
 }
 export async function positionMembers(id:string){const p:any=await storage().prepare("SELECT data FROM flow_entities WHERE id=? AND type='position' AND json_extract(data,'$.active')=1").bind(id).first();if(!p)return [];const ids=JSON.parse(p.data).members||[];const active=(await storage().prepare("SELECT id FROM app_members WHERE status='active'").all()).results as any[];return ids.filter((id:string)=>active.some(a=>a.id===id));}
 export async function inboxAccess(id:string,u:Session){const row=inboxDecode(await storage().prepare("SELECT * FROM flow_entities WHERE id=? AND type='inbox_thread'").bind(id).first()),mailbox=await inboxMailbox(u),me=mailbox.id;if(!row)throw new AccessError('گفت‌وگو یافت نشد.',404);const d=row.data,recipients=d.recipientType==='position'?await positionMembers(d.recipientId):[d.recipientId];if(d.sender!==me&&!recipients.includes(me))throw new AccessError('گفت‌وگو یافت نشد.',404);const responsible=d.recipientType==='person'?d.recipientId:recipients.includes(d.assignee)?d.assignee:'';return {...row,me,mailboxName:mailbox.name,profileTitle:mailbox.profileTitle,isSender:d.sender===me,isRecipient:recipients.includes(me),responsible,canWork:recipients.includes(me)&&responsible===me};}

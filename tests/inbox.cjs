@@ -89,6 +89,15 @@ let chain=Promise.resolve();const batch=db.batch.bind(db);db.batch=s=>{const p=c
  assert.ok(storeBox.people.some(p=>p.id===qualityBox.me));
  assert.ok(storeBox.people.every(p=>p.id.startsWith('@profile:')&&p.id!==storeBox.me));
  assert.equal(storeBox.positions.length,0);
+ seed('profile:bob','account_profile',{image:'/9j/2Q=='});
+ seed('position:inbox-avatar-test','position',{active:true,name:'Central store lead',members:['bob']});
+ const bobContact=(await get(a,'','&view=directory')).data.people.find(p=>p.id==='bob');
+ assert.deepEqual(bobContact.positions,['Central store lead']);
+ assert.equal(bobContact.avatarUrl,'/api/inbox?avatar=bob');
+ assert.equal((await run(a,()=>api.GET(request(bobContact.avatarUrl)))).headers.get('content-type'),'image/jpeg');
+ assert.equal((await run(store,()=>api.GET(request(bobContact.avatarUrl)))).status,404);
+ assert.equal((await run(agent,()=>api.GET(request(bobContact.avatarUrl)))).status,404);
+
  assert.equal((await get(admin,'','&view=directory')).data.people.some(p=>p.id===qualityBox.me),false);
  assert.ok((await get(admin)).data.threads.length>0,'Existing administrator mailbox still has its sent message');
  assert.equal((await get(store)).data.threads.length,0,'Administrator messages do not enter the preview');
