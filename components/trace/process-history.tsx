@@ -12,6 +12,7 @@ type Row=ProcessRow&{task?:unknown};
 const num=(v:number|undefined)=>v==null?'—':v.toLocaleString('fa-IR');
 const fields:Record<string,[keyof Row,string][]>={
  issue:[['material','کالا'],['place','انبار یا خط مقصد'],['batches','بچ']],
+ lineReceipt:[['material','کالا'],['place','انبار یا خط مقصد'],['batches','بچ'],['actor','تأییدکننده']],
  receipt:[['material','کالا'],['place','انبار مقصد'],['supplier','تأمین‌کننده'],['order','سفارش'],['batches','بچ']],
  quality:[['material','کالا'],['batches','بچ'],['actor','بازرس']],
  placement:[['material','کالا'],['batches','بچ'],['place','انبار یا قفسه']],

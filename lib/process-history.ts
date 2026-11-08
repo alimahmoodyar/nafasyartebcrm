@@ -6,7 +6,7 @@ export type ProcessRow = {
 };
 
 export const materialProcesses = {
- issue:'تحویل مواد به خط', receipt:'دریافت کالا', quality:'کنترل کیفیت ورودی', placement:'جانمایی',
+ issue:'تحویل مواد به خط', lineReceipt:'تأیید دریافت مواد در خط', receipt:'دریافت کالا', quality:'کنترل کیفیت ورودی', placement:'جانمایی',
 };
 
 export function materialHistory(entities:any[], warehouses:any[], processes:string[], waitingForLine:boolean):ProcessRow[]{
@@ -18,7 +18,7 @@ export function materialHistory(entities:any[], warehouses:any[], processes:stri
   const d=e.data,m=materials.get(d.materialId),material=[m?.name,m?.code].filter(Boolean).join(' · ');
   const base={title:m?.name||e.id,reference:e.id,material,unit:m?.unit,section:'flow',target:e.id};
   const place=names.get(d.warehouseId)||'';
-  if(e.type==='request'&&processes.includes('issue')){
+  if(e.type==='request'&&(processes.includes('issue')||processes.includes('lineReceipt'))){
    const deliveries=Array.isArray(d.deliveries)?d.deliveries:[];
    const pending=['awaiting_line_receipt','line_discrepancy'].includes(d.state);
    const shipments=[...deliveries];
@@ -26,11 +26,13 @@ export function materialHistory(entities:any[], warehouses:any[], processes:stri
    shipments.forEach((s:any,i:number)=>{
     if(!s.issuedAt)return;
     const waiting=s===d&&pending;
-    rows.push({...base,id:e.id+':issue:'+i,process:'issue',date:s.issuedAt,waiting:waiting&&waitingForLine&&d.state==='awaiting_line_receipt',
+    const shipment={...base,id:e.id+':issue:'+i,process:'issue',date:s.issuedAt,waiting:waiting&&waitingForLine&&d.state==='awaiting_line_receipt',
      status:waiting?(d.state==='line_discrepancy'?'مغایرت دریافت':'در انتظار تأیید خط'):'دریافت تأیید شد',
      place:[place,d.lineName||'خط تولید'].filter(Boolean).join(' ← '),actor:s.issuedBy,
      batches:(s.allocations||[]).map((a:any)=>String(a.batchId).replace(/^batch:/,'')).join('، '),
-     quantity:((s.originalQuantity??s.quantity)||0)/1000,received:waiting?undefined:s.quantity/1000,receivedAt:waiting?undefined:s.receivedAt});
+     quantity:((s.originalQuantity??s.quantity)||0)/1000,received:waiting?undefined:s.quantity/1000,receivedAt:waiting?undefined:s.receivedAt};
+    if(processes.includes('issue'))rows.push(shipment);
+    if(processes.includes('lineReceipt')&&shipment.receivedAt)rows.push({...shipment,id:e.id+':lineReceipt:'+i,process:'lineReceipt',date:shipment.receivedAt,actor:s.receivedBy,quantity:shipment.received});
    });
   }
   if(e.type!=='receipt')continue;
