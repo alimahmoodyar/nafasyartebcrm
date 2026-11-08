@@ -21,8 +21,8 @@ async function mount(){slots=[];effects=[];calls=[];reply={ok:true,json:async()=
  assert.ok(button('تأیید و ثبت').props.disabled);
  fixture.slots=[{batch_id:'batch-1',location:'WH1|A-1-1-1',quantity:2000}];
  t=await openIssue();
- assert.ok(text(t).includes('موجودی قابل برداشت برای تکمیل درخواست کافی نیست'));
- assert.ok(button('تأیید و ثبت').props.disabled);
+ assert.ok(text(t).includes('می‌توانید مقدار موجود را ارسال کنید'));
+ assert.equal(button('تأیید و ثبت').props.disabled,false);
  fixture.slots[0].quantity=5000;
  t=await openIssue();
  assert.ok(text(t).includes('اسکن لیبل بچ برداشت‌شده'));
