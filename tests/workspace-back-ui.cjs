@@ -24,3 +24,15 @@ slots=[];cursor=0;const modal=useWorkspaceModalBack(()=>calls.push('modal'));flu
 console.log('PASS React back registration: delayed DOM/portal attach and detach notify the header; stable ref prevents loops; latest controlled callback is used; disabled view unregisters; modal ref follows the same lifecycle.');
 
 const {SubprogramNavigation}=load('components/trace/program-workspace.tsx');slots=[];cursor=0;let picked='';const menu=SubprogramNavigation({items:[['stock','موجودی']],value:'',onChange:key=>{picked=key}});const child=Array.isArray(menu.props.children)?menu.props.children[0]:menu.props.children;child.props.onClick();assert.equal(picked,'stock');assert.equal(events.at(-1).type,'nafasyar-program-navigation');assert.equal(events.at(-1).detail.accountId,'test');const eventCount=events.length;slots=[];cursor=0;const denied=SubprogramNavigation({items:[['stock','موجودی']],value:'',onChange:()=>false});(Array.isArray(denied.props.children)?denied.props.children[0]:denied.props.children).props.onClick();assert.equal(events.length,eventCount,'Denied navigation never dismisses the active assistant form');
+const directCalls=[]; values.clear();
+slots=[];cursor=0;
+let directProvider=LayoutAccountProvider({accountId:'preview',onBack:()=>directCalls.push('role'),preferRootBack:true,children:null}),directRegistry;
+while(React.isValidElement(directProvider)){
+ if(directProvider.props.value?.entries instanceof Map)directRegistry=directProvider.props.value;
+ directProvider=directProvider.props.children;
+}
+directRegistry.register({element:()=>node,handler:()=>directCalls.push('legacy-menu'),priority:100,modal:false});
+directRegistry.run();
+const removeModal=directRegistry.register({element:()=>node,handler:()=>directCalls.push('modal'),priority:1000,modal:true});
+directRegistry.run();removeModal();directRegistry.run();
+assert.deepEqual(directCalls,['role','modal','role']);

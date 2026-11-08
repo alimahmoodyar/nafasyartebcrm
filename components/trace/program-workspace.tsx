@@ -12,12 +12,14 @@ function publishWorkspaceBreadcrumb(accountId:string|null,section:string,segment
 const RootBackContext=createContext<(()=>void)|null>(null);
 type BackRegistry={register:(entry:Omit<WorkspaceBackEntry,'order'>)=>()=>void;invalidate:()=>void;run:()=>void;entries:Map<number,WorkspaceBackEntry>;version:number};
 const BackRegistryContext=createContext<BackRegistry|null>(null);
-export function LayoutAccountProvider({accountId,children,onBack,onOpenTasks,activeSection=''}:{accountId:string;children:ReactNode;onBack?:()=>void;onOpenTasks?:()=>void;activeSection?:string}){
+export function LayoutAccountProvider({accountId,children,onBack,onOpenTasks,activeSection='',preferRootBack=false}:{accountId:string;children:ReactNode;onBack?:()=>void;onOpenTasks?:()=>void;activeSection?:string;preferRootBack?:boolean}){
  const inheritedBack=useContext(RootBackContext),inheritedRegistry=useContext(BackRegistryContext),entries=useRef(new Map<number,WorkspaceBackEntry>()),sequence=useRef(0),[version,setVersion]=useState(0),back=useRef(onBack||inheritedBack);
+ const rootFirst=useRef(preferRootBack);
  back.current=onBack||inheritedBack;
+ rootFirst.current=preferRootBack;
  const invalidate=useCallback(()=>setVersion(n=>n+1),[]);
  const register=useCallback((entry:Omit<WorkspaceBackEntry,'order'>)=>{const id=++sequence.current;entries.current.set(id,{...entry,order:id});setVersion(n=>n+1);return()=>{entries.current.delete(id);setVersion(n=>n+1);};},[]);
- const run=useCallback(()=>{const current=currentWorkspaceBack([...entries.current.values()]);if(current)current.handler();else back.current?.();},[]);
+ const run=useCallback(()=>{const current=currentWorkspaceBack([...entries.current.values()].filter(entry=>!rootFirst.current||entry.modal));if(current)current.handler();else back.current?.();},[]);
  const registry=useMemo(()=>({register,invalidate,run,entries:entries.current,version}),[register,invalidate,run,version]);
  return <RootBackContext.Provider value={onBack||inheritedBack}><BackRegistryContext.Provider value={inheritedRegistry||registry}><TaskNavigationContext.Provider value={onOpenTasks||null}><ActiveSectionContext.Provider value={activeSection}><AccountContext.Provider value={accountId}>{children}</AccountContext.Provider></ActiveSectionContext.Provider></TaskNavigationContext.Provider></BackRegistryContext.Provider></RootBackContext.Provider>;
 }
