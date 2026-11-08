@@ -4,13 +4,23 @@ import {latinDigits} from '@/lib/persian-date';
 import {MaterialSelect} from './material-select';
 import {Dialog,DialogContent,DialogTitle,DialogDescription} from '@/components/ui/dialog';
 const titles:Record<string,string>={package_finished:'ثبت بسته‌بندی محصول',receive_finished:'دریافت محصول نهایی در انبار خط',dispatch_scrap:'ارسال داغی به انبار مرکزی',receive_scrap:'تأیید دریافت داغی',request_scrap_sale:'درخواست فروش ضایعات',set_buffer:'تعیین ذخیره قطعه',count_worker:'انبارگردانی مانده کارگر',production_position:'تعریف جایگاه تولید بدون شخص',allocate:'تحویل مواد به کارگر',return_to_line:'برگشت مواد به انبار خط',reject_parts:'تحویل قطعه نامنطبق',physical_output:'ثبت تحویل فیزیکی خروجی کارگر',receive_output:'تأیید دریافت خروجی و مصرف مواد',assign_diagnosis:'تخصیص عیب‌یابی',repair_complete:'دریافت قطعه اصلاح‌شده',declare_scrap:'اعلام داغی'};
-export function WorkerCustodyPanel({onSaved}:{onSaved:()=>Promise<void>}){
+export function WorkerCustodyPanel({onSaved,focus=""}:{onSaved:()=>Promise<void>;focus?:string}){
  const [data,setData]=useState<any>(null),[draft,setDraft]=useState<any>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[message,setMessage]=useState('');
  async function load(){const r=await fetch('/api/worker-inventory',{cache:'no-store'}),d=await r.json() as any;if(!r.ok)throw Error(d.error);setData(d)}
  useEffect(()=>{void load().catch(e=>setError(e.message))},[]);
  const begin=(mode:string,extra:any={})=>{setError('');setDraft({id:crypto.randomUUID(),confirmed:true,mode,positionId:'',batchId:'',quantity:'',scannedCode:'',reason:'',...extra})};
  const change=(key:string,value:any)=>setDraft((d:any)=>({...d,[key]:typeof value==='string'&&['quantity','actual','returned','scannedCode'].includes(key)?latinDigits(value):value}));
  async function save(e:React.FormEvent){e.preventDefault();if(busy)return;setBusy(true);setError('');try{const r=await fetch(draft.mode==='production_position'?'/api/role-profiles':'/api/worker-inventory',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(draft)}),d=await r.json() as any;if(!r.ok)throw Error(d.error);setDraft(null);setMessage(d.pending?'تحویل فیزیکی محفوظ است؛ به دلیل کمبود مواد، مصرف و ورود قطعی محصول انجام نشد.':'ثبت و گردش موجودی انجام شد.');await load();await onSaved()}catch(e){setError(e instanceof Error?e.message:'ثبت انجام نشد.')}finally{setBusy(false)}}
+ useEffect(()=>{
+  if(!data||!focus)return;
+  const [kind,...parts]=focus.split(':'),id=parts.join(':');
+  const find=(rows:any[])=>rows.find(row=>row.id===id);
+  if(kind==='request-scrap-sale'){begin('request_scrap_sale');return;}
+  if(kind==='scrap'){const row=find(data.scrapTransfers);if(row?.data.state==='pending')begin('receive_scrap',{transferId:id,revision:row.revision});return;}
+  if(kind==='line-return'){const row=find(data.lineReturns||[]);if(row&&row.data.state!=='received')begin(row.data.state==='discrepancy'?'revise_line_return':'receive_from_line',{transferId:id,revision:row.revision,quantity:String((row.data.actual??row.data.quantity)/1000)});return;}
+  if(kind==='output'){const row=find(data.outputs);if(row&&row.data.state!=='received')begin('receive_output',{outputId:id,revision:row.revision});return;}
+  if(kind==='finished'){const row=find(data.builds);if(row&&!row.data.lineReceived&&row.data.latestQc?.verdict==='pass')begin(row.data.packagedAt?'receive_finished':'package_finished',{deviceId:id,revision:row.revision});}
+ },[!!data,focus]);
  if(!data)return <p className="notice">{error||'دریافت گردش کارگر…'}</p>;
  const movement=['allocate','return_to_line','reject_parts'].includes(draft?.mode),stock=data.stock.filter((s:any)=>draft?.mode==='allocate'?s.warehouse==='line':s.warehouse==='worker:'+draft?.positionId);
  return <section className="inside" dir="rtl"><h3>موجودی مجازی و دریافت خروجی کارگر</h3><p className="notice">تحویل به کارگر مصرف نیست. مصرف طبق BOM ثابت مأموریت فقط هنگام تأیید دریافت خروجی ثبت می‌شود؛ مانده سالم نزد کارگر باقی می‌ماند.</p>{error&&!draft&&<p role="alert" className="notice error">{error}</p>}{message&&<p role="status" className="notice">{message}</p>}

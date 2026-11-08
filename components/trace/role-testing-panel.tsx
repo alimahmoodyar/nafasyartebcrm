@@ -46,7 +46,7 @@ export function RoleTestingPanel({targetId='',onNavigate,onProfile,onAccessChang
   {snapshot.profile.id==='central-store'&&<BatchLookup/>}
   <button className="panel inside" style={{cursor:"pointer",textAlign:"right",width:"100%"}} onClick={()=>onNavigate("tasks")}><ClipboardList size={28}/><h3>کارتابل ({snapshot.work.length.toLocaleString("fa-IR")})</h3><p>پیام‌های مستقیم و کارهای فرایندی این جایگاه</p></button>
   {!snapshot.profile.operational?<div className="inside"><h3>پروفایل شخصی</h3><p>کارکرد، فیش حقوقی، مرخصی، مساعده، شرح وظایف و اموال امانی در این پروفایل قرار می‌گیرند. نمایش اطلاعات شخصی پس از اتصال فرد انجام می‌شود؛ برای این جایگاه فعلاً کارتابل عملیاتی تعریف نشده است.</p></div>:<>
-  <h3><Boxes size={20} style={{display:'inline',marginLeft:8}}/>عملیات و فرم‌ها</h3><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:12}}>{snapshot.profile.links.map((a,i)=><button className="btn" key={i} onClick={()=>onNavigate(a.section,a.target)}>{a.title}<ArrowLeftRight size={16}/></button>)}</div>
+  <h3><Boxes size={20} style={{display:'inline',marginLeft:8}}/>شروع کار و گزارش‌ها</h3><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:12}}>{snapshot.profile.links.map((a,i)=><button className="btn" key={i} onClick={()=>onNavigate(a.section,a.target)}>{a.title}<ArrowLeftRight size={16}/></button>)}</div>
   </>}
   {(snapshot.profile.gaps.length>0||snapshot.unverified.length>0)&&<details style={{marginTop:24}}><summary>بخش‌های نیازمند تکمیل و آزمون</summary>{[...snapshot.profile.gaps,...snapshot.unverified].map((gap,i)=><p className="notice" key={i}>{gap}</p>)}</details>}
  </>}

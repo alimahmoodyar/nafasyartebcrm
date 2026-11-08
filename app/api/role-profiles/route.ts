@@ -6,8 +6,9 @@ import {profileReviewCookie,profileJobRoles} from '@/lib/profile-review';
 import {syncInventoryCounts} from '@/lib/inventory-counts';
 import {requireAdmin,session,requireProfileAdmin,accessResponse,AccessError,checkOrigin} from '@/lib/authorization';
 import {storage} from '@/lib/storage';
-import {roleProfiles,materialProfileWork,type ProfileWork} from '@/lib/role-profiles';
-import {coverage,nextWork} from '@/lib/sourcing';
+import {roleProfiles,type RoleProfile} from '@/lib/role-profiles';
+
+const visibleProfile=(profile:RoleProfile)=>({...profile,links:profile.links.filter(link=>!link.taskOnly)});
 
 export async function GET(request:Request){try{
  const admin=await requireProfileAdmin();const templateSync=await syncReceiptTemplates(admin);if(templateSync.needsTaskSync)await syncMaterialTasks();await syncInventoryCounts();
@@ -15,11 +16,11 @@ export async function GET(request:Request){try{
  const profile=id?roleProfiles.find(p=>p.id===id):undefined;
  if(id&&!profile)throw new AccessError('پروفایل جایگاه پیدا نشد.',404);
  const json=(value:unknown)=>Response.json(value,{headers:{'Cache-Control':'private, no-store','Vary':'Cookie, Authorization'}});
- if(!profile)return json({profiles:roleProfiles});
- if(!profile.operational)return json({profile,work:[],activeProfile:(await session()).profileReview?.id||'',unverified:[],personalPreview:true});
+ if(!profile)return json({profiles:roleProfiles.map(visibleProfile)});
+ if(!profile.operational)return json({profile:visibleProfile(profile),work:[],activeProfile:(await session()).profileReview?.id||'',unverified:[],personalPreview:true});
  const position=profileSession(admin,profile.id,(await storage().prepare("SELECT id,data FROM flow_entities WHERE type='material_warehouse'").all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)})));
  const {work}=await profileWork(position);
- return json({profile,work,activeProfile:(await session()).profileReview?.id||'',unverified:[],personalPreview:false});
+ return json({profile:visibleProfile(profile),work,activeProfile:(await session()).profileReview?.id||'',unverified:[],personalPreview:false});
  }catch(e){return accessResponse(e)||Response.json({error:'دریافت پروفایل نقش انجام نشد.'},{status:500,headers:{'Cache-Control':'no-store'}})}}
 
 export async function POST(request:Request){try{

@@ -36,7 +36,7 @@ export function WarehouseHub({user,records,demo,onSaved,onOpen,onNavigate,target
   if((item.source==='flow'||item.source==='warehouse')&&item.view==='stock')return <WarehouseStockPanel key={key} user={user} demo={demo} onOpen={onOpen} onHistory={g=>onNavigate('warehouse',stockHistoryTarget(g))}/>;
   if(item.source==='flow')return <MaterialFlow key={key} hideHeading receiptLaunch={receiptLaunch} initialTab={item.view==='nonconforming'?'requests':item.view} initialAction={item.view==='nonconforming'?'reject':undefined} embedded onWarehouseReceipt={item.view==='materials'?(mid=>onNavigate('warehouse',warehouseTarget('flow','new-receipt:'+mid,'receipts'))):undefined} targetId={focus} demo={demo} onSaved={onSaved} onOpen={onOpen}/>;
   if(item.source==='inventory')return <ProductionPanel key={key} embedded stockMode={item.view as 'report'|'transfer'|'opening'} view="stock" records={records} user={user} demo={demo} onSaved={onSaved}/>;
-  if(item.source==='fulfillment')return <FulfillmentPanel key={key} embedded initialTab={item.view} demo={demo} onSaved={onSaved}/>;
+  if(item.source==='fulfillment')return <FulfillmentPanel key={key} embedded initialTab={item.view} handoffId={item.view==='handoff-receive'?focus:''} demo={demo} onSaved={onSaved}/>;
   if(item.source==='batch')return <WarehouseHistoryPanel key={key} demo={demo} initial={parseStockHistory(focus)}/>;
   if(item.source==='sales')return <WarehouseReturnsPanel key={key} demo={demo} onSaved={onSaved}/>;
   if(item.source==='after-sales'){const [domain,tab]=item.view.split(':');return <AfterSalesPanel key={key} embedded initialTab={tab} demo={demo} user={user} domain={domain} onNavigate={onNavigate}/>;}
@@ -53,7 +53,7 @@ export function WarehouseHub({user,records,demo,onSaved,onOpen,onNavigate,target
    </div>}
    {taskOverview&&<>{choices.map(item=><div key={item.key}>{render(item)}</div>)}</>}
    {group==='operations'&&<WarehouseOperations key={leaf+focus} entries={choices} initial={active} renderSource={render} demo={demo} onSaved={onSaved}/>}
-   {group==='dispatch'&&<WarehouseDispatchPanel demo={demo} user={user} onSaved={onSaved} onNavigate={onNavigate}/>}
+   {group==='dispatch'&&<WarehouseDispatchPanel key={focus} targetId={focus} demo={demo} user={user} onSaved={onSaved} onNavigate={onNavigate}/>}
    {group!=='operations'&&group!=='dispatch'&&active&&render(active)}
   </ProgramWorkspace>}
   {!available.length&&<p className="notice">برای این حساب کار مجازی در انبار تعریف نشده است.</p>}
