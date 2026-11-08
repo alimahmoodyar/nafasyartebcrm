@@ -1,4 +1,4 @@
-import {receiptDay} from './batch-number';
+import {asciiDigits,receiptDay} from './batch-number';
 /** Printed QR is a public, immutable label snapshot, never authorization. */
 export function batchQrText(batch:{id:string;data:Record<string,string>},origin:string){
  const b=batch.data,url=new URL('/b/'+encodeURIComponent(String(b.code)),origin);
@@ -8,8 +8,20 @@ export function batchQrText(batch:{id:string;data:Record<string,string>},origin:
 }
 export function batchScanCode(value:unknown){
  const raw=typeof value==='string'?value.replace(/\r\n?/g,'\n').trim():'';
- if(!raw.startsWith('NAFASYAR-BATCH/1\n'))return raw;
  if(raw.length>3000)return '';
- const matches=raw.split('\n').filter(s=>s.startsWith('بچ: '));
- return matches.length===1?matches[0].slice(4).trim():'';
+ if(raw.startsWith('NAFASYAR-BATCH/1\n')){
+  const matches=raw.split('\n').filter(s=>s.startsWith('بچ: '));
+  return matches.length===1?matches[0].slice(4).trim():'';
+ }
+ const numeric=asciiDigits(raw);
+ if(/^\d{2,12}-\d{8}-\d{3,16}$/.test(numeric))return numeric;
+
+ // Some keyboard scanners flatten the old label and convert its header to
+ // punycode. Recover only when its printed ID and trailing URL ID agree.
+ if(/^(?:NAFASYAR-BATCH|xn--[a-z0-9-]+)\/1(?=\s|:)/i.test(numeric)){
+  const end=numeric.match(/\/([0-9]{2,12}-[0-9]{8}-[0-9]{3,16})$/);
+  const codes=[...numeric.matchAll(/(?<![0-9-])[0-9]{2,12}-[0-9]{8}-[0-9]{3,16}(?![0-9-])/g)].map(match=>match[0]);
+  return end&&codes.length===2&&codes.every(code=>code===end[1])?end[1]:'';
+ }
+ return raw;
 }

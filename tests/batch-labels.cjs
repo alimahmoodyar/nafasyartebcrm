@@ -28,6 +28,11 @@ async function print(u,id,query=''){return context.run(u,()=>labels.GET(request(
  sql.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'receipt',?,1,?,?)").run(bid,JSON.stringify({warehouseId:'w1',qcOwner:'qc',state:'pending_qc',quantity:10000,day:'2026-10-17'}),now,now);
  const {batchQrText,batchScanCode}=load('lib/batch-qr.ts'),batchData=JSON.parse(sql.prepare('SELECT payload FROM records WHERE id=?').get(bid).payload),expectedQr=batchQrText({id:bid,data:batchData},base);
  assert.ok(expectedQr.includes('مقدار اولیه دریافت (نه موجودی فعلی): 10 عدد'));assert.ok(expectedQr.includes(base+'/b/'+code));assert.ok(!expectedQr.includes('SECRET-SUPPLIER'));assert.equal(batchScanCode(expectedQr),code);assert.equal(batchScanCode(code),code);assert.equal(batchScanCode(expectedQr+'\nبچ: OTHER'),'');
+ const keyboardScan='xn----glc7b4abom3fui7bzbabgg6a32i/1 : ) 2/5*8 ( : 10100050: 10100050-14050815-001 : 1405/08/15 ) (: 1000 :اففح://دثصزقئ.دشبشسغشق.زخئ/ذ/10100050-14050815-001';
+ assert.equal(batchScanCode(keyboardScan),'10100050-14050815-001');
+ assert.equal(batchScanCode(keyboardScan.replace(/001$/,'002')),'');
+ assert.equal(batchScanCode('۱۰۱۰۰۰۵۰-۱۴۰۵۰۸۱۵-۰۰۱'),'10100050-14050815-001');
+
 
  const landing=load('app/b/[code]/route.ts'),land=async(query='',actor)=>actor?context.run(actor,()=>landing.GET(request('/b/'+code+query),{params:Promise.resolve({code})})):landing.GET(request('/b/'+code+query),{params:Promise.resolve({code})});
  let landingResponse=await land('',admin);assert.equal(landingResponse.status,200);assert.ok((await landingResponse.text()).includes('اطلاعات عمومی بچ'));
@@ -41,6 +46,15 @@ async function print(u,id,query=''){return context.run(u,()=>labels.GET(request(
  assert.equal((await landing.GET(request('/b/bad'),{params:Promise.resolve({code:'bad\ncode'})})).status,400);
  identity=owner;
  const before=sql.prepare('SELECT COUNT(*) n FROM inventory_operations').get().n;
+ const encoder=bwip;const encoded=[];
+ bwip={...encoder,qrcode:(options,drawing)=>{encoded.push(options.text);return encoder.qrcode(options,drawing)}};
+ assert.equal((await print(admin,bid,'&symbol=qr')).status,200);
+ assert.equal(encoded.at(-1),code);
+ assert.equal((await print(admin,bid,'&symbol=qr&qrContent=details')).status,200);
+ assert.equal(encoded.at(-1),expectedQr);
+ assert.equal((await print(admin,bid,'&qrContent=invalid')).status,400);
+ bwip=encoder;
+
  const result=await print(admin,bid,'&copies=3');assert.equal(result.status,200,JSON.stringify(admin)+': '+(result.ok?'':await result.text()));assert.equal(result.headers.get('cache-control'),'private, no-store');let html=await result.text();assert.equal((html.match(/<article class="label">/g)||[]).length,3);assert.equal((html.match(/<svg /g)||[]).length,6);assert.ok(html.includes('100mm 80mm'));assert.ok(html.includes(code));assert.ok(html.includes('&lt;script&gt;'));assert.ok(!html.includes('<script>alert'));assert.ok(!html.includes('https://'));
  for(const actor of [qc,viewer]){const check=await print(actor,bid);assert.equal(check.status,200,actor.name+': '+(check.ok?'':await check.text()));}for(const actor of [other,sales,external])assert.equal((await print(actor,bid)).status,403);
  assert.equal((await print(admin,'missing')).status,404);assert.equal((await print(admin,bid,'&copies=101')).status,400);assert.equal((await print(admin,bid,'&width=0')).status,400);assert.equal((await print(admin,bid,'&layout=wrong')).status,400);assert.equal((await print(admin,bid,'&width=50&symbol=both')).status,400,'Do not shrink a dense barcode to an unreadable label');
