@@ -1,4 +1,5 @@
 import {profileWork} from '@/lib/profile-work';
+import {materialHistory} from '@/lib/process-history';
 import {syncReceiptTemplates} from '@/lib/receipt-template-sync';
 import {syncMaterialTasks} from '@/lib/material-tasks';
 import {syncInventoryCounts} from '@/lib/inventory-counts';
@@ -26,8 +27,35 @@ export async function GET(request?:Request){try{const u=await requireAccess(),db
  if(u.isAdmin||u.permissions.flowRoles?.includes('inventory')||u.permissions.supplyRoles?.some((r:string)=>['finance','ceo'].includes(r)))await syncInventoryCounts();
  const purchaseServices=await import('@/lib/purchase-services');await purchaseServices.syncServiceFinanceTasks();
  const canPurchaseServices=await purchaseServices.purchaseServicesAvailable(u);
- const tasks=u.profileReview?[]:(await db.prepare("SELECT * FROM duty_runs WHERE ?=1 OR assignee=? OR supervisor=? ORDER BY CASE WHEN state IN ('completed','cancelled') THEN 1 ELSE 0 END,due,id LIMIT 300").bind(u.isAdmin?1:0,mid,mid).all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}));
+ const processView=request&&new URL(request.url).searchParams.get('view')==='process-history';
+ const tasks=u.profileReview?[]:(await db.prepare(processView
+  ?"SELECT * FROM duty_runs WHERE (?=1 OR assignee=? OR supervisor=?) AND state IN ('completed','cancelled','submitted') ORDER BY updated DESC,id"
+  :"SELECT * FROM duty_runs WHERE ?=1 OR assignee=? OR supervisor=? ORDER BY CASE WHEN state IN ('completed','cancelled') THEN 1 ELSE 0 END,due,id LIMIT 300").bind(u.isAdmin?1:0,mid,mid).all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}));
  const allowedTasks:any[]=[];for(const t of tasks){if(!dutyVisible(u,t.data))continue;if(t.data.materialWorkflow||t.data.purchaseServiceWorkflow||t.data.purchaseInvoiceWorkflow||t.data.assetWorkflow||t.data.qmsWorkflow||t.data.foreignPurchaseWorkflow||t.data.personnelWorkflow||t.data.salesLeadWorkflow||t.data.treasuryWorkflow||t.data.guaranteeWorkflow||t.data.replenishmentWorkflow||t.data.buildIntakeWorkflow){try{await taskAccess(t.id,u);}catch{continue;}}if(t.data.transportWorkflow){try{const {transportAccess}=await import('@/lib/transport');await transportAccess(u,t.data.transportMissionId);}catch{continue;}}allowedTasks.push(t);}
+ if(processView){
+  const roles=u.permissions.flowRoles||[], profile=u.profileReview?.id;
+  const central=profile?profile==='central-store':u.isAdmin||roles.includes('inventory')||!!u.permissions.warehouseResponsibilities?.some(w=>w.role==='inventory');
+  const line=profile?profile==='line-store':roles.includes('production');
+  const quality=profile?profile==='quality':u.isAdmin||roles.includes('qc')||!!u.permissions.warehouseResponsibilities?.some(w=>w.role==='qc');
+  const processes=[...(central||line?['issue']:[]),...(central?['receipt','placement']:[]),...(quality?['quality']:[])];
+  let material:ReturnType<typeof materialHistory>=[];
+  if(processes.length){
+   const {GET:flow}=await import('@/app/api/flow/route');
+   const response=await flow();
+   if(!response.ok&&response.status!==403)return response;
+   if(response.ok){
+    const {entities,warehouses}=await response.json() as {entities:any[];warehouses:any[]};
+    const scoped=profile?entities.filter(e=>e.type==='material'||u.profileReview!.warehouseIds.includes(e.data.warehouseId)||profile==='quality'&&u.profileReview!.warehouseIds.includes(e.data.quarantineWarehouseId)||profile==='line-store'&&e.type==='request'&&e.data.lineOwner===mid):entities;
+    material=materialHistory(scoped,warehouses,processes,central);
+   }
+  }
+  const rows=allowedTasks.filter(t=>!(t.data.materialWorkflow&&material.some(row=>row.target===(t.data.receiptId||t.data.sourceId)))&&(t.state!=='submitted'||t.assignee===mid&&t.supervisor!==mid)).map(t=>({
+   id:t.id,process:'task:'+(t.data.sourceSection||'duty'),date:t.updated||t.created,title:t.data.title,reference:t.data.sourceId||t.id,
+   status:t.state==='completed'?'انجام‌شده':t.state==='cancelled'?'لغوشده':'در انتظار بررسی',
+   waiting:t.state==='submitted',task:t,
+  }));
+  return json({rows:[...material,...rows].sort((a,b)=>b.date.localeCompare(a.date)||a.id.localeCompare(b.id))});
+ }
  // Keep the personal counter private. Escalations for the admin are returned separately.
  const notifications=(await db.prepare("SELECT n.* FROM duty_notices n JOIN duty_runs t ON t.id=n.task_id WHERE n.recipient=? ORDER BY n.created DESC LIMIT 100").bind(mid).all()).results;
  const managementNotifications=u.isAdmin?(await db.prepare("SELECT n.* FROM duty_notices n JOIN duty_runs t ON t.id=n.task_id WHERE n.recipient='@admin' ORDER BY n.created DESC LIMIT 100").all()).results:[];
