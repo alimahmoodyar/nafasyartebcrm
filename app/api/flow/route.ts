@@ -260,8 +260,8 @@ export async function POST(request:Request){try{
  }else{
   const receivedQuantity=(r.data.receivedQuantity||0)+r.data.quantity;
   const remaining=Math.max(0,r.data.requestedQuantity-receivedQuantity);
-  const delivery={quantity:r.data.quantity,allocations:r.data.allocations,reason:r.data.reason,issuedBy:r.data.issuedBy,issuedAt:r.data.issuedAt,receivedBy:u.name,receivedAt:now,receivingNotes:notes};
-  put(r.id,'request',{...r.data,state:remaining?'pending':'issued',quantity:remaining||receivedQuantity,receivedQuantity,allocations:remaining?[]:r.data.allocations,deliveries:[...(r.data.deliveries||[]),delivery],receivedBy:u.name,receivedAt:now,receivingNotes:notes,reportedActuals:[],discrepancyNotes:'',discrepancyAgreement:null},r);
+  const delivery={quantity:r.data.quantity,originalQuantity:r.data.originalQuantity??r.data.quantity,allocations:r.data.allocations,reason:r.data.reason,issuedBy:r.data.issuedBy,issuedAt:r.data.issuedAt,receivedBy:u.name,receivedAt:now,receivingNotes:notes};
+  put(r.id,'request',{...r.data,state:remaining?'pending':'issued',quantity:remaining||receivedQuantity,receivedQuantity,allocations:remaining?[]:r.data.allocations,deliveries:[...(r.data.deliveries||[]),delivery],receivedBy:u.name,receivedAt:now,receivingNotes:notes,reportedActuals:[],originalQuantity:null,discrepancyNotes:'',discrepancyAgreement:null},r);
  }
  }else if(mode==='supply'){
  fail('نیاز تأمین باید از کسری مواد برنامه تولید تأییدشده محاسبه شود.');
