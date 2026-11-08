@@ -180,9 +180,9 @@ export function MaterialFlow({demo,onSaved,onOpen,initialTab='tasks',targetId=''
      <label className="field">اسکن لیبل بچ برداشت‌شده
       <input required dir="ltr" value={a.scannedCode} autoComplete="off" onChange={e=>update(i,{scannedCode:e.target.value})}
        onKeyDown={e=>{if(e.key==='Enter'&&!e.nativeEvent.isComposing){e.preventDefault();if(matches)e.currentTarget.closest('.flow-allocation')?.querySelector<HTMLInputElement>('input[inputmode=decimal]')?.focus()}}}/>
-      {a.scannedCode&&<small role="status">{matches?'لیبل با بچ انتخاب‌شده مطابقت دارد.':'لیبل با بچ انتخاب‌شده مطابقت ندارد.'}</small>}
      </label>
      <Input fieldKey="quantity" label="مقدار واقعی برداشت‌شده" type="number" value={a.quantity} onChange={quantity=>update(i,{quantity})} required/>
+     <small className="material-issue-scan-status" role="status">{a.scannedCode?(matches?'لیبل با بچ انتخاب‌شده مطابقت دارد.':'لیبل با بچ انتخاب‌شده مطابقت ندارد.'):''}</small>
      <button className="btn" type="button" onClick={()=>change('allocations',draft.allocations.filter((_:any,j:number)=>j!==i))}>حذف ردیف</button>
     </div>;
    })}

@@ -511,3 +511,5 @@ html,button,input,textarea,select,option,svg text{font-family:"Vazirmatn",sans-s
 .material-issue-form .field{min-width:0}
 .material-issue-form .field input,.material-issue-form .field textarea{width:100%;min-width:0;box-sizing:border-box}
 .material-issue-row>.btn{grid-column:1/-1;justify-self:start}
+.material-issue-row>.field{align-self:start}
+.material-issue-scan-status{grid-column:1/-1;min-block-size:1.5em}
