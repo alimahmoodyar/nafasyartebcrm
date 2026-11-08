@@ -1,4 +1,5 @@
 'use client';
+import {DirectMessages} from './direct-messages';
 import {RefreshButton} from './refresh-button';
 import {NumberInput} from '@/components/trace/number-input';
 import {IconActions,IconDisclosure} from "./program-workspace";
@@ -15,7 +16,17 @@ import {inboxModes,inboxStates} from '@/lib/inbox-contract';
 const fa=(d:string)=>d?formatDateTime(d):'بدون موعد';
 const sections:Record<string,string>={tasks:'وظیفه کارتابل',transport:'مأموریت حمل', 'after-sales':'پرونده خدمات',sourcing:'برنامه تأمین',sales:'فروش',personnel:'پرسنلی',qms:'کیفیت و تحقیق‌وتوسعه',guarantees:'ضمانت‌نامه',assets:'اموال',treasury:'خزانه',development:'درخواست توسعه',hospital:'خدمات بیمارستانی',flow:'گردش مواد','routine-production':'کار روزانه تولید','build-intake':'مشخصات سفارش ساخت','build-projects':'پروژه ساخت',device:'دستگاه',batch:'بچ',product:'محصول'};
 function Pick({label,value,items,onChange}:{label:string;value:string;items:string[][];onChange:(s:string)=>void}){return <label className="field">{label}<Select dir="rtl" value={value||'_none'} onValueChange={v=>onChange(v==='_none'?'':v)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="_none">انتخاب کنید</SelectItem>{items.map(([v,t])=><SelectItem key={v} value={v}>{t}</SelectItem>)}</SelectContent></Select></label>}
-export function InboxPanel({onNavigate,targetId=''}:{onNavigate:(s:string,target?:string)=>void;targetId?:string}){
+export function InboxPanel({onNavigate,targetId='',active=true}:{onNavigate:(s:string,target?:string)=>void;targetId?:string;active?:boolean}){
+ const [advanced,setAdvanced]=useState(!!targetId);
+ useEffect(()=>{if(targetId)setAdvanced(true)},[targetId]);
+ useEffect(()=>{const open=()=>setAdvanced(true);window.addEventListener('nafasyar-compose-message',open);return()=>window.removeEventListener('nafasyar-compose-message',open)},[]);
+ return <div>
+  <div className="tools"><button type="button" className="btn" aria-pressed={advanced} onClick={()=>setAdvanced(!advanced)}>{advanced?'بازگشت به پیام‌های مستقیم':'درخواست‌های کاری و سوابق پیام‌ها'}</button></div>
+  {active&&!advanced&&<DirectMessages/>}
+  <div hidden={!advanced}><InboxWorkflowPanel onNavigate={onNavigate} targetId={targetId}/></div>
+ </div>;
+}
+function InboxWorkflowPanel({onNavigate,targetId}:{onNavigate:(s:string,target?:string)=>void;targetId:string}){
  const [data,setData]=useState<any>(null),[dir,setDir]=useState<any>(null),[current,setCurrent]=useState<any>(null),[filter,setFilter]=useState('inbox'),[search,setSearch]=useState(''),[draft,setDraft]=useState<any>(null),[preview,setPreview]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[text,setText]=useState('');const alive=useRef(true),seq=useRef(0),selected=useRef('');const [detailLoading,setDetailLoading]=useState(false);
  const backRef=useWorkspaceBack(()=>{if(busy)return;selected.current='';seq.current++;setCurrent(null);setDetailLoading(false);setText('');setError('')},!!current||detailLoading);
  async function read(url:string){const r=await fetch(url,{cache:'no-store'}),d=await r.json() as any;if(!r.ok)throw new Error(d.error||'دریافت ناموفق بود.');return d;}
