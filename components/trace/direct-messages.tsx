@@ -79,7 +79,10 @@ export function DirectMessages(){
    const unread=result.filter(d=>d.thread.unread);
    if(!document.hidden&&unread.length){
     await Promise.all(unread.map(d=>post({id:crypto.randomUUID(),mode:'read',threadId:d.thread.id,revision:d.thread.revision,expectedMailbox:d.me})));
-    if(active)await refresh();
+    if(active){
+     window.dispatchEvent(new Event('nafasyar-tasks-changed'));
+     await refresh();
+    }
    }
   }).catch(e=>{if(active)setError(e.message)}).finally(()=>{if(active)setLoading(false)});
   return()=>{active=false};
