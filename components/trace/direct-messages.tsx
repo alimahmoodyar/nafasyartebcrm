@@ -3,7 +3,7 @@ import {useEffect,useRef,useState} from 'react';
 import {Paperclip,Send} from 'lucide-react';
 import {formatDate} from '@/lib/persian-date';
 
-type Contact={id:string;name:string;active:boolean};
+type Contact={id:string;name:string;active:boolean;positions?:string[];avatarUrl?:string|null};
 type Thread={id:string;title:string;kind:string;recipientType:string;sender:string;senderName:string;recipientId:string;recipientName:string;isSender:boolean;state:string;updated:string;revision:number;unread:boolean;lastMessage?:string;link?:unknown};
 type Message={id:string;author:string;created:string;body:string;mode:string;sentRevision?:number};
 type Conversation={me:string;thread:Thread;messages:Message[];nextOffset:number|null;peerReadRevision:number;files:{id:string;filename:string}[]};
@@ -21,6 +21,15 @@ async function request<T>(url:string,options?:RequestInit):Promise<T>{
 }
 const post=(body:object)=>request<{threadId:string}>('/api/inbox',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
 
+function ContactIdentity({contact}:{contact:Contact}){
+ const [failed,setFailed]=useState(false);
+ useEffect(()=>setFailed(false),[contact.avatarUrl]);
+ const title=contact.positions?.join('، ');
+ return <span className="direct-chat-identity">
+  {contact.avatarUrl&&!failed?<img src={contact.avatarUrl} alt="" loading="lazy" onError={()=>setFailed(true)}/>:<span className="direct-chat-avatar" aria-hidden="true">{Array.from(contact.name.trim())[0]||'؟'}</span>}
+  <span><strong>{contact.name}</strong>{title&&<small>{title}</small>}</span>
+ </span>;
+}
 export function DirectMessages(){
  const [box,setBox]=useState<Mailbox|null>(null),[directory,setDirectory]=useState<Contact[]>([]),[contactId,setContactId]=useState(''),[query,setQuery]=useState(''),[body,setBody]=useState(''),[details,setDetails]=useState<Conversation[]>([]),[limit,setLimit]=useState(8),[busy,setBusy]=useState(false),[loading,setLoading]=useState(false),[error,setError]=useState('');
  const list=useRef<HTMLDivElement>(null),contactRef=useRef(''),operation=useRef(false),refreshVersion=useRef(0);
@@ -38,7 +47,7 @@ export function DirectMessages(){
  }
  const threads=grouped.get(contactId)||[], visible=threads.slice(0,limit);
  const signature=visible.map(t=>t.id+':'+t.revision).join(',');
- const ordered=[...contacts.values()].filter(c=>searchKey(c.name).includes(searchKey(query))).sort((a,b)=>(grouped.get(b.id)?.[0]?.updated||'').localeCompare(grouped.get(a.id)?.[0]?.updated||'')||a.name.localeCompare(b.name,'fa'));
+ const ordered=[...contacts.values()].filter(c=>searchKey([c.name,...(c.positions||[])].join(" ")).includes(searchKey(query))).sort((a,b)=>(grouped.get(b.id)?.[0]?.updated||'').localeCompare(grouped.get(a.id)?.[0]?.updated||'')||a.name.localeCompare(b.name,'fa'));
  async function refresh(){
   const version=++refreshVersion.current;
   const result=await request<Mailbox>('/api/inbox');
@@ -125,14 +134,14 @@ export function DirectMessages(){
    <aside className="inbox-list"><h3>مخاطب‌ها</h3><label className="field">جست‌وجوی مخاطب<input type="search" value={query} onChange={event=>setQuery(event.target.value)}/></label>
     {ordered.map(c=>{
      const items=grouped.get(c.id)||[],unread=items.filter(t=>t.unread).length;
-     return <button type="button" key={c.id} className={'inbox-thread '+(c.id===contactId?'selected ':'')+(unread?'unread':'')} aria-pressed={c.id===contactId} onClick={()=>select(c.id)}><strong>{c.name}</strong>{items[0]?.lastMessage&&<span className="direct-chat-preview">{items[0].lastMessage}</span>}{items[0]&&<small>{formatDate(items[0].updated)} · {clock.format(new Date(items[0].updated))}</small>}{unread>0&&<small>{unread.toLocaleString('fa-IR')} گفت‌وگوی خوانده‌نشده</small>}</button>;
+     return <button type="button" key={c.id} className={'inbox-thread '+(c.id===contactId?'selected ':'')+(unread?'unread':'')} aria-pressed={c.id===contactId} onClick={()=>select(c.id)}><ContactIdentity contact={c}/>{items[0]?.lastMessage&&<span className="direct-chat-preview">{items[0].lastMessage}</span>}{items[0]&&<small>{formatDate(items[0].updated)} · {clock.format(new Date(items[0].updated))}</small>}{unread>0&&<small>{unread.toLocaleString('fa-IR')} گفت‌وگوی خوانده‌نشده</small>}</button>;
     })}
     {!ordered.length&&<p>{box?'مخاطبی پیدا نشد.':'در حال دریافت مخاطب‌ها…'}</p>}
     {box?.limited&&<small>فهرست شامل ۳۰۰ گفت‌وگوی اخیر است.</small>}
    </aside>
    <section className="inbox-conversation" aria-label="گفت‌وگوی مستقیم">
     {!contact?<p className="empty">برای شروع، یک مخاطب انتخاب کنید.</p>:<>
-     <header><button type="button" className="btn inbox-back" onClick={()=>select('')}>مخاطب‌ها</button><h3>{contact.name}</h3></header>
+     <header><button type="button" className="btn inbox-back" onClick={()=>select('')}>مخاطب‌ها</button><h3><ContactIdentity contact={contact}/></h3></header>
      <div className="inbox-messages" ref={list}>
       {(threads.length>limit||details.some(d=>d.nextOffset!==null))&&<button type="button" className="btn" disabled={busy||loading} onClick={()=>void older()}>پیام‌های قدیمی‌تر</button>}
       {loading&&!timeline.length&&<p role="status">در حال دریافت پیام‌ها…</p>}
