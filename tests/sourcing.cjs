@@ -1,3 +1,4 @@
+function issueLabel(id){return JSON.parse(sql.prepare('SELECT payload FROM records WHERE id=?').get(id).payload).code;}
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),ts=require('typescript');
 const {DatabaseSync}=require('node:sqlite');const root=path.resolve(__dirname,'..');const sql=new DatabaseSync(':memory:');sql.exec('PRAGMA foreign_keys=ON');for(const f of fs.readdirSync(path.join(root,'drizzle')).filter(f=>f.endsWith('.sql')).sort())sql.exec(fs.readFileSync(path.join(root,'drizzle',f),'utf8'));
 const db={prepare(q){let args=[];return{bind(...a){args=a;return this},async first(){return sql.prepare(q).get(...args)||null},async all(){return {results:sql.prepare(q).all(...args)}},async run(){return {meta:{changes:sql.prepare(q).run(...args).changes}}}}},async batch(stmts){sql.exec('BEGIN');try{const r=[];for(const s of stmts)r.push(await s.run());sql.exec('COMMIT');return r;}catch(e){sql.exec('ROLLBACK');throw e;}}};
@@ -69,7 +70,7 @@ const receivingFixture=require('./helpers/receiving-warehouse.cjs')(sql);
  await source('approve',{planId:other,count:1,needBy:future,notes:'approved'});await source('calculate',{planId:other,notes:'cannot reserve twice'});assert.equal((await detail(other)).lines[0].stock,0);
  // A generic line request cannot take stock reserved for an approved sourcing plan.
  const rq=await op('request',{materialId:material.id,quantity:'4',notes:'line'});const requestId=entities('request')[0].id;
- await op('issue',{requestId,allocations:[{batchId:stocked.id,location:receivingFixture.id+'|A-1-1-1',quantity:'4'}],reason:''});assert.equal(stock(stocked.id,'transit'),4000);assert.equal(stock(stocked.id,'line'),0);
+ await op('issue',{requestId,allocations:[{batchId:stocked.id,scannedCode:issueLabel(stocked.id),location:receivingFixture.id+'|A-1-1-1',quantity:'4'}],reason:''});assert.equal(stock(stocked.id,'transit'),4000);assert.equal(stock(stocked.id,'line'),0);
  await op('confirm_line_receipt',{requestId,notes:'received at line'});assert.equal(stock(stocked.id,'line'),4000);assert.equal(stock(stocked.id,'transit'),0);
  await op('reject',{batchId:stocked.id,quantity:'1',reason:'attempt to consume reservation'},409);assert.equal(stock(stocked.id,'line'),4000);
  const quote={planId:pid,partCode:'01',supplier:'Domestic',unitPrice:'10',currency:'IRR',fxRate:'1',fxDate:today,fxSource:'approved rate',extrasRial:'0',costNotes:'included',eta:later,validUntil:future,paymentTerms:'cash',specs:'V1',reference:'Q1',unavailable:false};
