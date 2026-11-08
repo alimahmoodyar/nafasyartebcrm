@@ -27,6 +27,18 @@ entity('material:11','material',{code:'11',name:'Oring',unit:'عدد',fields:[fi
 const ws=()=>sql.prepare("SELECT id,data FROM flow_entities WHERE type='material_warehouse'").all().map(r=>({...r,data:JSON.parse(r.data)}));
 const central=review.profileSession(admin,'central-store',ws()),quality=review.profileSession(admin,'quality',ws());
 assert.ok(!profiles.roleProfiles.find(p=>p.id==='central-store').links.some(l=>l.title==='جانمایی پس از کنترل کیفیت'));
+const centralLinks=profiles.roleProfiles.find(p=>p.id==='central-store').links.filter(link=>!link.taskOnly).map(link=>link.title);
+assert.ok(centralLinks.includes('دریافت کالا و محصول')&&centralLinks.includes('درخواست فروش ضایعات'));
+for(const title of ['تحویل مواد به خط','دریافت محصول نهایی','سفارشات ارسال'])assert.ok(!centralLinks.includes(title));
+const assigned=profiles.materialProfileWork('central-store',[
+ {id:'transfer:1',type:'scrap_transfer',data:{state:'pending'}},
+ {id:'handoff:1',type:'handoff',data:{state:'pending'}},
+ {id:'materials:1',type:'request',data:{state:'pending'}},
+]);
+assert.equal(assigned.length,3);
+assert.equal(assigned[0].target,'worker-custody:scrap:transfer:1');
+assert.ok(assigned[1].target.includes('handoff:1')&&assigned[2].target.includes('materials:1'));
+
 const made=await post(flow,{id:crypto.randomUUID(),mode:'receipt',receiptVersion:2,confirmed:true,materialId:'material:11',warehouseId:wh.id,day:'2026-11-06',quantity:'4'}),rid=made.receiptId;
 assert.equal((await queue.profileWork(central)).work.filter(w=>w.id===rid+':shelve').length,0);assert.equal((await queue.profileWork(central)).pendingQuality,1);assert.ok((await queue.profileWork(quality)).work.some(w=>w.id===rid+':qc'));
 const qc={userId:'local:'+wh.qcId,name:'Actual inspector',isAdmin:false,permissions:JSON.parse(sql.prepare('SELECT permissions FROM app_members WHERE id=?').get(wh.qcId).permissions)};
