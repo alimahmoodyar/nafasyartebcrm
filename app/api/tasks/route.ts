@@ -37,7 +37,7 @@ export async function GET(request?:Request){try{const u=await requireAccess(),db
   const central=profile?profile==='central-store':u.isAdmin||roles.includes('inventory')||!!u.permissions.warehouseResponsibilities?.some(w=>w.role==='inventory');
   const line=profile?profile==='line-store':roles.includes('production');
   const quality=profile?profile==='quality':u.isAdmin||roles.includes('qc')||!!u.permissions.warehouseResponsibilities?.some(w=>w.role==='qc');
-  const processes=[...(central||line?['issue']:[]),...(central?['receipt','placement']:[]),...(quality?['quality']:[])];
+  const processes=[...(central?['issue','receipt','placement']:[]),...(line?['lineReceipt']:[]),...(quality?['quality']:[])];
   let material:ReturnType<typeof materialHistory>=[];
   if(processes.length){
    const {GET:flow}=await import('@/app/api/flow/route');
@@ -45,11 +45,12 @@ export async function GET(request?:Request){try{const u=await requireAccess(),db
    if(!response.ok&&response.status!==403)return response;
    if(response.ok){
     const {entities,warehouses}=await response.json() as {entities:any[];warehouses:any[]};
-    const scoped=profile?entities.filter(e=>e.type==='material'||u.profileReview!.warehouseIds.includes(e.data.warehouseId)||profile==='quality'&&u.profileReview!.warehouseIds.includes(e.data.quarantineWarehouseId)||profile==='line-store'&&e.type==='request'&&e.data.lineOwner===mid):entities;
+    const scoped=profile?entities.filter(e=>e.type==='material'||u.profileReview!.warehouseIds.includes(e.data.warehouseId)||profile==='quality'&&u.profileReview!.warehouseIds.includes(e.data.quarantineWarehouseId)||profile==='line-store'&&e.type==='request'):entities;
     material=materialHistory(scoped,warehouses,processes,central);
    }
   }
-  const rows=allowedTasks.filter(t=>!(t.data.materialWorkflow&&material.some(row=>row.target===(t.data.receiptId||t.data.sourceId)))&&(t.state!=='submitted'||t.assignee===mid&&t.supervisor!==mid)).map(t=>({
+  const materialReferences=new Set(material.map(row=>row.reference));
+  const rows=allowedTasks.filter(t=>!(t.data.materialWorkflow&&materialReferences.has(t.data.receiptId||t.data.sourceId))&&(t.state!=='submitted'||t.assignee===mid&&t.supervisor!==mid)).map(t=>({
    id:t.id,process:'task:'+(t.data.sourceSection||'duty'),date:t.updated||t.created,title:t.data.title,reference:t.data.sourceId||t.id,
    status:t.state==='completed'?'انجام‌شده':t.state==='cancelled'?'لغوشده':'در انتظار بررسی',
    waiting:t.state==='submitted',task:t,
