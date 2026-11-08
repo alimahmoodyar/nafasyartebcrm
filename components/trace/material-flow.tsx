@@ -162,19 +162,21 @@ export function MaterialFlow({demo,onSaved,onOpen,initialTab='tasks',targetId=''
   function update(index:number,values:Record<string,string>){
    change('allocations',draft.allocations.map((row:any,i:number)=>i===index?{...row,...values}:row));
   }
-  return <section className="wide">
+  return <section className="material-issue-form">
    {available.length?<p className="notice">بچ پیشنهادی را از محل مشخص‌شده بردارید، لیبل آن را اسکن کنید و مقدار واقعی برداشت را وارد کنید.</p>:<p className="notice" role="status">برای این کالا بچ قابل برداشت پیدا نشد.{warehouse&&' انبار درخواست: '+warehouse.data.name+'؛'} بعد از جانمایی یا تأمین موجودی، درخواست را دوباره باز کنید.</p>}
    {issueShortage>0&&available.length>0&&<p className="notice" role="status">می‌توانید مقدار موجود را ارسال کنید. ماندهٔ درخواست پس از تأیید دریافت خط باز می‌ماند.</p>}
    <p>ماندهٔ پیش از برداشت: {n(request?.data.quantity/1000)} {unit} · موجودی قابل برداشت: {n(issueAvailable/1000)} {unit} · جمع برداشت این نوبت: {n(total)} {unit} · کسری این نوبت: {n(Math.max(0,request?.data.quantity/1000-total))} {unit}</p>
    {draft.allocations.map((a:any,i:number)=>{
     const code=rec(a.batchId)?.data.code||'',scan=batchScanCode(a.scannedCode);
     const matches=!!code&&scan===code;
-    return <div className="flow-allocation" key={i}>
+    return <div className="flow-allocation material-issue-row" key={i}>
+     <div className="material-issue-batch">
      <Select searchable label="بچ و محل برداشت" value={a.location} onChange={location=>{
       const slot=available.find((item:any)=>item.location===location);
       update(i,{location,batchId:slot?.batch_id||'',quantity:'',scannedCode:''});
      }} options={available.map((slot:any)=>[slot.location,serial(slot.batch_id)+' · '+whName(slot.receipt)+' · '+locLabel(slot.location)+' · موجودی '+n(slot.quantity/1000)])}/>
      {draft.suggested[a.location]>0&&<p>مقدار پیشنهادی: {n(draft.suggested[a.location]/1000)} {unit}</p>}
+     </div>
      <label className="field">اسکن لیبل بچ برداشت‌شده
       <input required dir="ltr" value={a.scannedCode} autoComplete="off" onChange={e=>update(i,{scannedCode:e.target.value})}
        onKeyDown={e=>{if(e.key==='Enter'&&!e.nativeEvent.isComposing){e.preventDefault();if(matches)e.currentTarget.closest('.flow-allocation')?.querySelector<HTMLInputElement>('input[inputmode=decimal]')?.focus()}}}/>

@@ -502,3 +502,12 @@ html,button,input,textarea,select,option,svg text{font-family:"Vazirmatn",sans-s
 .direct-chat-identity small{display:block;color:var(--muted-foreground);font-weight:normal}
 .direct-chat-identity img,.direct-chat-avatar{width:2rem;height:2rem;border-radius:50%;object-fit:cover;flex-shrink:0}
 .direct-chat-avatar{display:grid;place-items:center;background:#d9f1eb;color:#24685c}
+.material-issue-form{grid-column:1/-1;display:grid;gap:12px;min-width:0}
+.material-issue-form>.notice{display:block;margin:0}
+.material-issue-form>.btn{justify-self:start}
+.material-issue-form .material-issue-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,14rem),1fr));gap:12px;min-width:0;border:1px solid var(--border);border-radius:12px;padding:14px}
+.material-issue-row>.material-issue-batch{grid-column:1/-1;display:grid;gap:8px;min-width:0}
+.material-issue-batch [role=option]{overflow-wrap:anywhere}
+.material-issue-form .field{min-width:0}
+.material-issue-form .field input,.material-issue-form .field textarea{width:100%;min-width:0;box-sizing:border-box}
+.material-issue-row>.btn{grid-column:1/-1;justify-self:start}
