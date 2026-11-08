@@ -20,7 +20,7 @@ async function operate(b,status=200){const r=await production.POST(request('/api
 const receivingFixture=require('./helpers/receiving-warehouse.cjs')(sql,{id:'warehouse:user'}),flow=load('app/api/flow/route.ts');
 async function flowop(mode,args={}){const r=await flow.POST(request('/api/flow','POST',{id:crypto.randomUUID(),confirmed:true,mode,...args}));assert.equal(r.status,200,await r.clone().text());return r.json();}
 async function inspectAndShelve(batch,index){await flowop('incoming_qc',{receiptId:batch.id,accepted:'10',values:{quality:'pass'},notes:'Physical QC passed'});await flowop('shelve',{receiptId:batch.id,location:'A-1-1-'+index});}
-async function issueToLine(batch,index,quantity){const requestId=crypto.randomUUID();await flowop('request',{id:requestId,materialId:'material:'+batch.data.partCode,warehouseId:receivingFixture.id,quantity,notes:'Actual production need'});await flowop('issue',{requestId,allocations:[{batchId:batch.id,location:receivingFixture.id+'|A-1-1-'+index,quantity}],reason:''});await flowop('confirm_line_receipt',{requestId,notes:'Physically received'});}
+async function issueToLine(batch,index,quantity){const requestId=crypto.randomUUID();await flowop('request',{id:requestId,materialId:'material:'+batch.data.partCode,warehouseId:receivingFixture.id,quantity,notes:'Actual production need'});await flowop('issue',{requestId,allocations:[{batchId:batch.id,scannedCode:batch.data.code,location:receivingFixture.id+'|A-1-1-'+index,quantity}],reason:''});await flowop('confirm_line_receipt',{requestId,notes:'Physically received'});}
 (async()=>{
  identity=owner;await auth.session();
  await operate({mode:'opening',batchId:'missing',to:'raw',quantity:'1'},400);

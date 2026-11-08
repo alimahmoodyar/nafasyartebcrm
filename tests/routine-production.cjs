@@ -1,3 +1,4 @@
+function issueLabel(id){return JSON.parse(sql.prepare('SELECT payload FROM records WHERE id=?').get(id).payload).code;}
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),ts=require('typescript');
 const {DatabaseSync}=require('node:sqlite');const root=path.resolve(__dirname,'..');const sql=new DatabaseSync(':memory:');sql.exec('PRAGMA foreign_keys=ON');for(const f of fs.readdirSync(path.join(root,'drizzle')).filter(f=>f.endsWith('.sql')).sort())sql.exec(fs.readFileSync(path.join(root,'drizzle',f),'utf8'));
 let beforeBatch=null;
@@ -57,7 +58,7 @@ await flowPost('shelve',{receiptId:bid,location:'A-1-1-1'});
 assert.equal(balance('raw'),9000);assert.equal(balance('quarantine'),0);
 const request=await flowPost('request',{materialId:'part',warehouseId:'warehouse:user',quantity:'3',planId:'',notes:'Line requirement'});
 const requestId=sql.prepare("SELECT id FROM flow_entities WHERE type='request' ORDER BY created DESC").get().id;
-await flowPost('issue',{requestId,allocations:[{batchId:bid,location:'warehouse:user|A-1-1-1',quantity:'3'}],reason:''});
+await flowPost('issue',{requestId,allocations:[{batchId:bid,scannedCode:issueLabel(bid),location:'warehouse:user|A-1-1-1',quantity:'3'}],reason:''});
 assert.equal(balance('raw'),6000);assert.equal(balance('line'),0);assert.equal(balance('transit'),3000);
 await flowPost('confirm_line_receipt',{requestId,notes:'Physically scanned at line'});assert.equal(balance('line'),3000);assert.equal(balance('transit'),0);
 const prod=load('app/api/production/route.ts');
