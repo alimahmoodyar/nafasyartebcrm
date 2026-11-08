@@ -18,7 +18,7 @@ const sections:Record<string,string>={tasks:'وظیفه کارتابل',transpor
 function Pick({label,value,items,onChange}:{label:string;value:string;items:string[][];onChange:(s:string)=>void}){return <label className="field">{label}<Select dir="rtl" value={value||'_none'} onValueChange={v=>onChange(v==='_none'?'':v)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="_none">انتخاب کنید</SelectItem>{items.map(([v,t])=><SelectItem key={v} value={v}>{t}</SelectItem>)}</SelectContent></Select></label>}
 export function InboxPanel({onNavigate,targetId='',active=true}:{onNavigate:(s:string,target?:string)=>void;targetId?:string;active?:boolean}){
  const [advanced,setAdvanced]=useState(!!targetId);
- useEffect(()=>{if(targetId)setAdvanced(true)},[targetId]);
+ useEffect(()=>{if(active)setAdvanced(!!targetId)},[active,targetId]);
  useEffect(()=>{const open=()=>setAdvanced(true);window.addEventListener('nafasyar-compose-message',open);return()=>window.removeEventListener('nafasyar-compose-message',open)},[]);
  return <div>
   <div className="tools"><button type="button" className="btn" aria-pressed={advanced} onClick={()=>setAdvanced(!advanced)}>{advanced?'بازگشت به پیام‌های مستقیم':'درخواست‌های کاری و سوابق پیام‌ها'}</button></div>
