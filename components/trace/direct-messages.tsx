@@ -144,7 +144,12 @@ export function DirectMessages(){
       })}
      </div>
      {contact.active&&<form className="inbox-compose direct-chat-compose" onSubmit={event=>{event.preventDefault();void send()}}>
-      <textarea aria-label="متن پیام" rows={2} placeholder="پیام بنویسید…" value={body} maxLength={12000} onChange={event=>setBody(event.target.value)}/>
+      <textarea aria-label="متن پیام" rows={2} placeholder="پیام بنویسید…" value={body} maxLength={12000} onChange={event=>setBody(event.target.value)}
+       onKeyDown={event=>{
+        if(event.key!=='Enter'||event.shiftKey||event.nativeEvent.isComposing||event.keyCode===229)return;
+        event.preventDefault();
+        if(!busy&&body.trim())event.currentTarget.form?.requestSubmit();
+       }}/>
       {target&&<label className="btn"><Paperclip size={17} aria-hidden="true"/>پیوست<input type="file" aria-label="پیوست" disabled={busy} accept=".xlsx,.xls,.csv,.pdf,.png,.jpg,.jpeg,.docx,.zip" onChange={event=>{const file=event.target.files?.[0];if(file)attach(file);event.target.value=''}}/></label>}
       <button type="submit" className="btn primary" disabled={busy||!body.trim()}><Send size={17} aria-hidden="true"/>ارسال</button>
      </form>}
