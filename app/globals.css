@@ -486,3 +486,14 @@ html,button,input,textarea,select,option,svg text{font-family:"Vazirmatn",sans-s
 .notice.sourcing-work-card{display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:8px;margin:0;min-width:0}.notice.sourcing-work-card p{margin:0}.notice.sourcing-work-card .btn{align-self:flex-start;max-width:100%;white-space:normal;line-height:1.7;padding:8px 14px}
 
 .sourcing-review-inbox{display:grid;gap:14px;margin-block:16px}.sourcing-review-card{display:grid;gap:8px;border:1px solid var(--border);border-radius:12px;background:#fff;padding:18px}.sourcing-review-card p{margin:0;overflow-wrap:anywhere}.sourcing-review-card .tools{display:flex;gap:8px;flex-wrap:wrap}.sourcing-review-dialog{width:calc(100vw - 32px);max-width:640px!important;max-height:90vh;overflow:auto}.sourcing-review-form{display:grid;gap:14px;border:0;margin:0;padding:0}.sourcing-review-form .field{margin:0;min-width:0}.sourcing-review-form .field input,.sourcing-review-form .field select,.sourcing-review-form .field textarea{width:100%;box-sizing:border-box;padding:10px 12px}.sourcing-review-form .notice{display:block;margin:0}
+
+.direct-chat .inbox-conversation{background:var(--muted)}
+.direct-chat .inbox-message{width:fit-content;max-width:85%;padding:.55rem .8rem}
+.direct-chat .inbox-message p{margin:0}
+.direct-chat-row .inbox-message{margin-inline-start:auto}
+.direct-chat-row.own .inbox-message{margin-inline-start:0}
+.direct-chat-day{display:block;width:fit-content;margin:0 auto .65rem;padding:.2rem .7rem;border-radius:1rem;background:var(--background);font-size:.8rem}
+.direct-chat-preview{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%}
+.direct-chat-compose{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.direct-chat-compose textarea{flex:1;min-width:12rem;border:1px solid var(--border);border-radius:.75rem;padding:.6rem;background:var(--background)}
+.direct-chat-compose input[type=file]{max-width:8rem}

@@ -57,7 +57,7 @@ let chain=Promise.resolve();const batch=db.batch.bind(db);db.batch=s=>{const p=c
  const tomorrow=new Date(Date.now()+86400000).toISOString().slice(0,10)+'T16:00:00+03:30';
  assert.equal((await post(next,{mode:'snooze',threadId:pt,until:tomorrow})).status,200);assert.equal((await get(next,pt)).data.thread.needsAttention,false);assert.equal(entity(pt).data.due,new Date(future).toISOString());
  r=await post(a,{mode:'create',title:'Question',body:'Hello',recipientType:'person',recipientId:'bob',kind:'message',priority:'normal'});const message=r.data.threadId;
- assert.equal((await post(b,{mode:'read',threadId:message,revision:1})).status,200);assert.equal((await get(b,message)).data.thread.needsAttention,false);
+ assert.equal((await get(a,message)).data.peerReadRevision,0);assert.equal((await get(a,message)).data.messages[0].sentRevision,1);assert.equal((await post(b,{mode:'read',threadId:message,revision:1})).status,200);assert.equal((await get(a,message)).data.peerReadRevision,1);assert.equal((await get(b,message)).data.thread.needsAttention,false);
  assert.equal((await act(b,message,'convert',{due:future})).status,403);assert.equal((await act(a,message,'convert',{due:future})).status,200);assert.equal((await act(b,message,'close')).status,400);
  r=await get(agent,'','&view=directory');assert.equal(r.status,200);assert.ok(r.data.people.some(p=>p.id==='coordinator'));assert.ok(!r.data.people.some(p=>p.id==='bob'));assert.equal(r.data.positions.length,0);
  assert.equal((await post(agent,{mode:'create',title:'no',body:'no',recipientType:'person',recipientId:'bob',kind:'message',priority:'normal'})).status,400);
