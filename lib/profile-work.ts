@@ -2,13 +2,14 @@ import {storage} from './storage';
 import {warehouseTarget} from './warehouse-workspace';
 import {mcpActor} from './mcp/context';
 import type {DispatchRow} from './warehouse-dispatch';
+import {transportCanSee} from './transport';
 import {roleProfiles,materialProfileWork,type ProfileWork} from './role-profiles';
 import {coverage,nextWork} from './sourcing';
 import type {Session} from './permissions';
 /** Position queue from real domain stages, never fabricated assignees. */
 export async function profileWork(user:Session){
  const profile=roleProfiles.find(p=>p.id===user.profileReview?.id);if(!profile?.operational)return {work:[],pendingQuality:0};
- const db=storage(),rows=(await db.prepare("SELECT id,type,data FROM flow_entities WHERE type IN ('receipt','request','sourcing_plan','sourcing_quote','purchase_order','worker_output','scrap_transfer','scrap_sale_request','build','inventory_count','build_project','handoff','worker_nonconforming','line_return','worker_count_round','receipt_observation','purchase_payable','routine_lot') ORDER BY id").all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}));
+ const db=storage(),rows=(await db.prepare("SELECT id,type,data FROM flow_entities WHERE type IN ('receipt','request','sourcing_plan','sourcing_quote','purchase_order','worker_output','scrap_transfer','scrap_sale_request','build','inventory_count','build_project','handoff','worker_nonconforming','line_return','worker_count_round','receipt_observation','purchase_payable','routine_lot','transport') ORDER BY id").all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}));
  const work:ProfileWork[]=materialProfileWork(profile.id,rows);
  if(profile.workflowRoles.length){for(const plan of rows.filter(r=>r.type==='sourcing_plan')){
   const steps=nextWork(plan,rows.filter(r=>r.type==='sourcing_quote'&&r.data.planId===plan.id),rows.filter(r=>r.type==='purchase_order'&&r.data.planId===plan.id),await coverage(plan),rows.filter(r=>r.type==='receipt'));
@@ -25,6 +26,15 @@ export async function profileWork(user:Session){
    if(request.state==='ceo'||request.state==='returned'&&request.returnedBy==='ceo'&&Object.keys(request.answers||{}).length)add('ceo','decide','تصمیم درباره درخواست پرداخت');
    if(request.state==='returned')for(const role of request.returnTo||[])if(!request.answers?.[role])add(role==='buyer'?route:role,'answer:'+role,'پاسخ به برگشت درخواست پرداخت');
    if(request.latestPaymentId&&request.paymentAcknowledgement?.paymentId!==request.latestPaymentId)add(route,'ack','مشاهده رسید پرداخت خرید');
+  }
+ }
+ if(profile.id==='logistics'){
+  for(const mission of rows.filter(row=>row.type==='transport')){
+   const d=mission.data;
+   const title=d.blocker?.state==='open'?'پیگیری مانع حمل':d.state==='requested'?'تخصیص مأموریت حمل':d.state==='disputed'?'رسیدگی به مغایرت حمل':!d.inbound&&['carrier','offered'].includes(d.state)?'پیگیری تحویل محموله':'';
+   if(title&&await transportCanSee(user,mission)){
+    work.push({id:mission.id+':transport',title:title+' · '+d.code,section:'transport',target:mission.id,sourceId:mission.id,state:d.state});
+   }
   }
  }
  if(profile.id==='central-store'){
