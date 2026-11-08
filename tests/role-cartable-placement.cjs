@@ -30,6 +30,12 @@ assert.ok(!profiles.roleProfiles.find(p=>p.id==='central-store').links.some(l=>l
 const centralLinks=profiles.roleProfiles.find(p=>p.id==='central-store').links.filter(link=>!link.taskOnly).map(link=>link.title);
 assert.ok(centralLinks.includes('دریافت کالا و محصول')&&centralLinks.includes('درخواست فروش ضایعات'));
 for(const title of ['تحویل مواد به خط','دریافت محصول نهایی','سفارشات ارسال'])assert.ok(!centralLinks.includes(title));
+const project={id:'project:1',type:'build_project',data:{state:'active',units:[{id:'unit:1',title:'first',approved:true},{id:'unit:2',title:'second',approved:true}],movements:[{unitId:'unit:1',kind:'consume'}]}};
+const projectQuality=profiles.materialProfileWork('quality',[project]);
+assert.equal(projectQuality.length,1);
+assert.equal(new URLSearchParams(projectQuality[0].target.split('?')[1]).get('unit'),'unit:1');
+assert.equal(profiles.materialProfileWork('line-store',[project]).length,0);
+assert.ok(profiles.roleProfiles.find(p=>p.id==='quality').links.every(link=>link.taskOnly));
 const assigned=profiles.materialProfileWork('central-store',[
  {id:'transfer:1',type:'scrap_transfer',data:{state:'pending'}},
  {id:'handoff:1',type:'handoff',data:{state:'pending'}},
