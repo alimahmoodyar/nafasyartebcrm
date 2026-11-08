@@ -5,6 +5,7 @@ function render(data,tab='mine'){
  const children=({children})=>React.createElement('div',null,children),empty=()=>null;
  vm.runInNewContext(source,{exports,require:n=>{
   if(n==='react')return {...React,useState:initial=>[state<values.length?values[state++]:initial,()=>{}],useEffect:fn=>effects.push(fn)};
+  if(n==='lucide-react')return {Settings2:empty};
   if(n==='react/jsx-runtime')return require(n);
   if(n==='./program-workspace')return {ProgramWorkspace:({direct,children})=>React.createElement('div',{'data-direct':String(direct)},children),IconActions:children,IconDisclosure:children,SubprogramNavigation:({items,inline})=>React.createElement('nav',{'data-inline':String(inline)},items.map(([id,title])=>React.createElement('button',{key:id,'data-program':id},title)))};
   if(n==='./purchase-services-panel')return {PurchaseServicesPanel:()=>{mounts++;return React.createElement('section',null,'Service workspace')}};
@@ -24,6 +25,8 @@ let r=render({...base,canPurchaseServices:true},'purchase-services');assert.ok(r
 r=render({...base,isAdmin:true,canPurchaseServices:true});for(const key of ['purchase-services','management','definitions'])assert.ok(r.html.includes('data-program="'+key+'"'));
 r=render(null,'purchase-services');assert.equal(r.mounts,0);assert.ok(!r.html.includes('data-program="purchase-services"'));
 r=render(base);
+assert.match(r.html,/<summary[^>]*>ابزارهای کارتابل<\/summary>/);
+assert.ok(r.html.includes('به‌روزرسانی یادآوری‌های سامانه'));
 assert.ok(r.html.includes('data-direct="true"'));
 assert.equal((r.html.match(/data-inline="true"/g)||[]).length,2);
 r=render(base,'inbox');
