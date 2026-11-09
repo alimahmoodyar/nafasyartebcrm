@@ -5,7 +5,7 @@ import type {SurveyAnswers} from '@/lib/hospital-gas-survey-contract';
 
 const id=location.pathname.split('/').pop();
 const token=location.hash.slice(1);
-const valid=/^[0-9a-f-]{36}$/i.test(id||'')&&/^[a-f0-9]{64}$/.test(token);
+const valid=/^[0-9a-f-]{36}$/i.test(id||'')&&token.length<=1000&&token.includes(".");
 async function send(mode:'open'|'submit',answers?:SurveyAnswers){
  const response=await fetch('/survey',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,token,mode,answers})});
  const result=await response.json() as {center:string;submitted:boolean;error?:string};
