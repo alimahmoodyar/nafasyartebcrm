@@ -36,12 +36,12 @@ export function arr(v:unknown,max=100){if(!Array.isArray(v)||!v.length||v.length
 export const salesDecode=(r:any)=>({...r,data:JSON.parse(r.data)});
 export async function salesRows(){return (await storage().prepare("SELECT * FROM flow_entities WHERE type GLOB 'sales_*' AND type<>'sales_report' ORDER BY created,id").all()).results.map(salesDecode);}
 export async function salesEntity(id:string,type:string){const r:any=await storage().prepare('SELECT * FROM flow_entities WHERE id=? AND type=?').bind(id,type).first();if(!r)salesFail('پرونده پیدا نشد.',404);return salesDecode(r);}
-export async function liveSalesUser(u:Session){if(u.isAdmin||trainingContext.getStore())return u;const m:any=await storage().prepare("SELECT status,permissions FROM app_members WHERE subject=? OR id=?").bind(u.userId,u.userId.startsWith('local:')?u.userId.slice(6):u.userId).first();if(!m||m.status!=='active')salesFail('دسترسی فعال لازم است.',403);return {...u,permissions:storedAccessPermissions(m.permissions)};}
+export async function liveSalesUser(u:Session){if(u.isAdmin||u.profileReview||trainingContext.getStore())return u;const m:any=await storage().prepare("SELECT status,permissions FROM app_members WHERE subject=? OR id=?").bind(u.userId,u.userId.startsWith('local:')?u.userId.slice(6):u.userId).first();if(!m||m.status!=='active')salesFail('دسترسی فعال لازم است.',403);return {...u,permissions:storedAccessPermissions(m.permissions)};}
 export async function salesVisible(u:Session,a:any,operation:'read'|'write'='write'){
  if(salesRep(u))return a.id===u.permissions.salesAgentId;
  if(salesManager(u)||salesFinance(u))return true;
  if(operation==='read'&&salesReportRead(u))return true;
- if(salesStaff(u)||operation==='read'&&salesViewer(u))return a.data.ownerId===await memberId(u);
+ if(salesStaff(u)||operation==='read'&&salesViewer(u)){const id=await memberId(u);return !!id&&a.data.ownerId===id;}
  // Warehouse-only return reception retains its existing minimal scope.
  return salesWarehouse(u);
 }

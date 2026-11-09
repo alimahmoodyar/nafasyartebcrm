@@ -11,7 +11,7 @@ import {trainingContext} from './training-context';
 import {isIsoDay} from './persian-date';
 import {latestSalesTemplate,selectFixedSalesTemplate,promotionEndDay,overlappingSalesPromotion} from './sales-template';
 import {maxSalesPaymentDays} from './sales-payment-terms';
-export async function networkActor(u:Session){const members=await leadMembers();if(trainingContext.getStore())fail('این بخش در اطلاعات شرکت اجرا می‌شود.',403);if(!u.isAdmin){const m=members.find(m=>m.status==='active'&&(m.subject===u.userId||'local:'+m.id===u.userId));if(!m)fail('دسترسی فعال لازم است.',403);u={...u,permissions:storedAccessPermissions(m.permissions)};}if(!salesRead(u))fail('دسترسی فروش لازم است.',403);return {u,members};}
+export async function networkActor(u:Session){const members=await leadMembers();if(trainingContext.getStore())fail('این بخش در اطلاعات شرکت اجرا می‌شود.',403);if(!u.isAdmin&&!u.profileReview){const m=members.find(m=>m.status==='active'&&(m.subject===u.userId||'local:'+m.id===u.userId));if(!m)fail('دسترسی فعال لازم است.',403);u={...u,permissions:storedAccessPermissions(m.permissions)};}if(!salesRead(u))fail('دسترسی فروش لازم است.',403);return {u,members};}
 export async function readBuyerAssignments(actor:Session){
  const {u,members}=await networkActor(actor);if(!salesManager(u))fail('تخصیص خریدار فقط توسط مدیر فروش انجام می‌شود.',403);
  const eligible=members.filter(leadEligible).map(m=>({id:m.id,name:m.name}));
