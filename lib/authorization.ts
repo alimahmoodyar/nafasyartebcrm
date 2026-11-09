@@ -1,3 +1,4 @@
+import {isUnscopedRepresentative} from './permissions';
 import {profileReviewCookie,profileSession,validProfileScope} from './profile-review';
 import {financialAccess} from './financial-access';
 import {localSession} from "@/lib/password-auth";
@@ -23,7 +24,7 @@ export async function realSession(): Promise<Session> {
 async function currentSession():Promise<Session>{
  const user=await realSession();if(!user.isAdmin)return user;
  let token:string|undefined;let profile:string|undefined;try{const jar=await cookies();token=jar.get(rolePreviewCookie)?.value;profile=jar.get(profileReviewCookie)?.value;}catch{return user;}
- if(profile){try{const [profileId,buyerId='',invalid]=profile.split('~');if(invalid!==undefined||!await validProfileScope(profileId,buyerId))throw Error('invalid buyer');const ws=(await storage().prepare("SELECT id,data FROM flow_entities WHERE type='material_warehouse'").all()).results.map((w:any)=>({...w,data:JSON.parse(w.data)}));return profileSession(user,profileId,ws,buyerId);}catch{throw new AccessError('پروفایل آزمایشی معتبر نیست؛ از انتخاب پروفایل خارج شوید.',403);}}
+ if(profile){try{const [profileId,buyerId='',invalid]=profile.split('~');if(invalid!==undefined||!await validProfileScope(profileId,buyerId,true))throw Error('invalid buyer');const ws=(await storage().prepare("SELECT id,data FROM flow_entities WHERE type='material_warehouse'").all()).results.map((w:any)=>({...w,data:JSON.parse(w.data)}));return profileSession(user,profileId,ws,buyerId);}catch{throw new AccessError('پروفایل آزمایشی معتبر نیست؛ از انتخاب پروفایل خارج شوید.',403);}}
  if(!token||!/^[a-f0-9]{64}$/.test(token))return user;
  const row:any=await storage().prepare("SELECT m.*,r.admin_name FROM role_preview_sessions r JOIN app_members m ON m.id=r.member_id WHERE r.token_hash=? AND r.expires>? AND m.status='active'").bind(await digest(token),new Date().toISOString()).first();
  if(!row)return user;
@@ -57,6 +58,7 @@ export async function session(allowPasswordChange=false):Promise<Session>{
 export function can(user: Session, kind: Kind, operation: "read" | "write") {return user.isAdmin || user.permissions[operation].includes(kind);}
 export async function requireAccess(kind?: Kind, operation: "read" | "write" = "read") {
   const user = await session();
+  if(isUnscopedRepresentative(user))throw new AccessError('برای دسترسی به اطلاعات، نمایندگی را انتخاب کنید.',403);
   if(user.permissions.hospitalCenterId)throw new AccessError("این حساب فقط به پنل مرکز بیمارستانی دسترسی دارد.",403);
   if (kind && !can(user, kind, operation)) throw new AccessError("دسترسی این بخش برای حساب شما مجاز نیست.", 403);
   return user;

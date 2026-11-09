@@ -1,6 +1,6 @@
 import {returnRoles} from './sales-return-contract';
 import {financeStandaloneSections,financeTarget} from './finance-workspace';
-import {accessPermissions} from './permissions';
+import {accessPermissions,isUnscopedRepresentative} from './permissions';
 import {programsForRoles,selfServicePrograms} from './workflow-programs';
 import {financialWorkflowRole} from './financial-workflow-roles';
 import {financialAccess} from './financial-access';
@@ -8,6 +8,7 @@ import {canGenerateActivationCode} from './activation-code-access';
 import {routineRoles} from './routine-production';
 import {projectRoles} from './build-projects';
 import {buildIntakeRoles} from './build-intake-access';
+
 import {costRead} from './costing';
 import {pricingRead} from './pricing-access';
 import {salesRead,salesWarehouse,salesStaff,salesManager,salesFinance} from './sales-access';
@@ -23,6 +24,7 @@ const can=(u:Session,kind:Kind,operation:'read'|'write'='read')=>u.isAdmin||u.pe
 
 /** One navigation policy shared by the browser shell and the assistant. */
 export function canOpenSection(user:Session,s:string):boolean{
+ if(isUnscopedRepresentative(user))return false;
  const p=accessPermissions(user.permissions),u={...user,permissions:p};
  const internal=!p.hospitalCenterId&&!p.salesAgentId&&!p.serviceAgentId;
  // The inbox is a shared workspace. Showing its entry does not grant access
