@@ -1,3 +1,5 @@
+import * as labelTemplates from '@/app/api/label-templates/route';
+import * as batchLabels from '@/app/api/batch-labels/route';
 import * as warehouseMovements from '@/app/api/warehouse/movements/route';
 import * as buildProjects from '@/app/api/build-projects/route';
 import * as expenseRegister from '@/app/api/expense-register/route';
@@ -90,6 +92,8 @@ export const trainingRoutes:Record<string,Record<string,any>>={
  'suppliers/files':route25,
  'suppliers/quality':route26,
  'serials/print':route27,
+ 'label-templates':labelTemplates,
+ 'batch-labels':batchLabels,
  'transport/files':route28,
  'after-sales/print':route29,
  'after-sales/files':route30,
