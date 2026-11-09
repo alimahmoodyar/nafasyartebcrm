@@ -16,6 +16,7 @@ import {serviceRead} from './service-access';
 import {warehouseAccess,flowRole} from './material-flow';
 import {serviceReadDomains} from './service-access';
 import {warehouseLegacySections,warehouseTarget,type WarehouseEntry} from './warehouse-workspace';
+import {shortageRoles} from './handoff-shortage';
 
 const can=(u:Session,kind:Kind,operation:'read'|'write'='read')=>u.isAdmin||u.permissions[operation].includes(kind);
 
@@ -26,6 +27,7 @@ export function canOpenSection(user:Session,s:string):boolean{
  // The inbox is a shared workspace. Showing its entry does not grant access
  // to any task or conversation; the corresponding APIs scope each record.
  if(s==='tasks')return true;
+ if(s==='fulfillment'&&internal&&Object.values(shortageRoles(u)).some(Boolean))return true;
  if(s==='routine-production'&&internal&&u.productionParticipant===true)return true;
  if(s==='warehouse')return internal&&(!!p.supplyRoles?.includes('inventory')||canOpenSection(u,'flow')||canOpenSection(u,'inventory')||canOpenSection(u,'batch')||canOpenSection(u,'fulfillment')&&warehouseAccess(u,'finished')||canOpenSection(u,'after-sales')&&!!p.serviceRoles?.includes('inventory'));
  if(!u.isAdmin&&!selfServicePrograms.includes(s)){
@@ -57,7 +59,7 @@ export function canOpenSection(user:Session,s:string):boolean{
  if(s==='after-sales')return serviceRead(u);
  if(s==='sourcing')return !!p.qmsRoles?.some(r=>['qa','qc'].includes(r))||!!p.flowRoles?.includes('qc')||!!p.supplyRoles?.length||!!p.flowRoles?.some(r=>['inventory','logistics'].includes(r))||!!p.transportRoles?.includes('manager');
  if(['users','llm','finance','system-reset'].includes(s))return false;
- if(s==='fulfillment')return warehouseAccess(u,'finished')||salesStaff(u)||!!p.salesAgentId||!!p.flowRoles?.some(r=>['inventory','production','sales','logistics'].includes(r));
+ if(s==='fulfillment')return !!p.supplyRoles?.some(r=>r==='finance'||r==='ceo')||warehouseAccess(u,'finished')||salesStaff(u)||!!p.salesAgentId||!!p.flowRoles?.some(r=>['inventory','production','sales','logistics'].includes(r));
  if(s==='flow')return !!p.warehouseResponsibilities?.length||!!p.flowRoles?.some(r=>['inventory','qc','production','procurement'].includes(r))||!!p.supplyRoles?.includes('engineering');
  if(s==='finance-control')return financialAccess(u,'control')||financialAccess(u,'purchase');
  return can(u,(s==='inventory'?'batch':['serials','analytics'].includes(s)?'device':s) as Kind,'read');
@@ -67,6 +69,7 @@ export function canOpenSection(user:Session,s:string):boolean{
 export function sectionDestination(user:Session,section:string,target=''){
  if(user.isAdmin&&financeStandaloneSections.includes(section as any)&&canOpenSection(user,section))return {section:'finance',target:financeTarget(section,target)};
  const p=accessPermissions(user.permissions);
+ if(section==='fulfillment'&&target.startsWith('handoff-shortage:'))return {section,target};
  if(warehouseLegacySections.includes(section as any)&&canOpenSection(user,section)&&canOpenSection(user,'warehouse'))return {section:'warehouse',target:warehouseTarget(section,target)};
  if(section==='assets'&&!user.isAdmin&&!p.assetRoles?.includes('custodian')&&!p.hospitalCenterId&&!p.salesAgentId&&!p.serviceAgentId)return {section:'personnel',target:'asset:'+target};
  return {section,target};
