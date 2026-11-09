@@ -1,6 +1,7 @@
 import {storage} from './storage';
 import {resolveRoleAssignment,type Session} from './permissions';
 import {roleProfiles} from './role-profiles';
+
 export const profileReviewCookie='__Host-nafasyar-profile-review';
 export const profileJobRoles:Record<string,string[]>={
  'central-store':['inventory'],'line-store':['production_store_assistant'],'line-manager':['production'],
@@ -13,7 +14,8 @@ export const profileJobRoles:Record<string,string[]>={
 /** An authenticated admin tests a position's grants; the actor never becomes a person. */
 export function profileSession(admin:Session,id:string,warehouses:any[],buyerId=''):Session{
  const profile=roleProfiles.find(p=>p.id===id);if(!admin.isAdmin||!profile)throw Error('پروفایل معتبر مدیر لازم است.');
- if((profile.buyerScope==='required'&&!buyerId)||(!profile.buyerScope&&!profile.missionScope&&buyerId))throw Error('پرونده خریدار برای این پروفایل معتبر نیست.');
+ if((!profile.buyerScope&&!profile.missionScope&&buyerId))throw Error('پرونده خریدار برای این پروفایل معتبر نیست.');
+ if(profile.buyerScope==='required'&&!buyerId)return {...admin,isAdmin:false,permissions:{read:[],write:[],eventStages:[],manualPrograms:[]},profileReview:{id,title:profile.title,warehouseIds:[]},productionParticipant:false};
  const roles=profileJobRoles[id];if(!roles)throw Error('مجوزهای این پروفایل تعریف نشده است.');
  const selected=warehouses.filter(w=>w.data.active&&!w.data.deletedAt&&(id==='quality'||id==='line-store'?id==='quality'||w.data.warehouseType==='production_line':!w.data.serviceDomain&&!['production_line','quarantine'].includes(w.data.warehouseType)));
  const responsibilities=['central-store','line-store','quality'].includes(id)?selected.map(w=>({warehouseId:w.id,role:(id==='quality'?'qc':'inventory') as 'inventory'|'qc'})):[];
@@ -31,9 +33,9 @@ export async function profileScopeChoices(profileId:string){
  const rows=(await storage().prepare("SELECT id,json_extract(data,'$.name') AS name FROM flow_entities WHERE type='sales_agent' AND json_extract(data,'$.active')=1 AND json_extract(data,'$.kind')<>'referrer' AND (?<>'required' OR json_extract(data,'$.kind') IN ('representative','reseller')) ORDER BY name,id").bind(profile.buyerScope).all<{id:string;name:string}>()).results;
  return rows.filter(row=>/^[A-Za-z0-9:_-]{1,160}$/.test(row.id));
 }
-export async function validProfileScope(profileId:string,buyerId:string){
+export async function validProfileScope(profileId:string,buyerId:string,allowUnscoped=false){
  const profile=roleProfiles.find(p=>p.id===profileId);
- if(!buyerId)return profile?.buyerScope!=='required';
+ if(!buyerId)return !!profile&&(allowUnscoped||profile.buyerScope!=='required');
  if((!profile?.buyerScope&&!profile?.missionScope)||!/^[A-Za-z0-9:_-]{1,160}$/.test(buyerId))return false;
  if(profile.missionScope)return !!await storage().prepare("SELECT 1 FROM flow_entities WHERE id=? AND type='transport' AND json_extract(data,'$.driverId')<>'' AND json_extract(data,'$.state') NOT IN ('cancelled','requested')").bind(buyerId).first();
  return !!await storage().prepare("SELECT 1 FROM flow_entities WHERE id=? AND type='sales_agent' AND json_extract(data,'$.active')=1 AND json_extract(data,'$.kind')<>'referrer' AND (?<>'required' OR json_extract(data,'$.kind') IN ('representative','reseller'))").bind(buyerId,profile.buyerScope).first();

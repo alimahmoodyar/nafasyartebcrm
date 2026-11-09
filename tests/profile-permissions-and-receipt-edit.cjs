@@ -46,7 +46,17 @@ assert.equal(repProfile.userId,admin.userId);assert.equal(repProfile.permissions
 assert.equal(navigation.canOpenSection(repProfile,'build-intake'),false);
 assert.equal(navigation.canOpenSection(hospitalProfile,'build-intake'),true);
 assert.equal(await salesView.salesVisible(hospitalProfile,row('scope-buyer-a')),true);assert.equal(await salesView.salesVisible(hospitalProfile,row('scope-buyer-b')),false);
-for(const buyerId of ['', 'scope-inactive']){const r=await ctx.run(admin,()=>profileApi.POST(request('/api/role-profiles',{id:crypto.randomUUID(),mode:'select_profile',profileId:'sales-representative',buyerId,confirmed:true})));assert.equal(r.status,400);}
+for(const buyerId of ['scope-inactive']){const r=await ctx.run(admin,()=>profileApi.POST(request('/api/role-profiles',{id:crypto.randomUUID(),mode:'select_profile',profileId:'sales-representative',buyerId,confirmed:true})));assert.equal(r.status,400);}
+const unscoped=await ctx.run(admin,()=>profileApi.POST(request('/api/role-profiles',{id:crypto.randomUUID(),mode:'select_profile',profileId:'sales-representative',buyerId:'',confirmed:true})));
+assert.equal(unscoped.status,200);assert.match(unscoped.headers.get('set-cookie'),/sales-representative;/);
+cookieValues[review.profileReviewCookie]='sales-representative';
+const shell=await ctx.run(admin,()=>auth.session());
+assert.equal(shell.isAdmin,false);assert.equal(shell.profileReview.id,'sales-representative');
+assert.equal(navigation.canOpenSection(shell,'sales'),false);assert.equal(navigation.canOpenSection(shell,'tasks'),false);
+await assert.rejects(()=>ctx.run(admin,()=>auth.requireAccess()),e=>e.status===403);
+const shellCard=await ctx.run(admin,()=>profileApi.GET(request('/api/role-profiles?profile=sales-representative')));
+const shellData=await shellCard.json();assert.equal(shellData.activeProfile,'sales-representative');assert.equal(shellData.needsBuyer,true);assert.deepEqual(shellData.work,[]);
+cookieValues={};
 const selectedRepresentative=await ctx.run(admin,()=>profileApi.POST(request('/api/role-profiles',{id:crypto.randomUUID(),mode:'select_profile',profileId:'sales-representative',buyerId:'scope-buyer-a',confirmed:true})));
 assert.equal(selectedRepresentative.status,200);assert.match(selectedRepresentative.headers.get('set-cookie'),/sales-representative~scope-buyer-a/);
 entity('preview-mission','transport',{code:'TR-PREVIEW',state:'assigned',driverId:'driver-real',kind:'purchase_order',items:[],history:[]});

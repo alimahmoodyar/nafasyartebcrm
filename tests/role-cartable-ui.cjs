@@ -18,6 +18,18 @@ const renderHospital=()=>{cursor=0;return RoleTestingPanel({targetId:hospital.id
 assert.ok(nodes(renderHospital()).some(n=>n.type==='button'&&text(n).startsWith('کارتابل')));
 nodes(renderHospital()).find(n=>n.type==='button'&&text(n)==='انتخاب پرونده خریدار').props.onClick();await new Promise(r=>setImmediate(r));
 assert.ok(nodes(renderHospital()).some(n=>n.type==='option'&&n.props.value==='buyer'));
+const representative={id:'sales-representative',title:'نماینده فروش',operational:true,buyerScope:'required',links:[],gaps:[]};
+response={profiles:[representative]};await mount(renderCatalog);
+profileRequests=[];nodes(renderCatalog()).find(n=>n.type==='button'&&text(n).includes(representative.title)).props.onClick();await new Promise(r=>setImmediate(r));
+assert.equal(profileRequests[0].options.method,'POST');
+assert.equal(JSON.parse(profileRequests[0].options.body).buyerId,'');
+assert.deepEqual(navigation.pop(),['role-testing','sales-representative']);
+response={activeProfile:representative.id,profile:representative,work:[],unverified:[],needsBuyer:true,buyerChoices:[{id:'buyer',name:'نمایندگی نمونه'}]};
+const renderRepresentative=()=>{cursor=0;return RoleTestingPanel({targetId:representative.id,onNavigate:navigate,onProfile(){}})};
+await mount(renderRepresentative);
+assert.ok(nodes(renderRepresentative()).some(n=>n.type==='select'));
+assert.equal(nodes(renderRepresentative()).find(n=>n.type==='button'&&text(n).startsWith('کارتابل')).props.disabled,true);
+assert.ok(!nodes(renderRepresentative()).some(n=>n.type==='button'&&text(n)==='ورود به پروفایل'));
 response={profileReview:{id:'central-store',title:'مسئول انبار مرکزی'},positionWork:[],pendingQuality:2,tasks:[],notifications:[],definitions:[],ownPositions:[],isAdmin:false};const render=()=>{cursor=0;return TasksPanel({demo:false,onNavigate:navigate})};await mount(render);assert.ok(text(render()).includes('پس از تأیید، کار جانمایی همین‌جا ظاهر می‌شود'));assert.ok(nodes(render()).some(n=>n.type===leaves.SubprogramNavigation&&n.props.items.some(i=>i[0]==='inbox')&&n.props.items.some(i=>i[0]==='process')));
 response={...response,positionWork:[{id:'shelf',title:'جانمایی محموله تأییدشده',section:'warehouse',target:'specific-receipt'}],pendingQuality:0};await mount(render);const work=nodes(render()).find(n=>n.type==='article'&&text(n).includes('جانمایی محموله'));assert.ok(work);nodes(work).find(n=>n.type==='button').props.onClick();assert.deepEqual(navigation.pop(),['warehouse','specific-receipt']);assert.ok(!text(render()).includes('تعیین و برنامه‌ها را فعال کنید'));
 const renderInbox=()=>{cursor=0;return TasksPanel({demo:false,onNavigate:navigate,targetId:'inbox'})};
