@@ -4,7 +4,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 const root=fileURLToPath(new URL('../',import.meta.url));
 const out=path.resolve(process.argv[2]);
-const result=await build({root,configFile:false,resolve:{alias:{'@':root}},oxc:{jsx:{runtime:'automatic'}},build:{write:false,minify:true,lib:{entry:path.join(root,'survey-site/public-survey.tsx'),name:'HospitalSurvey',formats:['iife']}}});
+const result=await build({root,configFile:false,define:{"process.env.NODE_ENV":JSON.stringify("production")},resolve:{alias:{'@':root}},oxc:{jsx:{runtime:'automatic'}},build:{write:false,minify:true,lib:{entry:path.join(root,'survey-site/public-survey.tsx'),name:'HospitalSurvey',formats:['iife']}}});
 const script=(Array.isArray(result)?result[0]:result).output.find(item=>item.type==='chunk').code;
 mkdirSync(path.join(out,'worker'),{recursive:true});
 const worker=readFileSync(path.join(root,'survey-site/worker.js'),'utf8');
