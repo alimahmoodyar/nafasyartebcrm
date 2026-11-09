@@ -242,3 +242,4 @@ resetHelp.push('راهنماهای عیب‌یابی محصول، تاریخچه
 // Exact-master receipt template synchronization uses existing operational receipt JSON,
 // inventory_operations and access_audit. Both reset scopes cover these; existing 0016
 // freeze prevents partial activation. Read filters/history and catalog storage events add no business table or blob.
+// Versioned sales returns and replacement sales use existing flow_entities; both reset scopes back up and delete them. Existing freeze guards cover duties, inventory and sales-file waybills.

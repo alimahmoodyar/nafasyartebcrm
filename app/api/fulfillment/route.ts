@@ -32,7 +32,7 @@ export async function GET(){try{
  const legacy=all.find(t=>t.type==='finaltest'&&t.data.deviceId===e.id&&t.data.buildRevision===e.revision);
  return {id:e.id,revision:e.revision,created:e.created,data:{...e.data,latestQc:e.data.latestQc===undefined&&legacy?{verdict:legacy.data.verdict,by:legacy.data.by,reportId:legacy.data.reportId}:e.data.latestQc},printRecorded:prints.has(e.data.planId)};});
  const members=(await db.prepare("SELECT id,name,subject,permissions FROM app_members WHERE status='active'").all()).results.map((m:any)=>({id:m.id,name:m.name,subject:m.subject,permissions:storedAccessPermissions(m.permissions)}));
- const salesVisible=all.filter(e=>e.type==='sale'&&(!inventory||!e.data.salesOrderId||!all.some(order=>order.id===e.data.salesOrderId&&order.data.securedPolicy&&order.data.state!=='approved'))&&(inventory||salesStaff(u)||salesRep(u)&&e.data.salesAgentId===u.permissions.salesAgentId||logistics&&['local:'+e.data.carrierId,e.data.carrierSubject].includes(u.userId)));
+ const salesVisible=all.filter(e=>e.type==='sale'&&(!e.data.replacementReturnId||e.data.replacementReady)&&(!inventory||!e.data.salesOrderId||!all.some(order=>order.id===e.data.salesOrderId&&order.data.securedPolicy&&order.data.state!=='approved'))&&(inventory||salesStaff(u)||salesRep(u)&&e.data.salesAgentId===u.permissions.salesAgentId||logistics&&['local:'+e.data.carrierId,e.data.carrierSubject].includes(u.userId)));
  const orderVisible=all.filter(e=>e.type==='sales_order'&&e.data.state==='approved'&&(inventory||salesStaff(u)||salesRep(u)&&e.data.agentId===u.permissions.salesAgentId));
  return json({warehouses:physical.filter(w=>w.data.active&&(production||warehouseMember(u,w,'inventory'))).map(w=>({id:w.id,name:w.data.name,canReceive:warehouseMember(u,w,'inventory')})),builds,rows,handoffs,sales:salesVisible,orders:orderVisible.map(e=>({id:e.id,created:e.created,data:{code:e.data.code,agentId:e.data.agentId,recipient:e.data.recipient,lines:e.data.lines,deliveryMode:e.data.deliveryMode}})),carriers:inventory?members.filter(m=>(m.permissions.flowRoles?.includes('logistics')||m.permissions.transportRoles?.includes('driver'))).map(m=>({id:m.id,name:m.name})):[],roles:{production,inventory,sales,logistics,shortage}});
  }catch(e){return accessResponse(e)||Response.json({error:'دریافت کارتابل محصول نهایی انجام نشد.'},{status:503})}}
@@ -122,7 +122,7 @@ export async function POST(request:Request){try{
  // Use the registered profile directly; keep only a shipment snapshot, never a separate party master.
  const p={id:agent.id,data:{name:needed(agent.data.name),phone:text(agent.data.phone||agent.data.mobile||'',50),address:needed(agent.data.address,2000),kind:agent.data.kind||'representative',salesAgentId:agent.id}};
  const productId=needed(b.productId),count=Number(b.count);if(!Number.isInteger(count)||count<1||count>100)fail('تعداد بین ۱ تا ۱۰۰ باشد.');
- if(order){const line=order.data.lines.find((l:any)=>l.productId===productId);if(!line)fail('محصول در سفارش نیست.');const used:any=await db.prepare("SELECT COALESCE(SUM(json_extract(data,'$.count')),0) AS n FROM flow_entities WHERE type='sale' AND json_extract(data,'$.salesOrderId')=? AND json_extract(data,'$.productId')=? AND json_extract(data,'$.state')!='cancelled'").bind(order.id,productId).first();if(used.n+count>line.quantity)fail('تعداد حواله‌ها از تعداد سفارش بیشتر می‌شود.');}
+ if(order){const line=order.data.lines.find((l:any)=>l.productId===productId);if(!line)fail('محصول در سفارش نیست.');const used:any=await db.prepare("SELECT COALESCE(SUM(json_extract(data,'$.count')),0) AS n FROM flow_entities WHERE type='sale' AND json_extract(data,'$.salesOrderId')=? AND json_extract(data,'$.productId')=? AND json_extract(data,'$.state')!='cancelled' AND json_extract(data,'$.replacementReturnId') IS NULL").bind(order.id,productId).first();if(used.n+count>line.quantity)fail('تعداد حواله‌ها از تعداد سفارش بیشتر می‌شود.');}
  let selected:string[];
  if(Array.isArray(b.deviceIds)&&b.deviceIds.length)selected=ids(b.deviceIds);else selected=(await db.prepare("SELECT f.id FROM flow_entities f JOIN records r ON r.id=f.id WHERE f.type='build' AND json_extract(f.data,'$.state')='finished' AND json_extract(r.payload,'$.product')=? ORDER BY json_extract(f.data,'$.receivedAt'),f.id LIMIT ?").bind(productId,count).all()).results.map((r:any)=>r.id);
  if(selected.length!==count)fail('موجودی آزاد برای این تعداد کافی نیست.',409);
@@ -132,14 +132,15 @@ export async function POST(request:Request){try{
  const sale=await get(needed(b.saleId),'sale');if(sale.data.state!=='reserved')fail('فقط رزرو ارسال‌نشده قابل لغو است.');const reason=needed(b.reason,4000);
  for(const did of sale.data.deviceIds){const build=await get(did,'build');if(build.data.state!=='reserved'||build.data.saleId!==sale.id)fail('وضعیت رزرو تغییر کرده است.',409);put(did,'build',{...build.data,state:'finished',saleId:null},build);event(did,'لغو رزرو فروش',{notes:reason});}put(sale.id,'sale',{...sale.data,state:'cancelled',reason,cancelledBy:u.name,cancelledAt:now},sale);
  }else if(mode==='dispatch'){
- const primary=await get(needed(b.saleId),'sale');if(primary.data.state!=='reserved')fail('این حواله قبلاً خارج یا لغو شده است.',409);
+ const primary=await get(needed(b.saleId),'sale');if(primary.data.state!=='reserved'||primary.data.replacementReturnId&&!primary.data.replacementReady)fail('این حواله قبلاً خارج یا لغو شده است.',409);
  if(primary.data.salesOrderId){
   const order=await get(primary.data.salesOrderId,'sales_order');
   if(order.data.securedPolicy&&(order.data.state!=='approved'||!order.data.invoiceId))fail('ابتدا مالی فاکتور سفارش را صادر کند.',409);
  }
  const related=b.includeOrder===true&&primary.data.salesOrderId?(await list('sale')).filter(line=>line.id!==primary.id&&line.data.salesOrderId===primary.data.salesOrderId&&line.data.state==='reserved'):[];
  const sales=[primary,...related];
- if(related.some(line=>line.data.salesAgentId!==primary.data.salesAgentId||line.data.partyId!==primary.data.partyId||JSON.stringify(line.data.recipient)!==JSON.stringify(primary.data.recipient)))fail('گیرندهٔ حواله‌های این سفارش یکسان نیست.');
+ const recipientKey=(r:any)=>[r?.name,r?.phone||r?.mobile,r?.address];
+ if(related.some(line=>line.data.salesAgentId!==primary.data.salesAgentId||line.data.partyId!==primary.data.partyId||JSON.stringify(recipientKey(line.data.recipient))!==JSON.stringify(recipientKey(primary.data.recipient))))fail('گیرندهٔ حواله‌های این سفارش یکسان نیست.');
  const chosen=ids(b.deviceIds);
  if(chosen.length!==sales.reduce((sum,line)=>sum+line.data.count,0))fail('تعداد سریال خروج باید برابر مجموع حواله‌های آماده باشد.');
  const swaps=new Map<string,string[]>();
@@ -150,6 +151,7 @@ export async function POST(request:Request){try{
  for(const sale of sales){
  const selected=chosen.filter(did=>sale.data.deviceIds.includes(did));
  selected.push(...(swaps.get(sale.data.productId)||[]).splice(0,sale.data.count-selected.length));
+ if(sale.data.replacementReturnId&&selected.some(did=>!sale.data.deviceIds.includes(did)))fail('سریال جایگزین را از همان پرونده مرجوعی پیگیری کنید.',409);
  if(selected.length!==sale.data.count)fail('تعداد سریال هر مدل باید با حوالهٔ همان مدل برابر باشد.');
  const changed=JSON.stringify([...selected].sort())!==JSON.stringify([...sale.data.deviceIds].sort());const reason=text(b.reason||'',4000);if(changed&&!reason)fail('علت تغییر سریال‌های پیشنهادی را بنویسید.');if(b.handedOver!==true)fail('تحویل فیزیکی به تدارکات را تأیید کنید.');
  for(const did of sale.data.deviceIds.filter((d:string)=>!selected.includes(d))){const build=await get(did,'build');if(build.data.state!=='reserved'||build.data.saleId!==sale.id)fail('رزرو تغییر کرده است.',409);put(did,'build',{...build.data,state:'finished',saleId:null},build);event(did,'آزادسازی سریال رزرو',{notes:reason});}

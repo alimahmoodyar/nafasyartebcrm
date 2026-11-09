@@ -1,3 +1,4 @@
+import {returnRoles} from './sales-return-contract';
 import {financeStandaloneSections,financeTarget} from './finance-workspace';
 import {accessPermissions} from './permissions';
 import {programsForRoles,selfServicePrograms} from './workflow-programs';
@@ -27,6 +28,7 @@ export function canOpenSection(user:Session,s:string):boolean{
  // The inbox is a shared workspace. Showing its entry does not grant access
  // to any task or conversation; the corresponding APIs scope each record.
  if(s==='tasks')return true;
+ if(s==='sales-returns')return Object.values(returnRoles(u)).some(Boolean);
  if(s==='fulfillment'&&internal&&Object.values(shortageRoles(u)).some(Boolean))return true;
  if(s==='routine-production'&&internal&&u.productionParticipant===true)return true;
  if(s==='warehouse')return internal&&(!!p.supplyRoles?.includes('inventory')||canOpenSection(u,'flow')||canOpenSection(u,'inventory')||canOpenSection(u,'batch')||canOpenSection(u,'fulfillment')&&warehouseAccess(u,'finished')||canOpenSection(u,'after-sales')&&!!p.serviceRoles?.includes('inventory'));

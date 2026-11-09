@@ -1,4 +1,5 @@
 "use client";
+import {SalesReturnPanel,DeviceSalesReturnHistory} from '@/components/trace/sales-return-panel';
 import {DeviceBom} from '@/components/trace/bom-list';
 import {WarehouseHistoryPanel} from '@/components/trace/warehouse-history-panel';
 import {WarehouseHub} from '@/components/trace/warehouse-hub';
@@ -76,7 +77,7 @@ import {RoleTestingPanel} from "@/components/trace/role-testing-panel";
 const nf=new Intl.NumberFormat("fa-IR");const num=(n:number)=>nf.format(n);
 const date=(s?:string)=>s?formatDate(s):"—";
 import {financeHomeApps,financeHomeAliases} from '@/lib/finance-workspace';
-const sections=[...manualPermissionSections.filter(s=>s.key!=='users'),{key:'warehouse',title:'انبار',icon:Boxes}];
+const sections=[...manualPermissionSections.filter(s=>s.key!=='users'),{key:'warehouse',title:'انبار',icon:Boxes},{key:'sales-returns',title:'مرجوعی دستگاه',icon:Boxes}];
 // These legacy records share a table; business modules render their own panels.
 const recordTableSections:Kind[]=['product','device','batch','service','action'];
 function Badge({value}:{value:string}){return <span className={"badge "+(["تأیید","تحویل","بسته‌شده","تعمیرشده"].includes(value)?"good":["قرنطینه","رد","مردود"].includes(value)?"bad":["باز","در حال بررسی","در حال اجرا","نیاز به دوباره‌کاری"].includes(value)?"warn":"")}>{value}</span>}
@@ -177,7 +178,7 @@ function Workspace(){
  {visibleSections.some(s=>s.key==="assets")&&<TabsContent value="assets"><AssetsPanel key={identity.userId} demo={demo} targetId={workTarget}/></TabsContent>}
  {visibleSections.some(s=>s.key==="personnel")&&<TabsContent value="personnel"><PersonnelPanel demo={demo} targetId={workTarget}/></TabsContent>}
  {visibleSections.some(s=>s.key==="reminders")&&<><TabsContent value="reminders"><RemindersPanel key={identity.userId+String(demo)} accountId={identity.userId} demo={demo} onOpenThread={id=>navigate("tasks",id)}/></TabsContent>{!demo&&<ReminderNotifier key={identity.userId} accountId={identity.userId} onOpen={()=>navigate("reminders")}/>}</>}{visibleSections.some(s=>s.key==="pricing")&&<TabsContent value="pricing"><PricingPanel demo={demo}/></TabsContent>}{visibleSections.some(s=>s.key==="sales-bank")&&<TabsContent value="sales-bank"><SalesBankPanel/></TabsContent>}{visibleSections.some(s=>s.key==="treasury")&&<TabsContent value="treasury"><TreasuryPanel demo={demo} targetId={workTarget}/></TabsContent>}{visibleSections.some(s=>s.key==="guarantees")&&<TabsContent value="guarantees"><GuaranteesPanel demo={demo} targetId={workTarget}/></TabsContent>}{visibleSections.some(s=>s.key==="build-intake")&&<TabsContent value="build-intake"><BuildIntakePanel key={identity.userId} demo={demo} targetId={workTarget} onNavigate={navigate}/></TabsContent>}{visibleSections.some(s=>s.key==="build-projects")&&<TabsContent value="build-projects"><BuildProjectsPanel demo={demo} targetId={workTarget} onNavigate={navigate}/></TabsContent>}{visibleSections.some(s=>s.key==="costing")&&<TabsContent value="costing"><CostingPanel demo={demo}/></TabsContent>}
- {(financialAccess(identity,'control')||financialAccess(identity,'purchase'))&&<TabsContent value="finance-control"><FinanceControl write={financialAccess(identity,'control',true)} reports={financialAccess(identity,'control')} purchase={financialAccess(identity,'purchase')} targetId={workTarget} demo={demo}/></TabsContent>}
+ {visibleSections.some(s=>s.key==="sales-returns")&&<TabsContent value="sales-returns"><SalesReturnPanel targetId={workTarget} demo={demo}/></TabsContent>}{(financialAccess(identity,'control')||financialAccess(identity,'purchase'))&&<TabsContent value="finance-control"><FinanceControl write={financialAccess(identity,'control',true)} reports={financialAccess(identity,'control')} purchase={financialAccess(identity,'purchase')} targetId={workTarget} demo={demo}/></TabsContent>}
  <TabsContent value="llm-usage"><LlmUsagePanel key={identity.userId} accountId={identity.userId} demo={demo}/></TabsContent><TabsContent value="mobile-install"><MobileInstall/></TabsContent>{identity.isAdmin&&<TabsContent value="llm"><LlmSettings/></TabsContent>}
  {identity.isAdmin&&<TabsContent value="finance"><FinanceWorkspace user={identity} targetId={workTarget}/></TabsContent>}
  {canRead("device")&&<TabsContent value="analytics"><DeviceAnalytics key={demo?"demo":"real"} demo={demo} records={rows} onBack={()=>navigate("overview")}/></TabsContent>}
@@ -197,6 +198,7 @@ function Workspace(){
  {detail.kind==="device"&&!demo&&(identity.isAdmin||!!identity.permissions.serviceRoles?.length)&&<ServicePassport serial={detail.data.code} domains={identity.isAdmin?["home","hospital"]:identity.permissions.serviceDomains||[]} onOpen={()=>{setSelected(null);navigate("after-sales")}}/>}
  {detail.kind==="device"&&canRead("event")&&<QualityPanel key={detail.id+String(demo)} id={detail.id} mode="device" demo={demo} write={canWrite("event")&&identity.permissions.eventStages.includes("آزمون نهایی")} onSaved={()=>void reload()}/> }
  {detail.kind==="batch"&&!demo&&<BatchLabelLink batchId={detail.id}/>}
+ {detail.kind==="device"&&!demo&&<DeviceSalesReturnHistory deviceId={detail.id}/>}
  {detail.kind==="batch"&&<BatchFilesPanel key={detail.id+String(demo)} batchId={detail.id} demo={demo} write={canWrite("batch")}/> }
  {detail.kind==="batch"&&canRead("device")&&canRead("event")&&<div className="detailsection"><h2>دستگاه‌های مرتبط با این بچ</h2><p className="subtle">مصرف اولیه یا نصب در خدمات پس از فروش</p>{recordTable(devices.filter(d=>events(d.id).some(e=>e.data.batch===detail.id)||services.some(s=>s.data.device===d.id&&s.data.replacement===detail.id)),"device")}{canWrite("action")&&<button className="btn" style={{marginTop:14}} onClick={()=>start("action",{batch:detail.id})}>ثبت اقدام اصلاحی برای این بچ</button>}</div>}
  {detail.kind==="service"&&canWrite("action")&&<button className="btn primary" onClick={()=>start("action",{device:detail.data.device,batch:detail.data.batch||"",title:detail.data.complaint})}>ایجاد اقدام اصلاحی</button>}
