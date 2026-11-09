@@ -79,7 +79,7 @@ import {RoleTestingPanel} from "@/components/trace/role-testing-panel";
 const nf=new Intl.NumberFormat("fa-IR");const num=(n:number)=>nf.format(n);
 const date=(s?:string)=>s?formatDate(s):"—";
 import {financeHomeApps,financeHomeAliases} from '@/lib/finance-workspace';
-const sections=[...manualPermissionSections.filter(s=>s.key!=='users'),{key:'oxygen-capacity',title:'ظرفیت‌سنجی اکسیژن بیمارستان',icon:Calculator,group:'sales'},{key:'warehouse',title:'انبار',icon:Boxes},{key:'sales-returns',title:'مرجوعی دستگاه',icon:Boxes}];
+const sections=[...manualPermissionSections.filter(s=>s.key!=='users'),{key:'oxygen-capacity',title:'ظرفیت‌سنجی گازهای بیمارستانی',icon:Calculator,group:'sales'},{key:'warehouse',title:'انبار',icon:Boxes},{key:'sales-returns',title:'مرجوعی دستگاه',icon:Boxes}];
 // These legacy records share a table; business modules render their own panels.
 const recordTableSections:Kind[]=['product','device','batch','service','action'];
 function Badge({value}:{value:string}){return <span className={"badge "+(["تأیید","تحویل","بسته‌شده","تعمیرشده"].includes(value)?"good":["قرنطینه","رد","مردود"].includes(value)?"bad":["باز","در حال بررسی","در حال اجرا","نیاز به دوباره‌کاری"].includes(value)?"warn":"")}>{value}</span>}
