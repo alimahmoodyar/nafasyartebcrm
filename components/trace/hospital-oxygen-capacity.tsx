@@ -6,7 +6,7 @@ type Draft={id:number;kind:OxygenSection;count:string;department:string;demand:R
 const blank=(id:number,kind:OxygenSection='ward'):Draft=>({id,kind,count:'',department:'',demand:{}});
 const format=(value:number)=>value.toLocaleString('fa-IR',{maximumFractionDigits:3});
 
-export function HospitalOxygenCapacity(){
+export function HospitalOxygenCapacity({openOnLoad=false}:{openOnLoad?:boolean}){
  const [rows,setRows]=useState<Draft[]>([blank(0)]),[nextId,setNextId]=useState(1);
  const [specialUse,setSpecialUse]=useState('unknown'),[extra,setExtra]=useState('');
  const [result,setResult]=useState<OxygenEstimate|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);
@@ -29,7 +29,7 @@ export function HospitalOxygenCapacity(){
    setResult(data);
   }catch(e){setError((e as Error).message);}finally{setBusy(false);}
  }
- return <details className="flow-card">
+ return <details className="flow-card" open={openOnLoad||undefined}>
   <summary><strong>ظرفیت‌سنجی اولیه اکسیژن بیمارستان</strong></summary>
   <p>هر واحد بستری را در ردیف جدا ثبت کنید. برای واحدهای بستری یک دپارتمان، نام گروه یکسان بگذارید. در روش HTM، گروه‌بندی و فرمول‌ها مربوط به سطح ورودی بخش و دپارتمان‌اند.</p>
   <form onSubmit={submit}>
