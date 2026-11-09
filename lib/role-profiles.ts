@@ -1,7 +1,7 @@
 import {warehouseTarget} from './warehouse-workspace';
 
 export type RoleLink={title:string;section:string;target?:string;taskOnly?:boolean};
-export type RoleProfile={id:string;title:string;group:string;operational:boolean;links:RoleLink[];gaps:string[];workflowRoles:string[]};
+export type RoleProfile={id:string;title:string;group:string;operational:boolean;links:RoleLink[];gaps:string[];workflowRoles:string[];buyerScope?:'optional'|'required';missionScope?:true};
 const link=(title:string,section:string,target=''):RoleLink=>({title,section,target});
 const assigned=(entry:RoleLink):RoleLink=>({...entry,taskOnly:true});
 const warehouse=(title:string,source:string,view:string)=>link(title,'warehouse',warehouseTarget(source,'',view));
@@ -19,8 +19,13 @@ export const roleProfiles:RoleProfile[]=[
  {id:'domestic',title:'بازرگانی داخلی',group:'نقش‌های مرتبط',operational:true,workflowRoles:['domestic'],links:[assigned(link('کارتابل بازرگانی داخلی','sourcing','domestic:'))],gaps:[]},
  {id:'foreign',title:'بازرگانی خارجی',group:'نقش‌های مرتبط',operational:true,workflowRoles:['foreign'],links:[assigned(link('کارتابل بازرگانی خارجی','sourcing','foreign:'))],gaps:[]},
  {id:'sales',title:'فروش',group:'نقش‌های مرتبط',operational:true,workflowRoles:['sales'],links:[link('سفارش فروش و درخواست ارسال','sales'),link('ظرفیت‌سنجی اکسیژن بیمارستان','build-intake','oxygen-capacity')],gaps:[]},
+ {id:'hospital-sales',title:'کارشناس فروش بیمارستانی',group:'فروش',operational:true,workflowRoles:['sales'],buyerScope:'optional',links:[link('ظرفیت‌سنجی اکسیژن بیمارستان','build-intake','oxygen-capacity'),link('مشخصات سفارش ساخت','build-intake'),link('سفارش‌ها و پرونده فروش','sales'),link('مرجوعی دستگاه','sales-returns')],gaps:[]},
+ {id:'sales-representative',title:'نماینده فروش',group:'فروش',operational:true,workflowRoles:[],buyerScope:'required',links:[link('حساب و سفارش‌های نماینده','sales'),link('مرجوعی دستگاه','sales-returns'),link('پیگیری ارسال و دریافت','transport')],gaps:[]},
+ {id:'sales-manager',title:'مدیر فروش',group:'فروش',operational:true,workflowRoles:['sales'],links:[link('سفارش‌ها و شبکه فروش','sales'),link('بررسی تجاری سفارش ساخت','build-intake'),link('مرجوعی دستگاه','sales-returns')],gaps:[]},
+ {id:'sales-finance',title:'مالی فروش',group:'فروش',operational:true,workflowRoles:[],links:[link('حساب‌ها، فاکتورها و پرداخت‌های فروش','sales'),link('تطبیق بانکی فروش','sales-bank'),link('مرجوعی دستگاه','sales-returns')],gaps:[]},
  {id:'home-service',title:'خدمات پس از فروش خانگی',group:'نقش‌های مرتبط',operational:true,workflowRoles:[],links:[link('پرونده و درخواست قطعه خدمات خانگی','after-sales')],gaps:[]},
  {id:'hospital-service',title:'خدمات پس از فروش بیمارستانی',group:'نقش‌های مرتبط',operational:true,workflowRoles:[],links:[link('پرونده و درخواست قطعه خدمات بیمارستانی','after-sales')],gaps:[]},
+ {id:'driver',title:'راننده تدارکات',group:'تدارکات',operational:true,workflowRoles:[],missionScope:true,links:[link('مأموریت‌های حمل و ثبت گزارش راننده','transport')],gaps:[]},
  {id:'logistics',title:'مسئول تدارکات و حمل',group:'نقش‌های مرتبط',operational:true,workflowRoles:['logistics'],links:[link('ثبت مأموریت و گزارش حمل','transport')],gaps:[]},
 ];
 export type ProfileWork={id:string;title:string;section:string;target:string;sourceId:string;state:string;warehouseId?:string};

@@ -28,11 +28,39 @@ entity('material:11','material',{code:'11',name:'First',unit:'عدد',fields:[{k
 entity('material:12','material',{code:'12',name:'Second',unit:'عدد',fields:[{key:'right',label:'Right',type:'result',required:true}],sourcingRoutes:['foreign']});
 const profileApi=load('app/api/role-profiles/route.ts');
 const ws=()=>sql.prepare("SELECT id,data FROM flow_entities WHERE type='material_warehouse'").all().map(r=>({...r,data:JSON.parse(r.data)}));
+entity('scope-buyer-a','sales_agent',{name:'Buyer A',kind:'representative',active:true});
+entity('scope-buyer-b','sales_agent',{name:'Buyer B',kind:'representative',active:true});
+entity('scope-inactive','sales_agent',{name:'Inactive',kind:'representative',active:false});
 for(const profile of profiles.roleProfiles){
- cookieValues[review.profileReviewCookie]=profile.id;const actual=await ctx.run(admin,()=>auth.session());assert.equal(actual.userId,admin.userId);assert.equal(actual.name,admin.name);assert.equal(actual.isAdmin,false,profile.id);assert.equal(actual.profileReview.id,profile.id);assert.ok(!actual.permissions.flowRoles?.includes('qc')||profile.id==='quality',profile.id);assert.ok(!actual.permissions.supplyRoles?.includes('finance')||profile.id==='finance-director',profile.id);await assert.rejects(()=>ctx.run(admin,()=>auth.requireAdmin()),e=>e.status===403);await assert.rejects(()=>ctx.run(admin,()=>auth.requireRealAdmin()),e=>e.status===403);
+ cookieValues[review.profileReviewCookie]=profile.id+(profile.id==='sales-representative'?'~scope-buyer-a':'');const actual=await ctx.run(admin,()=>auth.session());assert.equal(actual.userId,admin.userId);assert.equal(actual.name,admin.name);assert.equal(actual.isAdmin,false,profile.id);assert.equal(actual.profileReview.id,profile.id);assert.ok(!actual.permissions.flowRoles?.includes('qc')||profile.id==='quality',profile.id);assert.ok(!actual.permissions.supplyRoles?.includes('finance')||profile.id==='finance-director',profile.id);await assert.rejects(()=>ctx.run(admin,()=>auth.requireAdmin()),e=>e.status===403);await assert.rejects(()=>ctx.run(admin,()=>auth.requireRealAdmin()),e=>e.status===403);
  const roleResponse=await ctx.run(admin,()=>flow.GET());assert.equal(roleResponse.status,['central-store','line-store','line-manager','quality','technical','domestic','foreign'].includes(profile.id)?200:403,profile.id+' API role scope');
  if(!profile.operational){assert.equal(actual.permissions.read.length,0);assert.equal(actual.permissions.write.length,0);assert.equal(navigation.canOpenSection(actual,'flow'),false);}
 }
+cookieValues={};
+const card=await ctx.run(admin,()=>profileApi.GET(request('/api/role-profiles?profile=sales-representative')));
+const cardData=await card.json();assert.equal(card.status,200,JSON.stringify(cardData));assert.equal(cardData.needsBuyer,true);
+assert.deepEqual(cardData.buyerChoices.map(b=>b.id),['scope-buyer-a','scope-buyer-b']);
+const repProfile=review.profileSession(admin,'sales-representative',ws(),'scope-buyer-a'),hospitalProfile=review.profileSession(admin,'hospital-sales',ws(),'scope-buyer-a');
+const salesView=load('lib/sales.ts');
+assert.equal(repProfile.userId,admin.userId);assert.equal(repProfile.permissions.salesAgentId,'scope-buyer-a');assert.equal(navigation.canOpenSection(repProfile,'sales-returns'),true);
+assert.equal(navigation.canOpenSection(repProfile,'build-intake'),false);
+assert.equal(navigation.canOpenSection(hospitalProfile,'build-intake'),true);
+assert.equal(await salesView.salesVisible(hospitalProfile,row('scope-buyer-a')),true);assert.equal(await salesView.salesVisible(hospitalProfile,row('scope-buyer-b')),false);
+for(const buyerId of ['', 'scope-inactive']){const r=await ctx.run(admin,()=>profileApi.POST(request('/api/role-profiles',{id:crypto.randomUUID(),mode:'select_profile',profileId:'sales-representative',buyerId,confirmed:true})));assert.equal(r.status,400);}
+const selectedRepresentative=await ctx.run(admin,()=>profileApi.POST(request('/api/role-profiles',{id:crypto.randomUUID(),mode:'select_profile',profileId:'sales-representative',buyerId:'scope-buyer-a',confirmed:true})));
+assert.equal(selectedRepresentative.status,200);assert.match(selectedRepresentative.headers.get('set-cookie'),/sales-representative~scope-buyer-a/);
+entity('preview-mission','transport',{code:'TR-PREVIEW',state:'assigned',driverId:'driver-real',kind:'purchase_order',items:[],history:[]});
+entity('another-mission','transport',{code:'TR-OTHER',state:'assigned',driverId:'driver-other',kind:'sale',items:[],history:[]});
+const driverView=review.profileSession(admin,'driver',ws(),'preview-mission'),transport=load('lib/transport.ts');
+assert.equal(driverView.userId,admin.userId);
+assert.equal(await transport.transportCanSee(driverView,row('preview-mission')),true);
+assert.equal(await transport.transportCanSee(driverView,row('another-mission')),false);
+assert.equal(await transport.transportCanSee(review.profileSession(admin,'driver',ws()),row('preview-mission')),false);
+const driverWork=await load('lib/profile-work.ts').profileWork(driverView);
+assert.ok(driverWork.work.some(x=>x.sourceId==='preview-mission'));assert.ok(!driverWork.work.some(x=>x.sourceId==='another-mission'));
+const transportApi=load('app/api/transport/route.ts');
+const forbiddenDriverWrite=await ctx.run(driverView,()=>transportApi.POST(request('/api/transport',{mode:'checklist',missionId:'preview-mission'})));
+assert.equal(forbiddenDriverWrite.status,403);
 cookieValues[review.profileReviewCookie]='bad-profile';await assert.rejects(()=>ctx.run(admin,()=>auth.session()),e=>e.status===403);cookieValues={};
 const central=review.profileSession(admin,'central-store',ws()),quality=review.profileSession(admin,'quality',ws()),line=review.profileSession(admin,'line-store',ws());
 assert.ok(central.permissions.warehouseResponsibilities.some(r=>r.warehouseId===wh.id));assert.ok(!central.permissions.warehouseResponsibilities.some(r=>r.warehouseId==='line-wh'));assert.deepEqual(Array.from(line.permissions.warehouseResponsibilities,r=>r.warehouseId),['line-wh']);
