@@ -50,6 +50,12 @@ export async function profileWork(user:Session){
    }
   }
  }
+ if(profile.id==='driver'&&user.profileReview?.missionId){
+  const mission=rows.find(row=>row.type==='transport'&&row.id===user.profileReview?.missionId);
+  const d=mission?.data;
+  const title=d?.blocker?.state==='open'?'پیگیری مانع حمل':d?.state==='assigned'?'چک‌لیست و تحویل‌گیری بار':d?.state==='collected'?'ثبت تحویل یا ارسال بار':d?.missingDocuments?'تکمیل مدارک حمل':'';
+  if(mission&&title)work.push({id:mission.id+':driver',title:title+' · '+d.code,section:'transport',target:mission.id,sourceId:mission.id,state:d.state});
+ }
  if(profile.id==='central-store'){
   const {GET}=await import('@/app/api/warehouse/dispatch/route');
   const response=await mcpActor.run(user,()=>GET(new Request('https://internal.invalid/api/warehouse/dispatch')));
@@ -57,6 +63,37 @@ export async function profileWork(user:Session){
    const {rows:dispatch}=await response.json() as {rows:DispatchRow[]};
    for(const order of dispatch.filter(row=>['منتظر رزرو / آماده‌سازی','منتظر آماده‌سازی','آماده ارسال','منتظر حواله انبار'].includes(row.state))){
     work.push({id:order.id+':dispatch',title:'آماده‌سازی و ارسال سفارش '+order.reference,section:'warehouse',target:warehouseTarget('fulfillment',order.id,'dispatch'),sourceId:order.sourceId,state:order.state});
+   }
+  }
+ }
+ const {returnRoles,returnActions}=await import('./sales-return-contract');
+ if(Object.values(returnRoles(user)).some(Boolean)){
+  const {returnWorkspace}=await import('./sales-return-workflow'),{items=[]}=await returnWorkspace(user);
+  for(const item of items)for(const action of item.actions)work.push({id:item.id+':'+action,title:returnActions[action]+' · '+item.serial,section:'sales-returns',target:item.id,sourceId:item.id,state:'open'});
+ }
+ if(['hospital-sales','sales-manager','sales-finance','sales-representative'].includes(profile.id)){
+  const {salesRows,salesVisible,salesDelivery}=await import('./sales'),sales=await salesRows();
+  const buyerIds=new Set<string>();
+  for(const buyer of sales.filter(row=>row.type==='sales_agent'&&row.data.active))if(await salesVisible(user,buyer))buyerIds.add(buyer.id);
+  const own=sales.filter(row=>buyerIds.has(row.data.agentId));
+  function addWork(row:any,title:string,section='sales',target=''){
+   work.push({id:row.id+':'+profile!.id,title,section,target,sourceId:row.id,state:row.data.state});
+  }
+  for(const row of own){
+   if(profile.id==='sales-manager'&&row.type==='sales_order'&&row.data.state==='submitted')addWork(row,'بررسی سفارش '+row.data.code,'sales','order:'+row.id);
+   if(profile.id==='sales-finance'&&row.type==='sales_order'&&['credit_review','sales_approved'].includes(row.data.state))addWork(row,'بررسی مالی سفارش '+row.data.code,'sales','order:'+row.id);
+   if(profile.id==='sales-finance'&&row.type==='sales_payment'&&(row.data.state==='pending'||row.data.disposition?.state==='pending'))addWork(row,'بررسی پرداخت یا چک','sales','account:'+row.data.agentId);
+
+  }
+  if(['hospital-sales','sales-manager'].includes(profile.id)&&buyerIds.size){
+   const intakes=(await db.prepare("SELECT id,data FROM flow_entities WHERE type='build_intake' AND json_extract(data,'$.state')=?").bind(profile.id==='sales-manager'?'commercial_review':'returned').all()).results;
+   for(const row of intakes){const data=JSON.parse(String(row.data));if(buyerIds.has(data.agentId))addWork({id:row.id,data},profile.id==='sales-manager'?'بررسی تجاری سفارش ساخت':'اصلاح مشخصات سفارش ساخت','build-intake',String(row.id));}
+  }
+  if(profile.id==='sales-representative'){
+   const seen=new Set<string>();
+   for(const delivery of await salesDelivery(own,[...buyerIds])){
+    const mission=delivery.transport;
+    if(mission&&!seen.has(mission.id)&&['carrier','offered'].includes(mission.state)){seen.add(mission.id);addWork({id:mission.id,data:{state:mission.state}},'تأیید دریافت محموله '+mission.code,'transport',mission.id);}
    }
   }
  }

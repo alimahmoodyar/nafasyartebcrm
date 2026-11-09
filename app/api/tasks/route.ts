@@ -68,14 +68,6 @@ export async function GET(request?:Request){try{const u=await requireAccess(),db
  const activeTaskIds=new Set(allowedTasks.filter(t=>!['completed','cancelled'].includes(t.state)).map(t=>t.id));
  const templateSync=await syncReceiptTemplates(u);if(templateSync.needsTaskSync)await syncMaterialTasks();
  const positionQueue=u.profileReview?await profileWork(u):{work:[],pendingQuality:0};
- if(u.profileReview){
-  const {returnWorkspace}=await import('@/lib/sales-return-workflow');
-  const {returnRoles,returnActions}=await import('@/lib/sales-return-contract');
-  if(Object.values(returnRoles(u)).some(Boolean)){
-   const {items=[]}=await returnWorkspace(u);
-   for(const item of items)for(const action of item.actions)positionQueue.work.push({id:item.id+':'+action,title:returnActions[action]+' · '+item.serial,section:'sales-returns',target:item.id,sourceId:item.id,state:'open'});
-  }
- }
  positionQueue.work.push(...await handoffShortageWork(u));
  return json({profileReview:u.profileReview||null,positionWork:positionQueue.work,pendingQuality:positionQueue.pendingQuality,accountId:u.userId,memberId:mid,isAdmin:u.isAdmin,receiptNotesAvailable:!u.permissions.salesAgentId&&!u.permissions.serviceAgentId&&!u.permissions.hospitalCenterId,canPurchaseServices,tasks:allowedTasks.map(t=>{const g=guidanceOutline(t);return {...t,guidance:{kind:g.kind,steps:g.steps,evidence:g.evidence}};}),limited:tasks.length===300,notifications:notifications.filter((n:any)=>activeTaskIds.has(n.task_id)),managementNotifications:managementNotifications.filter((n:any)=>activeTaskIds.has(n.task_id)),definitions:definitions.filter((p:any)=>!p.data.mergedInto),ownPositions:u.profileReview?[]:ownPositions,starterInstalled,members,scheduler:scheduler?JSON.parse(scheduler.data):null});
  }catch(e){return accessResponse(e)||Response.json({error:'کارتابل در دسترس نیست؛ نصب مهاجرت 0013 را بررسی کنید.'},{status:503})}}
