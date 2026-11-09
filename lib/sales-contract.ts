@@ -1,10 +1,10 @@
 // Shared UI / HTTP / MCP vocabulary. Money is integer IRR, never floating point.
 export const salesRoles:Record<string,string>={manager:'مدیر فروش',staff:'کارشناس فروش',finance:'مالی فروش',viewer:'گزارش خریداران تخصیص‌یافته',report_viewer:'مشاهده گزارش مدیریتی فروش',agent:'نماینده فروش'};
-export const salesStates:Record<string,string>={submitted:'منتظر بررسی فروش',sales_approved:'منتظر تأیید مالی',approved:'تأیید و آماده ارسال',rejected:'رد شده',cancelled:'لغو شده',pending:'منتظر بررسی مالی',received:'چک دریافت‌شده، وصول نشده',cleared:'وصول و تأیید شده',bounced:'چک برگشتی',reversed:'برگشت ثبت مالی',requested:'درخواست برگشت',returned:'دریافت در قرنطینه',credited:'بستانکار شده',reserved:'رزرو انبار',in_transit:'ارسال شده',consignment_received:'دریافت‌شده در شعبه امانی',delivered_partner:'تحویل قطعی به نماینده / عامل',delivered:'تحویل مشتری نهایی',active:'فعال',retired:'جایگزین شده'};
+export const salesStates:Record<string,string>={credit_review:'در انتظار بررسی بدهی معوق توسط مالی',submitted:'منتظر بررسی فروش',sales_approved:'منتظر تأیید مالی',approved:'تأیید و آماده ارسال',rejected:'رد شده',cancelled:'لغو شده',pending:'منتظر بررسی مالی',check_returned:'چک مسترد شد',check_collateral:'تبدیل‌شده به ضمانت',received:'چک دریافت‌شده، وصول نشده',cleared:'وصول و تأیید شده',bounced:'چک برگشتی',reversed:'برگشت ثبت مالی',requested:'درخواست برگشت',returned:'دریافت در قرنطینه',credited:'بستانکار شده',reserved:'رزرو انبار',in_transit:'ارسال شده',consignment_received:'دریافت‌شده در شعبه امانی',delivered_partner:'تحویل قطعی به نماینده / عامل',delivered:'تحویل مشتری نهایی',active:'فعال',retired:'جایگزین شده'};
 export const salesMilestones:Record<string,string>={waiting_stock:'انتظار تأمین موجودی',production:'در حال تولید',preparing:'آماده‌سازی ارسال'};
 export const salesRequestChannels:Record<string,string>={phone:'تماس تلفنی',message:'پیام نماینده',email:'ایمیل',in_person:'مراجعه حضوری',letter:'نامه'};
 export const salesProxyModes=['order','payment','order_cancel','return_request'];
-export const salesPipelineStages:Record<string,string>={submitted:'بررسی فروش',sales_approved:'تأیید مالی',...salesMilestones,shipping:'در مسیر حمل',consignment:'موجودی امانی شعبه',partial:'تحویل جزئی',delivered:'تحویل کامل',rejected:'رد شده',cancelled:'لغو شده'};
+export const salesPipelineStages:Record<string,string>={credit_review:'بررسی مالی بدهی معوق',submitted:'بررسی فروش',sales_approved:'تأیید مالی',...salesMilestones,shipping:'در مسیر حمل',consignment:'موجودی امانی شعبه',partial:'تحویل جزئی',delivered:'تحویل کامل',rejected:'رد شده',cancelled:'لغو شده'};
 export function salesOrderProgress(order:any,deliveries:any[],today:string){
  const shipments=deliveries.filter(s=>s.orderId===order.id&&s.state!=='cancelled');
  const lines=order.data.lines.map((l:any)=>{const ds=shipments.filter(s=>s.productId===l.productId),count=(state:string)=>ds.filter(s=>s.state===state).reduce((n,s)=>n+s.count,0),delivered=count('delivered');return {productId:l.productId,quantity:l.quantity,reserved:count('reserved'),inTransit:count('in_transit'),delivered,remaining:Math.max(0,l.quantity-delivered)};});
@@ -13,7 +13,7 @@ export function salesOrderProgress(order:any,deliveries:any[],today:string){
  const stage=order.data.state!=='approved'?order.data.state:delivered>=quantity?'delivered':consignment?'consignment':delivered>0?'partial':inTransit>0?'shipping':reserved>0?'preparing':order.data.milestone||'waiting_stock';
  return {orderId:order.id,agentId:order.data.agentId,stage,quantity,delivered,inTransit,reserved,remaining:Math.max(0,quantity-delivered),lines,late:order.data.state==='approved'&&delivered<quantity&&!!order.data.promisedDay&&order.data.promisedDay<today,daysSinceRequest:Math.max(0,Math.floor((Date.parse(today)-Date.parse(order.created.slice(0,10)))/86400000))};
 }
-export const salesActions:Record<string,string>={terms:'شرایط اعتباری نماینده',agent:'پرونده نماینده',price:'قیمت فروش',target:'انتشار تارگت و پلکان تخفیف',order:'ثبت سفارش',order_review:'بررسی فروش',order_progress:'موعد و پیشرفت سفارش',order_cancel:'لغو سفارش فاکتورنشده',invoice:'تأیید مالی و صدور فاکتور',branch_release:'تأیید ارسال امانی شعبه',payment:'اعلام پرداخت',payment_review:'بررسی پرداخت',check_status:'وصول یا برگشت چک',allocate:'تخصیص اعتبار به قسط',payment_reverse:'برگشت ثبت پرداخت',return_request:'درخواست برگشت دستگاه',return_receive:'دریافت فیزیکی برگشتی',return_review:'بررسی مالی برگشت',opening:'پیش‌نویس مانده افتتاحیه',opening_review:'تطبیق و تأیید افتتاحیه'};
+export const salesActions:Record<string,string>={terms:'شرایط اعتباری نماینده',agent:'پرونده نماینده',price:'قیمت فروش',target:'انتشار تارگت و پلکان تخفیف',order:'ثبت سفارش',order_review:'بررسی فروش',order_progress:'موعد و پیشرفت سفارش',order_cancel:'لغو سفارش فاکتورنشده',invoice:'تأیید مالی و صدور فاکتور',branch_release:'تأیید ارسال امانی شعبه',payment:'اعلام پرداخت',payment_review:'بررسی پرداخت',order_finance_review:'بررسی مالی سفارش دارای بدهی معوق',check_disposition_request:'درخواست تعیین تکلیف چک',check_disposition_review:'رسیدگی مالی به چک',check_status:'وصول یا برگشت چک',allocate:'تخصیص اعتبار به قسط',payment_reverse:'برگشت ثبت پرداخت',return_request:'درخواست برگشت دستگاه',return_receive:'دریافت فیزیکی برگشتی',return_review:'بررسی مالی برگشت',opening:'پیش‌نویس مانده افتتاحیه',opening_review:'تطبیق و تأیید افتتاحیه'};
 export const salesHelp=[
  'گزارش و پیگیری فروش یک مسیر مشترک است: کارشناس و مشاهده‌گر فقط خریداران تخصیص‌یافته را می‌بینند. مشاهدهٔ گزارش مدیریتی فروش مجوزی جدا و فقط برای خواندن است؛ مدیرعامل از آن استفاده می‌کند و اختیار مدیر فروش یا مالی از مشاهدهٔ گزارش ایجاد نمی‌شود.',
  'کارشناس و مدیر فروش از حساب خودشان برای خریدار سفارش، لغو سفارش و برگشتی ثبت می‌کنند؛ در ثبت سفارش فقط روش دریافت درخواست و تاریخ لازم است و نام تماس‌گیرنده درخواست نمی‌شود. در لغو و برگشتی نام تماس همچنان لازم است؛ مرجع یا خلاصه تماس اختیاری است. اعلام پرداخت برای نماینده، عامل، شعبه یا مصرف‌کننده ثبت می‌شود و نیازی به فرم درخواست از طرف خریدار ندارد؛ ثبت‌کننده واقعی خودکار در سابقه می‌ماند. اگر اطلاعات درخواست ارائه شود، اعتبارسنجی می‌شود. تأیید مالی با تطبیق رسید مستقل است. ثبت دریافت محموله از طرف خریدار همچنان اطلاعات درخواست و مدرک همان حمل را نیاز دارد.',
@@ -37,6 +37,30 @@ export function salesAccounts(rows:any[],agentId:string,today:string){
  const aging=[{label:'سررسید نشده',min:-Infinity,max:0},{label:'۱ تا ۳۰ روز',min:1,max:30},{label:'۳۱ تا ۶۰ روز',min:31,max:60},{label:'۶۱ تا ۹۰ روز',min:61,max:90},{label:'بیش از ۹۰ روز',min:91,max:Infinity}].map(b=>({label:b.label,amount:String(total(invoices.flatMap(i=>i.installments).filter(i=>-i.days>=b.min&&-i.days<=b.max),i=>i.remaining))}));
  return {invoices,credits:creditRows,payments,returns,allocations,debt:String(debt),credit:String(available),balance:String(debt-available),overdue:String(overdue),pending:String(total(payments.filter(p=>p.data.state==='pending'),p=>p.data.amount)),uncollectedChecks:String(total(payments.filter(p=>p.data.state==='received'),p=>p.data.amount)),aging};
 }
+export function salesSecuredCredit(rows:any[],agentId:string,today:string,excludeOrderId=''){
+ const account=salesAccounts(rows,agentId,today);
+ const ceiling=total(account.payments.filter(row=>row.data.state==='check_collateral'),row=>row.data.disposition?.amount);
+ const held=total(rows.filter(row=>row.type==='sales_order'&&row.id!==excludeOrderId&&row.data.agentId===agentId&&row.data.state==='sales_approved'),row=>row.data.securedHold);
+ const used=rial(account.debt)+held;
+ const funded=ceiling+rial(account.credit);
+ return {ceiling:String(ceiling),held:String(held),debt:account.debt,available:String(funded>used?funded-used:BigInt(0)),cashCredit:account.credit};
+}
+
+export function salesCheckPosition(payment:any, account:ReturnType<typeof salesAccounts>, today:string){
+ const check=payment.data;
+ const invoice=account.invoices.find(row=>row.id===check.checkInvoiceId);
+ const open=check.method==='check'&&check.state==='received'&&!check.bankRowId;
+ const eligibleCredits=new Set(account.payments.filter(row=>['bank','cash'].includes(row.data.method)&&row.data.state==='cleared'&&row.data.day<check.checkDue).map(row=>row.id));
+ const paidBeforeDue=invoice?total(account.allocations.filter(row=>row.data.invoiceId===invoice.id&&eligibleCredits.has(row.data.creditId)),row=>row.data.amount):BigInt(0);
+ const settledBeforeDue=!!invoice&&rial(invoice.remaining)===BigInt(0)&&paidBeforeDue>=rial(invoice.data.amount);
+ return {
+  invoiceRemaining:invoice?.remaining??null,
+  requiresReview:open&&!!invoice&&rial(check.amount)>rial(invoice.remaining),
+  canRequest:open&&settledBeforeDue&&check.checkDue<today&&check.disposition?.state!=='pending',
+  settledBeforeDue,
+ };
+}
+
 export function salesTargetProgress(target:any,rows:any[],today:string){
  const d=target.data,all=rows.filter(r=>r.data.agentId===d.agentId),invoices=all.filter(r=>r.type==='sales_invoice'&&!r.data.openingId&&r.data.day>=d.start&&r.data.day<=d.end);let progress=BigInt(0);
  for(const i of invoices)for(const l of i.data.lines||[])if(!d.productIds.length||d.productIds.includes(l.productId))progress+=d.basis==='units'?BigInt(l.quantity):rial(l.net);
