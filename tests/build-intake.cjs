@@ -99,6 +99,15 @@ async function approve(id){await action(id,'technical_accept',{notes:'Actual fea
  assert.deepEqual({...estimateCylinderOxygen(cylinders,120,4)},{volume:16800,average:16800/1440,peak:70});
  assert.equal(estimateCylinderOxygen(cylinders,100,4).peak,14000/240);
  assert.throws(()=>estimateCylinderOxygen(cylinders,120,0));
+ const {estimateHospitalNetwork,estimateSurgicalAir}=load('lib/hospital-air-vacuum.ts');
+ assert.equal(estimateHospitalNetwork('air',[{kind:'critical',count:8}]),360);
+ assert.equal(estimateHospitalNetwork('vacuum',[{kind:'critical',count:10},{kind:'theatre',count:2}]),250);
+ assert.equal(estimateHospitalNetwork('vacuum',[{kind:'ward',count:12,department:'A'},{kind:'ward',count:8,department:'A'}]),50);
+ assert.equal(estimateHospitalNetwork('air',[{kind:'critical',count:null}]),null);
+ assert.equal(estimateHospitalNetwork('air',[{kind:'critical',count:0}]),0);
+ assert.equal(estimateSurgicalAir(3,false,0),700);
+ assert.equal(estimateSurgicalAir(4,false,0),null);
+ assert.equal(estimateSurgicalAir(5,true,0),1050);
  const oxygen=load('app/api/build-intake/oxygen-capacity/route.ts'),oxygenPath='/api/build-intake/oxygen-capacity';
  const requestEstimate=(body,u=staff,status=200)=>post(body,u,status,oxygen,oxygenPath);
  const firstEstimate={rows:[{kind:'ward',count:28},{kind:'critical',count:12},{kind:'theatre',count:2},{kind:'recovery',count:0}],specialUse:'unknown'};
