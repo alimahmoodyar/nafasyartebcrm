@@ -519,3 +519,47 @@ html,button,input,textarea,select,option,svg text{font-family:"Vazirmatn",sans-s
 .process-history .field input,.process-history .field select{width:100%;min-width:0}
 .process-history .flow-card{margin:0;overflow-wrap:anywhere}
 .process-history .flow-card>.btn{justify-self:start}
+
+.hospital-network-options {
+ display: grid;
+ grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr));
+ gap: 12px;
+}
+.hospital-network-option {
+ display: grid;
+ justify-items: center;
+ align-content: center;
+ gap: 6px;
+ min-height: 100px;
+ padding: 12px;
+ border: 1px solid var(--border);
+ border-radius: 12px;
+ background: #fff;
+ color: inherit;
+ text-align: center;
+ font: inherit;
+}
+button.hospital-network-option { cursor: pointer; }
+.hospital-network-option.is-active,
+.hospital-network-option[aria-pressed=true] {
+ border-color: #19804b;
+ background: #edf8f1;
+ color: #145f39;
+}
+.hospital-network-option:focus-visible {
+ outline: 2px solid #19804b;
+ outline-offset: 2px;
+}
+.hospital-network-check {
+ display: inline-flex;
+ align-items: center;
+ gap: 8px;
+ cursor: pointer;
+}
+.hospital-network-check input[type=checkbox] {
+ flex: 0 0 auto;
+ width: 1rem;
+ height: 1rem;
+ margin: 0;
+ padding: 0;
+}

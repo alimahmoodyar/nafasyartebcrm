@@ -1,10 +1,12 @@
 'use client';
 import {useState,type FormEvent} from 'react';
+import {Cylinder as OxygenIcon,Wind,Gauge} from 'lucide-react';
 import {estimateCylinderOxygen,groupedOxygenSections,oxygenSections,type OxygenSection,type OxygenEstimate} from '@/lib/hospital-oxygen';
 
 import {estimateHospitalNetwork,estimateSurgicalAir,hospitalNetworkRules,type HospitalNetwork} from '@/lib/hospital-air-vacuum';
 
 const networkLabels={air:'هوای پزشکی ۴ بار',vacuum:'وکیوم پزشکی'};
+const networkIcons={air:Wind,vacuum:Gauge};
 const networks=['air','vacuum'] as const;
 const format=(value:number)=>value.toLocaleString('fa-IR',{maximumFractionDigits:3});
 const sections=Object.entries(oxygenSections) as [OxygenSection,(typeof oxygenSections)[OxygenSection]][];
@@ -74,7 +76,15 @@ function HtmForm(){
   <fieldset disabled={busy} className="space-y-4">
    <legend>روش HTM</legend>
    <p>تعداد تخت، اتاق یا جایگاه را در ردیف بخش مربوط وارد کنید. بخش‌های بدون مصرف را خالی بگذارید.</p>
-   <div className="tools">{networks.map(network=><label key={network}><input type="checkbox" checked={selected[network]} onChange={e=>{setSelected({...selected,[network]:e.target.checked});clear();}}/> {networkLabels[network]}</label>)}</div>
+   <div className="hospital-network-options" role="group" aria-label="خروجی‌های ظرفیت‌سنجی">
+    <div className="hospital-network-option is-active"><OxygenIcon aria-hidden="true"/><strong>اکسیژن</strong><small>خروجی پایه</small></div>
+    {networks.map(network=>{
+     const Icon=networkIcons[network];
+     return <button type="button" key={network} className="hospital-network-option" aria-pressed={selected[network]} onClick={()=>{setSelected(current=>({...current,[network]:!current[network]}));clear();}}>
+      <Icon aria-hidden="true"/><strong>{networkLabels[network]}</strong><small>{selected[network]?'فعال':'افزودن خروجی'}</small>
+     </button>;
+    })}
+   </div>
    {(selected.air||selected.vacuum)&&<p>خانهٔ خالی یعنی پوشش هنوز مشخص نیست. برای بخش بدون نیاز، صفر وارد کنید. مصرف‌های خارج از ردیف‌های جدول به بررسی فنی نیاز دارند.</p>}
    {groups.map(group=><fieldset key={group} className="flow-card">
     <legend>{group}</legend>
@@ -96,11 +106,11 @@ function HtmForm(){
     <button type="button" className="btn" disabled={wards.length+sections.length>=100} onClick={()=>{setWards([...wards,{id:crypto.randomUUID(),kind:'ward',count:'',department:''}]);clear();}}>افزودن واحد بستری</button>
    </details>
    {selected.air&&<label className="field">اتاق‌های جراحی عمدهٔ دهان دارای هوای پزشکی (اختیاری)<input type="number" min="0" max="10000" step="1" value={dentalAir} onChange={e=>{setDentalAir(e.target.value);clear();}}/></label>}
-   <label><input type="checkbox" checked={surgical} onChange={e=>{setSurgical(e.target.checked);clear();}}/> ابزار جراحی پنوماتیک متصل به شبکهٔ ۷ بار دارید؟</label>
+   <label className="hospital-network-check"><input type="checkbox" checked={surgical} onChange={e=>{setSurgical(e.target.checked);clear();}}/> ابزار جراحی پنوماتیک متصل به شبکهٔ ۷ بار دارید؟</label>
    {surgical&&<fieldset className="flow-card">
     <legend>هوای جراحی ۷ بار</legend>
     <label className="field">تعداد اتاق‌های عمل ارتوپدی یا جراحی اعصابِ متصل<input type="number" min="0" max="10000" step="1" value={surgicalRooms} required onChange={e=>{setSurgicalRooms(e.target.value);clear();}}/></label>
-    <label><input type="checkbox" checked={otherSurgical} onChange={e=>{setOtherSurgical(e.target.checked);clear();}}/> کارگاه تجهیزات یا کلینیک شکستگی به همین شبکه وصل است</label>
+    <label className="hospital-network-check"><input type="checkbox" checked={otherSurgical} onChange={e=>{setOtherSurgical(e.target.checked);clear();}}/> کارگاه تجهیزات یا کلینیک شکستگی به همین شبکه وصل است</label>
     <label className="field">دبی طراحی ابزارهای دندان‌پزشکی متصل، در صورت وجود (لیتر بر دقیقه)<input type="number" min="0" max="100000" step="any" value={dentalSurgical} onChange={e=>{setDentalSurgical(e.target.value);clear();}}/></label>
    </fieldset>}
    <label className="field">مصرف ویژهٔ اکسیژن خارج از ردیف‌ها، مثل اکسیژن پُردبی<select value={specialUse} onChange={e=>{setSpecialUse(e.target.value);clear();}}><option value="unknown">هنوز بررسی نشده</option><option value="none">مصرف اضافه ندارد</option><option value="assessed">دبی افزوده مشخص است</option></select></label>
