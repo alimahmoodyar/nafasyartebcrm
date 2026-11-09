@@ -5,6 +5,9 @@ import {estimateCylinderOxygen,groupedOxygenSections,oxygenSections,type OxygenS
 
 import {estimateHospitalNetwork,estimateSurgicalAir,hospitalNetworkRules,type HospitalNetwork} from '@/lib/hospital-air-vacuum';
 
+import {normalizeSurvey,type SurveyAnswers,type HtmSurvey,type CylinderSurvey} from '@/lib/hospital-gas-survey-contract';
+
+type Questionnaire=(answers:SurveyAnswers)=>Promise<void>;
 const networkLabels={air:'هوای پزشکی ۴ بار',vacuum:'وکیوم پزشکی'};
 const networkIcons={air:Wind,vacuum:Gauge};
 const networks=['air','vacuum'] as const;
@@ -16,29 +19,41 @@ type Ward={id:string;kind:OxygenSection;count:string;department:string};
 type Cylinder={volume:string;count:string};
 const emptyCylinder=():Cylinder=>({volume:'',count:''});
 
-export function HospitalOxygenCapacity(){
- const [method,setMethod]=useState<'htm'|'cylinder'>('htm');
+export function HospitalOxygenCapacity({initial,onSubmit}:{initial?:SurveyAnswers;onSubmit?:Questionnaire}={}){
+ const [method,setMethod]=useState<'htm'|'cylinder'>(initial?.method||'htm');
  return <section className="panel inside" dir="rtl">
   <h2>ظرفیت‌سنجی اولیه گازهای بیمارستانی</h2>
   <div className="tools" aria-label="روش ظرفیت‌سنجی">
    <button type="button" className={method==='htm'?'btn primary':'btn'} aria-pressed={method==='htm'} onClick={()=>setMethod('htm')}>روش HTM</button>
    <button type="button" className={method==='cylinder'?'btn primary':'btn'} aria-pressed={method==='cylinder'} onClick={()=>setMethod('cylinder')}>تطبیق کپسولی اکسیژن</button>
   </div>
-  <div hidden={method!=='htm'}><HtmForm/></div>
-  <div hidden={method!=='cylinder'}><CylinderForm/></div>
+  <div hidden={method!=='htm'}><HtmForm initial={initial?.method==="htm"?initial:undefined} onSubmit={onSubmit}/></div>
+  <div hidden={method!=='cylinder'}><CylinderForm initial={initial?.method==="cylinder"?initial:undefined} onSubmit={onSubmit}/></div>
   <p>انتخاب دستگاه به تأیید فنی اوج مصرف، فشار، خلوص، شرایط محل و منبع پشتیبان نیاز دارد.</p>
  </section>;
 }
 
-function HtmForm(){
- const [selected,setSelected]=useState({air:false,vacuum:false});
- const [coverage,setCoverage]=useState<Record<string,Partial<Record<HospitalNetwork,string>>>>({});
- const [surgical,setSurgical]=useState(false),[surgicalRooms,setSurgicalRooms]=useState('');
- const [otherSurgical,setOtherSurgical]=useState(false),[dentalSurgical,setDentalSurgical]=useState(''),[dentalAir,setDentalAir]=useState('');
- const [counts,setCounts]=useState<Partial<Record<OxygenSection,string>>>({});
- const [wardGroups,setWardGroups]=useState<Partial<Record<OxygenSection,string>>>({});
- const [wards,setWards]=useState<Ward[]>([]);
- const [specialUse,setSpecialUse]=useState('unknown'),[extra,setExtra]=useState('');
+function initialRows(initial?:HtmSurvey){
+ const base:Partial<Record<OxygenSection,Ward>>={},wards:Ward[]=[];
+ const coverage:Record<string,Partial<Record<HospitalNetwork,string>>>={};
+ for(const [index,row] of (initial?.rows||[]).entries()){
+  const id=base[row.kind]?String(index):row.kind;
+  const unit={id,kind:row.kind,count:String(row.count),department:row.department||''};
+  if(base[row.kind])wards.push(unit);else base[row.kind]=unit;
+  coverage[id]={air:row.air===undefined?'':String(row.air),vacuum:row.vacuum===undefined?'':String(row.vacuum)};
+ }
+ return {base,wards,coverage};
+}
+function HtmForm({initial,onSubmit}:{initial?:HtmSurvey;onSubmit?:Questionnaire}){
+ const [seed]=useState(()=>initialRows(initial));
+ const [selected,setSelected]=useState({air:initial?.air??false,vacuum:initial?.vacuum??false});
+ const [coverage,setCoverage]=useState<Record<string,Partial<Record<HospitalNetwork,string>>>>(seed.coverage);
+ const [surgical,setSurgical]=useState(initial?.surgicalRooms!==undefined),[surgicalRooms,setSurgicalRooms]=useState(initial?.surgicalRooms?.toString()||'');
+ const [otherSurgical,setOtherSurgical]=useState(initial?.otherSurgical??false),[dentalSurgical,setDentalSurgical]=useState(initial?.dentalSurgical?.toString()||''),[dentalAir,setDentalAir]=useState(initial?.dentalAir?.toString()||'');
+ const [counts,setCounts]=useState<Partial<Record<OxygenSection,string>>>(Object.fromEntries(Object.entries(seed.base).map(([kind,row])=>[kind,row.count])));
+ const [wardGroups,setWardGroups]=useState<Partial<Record<OxygenSection,string>>>(Object.fromEntries(Object.entries(seed.base).map(([kind,row])=>[kind,row.department])));
+ const [wards,setWards]=useState<Ward[]>(seed.wards);
+ const [specialUse,setSpecialUse]=useState(initial?.specialUse||'unknown'),[extra,setExtra]=useState(initial?.extraPeakLpm?.toString()||'');
  const [result,setResult]=useState<OxygenEstimate|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);
  function clear(){setResult(null);setError('');}
  const activeRows=[...sections.map(([kind])=>({id:kind,kind,count:counts[kind]||'',department:wardGroups[kind]||''})),...wards].filter(row=>Number(row.count)>0);
@@ -65,6 +80,19 @@ function HtmForm(){
   e.preventDefault();if(busy)return;clear();setBusy(true);
   try{
 
+   if(onSubmit){
+    const rows=activeRows.map(row=>{
+     const item:{kind:OxygenSection;count:number;department?:string;air?:number;vacuum?:number}={kind:row.kind,count:Number(row.count),...(row.department.trim()?{department:row.department}:{})};
+     for(const network of networks){
+      if(!selected[network]||!hospitalNetworkRules[network][row.kind]?.[0])continue;
+      const value=coverage[row.id]?.[network];
+      if(value!==undefined&&value!=='')item[network]=value==='all'?item.count:Number(value);
+     }
+     return item;
+    });
+    await onSubmit(normalizeSurvey({method:'htm',rows,...selected,specialUse,...(specialUse==='assessed'?{extraPeakLpm:Number(extra)}:{}),...(selected.air&&dentalAir?{dentalAir:Number(dentalAir)}:{}),...(surgical?{surgicalRooms:Number(surgicalRooms),otherSurgical,dentalSurgical:Number(dentalSurgical)}:{})}));
+    return;
+   }
    const rows=activeRows.map(row=>({kind:row.kind,count:Number(row.count),...(row.kind!=="maternityWard"&&row.department.trim()?{department:row.department}:{})}));
    const response=await fetch('/api/build-intake/oxygen-capacity',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({rows,specialUse,...(specialUse==='assessed'?{extraPeakLpm:Number(extra)}:{})})});
    const data=await response.json() as OxygenEstimate&{error?:string};
@@ -113,9 +141,9 @@ function HtmForm(){
     <label className="hospital-network-check"><input type="checkbox" checked={otherSurgical} onChange={e=>{setOtherSurgical(e.target.checked);clear();}}/> کارگاه تجهیزات یا کلینیک شکستگی به همین شبکه وصل است</label>
     <label className="field">دبی طراحی ابزارهای دندان‌پزشکی متصل، در صورت وجود (لیتر بر دقیقه)<input type="number" min="0" max="100000" step="any" value={dentalSurgical} onChange={e=>{setDentalSurgical(e.target.value);clear();}}/></label>
    </fieldset>}
-   <label className="field">مصرف ویژهٔ اکسیژن خارج از ردیف‌ها، مثل اکسیژن پُردبی<select value={specialUse} onChange={e=>{setSpecialUse(e.target.value);clear();}}><option value="unknown">هنوز بررسی نشده</option><option value="none">مصرف اضافه ندارد</option><option value="assessed">دبی افزوده مشخص است</option></select></label>
+   <label className="field">مصرف ویژهٔ اکسیژن خارج از ردیف‌ها، مثل اکسیژن پُردبی<select value={specialUse} onChange={e=>{setSpecialUse(e.target.value as HtmSurvey["specialUse"]);clear();}}><option value="unknown">هنوز بررسی نشده</option><option value="none">مصرف اضافه ندارد</option><option value="assessed">دبی افزوده مشخص است</option></select></label>
    {specialUse==='assessed'&&<label className="field">دبی افزودهٔ اوج پس از حذف هم‌پوشانی (لیتر بر دقیقه)<input type="number" min="0" max="100000" step="any" value={extra} required onChange={e=>{setExtra(e.target.value);clear();}}/></label>}
-   <button type="submit" className="btn primary">{busy?'در حال محاسبه…':'محاسبه ظرفیت اولیه'}</button>
+   <button type="submit" className="btn primary">{busy?'در حال پردازش…':onSubmit?'ارسال پاسخ':'محاسبه ظرفیت اولیه'}</button>
   </fieldset>
   {error&&<p className="notice error" role="alert">{error}</p>}
   {result&&<div className="notice space-y-2" aria-live="polite">
@@ -131,17 +159,24 @@ function FlowResult({title,flow,pending}:{title:string;flow:number|null;pending:
  return <section className="notice" aria-live="polite"><h3>{title}</h3>{flow===null?<p>{pending}</p>:<p>دبی طراحی · {format(flow)} لیتر بر دقیقه، معادل {format(flow*0.06)} مترمکعب بر ساعت</p>}</section>;
 }
 
-function CylinderForm(){
- const [rows,setRows]=useState<Cylinder[]>([emptyCylinder()]);
- const [pressure,setPressure]=useState('120'),[hours,setHours]=useState('');
+function CylinderForm({initial,onSubmit}:{initial?:CylinderSurvey;onSubmit?:Questionnaire}){
+ const [rows,setRows]=useState<Cylinder[]>(initial?.rows.map(row=>({volume:String(row.volume),count:String(row.count)}))||[emptyCylinder()]);
+ const [pressure,setPressure]=useState(initial?.pressure.toString()||'120'),[hours,setHours]=useState(initial?.peakHours.toString()||'');
  const [result,setResult]=useState<ReturnType<typeof estimateCylinderOxygen>|null>(null);
  function change(index:number,field:keyof Cylinder,value:string){setRows(rows.map((row,i)=>i===index?{...row,[field]:value}:row));setResult(null);}
- function submit(e:FormEvent<HTMLFormElement>){
+ const [sending,setSending]=useState(false),[error,setError]=useState('');
+ async function submit(e:FormEvent<HTMLFormElement>){
   e.preventDefault();
-  setResult(estimateCylinderOxygen(rows.map(row=>({volume:Number(row.volume),count:Number(row.count)})),Number(pressure),Number(hours)));
+  if(sending)return;
+  setError('');
+  const entries=rows.map(row=>({volume:Number(row.volume),count:Number(row.count)}));
+  if(!onSubmit){setResult(estimateCylinderOxygen(entries,Number(pressure),Number(hours)));return;}
+  setSending(true);
+  try{await onSubmit(normalizeSurvey({method:'cylinder',rows:entries,pressure:Number(pressure),peakHours:Number(hours)}));}
+  catch(error){setError((error as Error).message);}finally{setSending(false);}
  }
  return <form onSubmit={submit}>
-  <fieldset className="space-y-4">
+  <fieldset className="space-y-4" disabled={sending}>
    <legend>تطبیق کپسولی اکسیژن</legend>
    <p>برای هر اندازهٔ کپسول، حجم اسمی و مصرف روزانه را وارد کنید. برآورد اوج فرض می‌کند کل حجم روزانه در ساعت‌های اوج مصرف شود.</p>
    {rows.map((row,index)=><div className="form-grid" key={index}>
@@ -154,7 +189,7 @@ function CylinderForm(){
     <label className="field">فشار پرشدن کپسول (بار)<input type="number" min="1" max="400" step="any" value={pressure} required onChange={e=>{setPressure(e.target.value);setResult(null);}}/></label>
     <label className="field">چند ساعت در روز اوج مصرف دارید؟<input type="number" min="0.01" max="24" step="any" value={hours} required onChange={e=>{setHours(e.target.value);setResult(null);}}/></label>
    </div>
-   <button type="submit" className="btn primary">محاسبه ظرفیت اولیه</button>
+   <button type="submit" className="btn primary">{sending?"در حال ارسال…":onSubmit?"ارسال پاسخ":"محاسبه ظرفیت اولیه"}</button>
   </fieldset>
   {result&&<div className="notice space-y-2" aria-live="polite">
    <p>حجم تقریبی روزانه · {format(result.volume)} لیتر</p>

@@ -246,3 +246,5 @@ resetHelp.push('راهنماهای عیب‌یابی محصول، تاریخچه
 // inventory_operations and access_audit. Both reset scopes cover these; existing 0016
 // freeze prevents partial activation. Read filters/history and catalog storage events add no business table or blob.
 // Versioned sales returns and replacement sales use existing flow_entities; both reset scopes back up and delete them. Existing freeze guards cover duties, inventory and sales-file waybills.
+
+// hospital_gas_survey uses operational flow_entities. Both scopes back up/delete questionnaires; 0016 freezes all create, revoke and answer writes. No new tables, files or foreign keys.
