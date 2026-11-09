@@ -31,14 +31,29 @@ const n=(v:number)=>v.toLocaleString('fa-IR');
 const date=(v:string)=>v?formatDate(v):'تعیین نشده';
 const digits=(s:string)=>s.replace(/[۰-۹]/g,c=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(c))).replace(/[٠-٩]/g,c=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(c))).replace(/[,٬]/g,'');
 const plusDay=(day:string,days:number)=>new Date(Date.parse(day+'T12:00:00Z')+days*86400000).toISOString().slice(0,10);
+const representativeEntries={
+ 'rep-new-order':{view:'orders',mode:'order'},
+ 'rep-orders':{view:'orders'},
+ 'rep-account':{view:'account'},
+ 'rep-new-payment':{view:'account',mode:'payment'},
+ 'rep-new-return':{view:'returns',mode:'return_request'},
+} as const;
+
 export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:boolean;onNavigate:(s:string,target?:string)=>void}){
  const [credentials,setCredentials]=useState<{username:string;mobile:string;name:string}|null>(null);
  const [data,setData]=useState<any>(null),[selected,setSelected]=useState(''),[view,setView]=useState('home'),[error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[draft,setDraft]=useState<any>(null),[quote,setQuote]=useState<any>(null),[file,setFile]=useState<File|null>(null),[accounts,setAccounts]=useState<any[]>([]),[search,setSearch]=useState(''),[province,setProvince]=useState(''),[from,setFrom]=useState(''),[to,setTo]=useState(''),[stage,setStage]=useState('');
  async function load(){if(demo)return;const r=await fetch('/api/sales',{cache:'no-store'}),d=await r.json() as any;if(!r.ok){setData(null);setDraft(null);setQuote(null);throw Error(d.error)}setData(d);setError('');if(d.roles.manager){const a=await fetch('/api/sales/accounts',{cache:'no-store'});if(a.ok)setAccounts(((await a.json()) as any).accounts);}if(d.roles.agent&&d.agents[0])setSelected(d.agents[0].id);}
  useEffect(()=>{if(!demo)void load().catch(e=>setError(e.message))},[demo]);
- useEffect(()=>{if(targetId){if(targetId.startsWith('lead:')){setSelected('');setView('leads')}else if(targetId.startsWith('account:')){setSelected(targetId.slice('account:'.length));setView('account')}else if(targetId.startsWith('order:')){setSelected('');setView('orders')}else{setSelected(targetId);setView('orders')}}},[targetId]);
+ useEffect(()=>{if(targetId&&!Object.hasOwn(representativeEntries,targetId)){if(targetId.startsWith('lead:')){setSelected('');setView('leads')}else if(targetId.startsWith('account:')){setSelected(targetId.slice('account:'.length));setView('account')}else if(targetId.startsWith('order:')){setSelected('');setView('orders')}else{setSelected(targetId);setView('orders')}}},[targetId]);
+ const representativeEntry=data?.roles.agent&&Object.hasOwn(representativeEntries,targetId)
+  ?representativeEntries[targetId as keyof typeof representativeEntries]:null;
  const change=(k:string,v:any)=>{if((k==='agentId'||k==='method')&&draft?.[k]!==v){setFile(null);}setDraft((d:any)=>({...d,[k]:v,...(d.mode==='order'&&k==='items'&&JSON.stringify((d.items||[]).map((i:any)=>i.productId))!==JSON.stringify((v||[]).map((i:any)=>i.productId))?{salesTerms:undefined}:{}),...(k==='agentId'&&d.agentId!==v?{salesTerms:undefined,referrerId:undefined,cashOrderId:'',checkInvoiceId:'',fileId:'',fileRequestId:crypto.randomUUID(),invoiceId:'',deviceIds:[],...(d.requestSource?{requestSource:{...d.requestSource,contactName:'',reference:''}}:{})}:{}),...(k==='method'&&d.method!==v?{cashOrderId:'',checkInvoiceId:'',fileId:'',fileRequestId:crypto.randomUUID()}:{}),...(k==='invoiceId'?{deviceIds:[]}:{}),...(k==='result'?{receiptFileId:'',fileRequestId:crypto.randomUUID()}:{}),}));if(draft?.mode==='order')setQuote(null);};
  const begin=(mode:string,extra:any={})=>{if(mode==='agent'&&extra.linkedServiceAgents?.length){const link=extra.linkedServiceAgents[0];extra={serviceDomain:link.domain,linkedServiceAgentId:link.id,linkedServiceRevision:link.revision,...extra};}setError('');setQuote(null);setFile(null);setDraft({mode,id:crypto.randomUUID(),confirmed:true,agentId:(selected&&data?.agents.find((a:any)=>a.id===selected)?.canOperate!==false?selected:'')||(mode==='payment'?'':data?.agents.find((a:any)=>a.canOperate!==false)?.id||''),active:true,approved:true,day:localDay(),basis:'net',method:'bank',creditLimit:'0',termDays:0,ownerId:'',financeId:'',items:[{productId:'',quantity:1}],tiers:[{threshold:'',discountBps:100}],productIds:[],fileRequestId:crypto.randomUUID(),...(!data?.roles.agent&&[...salesProxyModes.filter(m=>m!=='payment'),'receipt'].includes(mode)?{requestSource:{channel:'phone',contactName:'',day:localDay(),reference:''}}:{}),...extra});};
+ useEffect(()=>{
+  if(!representativeEntry)return;
+  setView(representativeEntry.view);
+  if('mode' in representativeEntry)begin(representativeEntry.mode,{agentId:data.agents.find((a:any)=>a.canOperate!==false)?.id||''});
+ },[representativeEntry]);
  const agents=(data?.agents||[]).filter((a:any)=>(!selected||a.id===selected)&&(!province||a.data.province===province)),agentIds=new Set(agents.map((a:any)=>a.id));
  const acs=(data?.accounts||[]).filter((a:any)=>agentIds.has(a.agentId));const records=(kind:string)=>(data?.[kind]||[]).filter((r:any)=>agentIds.has(r.data.agentId)&&(kind!=='orders'||!targetId.startsWith('order:')||r.id===targetId.slice(6)));const agentName=(id:string)=>data?.agents.find((a:any)=>a.id===id)?.data.name||'—';const productName=(id:string)=>data?.products?.find((p:any)=>p.id===id)?.name||id;
  const action=(mode:string,label:string,extra:any={},disabled=false)=>{const buyerId=extra.agentId||selected;if(buyerId&&data?.agents.find((a:any)=>a.id===buyerId)?.canOperate===false)return null;return <button type="button" className="btn" disabled={disabled} onClick={()=>begin(mode,extra)}>{label}</button>};
@@ -119,9 +134,9 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
   }else{setError('');if(['finance','settings','reports','terms'].includes(next)){setDraft(null);setQuote(null);setFile(null);}setView(next);}
  };
 
- return <ProgramWorkspace programId="sales" direct={!!targetId} title="فروش" status={<>{error&&!draft&&<p className="notice error" role="alert">{error}</p>}{!data.warehouseOnly&&(staff||finance)&&!writableAgents.length&&<p className="notice" role="status">نقش فروش شما فعال است؛ برای ثبت فروش، مدیر فروش باید از مسیر «فروش ← تنظیمات فروش ← تخصیص خریدار به کارشناس» خریدار موجود را به شما تخصیص دهد. مجوز مشاهده گزارش به‌تنهایی اختیار ثبت در پرونده همکاران را نمی‌دهد.</p>}</>}><section className="panel sales-portal" dir="rtl"><div className="panelhead"><h2>{view==='orders'?'سفارش‌ها':rep?'پرتال نماینده فروش':'فروش و نمایندگان'}</h2></div><div className="inside">
- {!group&&view!=='orders'&&buyerFilters}
- <SubprogramNavigation items={navigation.main} value={data.warehouseOnly?'returns':group||view} onChange={openView}/>
+ return <ProgramWorkspace programId="sales" direct={!!targetId} title="فروش" status={<>{error&&!draft&&<p className="notice error" role="alert">{error}</p>}{!data.warehouseOnly&&(staff||finance)&&!writableAgents.length&&<p className="notice" role="status">نقش فروش شما فعال است؛ برای ثبت فروش، مدیر فروش باید از مسیر «فروش ← تنظیمات فروش ← تخصیص خریدار به کارشناس» خریدار موجود را به شما تخصیص دهد. مجوز مشاهده گزارش به‌تنهایی اختیار ثبت در پرونده همکاران را نمی‌دهد.</p>}</>}><section className="panel sales-portal" dir="rtl"><div className="panelhead"><h2>{view==='orders'?'سفارش‌ها':representativeEntry?.view==='account'?'حساب و اعتبار نماینده':representativeEntry?.view==='returns'?'مرجوعی دستگاه':rep?'پرتال نماینده فروش':'فروش و نمایندگان'}</h2></div><div className="inside">
+ {!representativeEntry&&!group&&view!=='orders'&&buyerFilters}
+ {!representativeEntry&&<SubprogramNavigation items={navigation.main} value={data.warehouseOnly?'returns':group||view} onChange={openView}/>}
  {error&&!draft&&<p className="notice error" role="alert">{error}</p>}{message&&<p className="notice" role="status">{message}</p>}{credentials&&<RepresentativeCredentials credentials={credentials} onClose={()=>setCredentials(null)}/>}
  {!data.warehouseOnly&&group==='reports'&&<ProgramWorkspace key={view==='reports'?'reports-menu':'reports-content'} programId="sales-reports" title="گزارش و پیگیری فروش" direct={view!=='reports'}>
  <SubprogramNavigation items={navigation.reports} value={view==='reports'?'home':view} onChange={openView}/>
