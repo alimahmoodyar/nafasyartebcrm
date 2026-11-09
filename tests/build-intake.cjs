@@ -93,6 +93,23 @@ async function approve(id){await action(id,'technical_accept',{notes:'Actual fea
  const templateDraft=(await post(draft({orderId:'order-a2',title:'Form revision race'}))).id;update('hospital-form',{...template,state:'superseded'});await action(templateDraft,'submit',{},staff,400);assert.deepEqual(entity(id).data.versions[0].items[0].template,savedSnapshot);update('hospital-form',template);
  const mcpView=await mcp('get_build_intakes',{},staff,'read');assert.ok(mcpView.intakes.some(r=>r.id===id));assert.ok(!JSON.stringify(mcpView).includes('SECRET'));assert.equal(catalog.tools.find(t=>t.name==='build_intake_apply').write,true);await assert.rejects(()=>mcp('build_intake_apply',draft(),staff,'read'),e=>e.status===403);await assert.rejects(()=>mcp('get_build_intakes',{},rep,'read'),e=>e.status===403);
  const fileResult=await mcp('download_build_intake_file',{id:'customer-file',offset:0,length:8},engineer,'read');assert.equal(fileResult.totalBytes,bytes.byteLength);assert.equal(Buffer.from(fileResult.base64,'base64').toString(),'%PDF act');await assert.rejects(()=>mcp('download_build_intake_file',{id:'other-file'},engineer,'read'),/404|فایل/);
+ const oxygen=load('app/api/build-intake/oxygen-capacity/route.ts'),oxygenPath='/api/build-intake/oxygen-capacity';
+ const requestEstimate=(body,u=staff,status=200)=>post(body,u,status,oxygen,oxygenPath);
+ const firstEstimate={rows:[{kind:'ward',count:28},{kind:'critical',count:12},{kind:'theatre',count:2},{kind:'recovery',count:0}],specialUse:'unknown'};
+ const unknown=await requestEstimate(firstEstimate);
+ assert.equal(unknown.subtotalLpm,220);assert.equal(unknown.designLpm,null);assert.equal(unknown.demandLpm,null);
+ const grouped={rows:[{kind:'ward',count:28,department:'گروه A'},{kind:'ward',count:20,department:'گروه A'}],specialUse:'assessed',extraPeakLpm:20};
+ const groupedResult=await requestEstimate(grouped,engineer);
+ assert.equal(groupedResult.grouped[0].designLpm,69.75);assert.equal(groupedResult.designLpm,89.75);
+ const demand={rows:[{kind:'critical',count:10,demand:{annualTurnover:73,oxygenPercent:50,flowLpm:5,treatmentDays:2}}],specialUse:'none'};
+ const predicted=await requestEstimate(demand);
+ assert.equal(predicted.demandLpm,10);assert.ok(Math.abs(predicted.demandM3day-14.4)<1e-9);
+ await requestEstimate({...demand,rows:[{kind:'ward',count:-1}]},staff,400);
+ await requestEstimate({...demand,rows:[{kind:'ward',count:4,demand:{annualTurnover:10}}]},staff,400);
+ await requestEstimate({...demand,extraPeakLpm:12},staff,400);
+ await requestEstimate(demand,rep,403);await requestEstimate(demand,home,403);await requestEstimate(demand,worker,403);
+ const previewTool=await mcp('estimate_hospital_oxygen',demand,staff,'read');
+ assert.equal(previewTool.demandLpm,predicted.demandLpm);
  // Generic company maintenance freezes intake changes atomically; backups include operational versions and evidence.
  const reset=load('lib/reset-contract.ts'),resetSystem=load('lib/system-reset.ts');
  const files=resetSystem.resetFiles({flow_entities:sql.prepare("SELECT * FROM flow_entities WHERE type IN ('sales_file','build_intake','qms_record')").all()});assert.ok(files.some(f=>f.key==='spec/a'&&f.sha256===hash));

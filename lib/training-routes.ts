@@ -1,3 +1,4 @@
+import * as oxygenCapacity from '@/app/api/build-intake/oxygen-capacity/route';
 import * as salesReturns from '@/app/api/sales/returns/route';
 import * as labelTemplates from '@/app/api/label-templates/route';
 import * as batchLabels from '@/app/api/batch-labels/route';
@@ -59,6 +60,7 @@ export const trainingRoutes:Record<string,Record<string,any>>={
  "purchase-settlement/files":settlementFiles,
  "costing":costing,
  "build-projects":buildProjects,
+ "build-intake/oxygen-capacity":oxygenCapacity,
  "expense-register":expenseRegister,
  "hospital/expenses":expenses,
  "hospital/expenses/files":expenseFiles,
