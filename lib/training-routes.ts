@@ -1,3 +1,4 @@
+import * as salesReturns from '@/app/api/sales/returns/route';
 import * as labelTemplates from '@/app/api/label-templates/route';
 import * as batchLabels from '@/app/api/batch-labels/route';
 import * as warehouseMovements from '@/app/api/warehouse/movements/route';
@@ -87,6 +88,7 @@ export const trainingRoutes:Record<string,Record<string,any>>={
  'profile':route20,
  'inbox':route21,
  'sales':route22,
+ 'sales/returns':salesReturns,
  'firmware/files':route23,
  'finance/files':route24,
  'suppliers/files':route25,
