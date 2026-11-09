@@ -2,7 +2,7 @@
 import {useEffect,useRef,useState,type FormEvent} from 'react';
 import type {SurveyAnswers} from '@/lib/hospital-gas-survey-contract';
 
-type Survey={id:string;center:string;agentId:string;expires:string;link?:string;submitted?:string;revoked?:string;answers?:SurveyAnswers};
+type Survey={id:string;center:string;agentId:string;expires:string;link?:string;submitted?:string;revoked?:string;answers?:SurveyAnswers;syncUrl?:string;syncTicket?:string};
 type Data={surveys:Survey[];buyers:{id:string;name:string}[]};
 const url='/api/hospital-gas-survey';
 
@@ -12,10 +12,23 @@ export function HospitalGasSurveyPanel({onAnswers}:{onAnswers:(answers:SurveyAns
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');
  const [fresh,setFresh]=useState<Survey|null>(null);
  const createId=useRef('');
- async function load(){
+ async function relay(id:string,endpoint:{syncUrl:string;syncTicket:string},mode:'read'|'revoke'){
+  const response=await fetch(endpoint.syncUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,ticket:endpoint.syncTicket,mode})});
+  const result=await response.json() as {receipt?:string;error?:string};
+  if(!response.ok)throw Error(result.error||'ارتباط با پرسش‌نامه برقرار نشد.');
+  if(result.receipt)await act({id,mode:'import',receipt:result.receipt});
+  return !!result.receipt;
+ }
+ async function load(sync=true){
   const response=await fetch(url,{cache:'no-store'}),next=await response.json() as Data&{error?:string};
   if(!response.ok)throw Error(next.error);
   setData(next);
+  if(sync){
+   const outstanding=next.surveys.filter(survey=>survey.syncUrl&&survey.syncTicket);
+   const results=await Promise.allSettled(outstanding.map(survey=>relay(survey.id,{syncUrl:survey.syncUrl!,syncTicket:survey.syncTicket!},'read')));
+   if(results.some(result=>result.status==='fulfilled'&&result.value))await load(false);
+   if(results.some(result=>result.status==='rejected'))setError('همگام‌سازی بعضی پاسخ‌ها انجام نشد. دوباره تازه‌سازی کنید.');
+  }
  }
  useEffect(()=>{if(open)void load().catch(error=>setError(error.message));},[open]);
  async function act<T>(body:object){
@@ -40,7 +53,7 @@ export function HospitalGasSurveyPanel({onAnswers}:{onAnswers:(answers:SurveyAns
  async function revoke(survey:Survey){
   if(busy||!window.confirm('لینک این پرسش‌نامه لغو شود؟'))return;
   setBusy(true);setError('');setMessage('');
-  try{await act({mode:'revoke',id:survey.id});if(fresh?.id===survey.id)setFresh(null);await load();setMessage('لینک لغو شد.');}
+  try{const ticket=await act<{syncUrl:string;syncTicket:string}>({mode:'prepare_revoke',id:survey.id});await relay(survey.id,ticket,'revoke');if(fresh?.id===survey.id)setFresh(null);await load();setMessage('وضعیت لینک به‌روز شد.');}
   catch(error){setError((error as Error).message);}finally{setBusy(false);}
  }
  return <section className="panel inside" dir="rtl">
