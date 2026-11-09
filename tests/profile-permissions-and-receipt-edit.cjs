@@ -38,8 +38,8 @@ for(const profile of profiles.roleProfiles){
 }
 cookieValues={};
 const card=await ctx.run(admin,()=>profileApi.GET(request('/api/role-profiles?profile=sales-representative')));
-const cardData=await card.json();assert.equal(card.status,200,JSON.stringify(cardData));assert.equal(cardData.needsBuyer,true);
-assert.deepEqual(cardData.buyerChoices.map(b=>b.id),['scope-buyer-a','scope-buyer-b']);
+const cardData=await card.json();assert.equal(card.status,200,JSON.stringify(cardData));assert.equal(cardData.sample,true);
+assert.equal(cardData.buyerChoices,undefined);
 const repProfile=review.profileSession(admin,'sales-representative',ws(),'scope-buyer-a'),hospitalProfile=review.profileSession(admin,'hospital-sales',ws(),'scope-buyer-a');
 const salesView=load('lib/sales.ts');
 assert.equal(repProfile.userId,admin.userId);assert.equal(repProfile.permissions.salesAgentId,'scope-buyer-a');assert.equal(navigation.canOpenSection(repProfile,'sales-returns'),true);
@@ -52,10 +52,29 @@ assert.equal(unscoped.status,200);assert.match(unscoped.headers.get('set-cookie'
 cookieValues[review.profileReviewCookie]='sales-representative';
 const shell=await ctx.run(admin,()=>auth.session());
 assert.equal(shell.isAdmin,false);assert.equal(shell.profileReview.id,'sales-representative');
-assert.equal(navigation.canOpenSection(shell,'sales'),false);assert.equal(navigation.canOpenSection(shell,'tasks'),false);
+assert.equal(navigation.canOpenSection(shell,'sales'),true);assert.equal(navigation.canOpenSection(shell,'tasks'),true);
 await assert.rejects(()=>ctx.run(admin,()=>auth.requireAccess()),e=>e.status===403);
 const shellCard=await ctx.run(admin,()=>profileApi.GET(request('/api/role-profiles?profile=sales-representative')));
-const shellData=await shellCard.json();assert.equal(shellData.activeProfile,'sales-representative');assert.equal(shellData.needsBuyer,true);assert.deepEqual(shellData.work,[]);
+const shellData=await shellCard.json();assert.equal(shellData.activeProfile,'sales-representative');assert.equal(shellData.sample,true,JSON.stringify(shellData));
+const sampleId=review.representativeSampleId(admin.userId);
+assert.equal(sql.prepare("SELECT id FROM flow_entities WHERE id=?").get(sampleId),undefined);
+assert.equal(sql.prepare("SELECT id FROM training_flow_entities WHERE id=?").get(sampleId).id,sampleId);
+for(const path of ['sales','sales/returns','transport','tasks']){
+ const response=await ctx.run(admin,()=>load('app/api/'+path+'/route.ts').GET(new Request('https://test.local/api/'+path)));
+ const body=await response.text();
+ assert.equal(response.status,200,path+': '+body);
+ assert.equal(response.headers.get('X-Training-Workspace'),'isolated');
+ assert.ok(!body.includes('scope-buyer-a')&&!body.includes('scope-buyer-b'));
+}
+const items=[{productId:'training-product-1',quantity:1}];
+const quoteResponse=await ctx.run(admin,()=>load('app/api/sales/quote/route.ts').POST(request('/api/sales/quote',{agentId:sampleId,items})));
+const quote=await quoteResponse.json();
+assert.equal(quoteResponse.status,200,JSON.stringify(quote));
+const sampleOrderId=crypto.randomUUID();
+const orderResponse=await ctx.run(admin,()=>load('app/api/sales/route.ts').POST(request('/api/sales',{mode:'order',id:sampleOrderId,agentId:sampleId,items,quoteHash:quote.quoteHash,confirmed:true})));
+assert.equal(orderResponse.status,200,await orderResponse.text());
+assert.equal(sql.prepare('SELECT id FROM flow_entities WHERE id=?').get(sampleOrderId),undefined);
+assert.equal(sql.prepare('SELECT id FROM training_flow_entities WHERE id=?').get(sampleOrderId).id,sampleOrderId);
 cookieValues={};
 const selectedRepresentative=await ctx.run(admin,()=>profileApi.POST(request('/api/role-profiles',{id:crypto.randomUUID(),mode:'select_profile',profileId:'sales-representative',buyerId:'scope-buyer-a',confirmed:true})));
 assert.equal(selectedRepresentative.status,200);assert.match(selectedRepresentative.headers.get('set-cookie'),/sales-representative~scope-buyer-a/);

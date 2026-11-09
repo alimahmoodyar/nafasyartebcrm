@@ -58,7 +58,7 @@ export async function session(allowPasswordChange=false):Promise<Session>{
 export function can(user: Session, kind: Kind, operation: "read" | "write") {return user.isAdmin || user.permissions[operation].includes(kind);}
 export async function requireAccess(kind?: Kind, operation: "read" | "write" = "read") {
   const user = await session();
-  if(isUnscopedRepresentative(user))throw new AccessError('برای دسترسی به اطلاعات، نمایندگی را انتخاب کنید.',403);
+  if(isUnscopedRepresentative(user))throw new AccessError('این بخش در پیش‌نمایش نماینده فروش در دسترس نیست.',403);
   if(user.permissions.hospitalCenterId)throw new AccessError("این حساب فقط به پنل مرکز بیمارستانی دسترسی دارد.",403);
   if (kind && !can(user, kind, operation)) throw new AccessError("دسترسی این بخش برای حساب شما مجاز نیست.", 403);
   return user;
