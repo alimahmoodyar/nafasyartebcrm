@@ -19,7 +19,7 @@ export const transportForms:Record<string,TransportField[]>={
  documents:[f('carrier','نام باربری'),f('waybill','شماره بارنامه',{optional:true}),f('tracking','کد رهگیری',{optional:true}),notes],
  offer:[f('handoverTo','نام فرد تحویل‌گیرنده'),day,notes],
  receipt:[packages,day,f('result','نتیجه دریافت',{type:'select',options:[['complete','کامل و سالم'],['shortage','کسری'],['damage','آسیب‌دیده']]}),f('location','محل نگهداری داخل شرکت؛ برای داغی',{optional:true}),notes],
- resolve:[f('resolution','نتیجه بررسی',{type:'select',options:[['retry','پیگیری و درخواست دریافت مجدد'],['accepted','مغایرت با مدرک رفع شد؛ دریافت مجدد لازم است']]}),notes],
+ resolve:[f('resolution','نتیجه بررسی',{type:'select',options:[['retry','پیگیری و درخواست دریافت مجدد'],['accepted','مغایرت با مدرک رفع شد؛ دریافت مجدد لازم است'],['warehouse','ارجاع سریال‌ها به انباردار خروج'],['finance','ارجاع سریال‌ها به مالی برای بررسی خسارت'],['reviewed','ثبت نتیجهٔ پیگیری و بازگشت به تدارکات']]}),notes],
  expense:[f('amountRial','هزینه حمل (ریال)',{type:'number'}),f('reference','شماره رسید هزینه'),notes],
  expense_review:[f('expenseId','هزینه مورد بررسی',{type:'select',source:'expenses'}),f('approved','تأیید هزینه',{type:'boolean'}),notes],
  cancel:[notes],

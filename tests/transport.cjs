@@ -101,6 +101,36 @@ async function collect(id){await op(driver,'checklist',{missionId:id,packagesChe
  assert.equal(entity(hospitalMission.id).revision,beforeReceipt.revision,'read-only stale receiver cannot append file history');assert.equal(objects.size,beforeObjects,'denied upload writes no bucket object');assert.equal(sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type='transport_file'").get().n,beforeFiles,'denied upload writes no file record');
  await upload(hospitalServiceManager,hospitalMission.id,'receipt');
  await op(hospitalServiceManager,'receipt',{missionId:hospitalMission.id,packages:1,day,result:'complete'});assert.equal(entity(hospitalMission.id).data.state,'delivered','assigned-domain manager can still receive the shipment');assert.ok(entity('hospital-service-case').data.physicalArrival);
+ // A single mission keeps separate sale and device ownership across two models.
+ seed('multi-agent','sales_agent',{active:true,name:'Receiver'});
+ const rep=actor('multi-rep',{salesAgentId:'multi-agent'});
+ for(const [id,model] of [['carton-a','Model A'],['carton-b','Model B']]){
+  const saleId='sale-'+id;
+  sql.prepare("INSERT INTO records(id,kind,payload,created) VALUES(?,'device',?,?)").run(id,JSON.stringify({code:id,model}),now);
+  seed(saleId,'sale',{state:'in_transit',dispatchBatchId:'multi-batch',dispatchedActor:admin.userId,salesAgentId:'multi-agent',deviceIds:[id],recipient:{name:'Receiver',phone:'090',address:'Destination'}});
+  seed(id,'build',{state:'in_transit',saleId});
+  balance(id,'in_transit',1000);
+ }
+ const sources=(await get(manager)).sources.filter(s=>s.items.some(item=>item.deviceId==='carton-a'||item.deviceId==='carton-b'));
+ assert.equal(sources.length,1);
+ assert.deepEqual(sources[0].items.map(item=>item.model).sort(),['Model A','Model B']);
+ const multi=(await op(manager,'create',{sourceKey:sources[0].key,route:'direct',pickup:'انبار',due:day})).id;
+ assert.equal(entity('sale-carton-b').data.transportId,multi);
+ await assign(multi);
+ await op(driver,'checklist',{missionId:multi,packagesChecked:true,itemsChecked:true,documentsChecked:true,conditionChecked:true});
+ await op(other,'collect',{missionId:multi,day,condition:'سالم',deviceIds:['carton-a']},404);
+ await op(driver,'collect',{missionId:multi,day,condition:'سالم',deviceIds:['carton-a']});
+ assert.equal(entity(multi).data.state,'assigned');
+ await op(driver,'collect',{missionId:multi,day,condition:'سالم',deviceIds:['carton-b']});
+ await op(driver,'offer',{missionId:multi,handoverTo:'Receiver',day});
+ await op(rep,'receipt',{missionId:multi,day,result:'shortage',deviceIds:['carton-a']});
+ assert.equal(entity('carton-a').data.state,'delivered');
+ assert.equal(entity('carton-b').data.state,'in_transit');
+ await op(manager,'resolve',{missionId:multi,resolution:'retry'});
+ await op(rep,'receipt',{missionId:multi,day,result:'complete',deviceIds:['carton-b']});
+ assert.equal(entity(multi).data.state,'delivered');
+ assert.equal(entity('sale-carton-a').data.state,'delivered');
+ assert.equal(entity('sale-carton-b').data.state,'delivered');
  await transport.installTransportPositions(admin);await transport.installTransportPositions(admin);assert.equal(sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type='position' AND id LIKE 'transport-position:%'").get().n,2);
  await transport.syncTransportTasks();assert.ok(sql.prepare("SELECT COUNT(*) n FROM duty_runs WHERE template_id LIKE 'transport:%'").get().n>0);
  const user=await context.run(manager,()=>auth.requireAccess());let denied=false;try{await catalog.executeTool('transport_apply',{id:crypto.randomUUID(),mode:'vehicle',revision:0,data:{name:'X',plate:'X',active:true},confirmed:true},base,{user,scope:'read',tokenId:null})}catch{denied=true}assert.ok(denied);
