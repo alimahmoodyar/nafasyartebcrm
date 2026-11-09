@@ -7,13 +7,14 @@ export const transportActions:Record<string,string>={checklist:'چک‌لیست 
 export type TransportField={key:string;label:string;type?:'text'|'textarea'|'select'|'number'|'date'|'boolean';source?:string;options?:string[][];optional?:boolean};
 const f=(key:string,label:string,extra:Partial<TransportField>={}):TransportField=>({key,label,...extra});
 const notes=f('notes','توضیحات / مدرک انجام کار',{type:'textarea'}),day=f('day','تاریخ واقعی انجام',{type:'date'}),packages=f('packages','تعداد بسته',{type:'number'});
+const optionalNotes={...notes,optional:true};
 export const transportForms:Record<string,TransportField[]>={
- checklist:[...Object.entries(transportChecklistLabels).map(([key,label])=>f(key,label,{type:'boolean'})),notes],
+ checklist:[...Object.entries(transportChecklistLabels).map(([key,label])=>f(key,label,{type:'boolean'})),optionalNotes],
  blocker:[f('reason','مانع انجام کار',{type:'select',options:Object.entries(transportBlockerReasons)}),f('retryDay','تاریخ پیگیری بعدی',{type:'date'}),notes],
  blocker_resolve:[notes],
  vehicle_report:[f('reportKind','نوع گزارش',{type:'select',options:[['reading','کیلومتر خودرو'],['fuel','سوخت‌گیری'],['fault','خرابی خودرو']]}),day,f('odometer','کیلومتر فعلی',{type:'number',optional:true}),f('fuelLitres','مقدار سوخت، لیتر',{optional:true}),f('fuelCostRial','مبلغ رسید سوخت، ریال',{optional:true}),f('reference','شماره رسید سوخت',{optional:true}),notes],
  create:[f('sourceKey','سفارش یا پرونده مرتبط',{type:'select',source:'sources'}),packages,f('route','روش تحویل',{type:'select',options:[['carrier','از طریق باربری'],['direct','مستقیم']]}),f('pickup','نشانی / محل دریافت'),f('destination','نشانی مقصد'),f('recipient','نام تحویل‌گیرنده'),f('phone','شماره تماس مقصد'),f('due','موعد انجام',{type:'date'}),f('receiverId','مسئول دریافت داخل شرکت؛ برگشتی یا خرید',{type:'select',source:'receivers',optional:true}),notes],
- assign:[f('receiverId','مسئول دریافت داخلی؛ اگر هنوز مشخص نشده',{type:'select',source:'receivers',optional:true}),f('driverId','راننده',{type:'select',source:'drivers'}),f('vehicleId','خودرو',{type:'select',source:'vehicles'}),f('due','موعد انجام',{type:'date'}),notes],
+ assign:[f('receiverId','مسئول دریافت داخلی؛ اگر هنوز مشخص نشده',{type:'select',source:'receivers',optional:true}),f('driverId','راننده',{type:'select',source:'drivers'}),f('vehicleId','خودرو',{type:'select',source:'vehicles'}),f('due','موعد انجام',{type:'date'}),optionalNotes],
  collect:[packages,day,f('condition','وضعیت ظاهری بسته‌ها'),notes],
  carrier:[f('carrier','نام باربری'),f('waybill','شماره بارنامه',{optional:true}),f('tracking','کد رهگیری',{optional:true}),day,notes],
  documents:[f('carrier','نام باربری'),f('waybill','شماره بارنامه',{optional:true}),f('tracking','کد رهگیری',{optional:true}),notes],

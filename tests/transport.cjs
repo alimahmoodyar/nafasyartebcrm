@@ -102,12 +102,14 @@ async function collect(id){await op(driver,'checklist',{missionId:id,packagesChe
  await upload(hospitalServiceManager,hospitalMission.id,'receipt');
  await op(hospitalServiceManager,'receipt',{missionId:hospitalMission.id,packages:1,day,result:'complete'});assert.equal(entity(hospitalMission.id).data.state,'delivered','assigned-domain manager can still receive the shipment');assert.ok(entity('hospital-service-case').data.physicalArrival);
  // A single mission keeps separate sale and device ownership across two models.
+ const shortageWarehouse=actor('shortage-warehouse',{flowRoles:['inventory'],warehouses:['finished']});
+ const shortageFinance=actor('shortage-finance',{financialRead:['transport'],financialWrite:['transport']});
  seed('multi-agent','sales_agent',{active:true,name:'Receiver'});
  const rep=actor('multi-rep',{salesAgentId:'multi-agent'});
  for(const [id,model] of [['carton-a','Model A'],['carton-b','Model B']]){
   const saleId='sale-'+id;
   sql.prepare("INSERT INTO records(id,kind,payload,created) VALUES(?,'device',?,?)").run(id,JSON.stringify({code:id,model}),now);
-  seed(saleId,'sale',{state:'in_transit',dispatchBatchId:'multi-batch',dispatchedActor:admin.userId,salesAgentId:'multi-agent',deviceIds:[id],recipient:{name:'Receiver',phone:'090',address:'Destination'}});
+  seed(saleId,'sale',{state:'in_transit',dispatchBatchId:'multi-batch',dispatchedActor:shortageWarehouse.userId,salesAgentId:'multi-agent',deviceIds:[id],recipient:{name:'Receiver',phone:'090',address:'Destination'}});
   seed(id,'build',{state:'in_transit',saleId});
   balance(id,'in_transit',1000);
  }
@@ -117,17 +119,29 @@ async function collect(id){await op(driver,'checklist',{missionId:id,packagesChe
  const multi=(await op(manager,'create',{sourceKey:sources[0].key,route:'direct',pickup:'انبار',due:day})).id;
  assert.equal(entity('sale-carton-b').data.transportId,multi);
  await assign(multi);
- await op(driver,'checklist',{missionId:multi,packagesChecked:true,itemsChecked:true,documentsChecked:true,conditionChecked:true});
+ await op(driver,'checklist',{missionId:multi,packagesChecked:true,itemsChecked:true,documentsChecked:true,conditionChecked:true,notes:''});
  await op(other,'collect',{missionId:multi,day,condition:'سالم',deviceIds:['carton-a']},404);
  await op(driver,'collect',{missionId:multi,day,condition:'سالم',deviceIds:['carton-a']});
  assert.equal(entity(multi).data.state,'assigned');
  await op(driver,'collect',{missionId:multi,day,condition:'سالم',deviceIds:['carton-b']});
  await op(driver,'offer',{missionId:multi,handoverTo:'Receiver',day});
+ await op(rep,'receipt',{missionId:multi,day,result:'shortage',deviceIds:['carton-a'],notes:''},400);
  await op(rep,'receipt',{missionId:multi,day,result:'shortage',deviceIds:['carton-a']});
  assert.equal(entity('carton-a').data.state,'delivered');
  assert.equal(entity('carton-b').data.state,'in_transit');
+ const {taskAccess}=load('lib/duties.ts');
+ for(const [resolution,assignee,otherAssignee] of [['warehouse',shortageWarehouse,shortageFinance],['finance',shortageFinance,shortageWarehouse]]){
+  await op(manager,'resolve',{missionId:multi,resolution,deviceIds:['carton-b']});
+  const task=sql.prepare("SELECT id FROM duty_runs WHERE template_id=? AND assignee=? AND state='open'").get('transport:'+multi+':disputed',assignee.userId);
+  assert.ok(task,'The assigned role has an open cartable item');
+  assert.equal((await context.run(assignee,()=>taskAccess(task.id,assignee))).data.transportMissionId,multi);
+  await assert.rejects(context.run(otherAssignee,()=>taskAccess(task.id,otherAssignee)));
+  await op(otherAssignee,'resolve',{missionId:multi,resolution:'reviewed',deviceIds:['carton-b']},403);
+  await op(assignee,'resolve',{missionId:multi,resolution:'reviewed',deviceIds:['carton-b']});
+  assert.equal(sql.prepare('SELECT state FROM duty_runs WHERE id=?').get(task.id).state,'completed');
+ }
  await op(manager,'resolve',{missionId:multi,resolution:'retry'});
- await op(rep,'receipt',{missionId:multi,day,result:'complete',deviceIds:['carton-b']});
+ await op(rep,'receipt',{missionId:multi,day,result:'complete',deviceIds:['carton-b'],notes:''});
  assert.equal(entity(multi).data.state,'delivered');
  assert.equal(entity('sale-carton-a').data.state,'delivered');
  assert.equal(entity('sale-carton-b').data.state,'delivered');
