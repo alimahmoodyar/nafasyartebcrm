@@ -93,6 +93,12 @@ async function approve(id){await action(id,'technical_accept',{notes:'Actual fea
  const templateDraft=(await post(draft({orderId:'order-a2',title:'Form revision race'}))).id;update('hospital-form',{...template,state:'superseded'});await action(templateDraft,'submit',{},staff,400);assert.deepEqual(entity(id).data.versions[0].items[0].template,savedSnapshot);update('hospital-form',template);
  const mcpView=await mcp('get_build_intakes',{},staff,'read');assert.ok(mcpView.intakes.some(r=>r.id===id));assert.ok(!JSON.stringify(mcpView).includes('SECRET'));assert.equal(catalog.tools.find(t=>t.name==='build_intake_apply').write,true);await assert.rejects(()=>mcp('build_intake_apply',draft(),staff,'read'),e=>e.status===403);await assert.rejects(()=>mcp('get_build_intakes',{},rep,'read'),e=>e.status===403);
  const fileResult=await mcp('download_build_intake_file',{id:'customer-file',offset:0,length:8},engineer,'read');assert.equal(fileResult.totalBytes,bytes.byteLength);assert.equal(Buffer.from(fileResult.base64,'base64').toString(),'%PDF act');await assert.rejects(()=>mcp('download_build_intake_file',{id:'other-file'},engineer,'read'),/404|فایل/);
+ const {estimateCylinderOxygen,oxygenSections}=load('lib/hospital-oxygen.ts');
+ assert.equal(Object.keys(oxygenSections).length,32);
+ const cylinders=[{volume:40,count:3},{volume:10,count:2}];
+ assert.deepEqual({...estimateCylinderOxygen(cylinders,120,4)},{volume:16800,average:16800/1440,peak:70});
+ assert.equal(estimateCylinderOxygen(cylinders,100,4).peak,14000/240);
+ assert.throws(()=>estimateCylinderOxygen(cylinders,120,0));
  const oxygen=load('app/api/build-intake/oxygen-capacity/route.ts'),oxygenPath='/api/build-intake/oxygen-capacity';
  const requestEstimate=(body,u=staff,status=200)=>post(body,u,status,oxygen,oxygenPath);
  const firstEstimate={rows:[{kind:'ward',count:28},{kind:'critical',count:12},{kind:'theatre',count:2},{kind:'recovery',count:0}],specialUse:'unknown'};
