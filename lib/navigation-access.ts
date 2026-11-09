@@ -28,6 +28,10 @@ export function canOpenSection(user:Session,s:string):boolean{
  // The inbox is a shared workspace. Showing its entry does not grant access
  // to any task or conversation; the corresponding APIs scope each record.
  if(s==='tasks')return true;
+ if(s==='oxygen-capacity'){
+  const roles=buildIntakeRoles(u);
+  return roles.sales||roles.engineering;
+ }
  if(s==='sales-returns')return Object.values(returnRoles(u)).some(Boolean);
  if(s==='fulfillment'&&internal&&Object.values(shortageRoles(u)).some(Boolean))return true;
  if(s==='routine-production'&&internal&&u.productionParticipant===true)return true;
@@ -69,6 +73,7 @@ export function canOpenSection(user:Session,s:string):boolean{
 
 // Hidden personal asset entry points still support authorized task/deep links.
 export function sectionDestination(user:Session,section:string,target=''){
+ if(section==='build-intake'&&target==='oxygen-capacity')return {section:'oxygen-capacity',target:''};
  if(user.isAdmin&&financeStandaloneSections.includes(section as any)&&canOpenSection(user,section))return {section:'finance',target:financeTarget(section,target)};
  const p=accessPermissions(user.permissions);
  if(section==='fulfillment'&&target.startsWith('handoff-shortage:'))return {section,target};
