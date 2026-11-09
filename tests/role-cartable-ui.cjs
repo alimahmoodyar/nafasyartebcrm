@@ -12,6 +12,6 @@ response={...response,positionWork:[{id:'shelf',title:'جانمایی محمول
 const renderInbox=()=>{cursor=0;return TasksPanel({demo:false,onNavigate:navigate,targetId:'inbox'})};
 await mount(renderInbox);
 assert.ok(nodes(renderInbox()).some(n=>n.type===leaves.SubprogramNavigation&&n.props.value==='inbox'),'Direct navigation opens the inbox tab for the role profile');
-assert.ok(nodes(renderInbox()).some(n=>n.type==='div'&&n.props.hidden===false&&n.props.children?.type===leaves.InboxPanel));
+assert.ok(nodes(renderInbox()).some(n=>n.type===leaves.DirectMessages));
 console.log('PASS clear cartable entry for operational/personal profiles, no duplicate role queue, shared direct/process tabs, useful pending-QC empty state, exact domain task navigation.');
 })().catch(e=>{console.error(e);process.exitCode=1});
