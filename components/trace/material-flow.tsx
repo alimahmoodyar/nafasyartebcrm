@@ -59,6 +59,7 @@ export function MaterialFlow({demo,onSaved,onOpen,initialTab='tasks',targetId=''
  useEffect(()=>{if(!state||!targetId||targetId.startsWith('new-')||openedTarget.current===targetId)return;const r=state.entities.find((e:any)=>e.id===targetId);if(!r)return;openedTarget.current=targetId;
  if(r.type==='receipt'&&r.data.state==='pending_qc'&&r.data.canInspect!==false&&state.roles.includes('qc'))void beginQc(r);
  if(r.type==='receipt'&&r.data.canWarehouseAct!==false&&state.roles.includes('inventory')){if(r.data.state==='awaiting_warehouse')shelf(r);if(r.data.state==='awaiting_relabel')start('confirm_receipt_relabel',{receiptId:r.id,scannedCode:'',labelsReplaced:false});}
+ if(r.type==='build'&&r.data.state==='planned'&&state.roles.includes('production'))buildForm(r);
  if(r.type==='build'&&['prepared','assembled'].includes(r.data.state)&&r.data.latestQc?.verdict!=='pass'&&state.canFinalQC!==false&&state.roles.includes('qc'))setQc(r.id);
  },[state,targetId]);
  useEffect(()=>{if(!receiptLaunch||!state||!state.roles.includes('inventory')||openedReceiptLaunch.current===receiptLaunch)return;openedReceiptLaunch.current=receiptLaunch;setTab('receipts');start('receipt',newReceipt(''));},[receiptLaunch,state]);

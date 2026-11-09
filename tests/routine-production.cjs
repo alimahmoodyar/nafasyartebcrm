@@ -47,14 +47,15 @@ const qc=body('quality',{warehouseId:'warehouse:user',lotId:lot.id,revision:row(
 const flow=load('app/api/flow/route.ts');
 async function flowPost(mode,x){const r=await ctx.run(user,()=>flow.POST(new Request('https://test.local/api/flow',{method:'POST',headers:{origin:'https://test.local'},body:JSON.stringify(body(mode,x))})));const d=await r.json();assert.equal(r.status,200,JSON.stringify(d));return d;}
 assert.equal(row('routine-batch:'+lot.id).data.state,'awaiting_warehouse');
-await flowPost('shelve',{receiptId:'routine-batch:'+lot.id,location:'A-1-1-1'});
+await flowPost('material_location',{materialId:'part',revision:row('part').revision,warehouseId:'warehouse:user',location:'A-1-1-1'});
+await flowPost('shelve',{receiptId:'routine-batch:'+lot.id,location:'A-1-1-1',materialRevision:row('part').revision,placed:true,confirmed:true});
 const rework=(await change('assign',lot.id,{...assign(),memberId:'worker2',start:'10:00',end:'10:30',stage:1,count:1,rework:true})).id;await change('output',rework,{good:1,scrap:0,reworkCount:0,overtime:false,allocations:[]});await change('close',rework,{actualMinutes:10,overtimeMinutes:0});await change('quality',lot.id,{good:1,scrap:0,reworkCount:0,reference:'QC2',warehouseId:'warehouse:user'});assert.equal(row(lot.id).data.received,9);assert.equal(row(lot.id).data.scrap,1);
 // Quality uses the user warehouse and requires shelving before issue to the line.
 const bid='routine-batch:'+lot.id;
 const balance=wh=>sql.prepare('SELECT quantity FROM inventory_balances WHERE item_id=? AND warehouse=?').get(bid,wh)?.quantity||0;
 assert.equal(balance('semi'),0);assert.equal(balance('raw'),8000);assert.equal(balance('quarantine'),1000);assert.equal(balance('line'),0);
 assert.equal(row(bid).data.warehouseId,'warehouse:user');
-await flowPost('shelve',{receiptId:bid,location:'A-1-1-1'});
+await flowPost('shelve',{receiptId:bid,location:'A-1-1-1',materialRevision:row('part').revision,placed:true,confirmed:true});
 assert.equal(balance('raw'),9000);assert.equal(balance('quarantine'),0);
 const request=await flowPost('request',{materialId:'part',warehouseId:'warehouse:user',quantity:'3',planId:'',notes:'Line requirement'});
 const requestId=sql.prepare("SELECT id FROM flow_entities WHERE type='request' ORDER BY created DESC").get().id;

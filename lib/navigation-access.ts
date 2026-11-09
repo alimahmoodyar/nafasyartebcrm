@@ -90,7 +90,7 @@ export function warehouseNavigation(user:Session){
   if(quality||p.warehouseResponsibilities?.some(r=>r.role==='qc')||inventory&&warehouseAccess(u,'quarantine')){add('receive','receipts','رسید، کنترل ورودی و جانمایی','flow','receipts');}
   if(production||inventory&&(warehouseAccess(u,'raw')||warehouseAccess(u,'line'))){add('issue','requests','درخواست و تحویل مواد به خط','flow','requests');}
   if(production)add('issue','plans','برنامه و سریال محصول','flow','plans');
-  if(quality)add('receive','builds','کنترل سریالی محصول','flow','builds');
+  if(quality||production)add('receive','builds',quality?'کنترل سریالی محصول':'ثبت بچ‌های مصرفی محصول','flow','builds');
   if(production)add('returns','nonconforming','ثبت قطعه نامنطبق خط','flow','nonconforming');
   if(inventory&&materialScope.length||p.supplyRoles?.includes('engineering'))add('settings','materials','شناسنامه کالاها','flow','materials');
   if(u.isAdmin)add('settings','warehouses','انبارها و محل‌های نگهداری','flow','warehouses');
