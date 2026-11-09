@@ -30,9 +30,9 @@ export async function treasuryRoles(u:Session,rows:any[]){
  const members=(await storage().prepare('SELECT id,subject,status,permissions FROM app_members ORDER BY id').all()).results as any[];
  const m=members.find(m=>m.status==='active'&&(m.subject===u.userId||m.id===(u.userId.startsWith('local:')?u.userId.slice(6):u.userId)));
  const p=m?storedAccessPermissions(m.permissions):null;
- if(!u.isAdmin&&(!p||!financialAccess({isAdmin:false,permissions:p},'treasury')))tFail('دسترسی فعال مالی لازم است.',403);
- const write=financialAccess(u,'purchase',true)&&(u.isAdmin||financialAccess({isAdmin:false,permissions:p},'purchase',true));
- const has=(role:FinancialWorkflowRole)=>u.isAdmin||!!p&&financialWorkflowRole(p,m.id,rows,role)&&financialWorkflowRole(u.permissions,m.id,rows,role);
+ if(!u.isAdmin&&!u.profileReview&&(!p||!financialAccess({isAdmin:false,permissions:p},'treasury')))tFail('دسترسی فعال مالی لازم است.',403);
+ const write=financialAccess(u,'purchase',true)&&(u.isAdmin||!!u.profileReview||financialAccess({isAdmin:false,permissions:p},'purchase',true));
+ const has=(role:FinancialWorkflowRole)=>u.isAdmin||(u.profileReview?financialWorkflowRole(u.permissions,'',rows,role):!!p&&financialWorkflowRole(p,m.id,rows,role)&&financialWorkflowRole(u.permissions,m.id,rows,role));
  return {read:true,write,treasury:has('treasury'),manager:has('manager'),accountant:has('accountant'),ceo:has('ceo'),memberId:m?.id||'',membersSnapshot:JSON.stringify(members)};
 }
 export function treasuryApprovalBasis(d:any){return JSON.stringify([d.direction,d.category,d.amount,d.currency,d.party,d.destination,d.beneficiaryMemberId||'',d.source||null,d.due,d.referenceDocument,d.approvedBy]);}
