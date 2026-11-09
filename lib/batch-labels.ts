@@ -1,11 +1,34 @@
 import {AccessError} from './authorization';
-export type BatchLabelOptions={layout:'thermal'|'a4';symbol:'both'|'barcode'|'qr';copies:number;width:number;height:number};
+export type BatchLabelOptions={layout:'thermal'|'a4'|'roll';roll?:RollLayout;symbol:'both'|'barcode'|'qr';copies:number;requestedCopies?:number;hideLocation?:boolean;width:number;height:number};
+type RollLayout={width:number;columns:number;gapX:number;gapY:number;left:number;top:number};
+const rollFields=[
+ ['rollWidth','عرض کل رول',35,330,100],
+ ['columns','تعداد لیبل در هر ردیف',1,12,1],
+ ['gapX','فاصلهٔ افقی',0,30,2],
+ ['gapY','فاصلهٔ عمودی',0,30,2],
+ ['left','حاشیهٔ چپ رول',0,30,0],
+ ['top','جابه‌جایی چاپ از بالای ردیف',0,30,0],
+] as const;
 export function batchLabelSize(symbol:BatchLabelOptions['symbol'],code='',defaultLocation=''){return symbol==='qr'?{width:60,height:75}:symbol==='barcode'?{width:70,height:defaultLocation.length>120?50:40}:{width:100,height:80};}
 export function batchLabelOptions(q:URLSearchParams,code='',defaultLocation=''):BatchLabelOptions{
  const choice=(key:string,values:string[],fallback:string)=>{const v=q.get(key)??fallback;if(!values.includes(v))throw new AccessError('قالب چاپ یا نوع کد معتبر نیست.',400);return v;};
  const number=(key:string,fallback:number,min:number,max:number)=>{const raw=q.get(key)??String(fallback);if(!/^\d+$/.test(raw)||Number(raw)<min||Number(raw)>max)throw new AccessError('تعداد یا اندازه لیبل خارج از محدوده است.',400);return Number(raw);};
  const symbol=choice('symbol',['both','barcode','qr'],'both') as BatchLabelOptions['symbol'],size=batchLabelSize(symbol,code,defaultLocation);
- return {layout:choice('layout',['thermal','a4'],'thermal') as BatchLabelOptions['layout'],symbol,copies:number('copies',1,1,100),width:number('width',size.width,50,100),height:number('height',size.height,30,80)};
+ const layout=choice('layout',['thermal','a4','roll'],'thermal') as BatchLabelOptions['layout'];
+ const copies=number('copies',1,1,100);
+ const hideLocation=q.get('location')==='hide';
+ if(layout!=='roll')return {layout,symbol,copies,hideLocation,width:number('width',size.width,50,100),height:number('height',size.height,30,80)};
+ function mm(key:string,fallback:number,min:number,max:number){
+  const raw=q.get(key)??String(fallback),value=Number(raw);
+  if(!/^\d+(?:\.\d{1,2})?$/.test(raw)||value<min||value>max)throw new AccessError('اندازهٔ رول، فاصله یا حاشیه معتبر نیست.',400);
+  return value;
+ }
+ const width=mm('width',size.width,18,150),height=mm('height',size.height,22,160);
+ const columns=number('columns',1,1,12),gapX=mm('gapX',2,0,30),gapY=mm('gapY',2,0,30),left=mm('left',0,0,30),top=mm('top',0,0,30);
+ const occupied=left+columns*width+(columns-1)*gapX;
+ const rollWidth=mm('rollWidth',Math.max(35,Math.ceil(occupied*100)/100),35,330);
+ if(occupied-rollWidth>0.00001||top>gapY)throw new AccessError('لیبل‌ها و حاشیهٔ چپ باید در عرض رول جا شوند. جابه‌جایی بالا هم نباید از فاصلهٔ ردیف بیشتر باشد.',400);
+ return {layout,symbol,width,height,hideLocation,copies:q.get('print')==='test'?columns:copies,requestedCopies:copies,roll:{width:rollWidth,columns,gapX,gapY,left,top}};
 }
 const esc=(v:unknown)=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
 export async function batchLabelHtml(batch:{id:string;data:Record<string,string>},o:BatchLabelOptions,printRequested=false,qrText=String(batch.data.code||''),defaultLocation='',qrContent:'scan'|'details'='scan'){
@@ -19,18 +42,63 @@ export async function batchLabelHtml(batch:{id:string;data:Record<string,string>
  const naturalWidth=barcode?Number(barcode.match(/viewBox="0 0 (\d+) /)?.[1]):0;
  if(barcode&&(!naturalWidth||barcodeWidth/naturalWidth<0.19))throw new AccessError('برای خوانایی این بارکد، عرض لیبل را بیشتر کنید یا چاپ جداگانهٔ بارکد / QR را انتخاب کنید.',400);
  const name=esc(batch.data.part||batch.data.name||'کالا'),human=esc(code),id=esc(batch.id);
- if(o.symbol!=='barcode'&&(o.height<(o.symbol==='both'?75:60)||o.width<60))throw new AccessError('برای QR از اندازهٔ پیشنهادی استفاده کنید؛ برای لیبل کوچک، بارکد عددی را انتخاب کنید.',400);
+ if(o.symbol!=='barcode'&&(o.height<(o.symbol==='both'?75:60)||o.width<60))throw new AccessError('برای QR اطلاعات‌دار از اندازهٔ پیشنهادی استفاده کنید؛ برای لیبل کوچک، بارکد عددی را انتخاب کنید.',400);
  const symbols=`<div class="symbols">${barcode?`<div class="barcode" role="img" aria-label="بارکد بچ ${human}">${barcode}</div>`:''}${qr?`<div class="qr" role="img" aria-label="QR بچ ${human}">${qr}</div>`:''}</div>`;
  if(defaultLocation&&o.symbol==='barcode'&&o.height<40)throw new AccessError('برای درج محل پیش‌فرض، ارتفاع لیبل بارکد را حداقل ۴۰ میلی‌متر انتخاب کنید.',400);
  if(defaultLocation&&((o.symbol==='qr'&&o.height<70)||(o.symbol==='both'&&o.height<80)||(o.symbol==='barcode'&&defaultLocation.length>120&&o.height<50)))throw new AccessError('برای درج کامل آدرس، ارتفاع لیبل را بیشتر کنید؛ QR حداقل ۷۰، ترکیبی ۸۰ و بارکد با آدرس طولانی حداقل ۵۰ میلی‌متر نیاز دارد.',400);
  const label=`<article class="label"><div class="name">${name}</div>${symbols}<div class="batch" dir="ltr">${human}</div><div class="part">کد کالا: <bdi>${esc(batch.data.partCode||'—')}</bdi></div>${defaultLocation?`<div class="storage"><strong>محل پیش‌فرض نگهداری:</strong> ${esc(defaultLocation)}</div>`:''}</article>`;
+ const roll=o.roll,pitch=roll?Math.round((o.height+roll.gapY)*100)/100:0;
+ const rows=roll?Array.from({length:Math.ceil(o.copies/roll.columns)},(_,row)=>`<div class="roll-row">${label.repeat(Math.min(roll.columns,o.copies-row*roll.columns))}</div>`).join(''):label.repeat(o.copies);
+ const rollInputs=rollFields.map(([key,title,min,max,fallback])=>{
+  const values={rollWidth:roll?.width??Math.max(35,o.width),columns:roll?.columns,gapX:roll?.gapX,gapY:roll?.gapY,left:roll?.left,top:roll?.top};
+  return `<label>${title}${key==='columns'?'':'، میلی‌متر'}<input name="${key}" type="number" step="${key==='columns'?1:0.01}" min="${min}" max="${max}" value="${values[key]??fallback}" required></label>`;
+ }).join('');
  const sizes=Object.fromEntries((['barcode','qr','both'] as const).map(symbol=>[symbol,batchLabelSize(symbol,code,defaultLocation)])),recommended=batchLabelSize(o.symbol,code,defaultLocation);
  const select=(key:string,choices:[string,string][],value:string)=>`<select name="${key}">${choices.map(([v,title])=>`<option value="${v}"${value===v?' selected':''}>${title}</option>`).join('')}</select>`;
  return `<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>چاپ لیبل بچ ${human}</title><style>
- @font-face{font-family:Vazirmatn;src:url('/fonts/Vazirmatn.woff2') format('woff2');font-display:swap}*{box-sizing:border-box}body{margin:0;background:#eef2f7;color:#111;font-family:Vazirmatn,Tahoma,sans-serif}header{max-width:900px;margin:16px auto;padding:16px;background:white;border-radius:12px;line-height:1.9}h1{font-size:20px;margin:0}.recommendation{padding:10px 12px;background:#eef8f3;border-radius:8px;font-weight:600}form{display:flex;gap:12px;flex-wrap:wrap;align-items:end}label{display:flex;flex-direction:column;font-size:13px}input,select,button{font:inherit;padding:7px;border:1px solid #bbc7d4;border-radius:6px}input{width:90px}button{cursor:pointer}.print{margin-top:12px;background:#177a4c;color:white;padding:8px 20px}.sheet{display:grid;grid-template-columns:repeat(${o.layout==='a4'?Math.floor(194/(o.width+2)):1},${o.width}mm);gap:${o.layout==='a4'?'2mm':'0'};width:max-content;margin:16px auto}.label{width:${o.width}mm;height:${o.height}mm;padding:2mm;background:white;display:flex;flex-direction:column;align-items:stretch;justify-content:space-between;break-inside:avoid;border:1px dashed #aaa;overflow:hidden;direction:rtl}.name{font-size:9pt;font-weight:bold;line-height:1.25;max-height:${o.height<36?'4':'7'}mm;overflow:hidden;overflow-wrap:anywhere;text-align:center}.symbols{display:flex;flex-direction:${o.symbol==='both'?'column':'row'};gap:1mm;align-items:center;justify-content:center;direction:ltr;height:${o.symbol==='both'?qrSize+15:o.symbol==='barcode'?14:qrSize}mm;flex-shrink:0}.barcode{width:100%;min-width:0;height:14mm}.barcode svg{width:100%;height:100%;display:block}.qr{width:${qrSize}mm;height:${qrSize}mm;flex-shrink:0}.qr svg{width:100%;height:100%;display:block}.batch{font:700 ${code.length>35?'6':'8'}pt monospace;text-align:center;white-space:nowrap}.storage{font-size:6.5pt;line-height:1.25;text-align:center;overflow-wrap:anywhere}.part{font-size:7pt;text-align:center;line-height:1.2}small{color:#526276}@page{size:${o.layout==='thermal'?`${o.width}mm ${o.height}mm`:'A4'};margin:${o.layout==='thermal'?'0':'8mm'}}@media print{body{background:white}header{display:none}.sheet{margin:0;${o.layout==='thermal'?'display:block;':''}}.label{border:0;${o.layout==='thermal'?'break-after:page;':''}}.label:last-child{break-after:auto}}
- </style></head><body><header><h1>چاپ لیبل بچ</h1><p>${name} · <bdi>${human}</bdi></p><p id="label-size-hint" class="recommendation" role="status" aria-live="polite">رول پیشنهادی: عرض ${recommended.width} × ارتفاع ${recommended.height} میلی‌متر؛ رول هم‌اندازه را در چاپگر قرار دهید.</p><form id="label-options" method="get"><input type="hidden" name="id" value="${id}"><label>محتوای لیبل${select('symbol',[['barcode','بارکد و نام کالا'],['qr','QR و نام کالا'],['both','بارکد، QR و نام کالا']],o.symbol)}</label><label>محتوای QR${select('qrContent',[['scan','شماره بچ برای اسکنر انبار'],['details','اطلاعات و لینک برای موبایل']],qrContent)}</label><label>کاغذ${select('layout',[['thermal','لیبل تکی'],['a4','برگه A4']],o.layout)}</label><label>عرض، میلی‌متر<input name="width" type="number" min="50" max="100" value="${o.width}" required></label><label>ارتفاع، میلی‌متر<input name="height" type="number" min="30" max="80" value="${o.height}" required></label><label>تعداد لیبل<input name="copies" type="number" min="1" max="100" value="${o.copies}" required></label><button id="label-preview" type="submit">پیش‌نمایش</button><button class="print" type="submit" name="print" value="1">چاپ / ذخیره PDF</button></form><p><small>اندازه چاپ ۱۰۰٪؛ سربرگ و پابرگ مرورگر خاموش. بارکد و QR عملیاتی فقط شمارهٔ بچ را می‌فرستند. برای نمایش مشخصات و لینک در موبایل، حالت «اطلاعات و لینک برای موبایل» را انتخاب کنید. محل درج‌شده، پیش‌فرض شناسنامه هنگام چاپ است؛ محل واقعی و آدرس به‌روز در صفحهٔ جزئیات بچ دیده می‌شود. چاپ مجدد بچ یا موجودی تازه ایجاد نمی‌کند. لیبل شناسهٔ محموله است و تأیید کیفیت محسوب نمی‌شود.</small></p></header><main class="sheet">${label.repeat(o.copies)}</main><script>
+ @font-face{font-family:Vazirmatn;src:url('/fonts/Vazirmatn.woff2') format('woff2');font-display:swap}*{box-sizing:border-box}body{margin:0;background:#eef2f7;color:#111;font-family:Vazirmatn,Tahoma,sans-serif}header{max-width:900px;margin:16px auto;padding:16px;background:white;border-radius:12px;line-height:1.9}h1{font-size:20px;margin:0}.recommendation{padding:10px 12px;background:#eef8f3;border-radius:8px;font-weight:600}form{display:flex;gap:12px;flex-wrap:wrap;align-items:end}label{display:flex;flex-direction:column;font-size:13px}input,select,button{font:inherit;padding:7px;border:1px solid #bbc7d4;border-radius:6px}input{width:90px}button{cursor:pointer}.print{margin-top:12px;background:#177a4c;color:white;padding:8px 20px}.sheet{display:grid;grid-template-columns:repeat(${o.layout==='a4'?Math.floor(194/(o.width+2)):1},${o.width}mm);gap:${o.layout==='a4'?'2mm':'0'};width:max-content;margin:16px auto}.label{width:${o.width}mm;height:${o.height}mm;padding:2mm;background:white;display:flex;flex-direction:column;align-items:stretch;justify-content:space-between;break-inside:avoid;border:1px dashed #aaa;overflow:hidden;direction:rtl}.name{font-size:9pt;font-weight:bold;line-height:1.25;max-height:${o.height<36?'4':'7'}mm;overflow:hidden;overflow-wrap:anywhere;text-align:center}.symbols{display:flex;flex-direction:${o.symbol==='both'?'column':'row'};gap:1mm;align-items:center;justify-content:center;direction:ltr;height:${o.symbol==='both'?qrSize+15:o.symbol==='barcode'?14:qrSize}mm;flex-shrink:0}.barcode{width:100%;min-width:0;height:14mm}.barcode svg{width:100%;height:100%;display:block}.qr{width:${qrSize}mm;height:${qrSize}mm;flex-shrink:0}.qr svg{width:100%;height:100%;display:block}.batch{font:700 ${code.length>35?'6':'8'}pt monospace;text-align:center;white-space:nowrap}.storage{font-size:6.5pt;line-height:1.25;text-align:center;overflow-wrap:anywhere}.part{font-size:7pt;text-align:center;line-height:1.2}small{color:#526276}${roll?`.sheet{display:block;width:${roll.width}mm}.roll-row{display:grid;direction:ltr;grid-template-columns:repeat(${roll.columns},${o.width}mm);column-gap:${roll.gapX}mm;width:${roll.width}mm;height:${pitch}mm;padding-left:${roll.left}mm;padding-top:${roll.top}mm;break-inside:avoid;background:#ddd}.roll-row:not(:last-child){break-after:page}.roll-row .label{padding:1.5mm} .roll-row .name{font-size:8pt;max-height:${o.height<30?'4':'7'}mm}.roll-row .symbols,.roll-row .barcode{${o.symbol==='barcode'&&o.height<30?'height:8mm':''}}.roll-row .part{font-size:6pt}.roll-row .batch{font-size:${o.width<35?5:7}pt}@media print{.roll-row{background:transparent}}`:''}@page{size:${roll?`${roll.width}mm ${pitch}mm`:o.layout==='thermal'?`${o.width}mm ${o.height}mm`:'A4'};margin:${o.layout==='a4'?'8mm':'0'}}@media print{body{background:white}header{display:none}.sheet{margin:0;${o.layout==='thermal'?'display:block;':''}}.label{border:0;${o.layout==='thermal'?'break-after:page;':''}}.label:last-child{break-after:auto}}
+ </style></head><body><header><h1>چاپ لیبل بچ</h1><p>${name} · <bdi>${human}</bdi></p><p id="label-size-hint" class="recommendation" role="status" aria-live="polite">رول پیشنهادی: عرض ${recommended.width} × ارتفاع ${recommended.height} میلی‌متر؛ رول هم‌اندازه را در چاپگر قرار دهید.</p><form id="label-options" method="get"><input type="hidden" name="id" value="${id}"><label>محتوای لیبل${select('symbol',[['barcode','بارکد و نام کالا'],['qr','QR و نام کالا'],['both','بارکد، QR و نام کالا']],o.symbol)}</label>${o.symbol==='barcode'?'':`<label>محتوای QR${select('qrContent',[['scan','شماره بچ برای اسکنر'],['details','اطلاعات کالا و لینک']],qrContent)}</label>`}<label>محل نگهداری${select('location',[['show','نمایش روی لیبل'],['hide','حذف از لیبل کوچک']],o.hideLocation?'hide':'show')}</label><label>کاغذ${select('layout',[['thermal','لیبل تکی'],['roll','رول چندستونه'],['a4','برگه A4']],o.layout)}</label><label>عرض، میلی‌متر<input name="width" type="number" step="${roll?0.01:1}" min="${roll?18:50}" max="${roll?150:100}" value="${o.width}" required></label><label>ارتفاع، میلی‌متر<input name="height" type="number" step="${roll?0.01:1}" min="${roll?22:30}" max="${roll?160:80}" value="${o.height}" required></label><label>تعداد لیبل<input name="copies" type="number" min="1" max="100" value="${o.requestedCopies??o.copies}" required></label><fieldset id="roll-settings" ${roll?'':'hidden disabled'}><legend>اندازه‌های رول، میلی‌متر</legend><div style="display:flex;gap:10px;flex-wrap:wrap">${rollInputs}</div><small>چاپ از چپ شروع می‌شود. فضای باقی‌مانده تا لبهٔ راست خالی می‌ماند. ارتفاع صفحهٔ چاپ برابر ارتفاع لیبل به‌علاوهٔ فاصلهٔ ردیف است.</small></fieldset><button id="label-preview" type="submit">پیش‌نمایش</button><button type="button" id="save-roll" ${roll?'':'hidden'}>ذخیره قالب رول</button><button type="button" id="load-roll">بارگذاری قالب ذخیره‌شده</button><button type="submit" name="print" value="test" id="test-roll" ${roll?'':'hidden'}>چاپ یک ردیف آزمایشی</button><button class="print" type="submit" name="print" value="1">چاپ / ذخیره PDF</button></form><p id="roll-feedback" role="status"></p><p><small>اندازه چاپ ۱۰۰٪؛ سربرگ و پابرگ مرورگر خاموش. بارکد فقط شمارهٔ بچ است؛ QR می‌تواند فقط شمارهٔ بچ یا اطلاعات کالا و لینکِ نیازمند ورود را داشته باشد. متن QR برای هر اسکن‌کننده قابل خواندن است و موجودی فعلی یا تأیید کیفیت نیست. محل درج‌شده، پیش‌فرض شناسنامه هنگام چاپ است؛ محل واقعی و آدرس به‌روز در صفحه QR دیده می‌شود. چاپ مجدد بچ یا موجودی تازه ایجاد نمی‌کند. لیبل شناسهٔ محموله است و تأیید کیفیت محسوب نمی‌شود.</small></p></header><main class="sheet">${rows}</main><script>
 const form=document.getElementById('label-options'),sizes=${JSON.stringify(sizes)};
-form.elements.namedItem('symbol').addEventListener('change',()=>{const size=sizes[form.elements.namedItem('symbol').value];form.elements.namedItem('width').value=String(size.width);form.elements.namedItem('height').value=String(size.height);document.getElementById('label-size-hint').textContent='رول پیشنهادی: عرض '+size.width+' × ارتفاع '+size.height+' میلی‌متر؛ رول هم‌اندازه را در چاپگر قرار دهید.';form.requestSubmit(document.getElementById('label-preview'));});
+const layout=form.elements.namedItem('layout'),dimensions=['width','height','rollWidth','columns','gapX','gapY','left','top','symbol','location','qrContent'];
+function updateRoll(){
+ const roll=layout.value==='roll',settings=document.getElementById('roll-settings');
+ settings.hidden=settings.disabled=!roll;
+ document.getElementById('save-roll').hidden=document.getElementById('test-roll').hidden=!roll;
+ for(const [key,min,max] of [['width',18,150],['height',22,160]]){
+  const field=form.elements.namedItem(key);
+  field.min=roll?min:key==='width'?50:30;field.max=roll?max:key==='width'?100:80;field.step=roll?'0.01':'1';
+ }
+}
+layout.addEventListener('change',updateRoll);
+const feedback=document.getElementById('roll-feedback');
+function validRoll(){
+ if(layout.value!=='roll')return true;
+ const read=key=>Number(form.elements.namedItem(key).value);
+ const columns=read('columns'),used=read('left')+columns*read('width')+(columns-1)*read('gapX');
+ if(used-read('rollWidth')>0.00001||read('top')>read('gapY')){
+  feedback.textContent='عرض رول برای این چیدمان کافی نیست یا جابه‌جایی بالا از فاصلهٔ ردیف بیشتر است.';
+  return false;
+ }
+ return true;
+}
+form.addEventListener('submit',event=>{if(!validRoll())event.preventDefault();});
+document.getElementById('save-roll').onclick=()=>{
+ if(!form.reportValidity()||!validRoll())return;
+ try{
+  localStorage.setItem('nafasyar-batch-roll-v1',JSON.stringify(Object.fromEntries(dimensions.flatMap(key=>{const field=form.elements.namedItem(key);return field?[[key,field.value]]:[]}))));
+  feedback.textContent='قالب رول در همین مرورگر ذخیره شد.';
+ }catch{feedback.textContent='مرورگر اجازهٔ ذخیرهٔ قالب را نداد.';}
+};
+document.getElementById('load-roll').onclick=()=>{
+ try{
+  const saved=JSON.parse(localStorage.getItem('nafasyar-batch-roll-v1')||'null');
+  if(!saved){feedback.textContent='قالب ذخیره‌شده‌ای در این مرورگر نیست.';return;}
+  layout.value='roll';updateRoll();
+  for(const key of dimensions)if(typeof saved[key]==='string'&&form.elements.namedItem(key))form.elements.namedItem(key).value=saved[key];
+  feedback.textContent='قالب بارگذاری شد. پیش‌نمایش را بررسی کنید.';
+ }catch{feedback.textContent='خواندن قالب ذخیره‌شده ممکن نیست.';}
+};
+form.elements.namedItem('symbol').addEventListener('change',()=>{if(layout.value==='roll')return;const size=sizes[form.elements.namedItem('symbol').value];form.elements.namedItem('width').value=String(size.width);form.elements.namedItem('height').value=String(size.height);document.getElementById('label-size-hint').textContent='رول پیشنهادی: عرض '+size.width+' × ارتفاع '+size.height+' میلی‌متر؛ رول هم‌اندازه را در چاپگر قرار دهید.';form.requestSubmit(document.getElementById('label-preview'));});
 if(${printRequested?'true':'false'})window.addEventListener('load',()=>{const url=new URL(window.location.href);url.searchParams.delete('print');window.history.replaceState(null,'',url);document.fonts.ready.then(()=>window.print());});
 </script></body></html>`;
 }
