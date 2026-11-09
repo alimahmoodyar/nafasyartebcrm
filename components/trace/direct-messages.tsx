@@ -15,9 +15,12 @@ const open=(t:Thread)=>!['closed','cancelled','completed'].includes(t.state);
 const searchKey=(value:string)=>value.replace(/ي/g,'ی').replace(/ك/g,'ک').toLocaleLowerCase('fa').trim();
 async function request<T>(url:string,options?:RequestInit):Promise<T>{
  const response=await fetch(url,{cache:'no-store',...options});
- const result=await response.json();
- if(!response.ok)throw Error(result.error||'ارتباط با صندوق پیام انجام نشد.');
- return result;
+ const result:unknown=await response.json();
+ if(!response.ok){
+  const message=result&&typeof result==='object'&&'error' in result&&typeof result.error==='string'?result.error:'';
+  throw Error(message||'ارتباط با صندوق پیام انجام نشد.');
+ }
+ return result as T;
 }
 const post=(body:object)=>request<{threadId:string}>('/api/inbox',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
 
