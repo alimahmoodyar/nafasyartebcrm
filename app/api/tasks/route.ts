@@ -1,4 +1,4 @@
-import {profileWork} from '@/lib/profile-work';
+import {profileWork,handoffShortageWork} from '@/lib/profile-work';
 import {materialHistory} from '@/lib/process-history';
 import {syncReceiptTemplates} from '@/lib/receipt-template-sync';
 import {syncMaterialTasks} from '@/lib/material-tasks';
@@ -68,6 +68,7 @@ export async function GET(request?:Request){try{const u=await requireAccess(),db
  const activeTaskIds=new Set(allowedTasks.filter(t=>!['completed','cancelled'].includes(t.state)).map(t=>t.id));
  const templateSync=await syncReceiptTemplates(u);if(templateSync.needsTaskSync)await syncMaterialTasks();
  const positionQueue=u.profileReview?await profileWork(u):{work:[],pendingQuality:0};
+ positionQueue.work.push(...await handoffShortageWork(u));
  return json({profileReview:u.profileReview||null,positionWork:positionQueue.work,pendingQuality:positionQueue.pendingQuality,accountId:u.userId,memberId:mid,isAdmin:u.isAdmin,receiptNotesAvailable:!u.permissions.salesAgentId&&!u.permissions.serviceAgentId&&!u.permissions.hospitalCenterId,canPurchaseServices,tasks:allowedTasks.map(t=>{const g=guidanceOutline(t);return {...t,guidance:{kind:g.kind,steps:g.steps,evidence:g.evidence}};}),limited:tasks.length===300,notifications:notifications.filter((n:any)=>activeTaskIds.has(n.task_id)),managementNotifications:managementNotifications.filter((n:any)=>activeTaskIds.has(n.task_id)),definitions:definitions.filter((p:any)=>!p.data.mergedInto),ownPositions:u.profileReview?[]:ownPositions,starterInstalled,members,scheduler:scheduler?JSON.parse(scheduler.data):null});
  }catch(e){return accessResponse(e)||Response.json({error:'کارتابل در دسترس نیست؛ نصب مهاجرت 0013 را بررسی کنید.'},{status:503})}}
 export async function POST(request:Request){try{checkOrigin(request);const u=await requireAccess(),db=storage(),b=JSON.parse(new TextDecoder().decode(await boundedBody(request,80000))),mode=required(b.mode),id=required(b.id),now=new Date().toISOString();if(!/^[a-f0-9-]{36}$/i.test(id))fail('شناسه عملیات معتبر نیست.');const signature=JSON.stringify(b),oldOp:any=await db.prepare('SELECT payload,actor FROM inventory_operations WHERE id=?').bind(id).first();if(oldOp){if(oldOp.actor!==u.userId||oldOp.payload!==signature)fail('شناسه عملیات تکراری است.',409);return json({saved:true,repeated:true});}

@@ -6,6 +6,19 @@ import {transportCanSee} from './transport';
 import {roleProfiles,materialProfileWork,type ProfileWork} from './role-profiles';
 import {coverage,nextWork} from './sourcing';
 import type {Session} from './permissions';
+import {shortageRoles,canActOnShortage,shortageStages,type Shortage} from './handoff-shortage';
+
+export async function handoffShortageWork(user:Session):Promise<ProfileWork[]>{
+ const roles=shortageRoles(user);
+ if(!Object.values(roles).some(Boolean))return [];
+ const rows=(await storage().prepare("SELECT id,data FROM flow_entities WHERE type='handoff' AND json_type(data,'$.shortages')='object' AND json_extract(data,'$.state')='pending'").all()).results;
+ return rows.flatMap(row=>{
+  const id=String(row.id),data=JSON.parse(String(row.data));
+  return Object.entries(data.shortages as Record<string,Shortage>).filter(([,item])=>canActOnShortage(roles,item.stage)).map(([deviceId,item])=>({
+   id:id+':'+deviceId,title:shortageStages[item.stage]+' · '+deviceId.replace(/^device:/,''),section:'fulfillment',target:'handoff-shortage:'+id,sourceId:id,state:item.stage,
+  }));
+ });
+}
 /** Position queue from real domain stages, never fabricated assignees. */
 export async function profileWork(user:Session){
  const profile=roleProfiles.find(p=>p.id===user.profileReview?.id);if(!profile?.operational)return {work:[],pendingQuality:0};
