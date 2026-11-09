@@ -2,6 +2,8 @@ import {storage} from './storage';
 import {resolveRoleAssignment,type Session} from './permissions';
 import {roleProfiles} from './role-profiles';
 
+// Stable per administrator and only materialized in isolated preview storage.
+export const representativeSampleId=(userId:string)=>'role-sample-representative:'+userId;
 export const profileReviewCookie='__Host-nafasyar-profile-review';
 export const profileJobRoles:Record<string,string[]>={
  'central-store':['inventory'],'line-store':['production_store_assistant'],'line-manager':['production'],
@@ -15,6 +17,7 @@ export const profileJobRoles:Record<string,string[]>={
 export function profileSession(admin:Session,id:string,warehouses:any[],buyerId=''):Session{
  const profile=roleProfiles.find(p=>p.id===id);if(!admin.isAdmin||!profile)throw Error('پروفایل معتبر مدیر لازم است.');
  if((!profile.buyerScope&&!profile.missionScope&&buyerId))throw Error('پرونده خریدار برای این پروفایل معتبر نیست.');
+
  if(profile.buyerScope==='required'&&!buyerId)return {...admin,isAdmin:false,permissions:{read:[],write:[],eventStages:[],manualPrograms:[]},profileReview:{id,title:profile.title,warehouseIds:[]},productionParticipant:false};
  const roles=profileJobRoles[id];if(!roles)throw Error('مجوزهای این پروفایل تعریف نشده است.');
  const selected=warehouses.filter(w=>w.data.active&&!w.data.deletedAt&&(id==='quality'||id==='line-store'?id==='quality'||w.data.warehouseType==='production_line':!w.data.serviceDomain&&!['production_line','quarantine'].includes(w.data.warehouseType)));

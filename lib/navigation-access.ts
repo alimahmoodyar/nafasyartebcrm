@@ -24,7 +24,7 @@ const can=(u:Session,kind:Kind,operation:'read'|'write'='read')=>u.isAdmin||u.pe
 
 /** One navigation policy shared by the browser shell and the assistant. */
 export function canOpenSection(user:Session,s:string):boolean{
- if(isUnscopedRepresentative(user))return false;
+ if(isUnscopedRepresentative(user))return ['tasks','sales','sales-returns','transport'].includes(s);
  const p=accessPermissions(user.permissions),u={...user,permissions:p};
  const internal=!p.hospitalCenterId&&!p.salesAgentId&&!p.serviceAgentId;
  // The inbox is a shared workspace. Showing its entry does not grant access
