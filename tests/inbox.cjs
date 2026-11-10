@@ -82,6 +82,16 @@ let chain=Promise.resolve();const batch=db.batch.bind(db);db.batch=s=>{const p=c
  const store=profileSession(admin,'central-store',[]);
  const quality=profileSession(admin,'quality',[]);
  const line=profileSession(admin,'line-store',[]);
+ const representativePreview=profileSession(admin,'sales-representative',[]);
+ const representativeDirectory=await get(representativePreview,'','&view=directory');
+ assert.equal(representativeDirectory.status,200);
+ assert.ok(representativeDirectory.data.people.some(p=>p.id==='@profile:logistics'));
+ assert.ok(representativeDirectory.data.people.some(p=>p.id==='@profile:home-service'));
+ assert.ok(!representativeDirectory.data.people.some(p=>p.id==='@profile:quality'));
+ const representativeMessage={id:crypto.randomUUID(),mode:'create',recipientType:'person',recipientId:'@profile:logistics',kind:'message',priority:'normal',title:'Preview message',body:'Preview only',expectedMailbox:representativeDirectory.data.me};
+ assert.equal((await post(representativePreview,{...representativeMessage,recipientId:'@profile:quality'})).status,400);
+ assert.equal((await post(representativePreview,representativeMessage)).status,200);
+ assert.equal((await get(admin,representativeMessage.id)).status,404);
  const storeBox=(await get(store,'','&view=directory')).data;
  const qualityBox=(await get(quality,'','&view=directory')).data;
  assert.equal(storeBox.profileTitle,'مسئول انبار مرکزی');

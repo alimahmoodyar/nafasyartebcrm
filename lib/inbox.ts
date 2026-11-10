@@ -1,7 +1,7 @@
-import {storedAccessPermissions} from './permissions';
+import {isUnscopedRepresentative,storedAccessPermissions} from './permissions';
 import {salesScope,salesStaff,salesFinance} from './sales';
 import {storage} from './storage';
-import {AccessError,can} from './authorization';
+import {AccessError,can,session} from './authorization';
 import {memberId,taskAccess} from './duties';
 import type {Session} from './permissions';
 import {roleProfiles} from './role-profiles';
@@ -12,6 +12,11 @@ export async function inboxIdentity(u:Session){const id=await memberId(u);if(id)
 // Operational notices still use the authenticated account. Interactive previews use a separate mailbox.
 const profileAddress=(id:string)=>'@profile:'+id;
 const representativeInboxProfiles=new Set(['sales','home-sales','hospital-sales','sales-manager','sales-finance','logistics','home-service','hospital-service']);
+export async function requireInboxAccess(){
+ const user=await session();
+ if(user.permissions.hospitalCenterId)throw new AccessError('این حساب فقط به پنل مرکز بیمارستانی دسترسی دارد.',403);
+ return user;
+}
 export async function inboxMailbox(u:Session){
  const preview=u.profileReview;
  if(!preview)return {id:await inboxIdentity(u),name:u.name,profileTitle:null};
@@ -80,6 +85,7 @@ export async function prepareInboxCreate(u:Session,b:any,now=new Date(),mailboxD
  if(b.recipientType==='person'&&recipient.id===me||b.recipientType==='position'&&!recipient.members.some((x:string)=>x!==me))fail('گیرنده باید شخص دیگری یا سمتی دارای همکار فعال باشد.');
  if(!['message','request'].includes(b.kind)||!['normal','urgent'].includes(b.priority))fail('نوع یا اولویت معتبر نیست.');
  let due='';if(b.kind==='request'){const value=req(b.due,40);if(!/^\d{4}-\d\d-\d\dT([01]\d|2[0-3]):[0-5]\d:00\+03:30$/.test(value)||!Number.isFinite(Date.parse(value))||new Date(value.slice(0,10)).toISOString().slice(0,10)!==value.slice(0,10)||Date.parse(value)<=now.getTime())fail('مهلت آینده با ساعت تهران انتخاب کنید.');due=new Date(value).toISOString();}
+ if(isUnscopedRepresentative(u)&&b.link?.id)fail('اتصال پرونده در صندوق آزمایشی نماینده در دسترس نیست.');
  const data={title:req(b.title,180),kind:b.kind,priority:b.priority,sender:me,senderName:mailboxDirectory?.mailboxName||u.name,recipientType:b.recipientType,recipientId:recipient.id,recipientName:recipient.name,assignee:b.recipientType==='person'?recipient.id:'',state:'open',due,link:b.link?.id?await inboxLink(u,b.link):null};
  return {data,body:req(b.body,12000),recipient,me};
 }
