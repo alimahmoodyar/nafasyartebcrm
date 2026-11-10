@@ -28,8 +28,8 @@ export const roleProfiles:RoleProfile[]=[
  {id:'domestic',title:'بازرگانی داخلی',group:'نقش‌های مرتبط',operational:true,workflowRoles:['domestic'],links:[assigned(link('کارتابل بازرگانی داخلی','sourcing','domestic:'))],gaps:[]},
  {id:'foreign',title:'بازرگانی خارجی',group:'نقش‌های مرتبط',operational:true,workflowRoles:['foreign'],links:[assigned(link('کارتابل بازرگانی خارجی','sourcing','foreign:'))],gaps:[]},
  {id:'sales',title:'فروش',group:'نقش‌های مرتبط',operational:true,workflowRoles:['sales'],links:[link('سفارش فروش و درخواست ارسال','sales'),link('ظرفیت‌سنجی گازهای بیمارستانی','oxygen-capacity')],gaps:[]},
- {id:'home-sales',title:'کارشناس فروش خانگی',group:'فروش',operational:true,workflowRoles:['sales'],buyerScope:'optional',links:[
-  salesLink('پیگیری سفارش‌ها','orders'),salesLink('ثبت فروش و پیش‌فاکتور','new_order'),
+ {id:'home-sales',title:'کارشناس فروش خانگی',group:'فروش',operational:true,workflowRoles:['sales'],links:[
+  salesLink('ثبت فروش و پیش‌فاکتور','new_order'),salesLink('پیگیری سفارش‌ها','orders'),
   salesLink('خریداران و نمایندگان','profiles'),salesLink('سرنخ و فرصت فروش','leads'),
   link('مرجوعی دستگاه','sales-returns'),salesLink('گزارش و پیگیری فروش','home'),
   salesLink('تارگت و تخفیف','targets'),salesLink('فایل‌های فروش و آموزش','resources')

@@ -56,6 +56,15 @@ const nw=(mode,extra={},u=manager,status=200)=>post(network,'/api/sales/network'
  const homePreview=profileSession(admin,'home-sales',[]),hospitalPreview=profileSession(admin,'hospital-sales',[]),managerPreview=profileSession(admin,'sales-manager',[]);
  const homeExample=await readCalls(homePreview),hospitalExample=await readCalls(hospitalPreview),managerExample=await readCalls(managerPreview);
  assert.equal(homeExample.sample,true);
+ const orderPreview=await context.run(homePreview,()=>sales.GET(request('/api/sales?orderPreview=1')));
+ assert.equal(orderPreview.status,200);
+ const sampleOrders=(await orderPreview.json()).orderSample;
+ assert.equal(sampleOrders.orders.length,4);
+ assert.equal(sampleOrders.pipeline.filter(o=>o.stage==='delivered').length,1);
+ assert.ok(sampleOrders.pipeline.some(o=>o.stage==='awaiting_receipt'));
+ const liveOrders=await context.run(staff,()=>sales.GET(request('/api/sales?orderPreview=1')));
+ assert.equal((await liveOrders.json()).orderSample,null);
+
  assert.equal(homeExample.agents.length,1);
  assert.ok(homeExample.open[0].reasons.some(r=>r.includes('افت فروش')));
  assert.equal(hospitalExample.agents.length,1);
