@@ -5,6 +5,7 @@ import {trainingContext} from './training-context';
 import {firmwareBucket} from './firmware-storage';
 import {sha256} from './firmware';
 import {salesRows,salesLock,salesFail as fail,sreq,stxt,sday} from './sales';
+import {usesAssignedSalesAccounts} from './sales-contract';
 import {salesRep,salesManager,salesFinance} from './sales-access';
 import {financialWorkflowRole} from './financial-workflow-roles';
 import {leadMembers,leadMemberGuard} from './sales-leads';
@@ -26,7 +27,7 @@ export async function salesBankRoles(actor:Session){
 async function bankEntities(){return [...await salesRows(),...(await storage().prepare("SELECT * FROM flow_entities WHERE type='treasury_account' ORDER BY id").all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}))];}
 const accountPublic=(a:any,bank:boolean)=>({id:a.id,revision:a.revision,data:{title:a.data.title,...(bank?{number:a.data.number}:{}),currency:a.data.currency,kind:a.data.kind,state:a.data.state}});
 const approvedAccount=(a:any)=>a.type==='treasury_account'&&a.data.state==='active'&&a.data.kind==='bank'&&a.data.currency==='IRR';
-const minimalAgent=(a:any)=>({id:a.id,data:{name:a.data.name,active:a.data.active,kind:a.data.kind||'representative'}});
+const minimalAgent=(a:any)=>({id:a.id,revision:a.revision,data:{name:a.data.name,active:a.data.active,kind:a.data.kind||'representative',receivingAccountIds:a.data.receivingAccountIds||[]}});
 const statementPublic=(s:any)=>{const {objectKey,...data}=s.data;return {...s,data};};
 export async function readSalesBank(actor:Session){
  const roles=await salesBankRoles(actor),all=await bankEntities();
@@ -61,7 +62,7 @@ export async function applySalesBank(actor:Session,b:any){
  if(!b||b.confirmed!==true||!salesBankModes.includes(b.mode)||! /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(b.id))fail('تأیید و شناسه معتبر عملیات لازم است.');
  if(b.mode==='terminal'?!roles.manage:!roles.bank)fail('مجوز این مرحله را ندارید.',403);
  const signature='sha256:'+await sha256(new TextEncoder().encode(JSON.stringify(b))),prior:any=await db.prepare('SELECT actor,payload FROM inventory_operations WHERE id=?').bind(b.id).first();
- if(prior){if(prior.actor!==u.userId||prior.payload!==signature)fail('شناسه قبلاً برای عملیات دیگری استفاده شده است.',409);const remaining=['import','reconcile'].includes(b.mode)?await bankEntities():[];return {saved:true,id:b.terminalId||b.rowId||b.id,repeated:true,...(['import','reconcile'].includes(b.mode)?{reconciled:0,matched:0,pendingReady:remaining.filter(r=>r.type==='sales_bank_row'&&r.data.status==='pending'&&bankMatch(r,remaining).status==='ready').length}: {})};}
+ if(prior){if(prior.actor!==u.userId||prior.payload!==signature)fail('شناسه قبلاً برای عملیات دیگری استفاده شده است.',409);const remaining=['import','reconcile'].includes(b.mode)?await bankEntities():[];return {saved:true,id:b.mode==='receiving_accounts'?b.agentId:b.terminalId||b.rowId||b.id,repeated:true,...(['import','reconcile'].includes(b.mode)?{reconciled:0,matched:0,pendingReady:remaining.filter(r=>r.type==='sales_bank_row'&&r.data.status==='pending'&&bankMatch(r,remaining).status==='ready').length}: {})};}
  const checks=await salesLock(db,b.id),all=await bankEntities(),writes=new Map<string,{id:string;type:string;data:any;old:any}>();checks.push(leadMemberGuard(db,b.id,members));
  const guard=(query:string,...values:any[])=>checks.push(db.prepare('UPDATE inventory_operations SET guard=CASE WHEN '+query+' THEN guard ELSE 0 END WHERE id=?').bind(...values,b.id));
  const put=(id:string,type:string,data:any,old?:any)=>{
@@ -72,7 +73,15 @@ export async function applySalesBank(actor:Session,b:any){
  };
  const account=(id:string)=>{const a=all.find(r=>r.id===id&&approvedAccount(r));if(!a)fail('حساب بانکی ریالی تأییدشده لازم است.');guard('EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)',a.id,a.revision);return a;};
  let target=b.id,objectKey='',imported=0,skipped=0,matched=0,ignored=0,unresolved=0;const importedIds:string[]=[];
- if(b.mode==='terminal'){
+ if(b.mode==='receiving_accounts'){
+  const agent=all.find(r=>r.type==='sales_agent'&&r.id===b.agentId&&r.data.active&&usesAssignedSalesAccounts(r.data.kind));
+  if(!agent)fail('نماینده یا عامل فروش فعال را انتخاب کنید.');
+  if(agent.revision!==b.revision)fail('پرونده خریدار تغییر کرده است. فهرست را تازه کنید.',409);
+  if(!Array.isArray(b.receivingAccountIds)||b.receivingAccountIds.length>2||new Set(b.receivingAccountIds).size!==b.receivingAccountIds.length)fail('حداکثر دو حساب متفاوت انتخاب کنید.');
+  const receivingAccountIds=b.receivingAccountIds.map((id:unknown)=>account(sreq(id)).id);
+  target=agent.id;
+  put(target,'sales_agent',{...agent.data,receivingAccountIds},agent);
+ }else if(b.mode==='terminal'){
   const old=b.terminalId?all.find(r=>r.id===b.terminalId&&r.type==='sales_bank_terminal'):null;if(b.terminalId&&!old)fail('اتصال ترمینال پیدا نشد.',404);
   if(b.revision!==(old?.revision||0))fail('نسخه اتصال پوز تغییر کرده؛ تازه‌سازی کنید.',409);
   const terminalCode=sreq(b.terminalCode,200),provider=sreq(b.provider,200),a=account(sreq(b.accountId)),agentId=sreq(b.agentId),agent=all.find(r=>r.id===agentId&&r.type==='sales_agent'&&r.data.kind!=='referrer');if(!agent)fail('خریدار معتبر لازم است.');

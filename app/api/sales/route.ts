@@ -7,6 +7,7 @@ import {salesRepresentationLinks,salesLinkWorkspace} from '@/lib/representative-
 import {storedAccessPermissions} from '@/lib/permissions';
 import {buildIntakeRoles} from '@/lib/build-intake-access';
 import {productProductionMode} from '@/lib/model';
+import {usesAssignedSalesAccounts} from '@/lib/sales-contract';
 import {bankCode} from '@/lib/sales-bank-contract';
 import {digest} from '@/lib/password-auth';
 import {automaticRepresentativeAccount,initialRepresentativeAccount,representativePublic} from '@/lib/representative-account';
@@ -32,7 +33,7 @@ async function get(request:Request){try{
  const candidates=all.filter(r=>r.type==='sales_agent'&&(!own||r.id===own)),visible=await Promise.all(candidates.map(a=>salesVisible(u,a,'read'))),agents=candidates.filter((_,i)=>visible[i]),ids=agents.map(a=>a.id),rows=all.filter(r=>ids.includes(r.data.agentId)||r.type==='sales_price'&&r.data.agentId==='');const today=dayAt();
  const warehouseOnly=!salesRead(u);if(warehouseOnly)return json({warehouseOnly:true,roles:{warehouse:true},agents:agents.map(a=>({id:a.id,data:{name:a.data.name}})),returns:rows.filter(r=>r.type==='sales_return'&&!r.data.workflowVersion).map(r=>({...r,data:{agentId:r.data.agentId,state:r.data.state,deviceIds:r.data.deviceIds,serials:r.data.serials,reason:r.data.reason,receipt:r.data.receipt}})),help:salesHelp});
  const links=await salesLinkWorkspace(storage(),u,agents);
- const receivingAccounts=(salesStaff(u)||salesFinance(u)||salesRep(u))?await dbReceivingAccounts():[];
+ const receivingAccounts=(salesStaff(u)||salesFinance(u)||salesRep(u))?(await dbReceivingAccounts()).filter(account=>!salesRep(u)||agents.some(agent=>!usesAssignedSalesAccounts(agent.data.kind)||agent.data.receivingAccountIds?.includes(account.id))):[];
  const products=(await storage().prepare("SELECT id,payload FROM records WHERE kind='product'").all()).results.map((r:any)=>{const p=JSON.parse(r.payload);return {id:r.id,name:p.name||p.model||p.code,model:p.model||'',status:p.status,productionMode:productProductionMode(p)};});
  const canOperate=await Promise.all(agents.map(a=>salesVisible(u,a)));
  const bankRowsById=new Map(rows.filter(row=>row.type==='sales_bank_row').map(row=>[row.id,row.data]));
@@ -200,8 +201,25 @@ async function post(request:Request){try{
   }
  }else if(mode==='payment'){
   const old=b.paymentId?await get(req(b.paymentId),'sales_payment'):null;if(old){revision(old);state(old,['pending','rejected']);if(old.data.openingId)fail('افتتاحیه از فرم پرداخت تغییر نمی‌کند.');}
-  if(!['bank','cash','check'].includes(b.method))fail('روش پرداخت معتبر نیست.');const amount=money(b.amount,true),day=sday(b.day);if(day>today)fail('تاریخ پرداخت در آینده نیست.');const bank=txt(b.bank||'',200),normalizedBank=bank.toLowerCase().replace(/\s+/g,''),reference=req(b.reference,300),normalizedReference=reference.toLowerCase().replace(/\s+/g,'');if(b.method!=='cash'&&!bank)fail('بانک لازم است.');if(rows.some(r=>r.type==='sales_payment'&&r.id!==old?.id&&r.data.method===b.method&&(r.data.normalizedBank||r.data.bank?.toLowerCase().replace(/\s+/g,''))===normalizedBank&&r.data.normalizedReference===normalizedReference))fail('این مرجع پرداخت قبلاً ثبت شده است؛ سابقه را بررسی کنید.',409);
-  const file=b.fileId?await get(req(b.fileId),'sales_file'):null;if(b.method!=='cash'&&!file)fail('تصویر رسید یا چک همین نماینده لازم است.');const receivingAccountId=b.method==='bank'?txt(b.receivingAccountId||'',200):'';if(b.method==='bank'&&!old&&!receivingAccountId&&(await dbReceivingAccounts()).length)fail('حساب مقصد شرکت را برای این واریز انتخاب کنید.');if(receivingAccountId){const destination=(await dbReceivingAccounts()).find(a=>a.id===receivingAccountId);if(!destination)fail('حساب مقصد شرکت فعال و مصوب نیست.');guard("EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)",destination!.id,destination!.revision);}
+  if(!['bank','cash','check'].includes(b.method))fail('روش پرداخت معتبر نیست.');
+  const amount=money(b.amount,true),day=sday(b.day);if(day>today)fail('تاریخ پرداخت در آینده نیست.');
+  const receivingAccountId=b.method==='bank'?txt(b.receivingAccountId||'',200):'';
+  const assigned=usesAssignedSalesAccounts(own().data.kind);
+  const existingDestination=old?.data.method==='bank'&&old.data.receivingAccountId===receivingAccountId;
+  const destinations=b.method==='bank'?await dbReceivingAccounts():[];
+  const destination=destinations.find(account=>account.id===receivingAccountId);
+  if(b.method==='bank'&&!existingDestination){
+   if(!receivingAccountId&&(assigned||destinations.length))fail('حساب مقصد شرکت را برای این واریز انتخاب کنید.');
+   if(receivingAccountId&&(!destination||assigned&&!own().data.receivingAccountIds?.includes(receivingAccountId)))fail('این حساب مقصد برای خریدار فعال یا تخصیص داده نشده است.');
+   if(assigned)guard("EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)",own().id,own().revision);
+   if(destination)guard("EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)",destination.id,destination.revision);
+  }
+  const bank=destination?.title||(existingDestination?old!.data.bank:txt(b.bank||'',200));
+  const normalizedBank=bank.toLowerCase().replace(/\s+/g,''),reference=req(b.reference,300),normalizedReference=reference.toLowerCase().replace(/\s+/g,'');
+  if(b.method!=='cash'&&!bank)fail('بانک لازم است.');
+  if(rows.some(r=>r.type==='sales_payment'&&r.id!==old?.id&&r.data.method===b.method&&(!receivingAccountId||!r.data.receivingAccountId)&&(r.data.normalizedBank||r.data.bank?.toLowerCase().replace(/\s+/g,''))===normalizedBank&&r.data.normalizedReference===normalizedReference))fail('این مرجع پرداخت قبلاً ثبت شده است؛ سابقه را بررسی کنید.',409);
+  const file=b.fileId?await get(req(b.fileId),'sales_file'):null;
+  if(b.method!=='cash'&&!file)fail('تصویر رسید یا چک همین نماینده لازم است.');
   if(receivingAccountId&&rows.some(r=>r.type==='sales_payment'&&r.id!==old?.id&&r.data.receivingAccountId===receivingAccountId&&r.data.normalizedReference===normalizedReference))fail('این تراکنش برای حساب مقصد قبلاً ثبت شده است.',409);
   if(b.method==='bank'&&rows.some(r=>r.type==='sales_payment'&&r.id!==old?.id&&r.data.bankRowId&&bankCode(r.data.reference||'')===bankCode(reference)&&(!receivingAccountId||r.data.receivingAccountId===receivingAccountId)))fail('این پیگیری قبلاً به وصول بانکی متصل شده است؛ سابقه بانک را بررسی کنید.',409);
   const checkDue=b.method==='check'?sday(b.checkDue):'';const cashOrderId=txt(b.cashOrderId||'',200),checkInvoiceId=txt(b.checkInvoiceId||'',200);if(cashOrderId){if(b.method==='check')fail('وجه نقد خرید جدید نمی‌تواند چک باشد.');const o=await get(cashOrderId,'sales_order');state(o,['sales_approved','approved']);if(!o.data.salesTerms)fail('خرید فاقد شرایط مصوب است.');if(!rows.some(r=>r.type==='sales_invoice'&&r.data.orderId===o.id))fail('ابتدا فاکتور خرید جدید صادر شود تا وجه نقد به قسط مصوب متصل شود.');}if(b.method==='check'&&b.checkPurpose==='collateral'&&checkInvoiceId)fail('چک ضمانت به فاکتور پرداخت متصل نمی‌شود.');if(checkInvoiceId)await get(checkInvoiceId,'sales_invoice');target=old?.id||id;put(target,'sales_payment',{agentId:own().id,method:b.method,receivingAccountId,amount,day,bank,normalizedBank,reference,normalizedReference,fileId:file?.id||'',checkDue,cashOrderId,checkInvoiceId,state:'pending',checkPurpose:b.method==='check'&&b.checkPurpose==='collateral'?'collateral':'payment',submittedBy:u.userId,notes:txt(b.notes||'',4000)},old);

@@ -1,7 +1,7 @@
 import {salesFail as fail,sreq,stxt,sday,money} from './sales';
 import {dayAt} from './duties';
 
-export const salesBankModes=['terminal','import','reconcile','reverse'] as const;
+export const salesBankModes=['terminal','import','reconcile','reverse','receiving_accounts'] as const;
 export const MAX_SALES_BANK_BYTES=10*1024*1024;
 // Identifiers are strings: leading zeroes matter and punctuation is not interchangeable.
 export const bankCode=(value:string)=>value.trim().toLowerCase().replace(/\s+/g,'');
