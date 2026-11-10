@@ -35,7 +35,14 @@ export function salesPaymentSubmission(u:Session,agentId:string,source:any,at:st
 export function integer(v:unknown,min=1,max=10000){if(typeof v!=='number'||!Number.isSafeInteger(v)||v<min||v>max)salesFail('عدد صحیح در محدوده مجاز وارد کنید.');return v as number;}
 export function arr(v:unknown,max=100){if(!Array.isArray(v)||!v.length||v.length>max)salesFail('فهرست غیرخالی معتبر لازم است.');return v as any[];}
 export const salesDecode=(r:any)=>({...r,data:JSON.parse(r.data)});
-export async function salesRows(){return (await storage().prepare("SELECT * FROM flow_entities WHERE type GLOB 'sales_*' AND type<>'sales_report' ORDER BY created,id").all()).results.map(salesDecode);}
+export async function salesRows(){
+ const db=storage(),test=trainingContext.getStore();
+ const base="SELECT * FROM flow_entities WHERE type GLOB 'sales_*' AND type<>'sales_report'";
+ const statement=test?.salesBankTest
+  ? db.prepare(base+" AND (json_extract(data,'$.profileTestOwner')=? OR json_extract(data,'$.agentId') IN (SELECT id FROM flow_entities WHERE type='sales_agent' AND json_extract(data,'$.profileTestOwner')=?) OR (type IN ('sales_bank_statement','sales_bank_row') AND json_extract(data,'$.accountId') IN (SELECT id FROM flow_entities WHERE type='sales_receiving_account' AND json_extract(data,'$.profileTestOwner')=?))) ORDER BY created,id").bind(test.actor,test.actor,test.actor)
+  : db.prepare(base+' ORDER BY created,id');
+ return (await statement.all()).results.map(salesDecode);
+}
 export async function salesEntity(id:string,type:string){const r:any=await storage().prepare('SELECT * FROM flow_entities WHERE id=? AND type=?').bind(id,type).first();if(!r)salesFail('پرونده پیدا نشد.',404);return salesDecode(r);}
 export async function liveSalesUser(u:Session){if(u.isAdmin||u.profileReview||trainingContext.getStore())return u;const m:any=await storage().prepare("SELECT status,permissions FROM app_members WHERE subject=? OR id=?").bind(u.userId,u.userId.startsWith('local:')?u.userId.slice(6):u.userId).first();if(!m||m.status!=='active')salesFail('دسترسی فعال لازم است.',403);return {...u,permissions:storedAccessPermissions(m.permissions)};}
 export async function salesVisible(u:Session,a:any,operation:'read'|'write'='write'){

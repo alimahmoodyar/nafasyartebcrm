@@ -7,7 +7,10 @@ import {salesRepresentationLinks,salesLinkWorkspace} from '@/lib/representative-
 import {storedAccessPermissions} from '@/lib/permissions';
 import {buildIntakeRoles} from '@/lib/build-intake-access';
 import {productProductionMode} from '@/lib/model';
-import {bankCode} from '@/lib/sales-bank-contract';
+import {usesAssignedSalesAccounts} from '@/lib/sales-contract';
+import {bankCode,transferPaymentFits} from '@/lib/sales-bank-contract';
+import {bankTestBuyer,runBankProfileTest} from '@/lib/sales-bank-profile-test';
+import {mcpActor} from '@/lib/mcp/context';
 import {digest} from '@/lib/password-auth';
 import {automaticRepresentativeAccount,initialRepresentativeAccount,representativePublic} from '@/lib/representative-account';
 import {termsPlan,allocationPlan} from '@/lib/sales-network-contract';
@@ -26,13 +29,18 @@ import {salesRoles,salesActions,salesHelp,salesAccounts,salesCheckPosition,sales
 import {salesFail as fail,salesRep,salesManager,salesStaff,salesFinance,salesRead,salesWarehouse,salesViewer,salesReportRead,salesScope,salesLock,salesRows,salesEntity,salesQuote,salesSubmission,salesPaymentSubmission,salesDelivery,publicSalesFile,sreq as req,stxt as txt,money,integer,arr,sday} from '@/lib/sales';
 import {syncSalesTasks} from '@/lib/sales-tasks';
 const json=(d:any,status=200)=>Response.json(d,{status,headers:{'Cache-Control':'private, no-store','Vary':'Cookie, Authorization'}});
-async function dbReceivingAccounts(){return (await storage().prepare("SELECT id,revision,data FROM flow_entities WHERE type='treasury_account' AND json_extract(data,'$.state')='active' AND json_extract(data,'$.kind')='bank' AND json_extract(data,'$.currency')='IRR'").all()).results.map((a:any)=>{const d=JSON.parse(a.data);return {id:a.id,revision:a.revision,title:d.title,number:d.number,currency:d.currency};});}
+async function dbReceivingAccounts(){
+ const db=storage(),test=trainingContext.getStore();
+ const query="SELECT id,revision,data FROM flow_entities WHERE type IN ('treasury_account','sales_receiving_account') AND json_extract(data,'$.state')='active' AND json_extract(data,'$.kind')='bank' AND json_extract(data,'$.currency')='IRR'";
+ const statement=test?.salesBankTest?db.prepare(query+" AND json_extract(data,'$.profileTestOwner')=?").bind(test.actor):db.prepare(query);
+ return (await statement.all()).results.map((a:any)=>{const d=JSON.parse(a.data);return {id:a.id,revision:a.revision,title:d.title,number:d.number,iban:d.iban,cardNumber:d.cardNumber,currency:d.currency};});
+}
 async function get(request:Request){try{
  const u=await liveSalesUser(await requireAccess());if(!salesRead(u)&&!salesWarehouse(u))fail('دسترسی فروش ندارید.',403);const q=new URL(request.url).searchParams;if(q.get('locations')==='1'){if(!salesManager(u))fail('مجوز تعریف نماینده لازم است.',403);return json({provinces:iranProvinces,localities:q.has('province')?iranLocalities(q.get('province')):[]});}const all=await salesRows(),selected=new URL(request.url).searchParams.get('agent')||'',own=salesRep(u)?u.permissions.salesAgentId!:selected;if(salesRep(u)&&selected&&selected!==own)fail('پرونده پیدا نشد یا دسترسی ندارید.',404);if(own)await salesScope(u,own,'read');
  const candidates=all.filter(r=>r.type==='sales_agent'&&(!own||r.id===own)),visible=await Promise.all(candidates.map(a=>salesVisible(u,a,'read'))),agents=candidates.filter((_,i)=>visible[i]),ids=agents.map(a=>a.id),rows=all.filter(r=>ids.includes(r.data.agentId)||r.type==='sales_price'&&r.data.agentId==='');const today=dayAt();
  const warehouseOnly=!salesRead(u);if(warehouseOnly)return json({warehouseOnly:true,roles:{warehouse:true},agents:agents.map(a=>({id:a.id,data:{name:a.data.name}})),returns:rows.filter(r=>r.type==='sales_return'&&!r.data.workflowVersion).map(r=>({...r,data:{agentId:r.data.agentId,state:r.data.state,deviceIds:r.data.deviceIds,serials:r.data.serials,reason:r.data.reason,receipt:r.data.receipt}})),help:salesHelp});
  const links=await salesLinkWorkspace(storage(),u,agents);
- const receivingAccounts=(salesStaff(u)||salesFinance(u)||salesRep(u))?await dbReceivingAccounts():[];
+ const receivingAccounts=(salesStaff(u)||salesFinance(u)||salesRep(u))?(await dbReceivingAccounts()).filter(account=>!salesRep(u)||agents.some(agent=>!usesAssignedSalesAccounts(agent.data.kind)||agent.data.receivingAccountIds?.includes(account.id))):[];
  const products=(await storage().prepare("SELECT id,payload FROM records WHERE kind='product'").all()).results.map((r:any)=>{const p=JSON.parse(r.payload);return {id:r.id,name:p.name||p.model||p.code,model:p.model||'',status:p.status,productionMode:productProductionMode(p)};});
  const canOperate=await Promise.all(agents.map(a=>salesVisible(u,a)));
  const bankRowsById=new Map(rows.filter(row=>row.type==='sales_bank_row').map(row=>[row.id,row.data]));
@@ -43,7 +51,7 @@ async function get(request:Request){try{
   const isTerminalPayment=bankRow?.kind==='pos'&&!!bankRow.terminalId&&bankRow.paymentId===payment.id;
   const claim=payment.data;
   let bankMatchMissing=false;
-  if(salesRep(u)&&claim.method==='bank'&&claim.state==='pending'&&!claim.bankRowId&&claim.receivingAccountId&&claim.day&&bankCode(claim.reference||'')){
+  if(salesRep(u)&&claim.method==='bank'&&claim.state==='pending'&&!claim.bankRowId&&claim.receivingAccountId&&claim.day){
    const uploadDays=new Set<string>();
    for(const statement of bankStatements){
     if(statement.data.accountId===claim.receivingAccountId&&statement.created>=payment.created&&statement.data.to>=claim.day){
@@ -51,7 +59,7 @@ async function get(request:Request){try{
     }
    }
    const consecutiveUploads=[...uploadDays].some(day=>uploadDays.has(addDay(day,1)));
-   const matchingEntry=incomingBankRows.some(row=>row.data.accountId===claim.receivingAccountId&&row.data.amount===claim.amount&&row.data.day===claim.day&&bankCode(row.data.reference||'')===bankCode(claim.reference));
+   const matchingEntry=incomingBankRows.some(row=>transferPaymentFits(row,payment));
    bankMatchMissing=consecutiveUploads&&!matchingEntry;
   }
   return {...payment,isTerminalPayment,bankMatchMissing};
@@ -69,6 +77,7 @@ async function get(request:Request){try{
 async function post(request:Request){try{
  checkOrigin(request);const u=await liveSalesUser(await requireAccess()),b=JSON.parse(new TextDecoder().decode(await boundedBody(request,128000))),db=storage(),id=req(b.id,80),mode=req(b.mode),now=new Date().toISOString(),today=dayAt();
  if(!/^[0-9a-f-]{36}$/i.test(id)||b.confirmed!==true||!Object.hasOwn(salesActions,mode))fail('شناسه عملیات و تأیید صریح لازم است.');
+ if(trainingContext.getStore()?.salesBankTest&&(mode!=='payment'||b.method!=='bank'||b.fileId||b.cashOrderId||b.checkInvoiceId))fail('در این آزمون فقط اعلام واریز بانکی مجاز است.',403);
  const allowed=mode==='check_disposition_request'?salesRep(u):['check_disposition_review','order_finance_review'].includes(mode)?salesFinance(u):['agent','price','target'].includes(mode)?salesManager(u):['terms','invoice','payment_review','check_status','allocate','payment_reverse','return_review','opening_review'].includes(mode)?salesFinance(u):mode==='branch_release'?salesManager(u)||salesFinance(u):mode==='return_receive'?salesWarehouse(u):['order_review','order_progress','opening'].includes(mode)?salesStaff(u)||mode==='opening'&&salesFinance(u):salesRep(u)||salesStaff(u)||salesFinance(u);
  if(!allowed||mode==='return_request'&&!salesRep(u)&&!salesStaff(u))fail('مجوز این مرحله فروش را ندارید.',403);
  const agent=mode==='price'&&!b.agentId?null:mode==='agent'&&!b.agentId?null:await salesScope(u,req(b.agentId));
@@ -200,10 +209,27 @@ async function post(request:Request){try{
   }
  }else if(mode==='payment'){
   const old=b.paymentId?await get(req(b.paymentId),'sales_payment'):null;if(old){revision(old);state(old,['pending','rejected']);if(old.data.openingId)fail('افتتاحیه از فرم پرداخت تغییر نمی‌کند.');}
-  if(!['bank','cash','check'].includes(b.method))fail('روش پرداخت معتبر نیست.');const amount=money(b.amount,true),day=sday(b.day);if(day>today)fail('تاریخ پرداخت در آینده نیست.');const bank=txt(b.bank||'',200),normalizedBank=bank.toLowerCase().replace(/\s+/g,''),reference=req(b.reference,300),normalizedReference=reference.toLowerCase().replace(/\s+/g,'');if(b.method!=='cash'&&!bank)fail('بانک لازم است.');if(rows.some(r=>r.type==='sales_payment'&&r.id!==old?.id&&r.data.method===b.method&&(r.data.normalizedBank||r.data.bank?.toLowerCase().replace(/\s+/g,''))===normalizedBank&&r.data.normalizedReference===normalizedReference))fail('این مرجع پرداخت قبلاً ثبت شده است؛ سابقه را بررسی کنید.',409);
-  const file=b.fileId?await get(req(b.fileId),'sales_file'):null;if(b.method==='check'&&!file)fail('تصویر چک همین نماینده لازم است.');const receivingAccountId=b.method==='bank'?txt(b.receivingAccountId||'',200):'';if(b.method==='bank'&&!old&&!receivingAccountId&&(await dbReceivingAccounts()).length)fail('حساب مقصد شرکت را برای این واریز انتخاب کنید.');if(receivingAccountId){const destination=(await dbReceivingAccounts()).find(a=>a.id===receivingAccountId);if(!destination)fail('حساب مقصد شرکت فعال و مصوب نیست.');guard("EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)",destination!.id,destination!.revision);}
-  if(receivingAccountId&&rows.some(r=>r.type==='sales_payment'&&r.id!==old?.id&&r.data.receivingAccountId===receivingAccountId&&r.data.normalizedReference===normalizedReference))fail('این تراکنش برای حساب مقصد قبلاً ثبت شده است.',409);
-  if(b.method==='bank'&&rows.some(r=>r.type==='sales_payment'&&r.id!==old?.id&&r.data.bankRowId&&bankCode(r.data.reference||'')===bankCode(reference)&&(!receivingAccountId||r.data.receivingAccountId===receivingAccountId)))fail('این پیگیری قبلاً به وصول بانکی متصل شده است؛ سابقه بانک را بررسی کنید.',409);
+  if(!['bank','cash','check'].includes(b.method))fail('روش پرداخت معتبر نیست.');
+  const amount=money(b.amount,true),day=sday(b.day);if(day>today)fail('تاریخ پرداخت در آینده نیست.');
+  const receivingAccountId=b.method==='bank'?txt(b.receivingAccountId||'',200):'';
+  const assigned=usesAssignedSalesAccounts(own().data.kind);
+  const existingDestination=old?.data.method==='bank'&&old.data.receivingAccountId===receivingAccountId;
+  const destinations=b.method==='bank'?await dbReceivingAccounts():[];
+  const destination=destinations.find(account=>account.id===receivingAccountId);
+  if(b.method==='bank'&&!existingDestination){
+   if(!receivingAccountId&&(assigned||destinations.length))fail('حساب مقصد شرکت را برای این واریز انتخاب کنید.');
+   if(receivingAccountId&&(!destination||assigned&&!own().data.receivingAccountIds?.includes(receivingAccountId)))fail('این حساب مقصد برای خریدار فعال یا تخصیص داده نشده است.');
+   if(assigned)guard("EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)",own().id,own().revision);
+   if(destination)guard("EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)",destination.id,destination.revision);
+  }
+  const bank=destination?.title||(existingDestination?old!.data.bank:txt(b.bank||'',200));
+  const normalizedBank=bank.toLowerCase().replace(/\s+/g,''),reference=b.method==='bank'?txt(b.reference??'',300):req(b.reference,300),normalizedReference=bankCode(reference);
+  if(b.method!=='cash'&&!bank)fail('بانک لازم است.');
+  if(reference&&rows.some(r=>r.type==='sales_payment'&&r.id!==old?.id&&r.data.method===b.method&&(!receivingAccountId||!r.data.receivingAccountId)&&(r.data.normalizedBank||r.data.bank?.toLowerCase().replace(/\s+/g,''))===normalizedBank&&bankCode(r.data.reference||r.data.normalizedReference||'')===normalizedReference))fail('این مرجع پرداخت قبلاً ثبت شده است؛ سابقه را بررسی کنید.',409);
+  const file=b.fileId?await get(req(b.fileId),'sales_file'):null;
+  if(b.method==='check'&&!file)fail('تصویر چک همین نماینده لازم است.');
+  if(receivingAccountId&&reference&&rows.some(r=>r.type==='sales_payment'&&r.id!==old?.id&&r.data.receivingAccountId===receivingAccountId&&bankCode(r.data.reference||r.data.normalizedReference||'')===normalizedReference))fail('این تراکنش برای حساب مقصد قبلاً ثبت شده است.',409);
+  if(b.method==='bank'&&reference&&rows.some(r=>r.type==='sales_payment'&&r.id!==old?.id&&r.data.bankRowId&&bankCode(r.data.reference||'')===bankCode(reference)&&(!receivingAccountId||r.data.receivingAccountId===receivingAccountId)))fail('این پیگیری قبلاً به وصول بانکی متصل شده است؛ سابقه بانک را بررسی کنید.',409);
   const checkDue=b.method==='check'?sday(b.checkDue):'';const cashOrderId=txt(b.cashOrderId||'',200),checkInvoiceId=txt(b.checkInvoiceId||'',200);if(cashOrderId){if(b.method==='check')fail('وجه نقد خرید جدید نمی‌تواند چک باشد.');const o=await get(cashOrderId,'sales_order');state(o,['sales_approved','approved']);if(!o.data.salesTerms)fail('خرید فاقد شرایط مصوب است.');if(!rows.some(r=>r.type==='sales_invoice'&&r.data.orderId===o.id))fail('ابتدا فاکتور خرید جدید صادر شود تا وجه نقد به قسط مصوب متصل شود.');}if(b.method==='check'&&b.checkPurpose==='collateral'&&checkInvoiceId)fail('چک ضمانت به فاکتور پرداخت متصل نمی‌شود.');if(checkInvoiceId)await get(checkInvoiceId,'sales_invoice');target=old?.id||id;put(target,'sales_payment',{agentId:own().id,method:b.method,receivingAccountId,amount,day,bank,normalizedBank,reference,normalizedReference,fileId:file?.id||'',checkDue,cashOrderId,checkInvoiceId,state:'pending',checkPurpose:b.method==='check'&&b.checkPurpose==='collateral'?'collateral':'payment',submittedBy:u.userId,notes:txt(b.notes||'',4000)},old);
  }else if(['check_disposition_request','check_disposition_review'].includes(mode)){
   const payment=await get(req(b.paymentId),'sales_payment');
@@ -237,6 +263,7 @@ async function post(request:Request){try{
   put(payment.id,'sales_payment',{...payment.data,state:next,disposition,previousDispositions:mode==='check_disposition_request'&&previous?[...(payment.data.previousDispositions||[]),previous]:payment.data.previousDispositions},payment);
  }else if(['payment_review','check_status','payment_reverse'].includes(mode)){
   const p=await get(req(b.paymentId),'sales_payment');revision(p);target=p.id;let next='';
+  if(mode==='payment_review'&&b.approved===true&&p.data.method==='bank'&&(p.data.receivingAccountId||!bankCode(p.data.reference||'')))fail('این واریز را از بخش تطبیق بانکی با ردیف بانک تأیید کنید.',409);
   if(mode==='payment_review'&&b.approved===true&&p.data.method==='bank'&&rows.some(r=>r.type==='sales_payment'&&r.id!==p.id&&r.data.bankRowId&&bankCode(r.data.reference||'')===bankCode(p.data.reference||'')&&(!p.data.receivingAccountId||r.data.receivingAccountId===p.data.receivingAccountId)))fail('این پرداخت با وصول بانکی دیگری تعارض دارد؛ از بخش تطبیق بانک بررسی کنید.',409);
   if(mode==='payment_review'){state(p,['pending']);if(typeof b.approved!=='boolean')fail('نتیجه بررسی لازم است.');next=b.approved?(p.data.method==='check'?(p.data.checkPurpose==='collateral'?'check_collateral':'received'):'cleared'):'rejected';}
   if(mode==='check_status'){if(p.data.method!=='check')fail('این پرداخت چک نیست.');if(!['cleared','bounced'].includes(b.state))fail('وضعیت چک معتبر نیست.');state(p,b.state==='cleared'?['received']:['received','cleared']);if(b.state==='cleared'&&salesCheckPosition(p,account(),today).requiresReview)fail('مبلغ چک بیشتر از مانده فاکتور است؛ ابتدا چک را تعیین تکلیف کنید.',409);if(b.state==='cleared'&&p.data.checkDue>today)fail('تاریخ وصول چک هنوز نرسیده است.');next=b.state;}
@@ -273,8 +300,23 @@ async function post(request:Request){try{
   for(const [ci,c] of credits.entries()){const plan=allocationPlan(rows,agent.id,c.id,today);plan.allocations.forEach((l,i)=>put(id+':auto:'+ci+':'+i,'sales_allocation',{agentId:agent.id,creditId:c.id,...l,policy:plan.policy,by:u.userId}));plan.recoveries.forEach((r,i)=>put(id+':recovery:'+ci+':'+i,'sales_check_recovery',{agentId:agent.id,creditId:c.id,...r,by:u.userId}));}
  }
  await db.batch([db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(id,'sales_'+mode,signature,u.userId,now),...checks,...stmts,db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,target,'sales_'+mode,signature,now)]);
- let followupPending=false;try{await syncSalesTasks();if(b.leadId)await syncLeadTasks();await scanSalesMonitor({reports:false,source:'event'});}catch{followupPending=true;}return json({saved:true,id:target,followupPending,automaticAccount});
+ let followupPending=false;if(!trainingContext.getStore()?.salesBankTest)try{await syncSalesTasks();if(b.leadId)await syncLeadTasks();await scanSalesMonitor({reports:false,source:'event'});}catch{followupPending=true;}return json({saved:true,id:target,followupPending,automaticAccount});
  }catch(e){return accessResponse(e)||json({error:/constraint|SQLITE|D1/i.test(String(e))?'اطلاعات هم‌زمان تغییر کرده است؛ فهرست را تازه و نتیجه را بررسی کنید.':'ثبت انجام نشد؛ ورودی‌ها را بررسی کنید.'},409)}}
 
-export const GET=withRepresentativeSample(get);
-export const POST=withRepresentativeSample(post);
+function withBankPaymentTest(handler:(request:Request)=>Promise<Response>){
+ const defaultHandler=withRepresentativeSample(handler);
+ return async(request:Request)=>{
+  if(new URL(request.url).searchParams.get('roleTest')!=='true')return defaultHandler(request);
+  try{
+   const user=await requireAccess(),review=user.profileReview;
+   if(review?.id!=='sales-representative'||!review.buyerId)fail('پرونده نماینده را برای آزمون انتخاب کنید.',403);
+   const buyer=await bankTestBuyer(user,review!.buyerId!);
+   return await runBankProfileTest(user,async()=>{
+    if(!(await salesRows()).some(r=>r.id===buyer.id&&r.data.receivingAccountIds?.length))fail('ابتدا مالی فروش یک حساب آزمایشی به همین نماینده تخصیص دهد.',409);
+    return mcpActor.run({...user,permissions:{...user.permissions,salesAgentId:buyer.id},profileReview:{...review!,buyerId:buyer.id}},()=>handler(request));
+   });
+  }catch(e){return accessResponse(e)||json({error:'آزمون اعلام واریز در دسترس نیست.'},409);}
+ };
+}
+export const GET=withBankPaymentTest(get);
+export const POST=withBankPaymentTest(post);
