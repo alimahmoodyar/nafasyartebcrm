@@ -46,6 +46,10 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
  const [data,setData]=useState<any>(null),[selected,setSelected]=useState(''),[view,setView]=useState('home'),[error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[draft,setDraft]=useState<any>(null),[quote,setQuote]=useState<any>(null),[file,setFile]=useState<File|null>(null),[accounts,setAccounts]=useState<any[]>([]),[search,setSearch]=useState(''),[province,setProvince]=useState(''),[from,setFrom]=useState(''),[to,setTo]=useState(''),[stage,setStage]=useState('');
  const [orderList,setOrderList]=useState<'open'|'history'>('open');
  const [orderProduct,setOrderProduct]=useState('');
+ const [paymentView,setPaymentView]=useState<'open'|'history'>('open');
+ const [paymentDay,setPaymentDay]=useState('');
+ const [paymentAmount,setPaymentAmount]=useState('');
+ const [paymentReference,setPaymentReference]=useState('');
  const [relatedReturns,setRelatedReturns]=useState<any[]>([]);
  const [returnsUnavailable,setReturnsUnavailable]=useState(false);
  const representativeDashboard=targetId==='rep-dashboard';
@@ -139,7 +143,42 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
  const unpaidInstallment=(invoice:any)=>invoice?.installments?.filter((part:any)=>rial(part.remaining)>BigInt(0)).sort((a:any,b:any)=>a.due.localeCompare(b.due))[0];
  const outstandingDue=representativeAccount?.invoices.flatMap((invoice:any)=>unpaidInstallment(invoice)||[]).sort((a:any,b:any)=>a.due.localeCompare(b.due))[0];
  const dueLabel=(part:any)=>part.days<0?n(-part.days)+' روز معوق':part.days===0?'امروز':n(part.days)+' روز مانده';
- const recentPayments=representativeAccount?.payments.slice().sort((a:any,b:any)=>(b.data.bankSettlementDay||b.data.day).localeCompare(a.data.bankSettlementDay||a.data.day)||b.created.localeCompare(a.created)).slice(0,5)||[];
+ const searchingPayments=!!(paymentDay||paymentAmount||paymentReference.trim());
+ const referenceQuery=digits(paymentReference.trim()).toLowerCase();
+ const isSystemConfirmed=(entry:any)=>entry.state==='cleared'&&!!entry.bankRowId;
+ const sortedPayments=(representativeAccount?.payments||[]).filter((payment:any)=>paymentView==='history'
+  ?isSystemConfirmed(payment.data)
+  :['pending','received'].includes(payment.data.state)
+ ).sort((a:any,b:any)=>(b.data.bankSettlementDay||b.data.day).localeCompare(a.data.bankSettlementDay||a.data.day)||b.created.localeCompare(a.created));
+ const recentPayments=searchingPayments?sortedPayments.filter((payment:any)=>{
+  const entry=payment.data;
+  return (!paymentDay||entry.day===paymentDay||entry.bankSettlementDay===paymentDay)
+   &&(!paymentAmount||entry.amount===paymentAmount)
+   &&(!referenceQuery||[entry.reference,entry.bankEvidence?.bankId].some(value=>digits(String(value||'')).toLowerCase().includes(referenceQuery)));
+ }):sortedPayments;
+ const paymentOrigin=(payment:any)=>{
+  const entry=payment.data;
+  if(payment.isTerminalPayment)return 'پوز';
+  if(entry.submission?.channel==='portal'&&entry.submission?.onBehalf===false)return 'اعلام نماینده';
+  return entry.bankRowId?'گردش بانک':'';
+ };
+ const paymentReferenceLabel=(entry:any)=>entry.reference||entry.bankEvidence?.bankId||'';
+ async function downloadPaymentHistory(){
+  try{
+   const XLSX=await import('xlsx');
+   const book=XLSX.utils.book_new();
+   const rows=recentPayments.map((payment:any)=>{
+    const entry=payment.data,amount=String(entry.amount);
+    return [date(entry.bankSettlementDay||entry.day),/^\d{1,15}$/.test(amount)?Number(amount):amount,String(paymentReferenceLabel(entry)),paymentOrigin(payment),'تأیید سیستمی'];
+   });
+   XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet([
+    ['تاریخ','مبلغ (ریال)','شماره پیگیری / شناسه','منبع','وضعیت'],
+    ...rows,
+   ]),'سوابق پرداخت');
+   book.Workbook={Views:[{RTL:true}]};
+   XLSX.writeFile(book,'سوابق پرداخت‌های نماینده.xlsx');
+  }catch{setError('ساخت خروجی اکسل سوابق پرداخت انجام نشد.');}
+ }
  const representativeTracking=rep&&(targetId==='rep-orders'||representativeDashboard);
  const orders=records('orders');
  const orderStages=new Map<string,string>(pipeline.map((progress:any)=>[progress.orderId,progress.stage]));
@@ -256,19 +295,29 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
 
  {!reportOnly&&<>{ordersPage}{returnsPage}</>}
  {representativeDashboard&&rep&&<section className="representative-payments" aria-label="پرداخت‌ها">
-  <div className="panelhead"><h3>پرداخت‌های اخیر</h3><button type="button" className="link" onClick={()=>onNavigate('sales','rep-account')}>گزارش کامل مالی و چک‌ها</button></div>
-  {recentPayments.length>0?<div className="sales-table"><table><thead><tr><th>تاریخ</th><th>مبلغ</th><th>منبع</th><th>وضعیت</th></tr></thead><tbody>
+  <div className="panelhead"><h3>پرداخت‌ها</h3><button type="button" className="link" onClick={()=>onNavigate('sales','rep-account')}>گزارش کامل مالی و چک‌ها</button></div>
+  <div className="representative-order-tabs" role="group" aria-label="فهرست پرداخت‌ها">
+   <button type="button" className={paymentView==='open'?'btn primary':'btn'} aria-pressed={paymentView==='open'} onClick={()=>setPaymentView('open')}>پرداخت‌های باز</button>
+   <button type="button" className={paymentView==='history'?'btn primary':'btn'} aria-pressed={paymentView==='history'} onClick={()=>setPaymentView('history')}>سوابق پرداخت‌ها</button>
+  </div>
+  <div className="formgrid representative-payment-filters" role="group" aria-label="جست‌وجوی پرداخت‌ها">
+   <SolarDate label="تاریخ پرداخت" value={paymentDay} onChange={setPaymentDay}/>
+   <label className="field">مبلغ، ریال<input value={paymentAmount} inputMode="numeric" onChange={event=>setPaymentAmount(digits(event.target.value).replace(/[^0-9]/g,'').replace(/^0+(?=\d)/,''))}/></label>
+   <label className="field">شماره پیگیری، رسید یا شناسه چک<input value={paymentReference} onChange={event=>setPaymentReference(event.target.value)}/></label>
+  </div>
+  {recentPayments.length>0?<div className="sales-table"><table><thead><tr><th>تاریخ</th><th>مبلغ</th><th>شماره پیگیری / شناسه</th><th>منبع</th><th>وضعیت</th></tr></thead><tbody>
    {recentPayments.map((payment:any)=>{
     const entry=payment.data;
-    const origin=payment.isTerminalPayment?'پوز':entry.submission?.channel==='portal'&&entry.submission?.onBehalf===false?'اعلام نماینده':entry.bankRowId?'گردش بانک':'';
-    const matched=entry.state==='cleared'&&!!entry.bankRowId;
+    const origin=paymentOrigin(payment);
+    const matched=isSystemConfirmed(entry);
     const pendingBank=entry.state==='pending'&&entry.method==='bank'&&!entry.bankRowId;
     const late=pendingBank&&payment.bankMatchMissing===true;
     const StatusIcon=matched?CircleCheck:late?TriangleAlert:pendingBank?Clock:null;
     const status=matched?'تأیید سیستمی':late?'در گردش بانک پیدا نشد':pendingBank?'در انتظار تطبیق':salesStates[entry.state]||'';
-    return <tr key={payment.id}><td>{date(entry.bankSettlementDay||entry.day)}</td><td>{money(entry.amount)}</td><td>{origin||'—'}</td><td><span className="representative-payment-status" data-tone={matched?'confirmed':late?'warning':undefined}>{StatusIcon&&<StatusIcon size={16} aria-hidden="true"/>}{status||'—'}</span></td></tr>;
+    return <tr key={payment.id}><td>{date(entry.bankSettlementDay||entry.day)}</td><td>{money(entry.amount)}</td><td><bdi>{paymentReferenceLabel(entry)||'—'}</bdi></td><td>{origin||'—'}</td><td><span className="representative-payment-status" data-tone={matched?'confirmed':late?'warning':undefined}>{StatusIcon&&<StatusIcon size={16} aria-hidden="true"/>}{status||'—'}</span></td></tr>;
    })}
-  </tbody></table></div>:<p className="empty">پرداختی ثبت نشده است.</p>}
+  </tbody></table></div>:<p className="empty">{searchingPayments?'پرداختی با این مشخصات پیدا نشد.':paymentView==='open'?'پرداخت بازی ندارید.':'پرداخت دارای تأیید سیستمی ثبت نشده است.'}</p>}
+  {paymentView==='history'&&<button type="button" className="btn" disabled={!recentPayments.length} onClick={()=>void downloadPaymentHistory()}>خروجی اکسل سوابق</button>}
  </section>}
  {!data.warehouseOnly&&view==='profiles'&&<SalesBuyerDirectory agents={data.agents} members={data.members||[]} initialBuyerId={rep?data.agents[0]?.id:selected} createAction={data.roles.manager&&action('agent','تعریف خریدار / نماینده',{agentId:''})} renderDossier={a=><SalesNetworkPanel key={a.id} embedded selected={a.id} readOnly={a.canOperate===false} members={data.members||[]} onAssign={id=>{setSelected(id);setView('assignments')}} onChange={()=>void load().catch(e=>setError(e.message))} profileContent={<><p>مسئول تماس: {a.data.contact||'ثبت نشده'}</p><p>موبایل: <bdi>{a.data.mobile||'ثبت نشده'}</bdi> · تلفن: <bdi>{a.data.phone||'ثبت نشده'}</bdi> · {a.data.province} / {a.data.city}</p><p>{a.data.address}</p>{a.data.linkedServiceAgents?.length>0&&<p>نمایندگی فروش و خدمات · پرونده خدمات: {a.data.linkedServiceAgents.map((r:any)=>r.name+' ('+(r.domain==='hospital'?'بیمارستانی':'خانگی')+')').join('؛ ')}</p>}<p>مرجع قرارداد: {a.data.contractRef||'ثبت نشده'}{a.data.kind!=='referrer'&&<> · سقف اعتبار: {money(a.data.creditLimit)} · مهلت خرید: {n(a.data.termDays)} روز</>}</p>{!rep&&<p>کارشناس فروش: {data.members.find((m:any)=>m.id===a.data.ownerId)?.name||'اعضای نقش فروش'} · مسئول مالی: {data.members.find((m:any)=>m.id===a.data.financeId)?.name||'اعضای نقش مالی فروش'} · مدیر پیگیری: {data.members.find((m:any)=>m.id===a.data.managerId)?.name||'مدیر فروش فعال موجود'}</p>}<IconActions inline scope="sales-panel-actions-2c83560e6b">{staff&&a.data.kind!=='referrer'&&<button className="btn primary" onClick={()=>{setSelected(a.id);setProvince('');setStage('');setSearch('');setView('orders')}}>سفارش‌های این خریدار</button>}{data.roles.manager&&action('agent','ویرایش پرونده',{...a.data,agentId:a.id,revision:a.revision})}{finance&&a.data.kind!=='referrer'&&action('terms','سقف و مهلت اعتباری',{agentId:a.id,revision:a.revision,creditLimit:a.data.creditLimit,termDays:a.data.termDays})}{data.roles.manager&&a.data.active&&!accounts.some(c=>c.agentId===a.id)&&action('account','ساخت حساب ورود',{agentId:a.id,revision:a.revision,name:a.data.contact})}{(rep||staff||finance)&&action('file','افزودن قرارداد / مدرک',{agentId:a.id,title:''})}</IconActions>{data.roles.manager&&accounts.filter(c=>c.agentId===a.id).map(c=><p key={c.id}>{c.automaticAccount&&c.mustChangePassword&&<button type="button" className="btn" onClick={()=>setCredentials({username:c.username,mobile:a.data.mobile,name:c.name})}>اطلاعات ورود اولیه / کپی</button>} حساب: <bdi>{c.username}</bdi> · {c.name} · {c.status==='active'?'فعال':'غیرفعال'} · مدیریت رمز و غیرفعال‌سازی در کاربران توسط مدیر سامانه</p>)}{files(a.id).map((f:any)=><p key={f.id}><a href={'/api/sales/files?id='+encodeURIComponent(f.id)}>{f.data.title} · {f.data.filename}</a></p>)}</>}/>}/>}
 
