@@ -628,6 +628,13 @@ async function fundWithCollateral(quoted) {
   seed('legacy-net-reward','sales_reward',{agentId:'buyer-snapshot',period:'quarter',year:1405,quarter:3,start:'2026-09-23',end:'2026-12-21',basis:'net',target:'1000',productIds:['product'],kind:'cash',rate:1000,state:'active'});
   const quarterReward=await post(rewardsApi,rewardsRoute,reward(),manager);
   const yearReward=await post(rewardsApi,rewardsRoute,reward({period:'year',kind:'equivalent',productId:'product',unitValue:'150'}),manager);
+  const staffRewards=await context.run(staff,()=>rewardsApi.GET(new Request(base+rewardsRoute+'?buyer=buyer-snapshot')));
+  assert.equal(staffRewards.status,200);
+  const staffRewardSummary=await staffRewards.json();
+  assert.equal(staffRewardSummary.manager,false);
+  assert.equal(staffRewardSummary.finance,false);
+  assert.deepEqual(staffRewardSummary.rewards.map(row=>row.id).sort(),[quarterReward.id,yearReward.id].sort());
+  assert.equal((await context.run(staff,()=>rewardsApi.GET(new Request(base+rewardsRoute)))).status,403);
   await post(rewardsApi,rewardsRoute,reward(),manager,409);
   await post(rewardsApi,rewardsRoute,reward(),finance,403);
   const financeRewards=async()=> {

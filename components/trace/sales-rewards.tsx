@@ -27,7 +27,7 @@ function progressLine(label:string,actual:string,target:string,unit:string){
 const seasons=['بهار','تابستان','پاییز','زمستان'];
 const kinds={cash:'ریالی',fixed:'کالایی با تعداد ثابت',equivalent:'کالایی معادل پاداش ریالی'};
 
-export function SalesRewards({period,manage=false,focusId=''}:{period?:Period;manage?:boolean;focusId?:string}){
+export function SalesRewards({period,manage=false,focusId='',buyerId=''}:{period?:Period;manage?:boolean;focusId?:string;buyerId?:string}){
  const [library,setLibrary]=useState<Library|null>(null);
  const [draft,setDraft]=useState<Reward|null>(null);
  const [formOpen,setFormOpen]=useState(false);
@@ -37,7 +37,7 @@ export function SalesRewards({period,manage=false,focusId=''}:{period?:Period;ma
  const [error,setError]=useState('');
  const [operation,setOperation]=useState('');
  async function load(signal?:AbortSignal){
-  const response=await fetch(endpoint,{cache:'no-store',signal});
+  const response=await fetch(buyerId?endpoint+'?buyer='+encodeURIComponent(buyerId):endpoint,{cache:'no-store',signal});
   if(!response.ok)throw Error(((await response.json()) as {error:string}).error);
   const data=await response.json() as Library;
   if(!signal?.aborted)setLibrary(data);
@@ -46,7 +46,7 @@ export function SalesRewards({period,manage=false,focusId=''}:{period?:Period;ma
   const controller=new AbortController();
   void load(controller.signal).catch(error=>{if(!controller.signal.aborted)setError(error.message);});
   return ()=>controller.abort();
- },[]);
+ },[buyerId]);
  useEffect(()=>{
   if(focusId&&library?.finance){
    setReview(library.rewards.find(reward=>reward.id===focusId&&reward.progress.ready&&reward.data.state!=='approved')||null);

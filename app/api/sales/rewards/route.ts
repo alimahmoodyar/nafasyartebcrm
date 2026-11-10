@@ -5,7 +5,7 @@ import {solarParts} from '@/lib/persian-date';
 import {representativeSampleId} from '@/lib/profile-review';
 import {trainingContext} from '@/lib/training-context';
 import {withRepresentativeSample} from '@/lib/representative-sample';
-import {liveSalesUser,salesManager,salesFinance,salesRep,salesScope,salesRows,salesFail as fail,salesLock,salesEntity,integer,money,sreq} from '@/lib/sales';
+import {liveSalesUser,salesManager,salesFinance,salesRep,salesStaff,salesScope,salesRows,salesFail as fail,salesLock,salesEntity,integer,money,sreq} from '@/lib/sales';
 import {allocationPlan} from '@/lib/sales-network-contract';
 import {rewardPeriods,salesRewardDates,salesRewardProgress} from '@/lib/sales-rewards';
 import {syncSalesTasks} from '@/lib/sales-tasks';
@@ -34,17 +34,19 @@ async function seedRewardPreview(agentId:string,today:string){
  if(missing.length)await db.batch(missing);
 }
 
-async function get(){
+async function get(request?:Request){
  try{
   const user=await liveSalesUser(await requireAccess());
   const manager=salesManager(user),finance=salesFinance(user),rep=salesRep(user);
-  if(!manager&&!finance&&!rep)fail('دسترسی به پاداش فروش ندارید.',403);
+  const buyerId=request?new URL(request.url).searchParams.get('buyer'):'';
+  if(!manager&&!finance&&!rep&&!(buyerId&&salesStaff(user)))fail('دسترسی به پاداش فروش ندارید.',403);
+  const buyer=buyerId?await salesScope(user,buyerId,'read'):null;
   const today=dayAt();
   const sampleId=representativeSampleId(user.userId);
   const sample=!!trainingContext.getStore()&&user.permissions.salesAgentId===sampleId;
   if(sample)await seedRewardPreview(sampleId,today);
   const rows=await salesRows();
-  const agents=rep?[await salesScope(user,user.permissions.salesAgentId!,'read')]:rows.filter(row=>row.type==='sales_agent');
+  const agents=buyer?[buyer]:rep?[await salesScope(user,user.permissions.salesAgentId!,'read')]:rows.filter(row=>row.type==='sales_agent');
   const ids=new Set(agents.filter(agent=>!rep||eligible(agent)).map(agent=>agent.id));
   const rewards=rows.filter(row=>row.type==='sales_reward'&&row.data.basis==='units'&&ids.has(row.data.agentId)).map(row=>({...row,progress:salesRewardProgress(row,rows,today)}));
   const products=(await storage().prepare("SELECT id,payload FROM records WHERE kind='product' ORDER BY id").all<{id:string;payload:string}>()).results.map(({id,payload})=>({id,name:JSON.parse(payload).name||id}));

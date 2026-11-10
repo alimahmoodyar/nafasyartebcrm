@@ -8,6 +8,7 @@ import {coverage,nextWork} from './sourcing';
 import type {Session} from './permissions';
 import {rewardPeriods,salesRewardProgress} from './sales-rewards';
 import {dayAt} from './duties';
+import {rial,salesAccounts,salesOrderProgress} from './sales-contract';
 import {shortageRoles,canActOnShortage,shortageStages,type Shortage} from './handoff-shortage';
 
 export async function handoffShortageWork(user:Session):Promise<ProfileWork[]>{
@@ -60,7 +61,7 @@ export async function profileWork(user:Session){
   const {returnWorkspace}=await import('./sales-return-workflow'),{items=[]}=await returnWorkspace(user);
   for(const item of items)for(const action of item.actions)work.push({id:item.id+':'+action,title:returnActions[action]+' · '+item.serial,section:'sales-returns',target:item.id,sourceId:item.id,state:'open'});
  }
- if(['hospital-sales','sales-manager','sales-finance','sales-representative'].includes(profile.id)){
+ if(['home-sales','hospital-sales','sales-manager','sales-finance','sales-representative'].includes(profile.id)){
   const {salesRows,salesVisible,salesDelivery}=await import('./sales'),sales=await salesRows();
   const buyerIds=new Set<string>();
   for(const buyer of sales.filter(row=>row.type==='sales_agent'&&row.data.active))if(await salesVisible(user,buyer))buyerIds.add(buyer.id);
@@ -77,6 +78,21 @@ export async function profileWork(user:Session){
    if(profile.id==='sales-finance'&&row.type==='sales_order'&&['credit_review','sales_approved'].includes(row.data.state))addWork(row,'بررسی مالی سفارش '+row.data.code,'sales','order:'+row.id);
    if(profile.id==='sales-finance'&&row.type==='sales_payment'&&(row.data.state==='pending'||row.data.disposition?.state==='pending'))addWork(row,'بررسی پرداخت یا چک','sales','account:'+row.data.agentId);
 
+  }
+  if(profile.id==='home-sales'){
+   const today=dayAt(),deliveries=await salesDelivery(own,[...buyerIds]);
+   for(const order of own.filter(row=>row.type==='sales_order'&&!['cancelled','rejected'].includes(row.data.state))){
+    const progress=salesOrderProgress(order,deliveries,today);
+    if(progress.stage!=='delivered')addWork(order,'پیگیری سفارش '+order.data.code,'sales','order:'+order.id);
+   }
+   for(const buyerId of buyerIds){
+    const account=salesAccounts(own,buyerId,today);
+    for(const invoice of account.invoices){
+     if(invoice.installments.some((part:any)=>part.days<=7&&rial(part.remaining)>BigInt(0))){
+      addWork(invoice,'پیگیری سررسید فاکتور '+invoice.data.reference,'sales','account:'+buyerId);
+     }
+    }
+   }
   }
   if(['hospital-sales','sales-manager'].includes(profile.id)&&buyerIds.size){
    const intakes=(await db.prepare("SELECT id,data FROM flow_entities WHERE type='build_intake' AND json_extract(data,'$.state')=?").bind(profile.id==='sales-manager'?'commercial_review':'returned').all()).results;

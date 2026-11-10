@@ -40,7 +40,7 @@ export async function salesEntity(id:string,type:string){const r:any=await stora
 export async function liveSalesUser(u:Session){if(u.isAdmin||u.profileReview||trainingContext.getStore())return u;const m:any=await storage().prepare("SELECT status,permissions FROM app_members WHERE subject=? OR id=?").bind(u.userId,u.userId.startsWith('local:')?u.userId.slice(6):u.userId).first();if(!m||m.status!=='active')salesFail('دسترسی فعال لازم است.',403);return {...u,permissions:storedAccessPermissions(m.permissions)};}
 export async function salesVisible(u:Session,a:any,operation:'read'|'write'='write'){
  if(salesRep(u))return a.id===u.permissions.salesAgentId;
- if(u.profileReview?.id==='hospital-sales'&&u.profileReview.buyerId)return a.id===u.profileReview.buyerId;
+ if(u.profileReview?.buyerId&&['hospital-sales','home-sales'].includes(u.profileReview.id))return a.id===u.profileReview.buyerId;
  if(salesManager(u)||salesFinance(u))return true;
  if(operation==='read'&&salesReportRead(u))return true;
  if(salesStaff(u)||operation==='read'&&salesViewer(u)){const id=await memberId(u);return !!id&&a.data.ownerId===id;}
