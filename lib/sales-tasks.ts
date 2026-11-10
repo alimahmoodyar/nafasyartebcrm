@@ -5,6 +5,7 @@ import {salesRows,salesLock,salesStaff,salesFinance,salesRep,salesManager} from 
 import {salesAccounts,salesCheckPosition,salesTargetProgress,rial} from './sales-contract';
 import {bankEntities} from './sales-bank';
 import {bankAmbiguities} from './sales-bank-contract';
+import {heldSalesCustody} from './sales-custody';
 import {salesBankRowTarget} from './role-profiles';
 export async function syncSalesTasks(){
  const db=storage(),op=crypto.randomUUID(),checks=await salesLock(db,op),rows=await salesRows(),today=dayAt(),now=new Date().toISOString();
@@ -24,6 +25,13 @@ export async function syncSalesTasks(){
  for(const {row,assessment} of collisions)task(null,'bank-conflict:'+row.id,'مغایرت واریز بانکی',today,'finance',assessment.reason,salesBankRowTarget+row.id,'','','sales-bank');
  for(const a of rows.filter(r=>r.type==='sales_agent'&&r.data.active)){
   const own=rows.filter(r=>r.data.agentId===a.id),account=salesAccounts(rows,a.id,today);
+  if(a.data.custodyRecall?.state==='open'){
+   const held=heldSalesCustody(rows,a.id),target='sales-view:custody:'+a.id,due=a.data.custodyRecall.requestedDay;
+   const hasPos=held.some(row=>row.type==='sales_bank_terminal'),hasOther=held.some(row=>row.type==='sales_custody_item');
+   if(hasPos)task(a,'custody-pos:'+a.id,'دریافت پوزهای امانی',due,'finance','سریال پوز را با پرونده کنترل و دریافت واقعی دستگاه را ثبت کنید.',target);
+   if(hasOther)task(a,'custody-items:'+a.id,'دریافت کالاهای امانی',due,'manager','اقلام، تعداد و سریال را با پرونده کنترل و دریافت واقعی را ثبت کنید.',target,'',a.data.managerId&&members.some(m=>m.id===a.data.managerId&&salesManager({isAdmin:false,permissions:m.permissions} as any))?a.data.managerId:'');
+   if(held.length)task(a,'custody-agent:'+a.id,'برگرداندن کالاهای امانی',due,'agent','فهرست امانت‌ها را باز کنید و برای تحویل با شرکت هماهنگ کنید.',target);
+  }
   const contacts=own.filter(r=>r.type==='sales_contact').sort((a,b)=>b.created.localeCompare(a.created));if(a.data.contactDays)task(a,'contact','پیگیری تماس / بازدید',contacts[0]?.data.nextDue||addDay(a.created.slice(0,10),a.data.contactDays),'staff',contacts[0]?.data.nextAction||'تماس با شریک فروش و ثبت نتیجه');for(const c of own.filter(r=>r.type==='sales_case'&&r.data.state==='open'))task(a,'network-case:'+c.id,c.data.title,c.data.nextDue,'staff',c.data.nextAction);
   for(const o of own.filter(r=>r.type==='sales_order'))if(['submitted','credit_review','sales_approved'].includes(o.data.state))task(a,'order:'+o.id+':'+o.data.state,o.data.state==='submitted'?'بررسی سفارش '+o.data.code:'تأیید مالی سفارش '+o.data.code,addDay(o.created.slice(0,10),1),o.data.state==='submitted'?(o.data.securedPolicy||o.data.salesTerms?'manager':'staff'):'finance','قیمت، مهلت پرداخت و موجودی قابل تحویل را بررسی کنید.');else if(o.data.state==='approved'){
    const sales=(await db.prepare("SELECT data FROM flow_entities WHERE type='sale' AND json_extract(data,'$.salesOrderId')=?").bind(o.id).all()).results.map((s:any)=>JSON.parse(s.data));const complete=o.data.lines.every((l:any)=>sales.filter(s=>!s.replacementReturnId&&s.productId===l.productId&&s.state==='delivered').reduce((n,s)=>n+s.count,0)>=l.quantity);if(!complete)task(a,'delivery:'+o.id,'پیگیری تحویل '+o.data.code,o.data.promisedDay||addDay(o.created.slice(0,10),2),'staff','رزرو سریال، ارسال و تأیید دریافت هر محموله را پیگیری کنید. اگر نماینده از سامانه استفاده نمی‌کند، مستند دریافت را بگیرید و از حساب خودتان ثبت کنید. مانع یا موعد جدید را ثبت کنید.');

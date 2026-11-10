@@ -30,7 +30,7 @@ const xml=v=>String(v).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll
 function xlsx(grid){const cells=grid.map((r,i)=>'<row r="'+(i+1)+'">'+r.map((v,j)=>'<c r="'+String.fromCharCode(65+j)+(i+1)+'" t="inlineStr"><is><t>'+xml(v??'')+'</t></is></c>').join('')+'</row>').join('');return zip({'[Content_Types].xml':'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>','_rels/.rels':'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>','xl/workbook.xml':'<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Bank" sheetId="1" r:id="rId1"/></sheets></workbook>','xl/_rels/workbook.xml.rels':'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>','xl/worksheets/sheet1.xml':'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>'+cells+'</sheetData></worksheet>'});}
 function bankRow(bankId,extra={}){return{bankId,day:today,direction:'in',amount:'500',reference:'REF-'+bankId,terminalCode:'00123456',provider:'PSP',kind:'pos',description:'Actual settled bank credit',...extra};}
 function importBody(entries,extra={}){const grid=[['Date','Bank transaction','Reference','Terminal','Provider','Kind','Description','Incoming','Outgoing'],...entries.map(r=>[r.day,r.bankId,r.reference,r.terminalCode,r.provider,r.kind==='pos'?'POS':r.kind==='transfer'?'TRANSFER':'OTHER',r.description,r.direction==='in'?r.amount:'0',r.direction==='out'?r.amount:'0'])];return body('import',{accountId:'bank-a',filename:'actual-bank.xlsx',contentBase64:xlsx(grid).toString('base64'),mapping:mapping(grid.length),rows:entries,...extra});}
-const terminal=(extra={})=>body('terminal',{revision:0,terminalCode:'00123456',provider:'PSP',accountId:'bank-a',agentId:'buyer-a',validFrom:past,validTo:'',active:true,notes:'Verified actual terminal ownership',...extra});
+const terminal=(extra={})=>body('terminal',{revision:0,serial:'SER-'+(extra.terminalCode||'00123456'),handedDay:past,terminalCode:'00123456',provider:'PSP',accountId:'bank-a',agentId:'buyer-a',validFrom:past,validTo:'',active:true,notes:'Verified actual terminal ownership',...extra});
 async function claim(agentId,reference,amount='400',receivingAccountId='bank-a',u=rep){const form=new FormData(),fileId=crypto.randomUUID();form.set('metadata',JSON.stringify({id:fileId,agentId,confirmed:true,title:'Actual payment receipt'}));form.set('file',new File(['%PDF-actual-receipt'],'receipt.pdf'));const r=await context.run(u,()=>files.POST(new Request(base+'/api/sales/files',{method:'POST',headers:{origin:base},body:form})));assert.equal(r.status,201,await r.clone().text());const id=(await r.json()).id;const b=body('payment',{agentId,method:'bank',day:today,amount,bank:'Actual bank',reference,fileId:id,receivingAccountId,notes:'Payment claim with receipt'});await post(sales,'/api/sales',b,u);return b.id;}
 async function verifyBankUI(){
  let states=[],index=0,catalog,requests=[];
@@ -38,12 +38,12 @@ async function verifyBankUI(){
  const exports={},source=ts.transpileModule(fs.readFileSync(path.join(root,'components/trace/sales-bank-panel.tsx'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
  vm.runInNewContext(source,{exports,require:n=>{if(n==='react')return react;if(n==='react/jsx-runtime')return{jsx,jsxs:jsx,Fragment:'Fragment'};if(n==='@/lib/persian-date')return load('lib/persian-date.ts');if(n==='@/lib/sales-bank-import')return load('lib/sales-bank-import.ts');if(n==='@/lib/sales-bank-workbook')return load('lib/sales-bank-workbook.ts');if(n==='./refresh-button')return{RefreshButton:'RefreshButton'};if(n==='@/lib/sales-contract')return load('lib/sales-contract.ts');if(n==='./sales-pos-preview')return{SalesPosPreview:'SalesPosPreview'};if(n.endsWith('/dialog'))return Object.fromEntries(['Dialog','DialogContent','DialogTitle','DialogDescription'].map(k=>[k,k]));if(n==='./number-input')return{NumberInput:'NumberInput'};if(n==='./solar-date')return{SolarDate:'SolarDate'};throw Error('Unexpected UI dependency '+n);},crypto:globalThis.crypto,BigInt,Date,Intl,Object,Array,String,Number,Error,Uint8Array,btoa,fetch:async(url,options)=>{if(options){const payload=JSON.parse(options.body);requests.push(payload);return Response.json(payload.mode==='import'?{saved:true,pendingReady:26}:{saved:true,matched:requests.length===2?25:1,pendingReady:requests.length===2?1:0});}return Response.json(catalog);}},{filename:'sales-bank-panel.tsx'});
  const render=()=>{index=0;return exports.SalesBankPanel({});},walk=(tree,all=[])=>{if(Array.isArray(tree)){tree.forEach(t=>walk(t,all));return all;}if(tree&&typeof tree==='object'){if(tree.type==='Dialog'&&!tree.props.open)return all;all.push(tree);walk(tree.props.children,all);}return all;},textOf=t=>typeof t==='string'||typeof t==='number'?String(t):Array.isArray(t)?t.map(textOf).join(''):t&&typeof t==='object'?textOf(t.props.children):'';
- const init=roles=>{catalog={roles,accounts:[],agents:[],terminals:[],statements:[{id:'S',created:today,data:{filename:'PRIVATE_BANK.xlsx',rowCount:1}}],rows:[{id:'R',revision:1,data:{bankId:'PRIVATE_BANK_TRANSACTION',amount:'100',day:today,status:'matched'}}]};states=[catalog];requests=[];};
- init({manage:true,bank:false});let tree=render(),nodes=walk(tree);assert.ok(textOf(tree).includes('اتصال پوز به خریدار'));assert.ok(!textOf(tree).includes('خواندن اکسل بانک / پوز'));assert.ok(!textOf(tree).includes('PRIVATE_BANK'));nodes.find(n=>n.type==='button'&&textOf(n)==='اتصال پوز به خریدار').props.onClick();tree=render();assert.equal(states[5].revision,0,'New terminal form submits the required zero revision');assert.ok(walk(tree).some(n=>n.type==='SolarDate'&&n.props.label==='شروع ارتباط با این خریدار'));
- init({manage:false,bank:true});tree=render();nodes=walk(tree);assert.ok(!textOf(tree).includes('اتصال پوز به خریدار'));assert.ok(textOf(tree).includes('خواندن اکسل بانک / پوز'));assert.ok(textOf(tree).includes('PRIVATE_BANK_TRANSACTION'));nodes.find(n=>n.type==='button'&&textOf(n)==='خواندن اکسل بانک / پوز').props.onClick();tree=render();nodes=walk(tree);assert.equal(nodes.find(n=>n.type==='button'&&n.props.type==='submit').props.disabled,true,'No bank import is submitted without checked preview and original file');
+ const init=roles=>{catalog={roles,canImport:roles.bank,accounts:[],agents:[],terminals:[],statements:[{id:'S',created:today,data:{filename:'PRIVATE_BANK.xlsx',rowCount:1}}],rows:[{id:'R',revision:1,data:{bankId:'PRIVATE_BANK_TRANSACTION',amount:'100',day:today,status:'matched'}}]};states=[catalog];requests=[];};
+ init({manage:true,bank:false});let tree=render(),nodes=walk(tree);assert.ok(textOf(tree).includes('ثبت اتصال و تحویل امانی پوز'));assert.ok(!textOf(tree).includes('ثبت اکسل بانک / پوز'));assert.ok(!textOf(tree).includes('PRIVATE_BANK'));nodes.find(n=>n.type==='button'&&textOf(n)==='ثبت اتصال و تحویل امانی پوز').props.onClick();tree=render();assert.equal(states[5].revision,0,'New terminal form submits the required zero revision');assert.ok(walk(tree).some(n=>n.type==='SolarDate'&&n.props.label==='شروع ارتباط با این خریدار'));
+ init({manage:false,bank:true});tree=render();nodes=walk(tree);assert.ok(!textOf(tree).includes('ثبت اتصال و تحویل امانی پوز'));assert.ok(textOf(tree).includes('ثبت اکسل بانک / پوز'));assert.ok(textOf(tree).includes('PRIVATE_BANK_TRANSACTION'));nodes.find(n=>n.type==='button'&&textOf(n)==='ثبت اکسل بانک / پوز').props.onClick();tree=render();nodes=walk(tree);assert.equal(nodes.find(n=>n.type==='button'&&n.props.type==='submit').props.disabled,true,'No bank import is submitted without checked preview and original file');
  const grid=[['Date','Id'],[today,'B1']];states[5]={...states[5],accountId:'bank-a',filename:'bank.xlsx'};states[6]=[{sheet:'Bank',data:grid}];states[8]=mapping(2);states[9]={rows:[bankRow('B1')],warnings:[]};states[10]=true;states[11]='UEsDBA==';tree=render();nodes=walk(tree);assert.equal(nodes.find(n=>n.type==='button'&&n.props.type==='submit').props.disabled,false);nodes.find(n=>n.type==='form').props.onSubmit({preventDefault(){}});for(let i=0;i<5;i++)await Promise.resolve();await new Promise(resolve=>setTimeout(resolve,0));assert.deepEqual(requests.map(r=>r.mode),['import','reconcile','reconcile'],'Import runs safe batches until all ready rows are reconciled');assert.ok(requests.every(r=>r.confirmed===true));assert.equal(new Set(requests.map(r=>r.id)).size,3);assert.equal(requests[0].sheet,'Bank');assert.equal(requests[0].contentBase64,'UEsDBA==');assert.equal(requests[0].mapping.firstRow,2);
  init({manage:false,bank:false});tree=render();assert.equal(walk(tree).filter(n=>n.type==='button').length,0);assert.ok(!textOf(tree).includes('PRIVATE_BANK'));
- init({manage:false,bank:true});render();states[4]='import';states[6]=[{sheet:'POS',data:[['sample']]}];states[9]={kind:'pos',rows:[],excluded:[],warnings:[],summary:{total:0,accounts:[],terminals:[],paid:'0',fee:'0',net:'0'}};states[10]=true;tree=render();nodes=walk(tree);assert.equal(nodes.some(n=>n.type==='button'&&n.props.type==='submit'),false,'A POS preview never exposes a bank credit commit action');nodes.find(n=>n.type==='form').props.onSubmit({preventDefault(){}});assert.equal(requests.length,0,'Even a forced form submission cannot commit POS transactions');assert.equal(nodes.find(n=>n.type==='input'&&n.props.type==='file').props.accept,'.xls,.xlsx');
+ init({manage:false,bank:true});render();states[4]='import';states[6]=[{sheet:'POS',data:[['sample']]}];states[9]={kind:'pos',rows:[],excluded:[],warnings:[],summary:{total:0,accounts:[],terminals:[],paid:'0',fee:'0',net:'0'}};states[10]=true;states[11]='UEsDBA==';tree=render();nodes=walk(tree);assert.equal(textOf(nodes.find(n=>n.type==='button'&&n.props.type==='submit')),'تأیید و بایگانی پوز');nodes.find(n=>n.type==='form').props.onSubmit({preventDefault(){}});await new Promise(resolve=>setTimeout(resolve,0));assert.deepEqual(requests.map(r=>r.mode),['archive_pos'],'A POS report cannot start a bank reconciliation batch');assert.equal(nodes.find(n=>n.type==='input'&&n.props.type==='file').props.accept,'.xls,.xlsx');
  console.log('PASS bank UI: role-scoped actions/data, terminal date/revision, explicit preview confirmation and automatic reconciliation batches');
 }
 
@@ -88,6 +88,47 @@ async function verifyWorkbookExtraction(tools,principal){
  const accepted=await apply(body('import',{...legacy,accountId:'bank-b',rows:legacyPreview.rows}),treasury);assert.equal(accepted.imported,2);assert.equal(accepted.matched,0,'Reading/importing an account statement does not execute reconciliation itself');
  const repeated=await apply(body('import',{...modern,accountId:'bank-b',rows:modernPreview.rows}),treasury);assert.equal(repeated.imported,0);assert.equal(repeated.skipped,2,'Overlapping XLS/XLSX exports cannot create duplicate bank rows');
  const statement=rows('sales_bank_statement').find(r=>r.data.filename==='test-report.xls');assert.ok(statement.data.objectKey.endsWith('.xls'));assert.ok(objects.has(statement.data.objectKey));
+ const addDay=load('lib/duties.ts').addDay,first=addDay(today,-3),middle=addDay(today,-2),last=yesterday;
+ const iban='IR'+'1'.repeat(24);
+ seed('coverage-bank','treasury_account',{title:'Coverage Bank',kind:'bank',state:'active',currency:'IRR',iban});
+ const coverageTerminal=terminal({accountId:'coverage-bank',agentId:'buyer-b',validFrom:first,handedDay:first,serial:'SER-00123456-COVERAGE'});
+ await apply(coverageTerminal,finance);
+ const empty=(kind,from,to)=>body(kind==='pos'?'archive_pos':'import',{...file([kind==='pos'?posHeader:bankHeader]),accountId:'coverage-bank',coverageFrom:from,coverageTo:to,emptyStatement:true,rows:[]});
+ await apply(empty('bank',first,first),treasury);
+ await apply(empty('bank',last,last),treasury);
+ const findCoverage=async()=>(await get(treasury)).coverage.find(a=>a.accountId==='coverage-bank');
+ let coverage=await findCoverage();
+ assert.deepEqual(coverage.missing,[{from:middle,to:middle}]);
+ assert.deepEqual(coverage.pos.missing,[{from:first,to:last}]);
+ const openGaps=()=>sql.prepare("SELECT data FROM duty_runs WHERE id LIKE 'treasury:coverage-bank:bank-gap:%' AND state='open'").all().map(t=>JSON.parse(t.data).sourceId);
+ assert.ok(openGaps().includes('sales-bank-gap:coverage-bank:'+middle+':bank'));
+ assert.ok(openGaps().includes('sales-bank-gap:coverage-bank:'+middle+':pos'));
+ const blobCount=objects.size;
+ const full=await apply(empty('bank',first,last),treasury);
+ assert.equal(full.archived,true);
+ assert.deepEqual(entity(full.id).data.newCoverage,[{from:middle,to:middle}]);
+ assert.equal(objects.size,blobCount,'Identical original bytes need only one private object per account and source');
+ assert.equal((await apply(empty('bank',first,last),treasury)).archived,false);
+ assert.ok(!openGaps().includes('sales-bank-gap:coverage-bank:'+middle+':bank'));
+ const actualPos=posLine('EXACT-POS');actualPos[3]=actualPos[5]=actualPos[6]=middle;
+ const posBytes=file([posHeader,actualPos]);
+ const fields={...posBytes,accountId:'coverage-bank',coverageFrom:middle,coverageTo:middle};
+ const posRows=(await preview(fields)).rows,priorCredits=cleared().length;
+ await apply(body('archive_pos',{...fields,rows:posRows}),finance,403);
+ const archived=await apply(body('archive_pos',{...fields,rows:posRows}),treasury);
+ assert.equal(archived.imported,1);
+ assert.equal((await apply(body('archive_pos',{...fields,rows:posRows}),treasury)).archived,false);
+ assert.equal(cleared().length,priorCredits,'A POS report never creates bank credit');
+ coverage=await findCoverage();
+ assert.deepEqual(coverage.pos.missing,[{from:first,to:first},{from:last,to:last}]);
+ const response=await context.run(treasury,()=>bank.GET(request('/api/sales/bank?statement='+archived.id)));
+ assert.equal(response.status,200);assert.equal(Buffer.from(await response.arrayBuffer()).toString('base64'),posBytes.contentBase64);
+ const denied=await context.run(rep,()=>bank.GET(request('/api/sales/bank?statement='+archived.id)));
+ assert.equal(denied.status,403);
+ await apply(empty('pos',first,last),treasury);
+ assert.deepEqual((await findCoverage()).pos.missing,[]);
+ assert.deepEqual(openGaps(),[]);
+ console.log('PASS bank and POS coverage: independently missing days, no-transaction days, original archive and overlapping imports');
  const reset=load('lib/reset-contract.ts');assert.ok(sql.prepare('SELECT count(*) n FROM flow_entities WHERE '+reset.resetWhere('flow_entities','operations')+' AND id=?').get(statement.id).n);
  console.log('PASS bank workbook extraction: XLS/XLSX parity, metadata bounds, stable cross-format identity, explicit units, POS exclusions/fees/accounts, unknown-status and precision guards, read-only HTTP/MCP permissions, source tampering and duplicate import prevention');
 }
@@ -130,8 +171,8 @@ async function verifyWorkbookExtraction(tools,principal){
  for(const u of [rep,other,staff,generic,accountant,treasuryManager]){await get(u,403);await importStatement(importBody([bankRow('DENIED')]),u,403);}
  await get(treasury);const limited=await get(manager);assert.ok(!JSON.stringify(limited).includes('PRIVATE BANK NUMBER'));assert.equal((limited.rows||[]).length,0);
  await importStatement(importBody([bankRow('MANAGER-DENIED')]),manager,403);
- const t=terminal();await apply(t,manager);assert.equal(entity(t.id).data.terminalCode,'00123456','Terminal identifiers retain leading zeros');
- await apply(terminal({agentId:'buyer-b'}),manager,409);
+ const t=terminal();await apply(t,manager,403);await apply(t,finance);assert.equal(entity(t.id).data.terminalCode,'00123456','Terminal identifiers retain leading zeros');
+ await apply(terminal({agentId:'buyer-b'}),finance,409);
  const previewTamper=importBody([bankRow('TAMPERED')]);previewTamper.rows[0].amount='900';await apply(previewTamper,treasury,409);assert.equal(rows('sales_bank_row').length,0,'A modified preview cannot substitute rows not present in the retained original');
  await apply(importBody([bankRow('NO-XLSX')],{contentBase64:Buffer.from('not an Excel file').toString('base64')}),treasury,400);await apply(importBody([bankRow('BROKEN-XLSX')],{contentBase64:Buffer.from('PK\x03\x04invalid').toString('base64')}),treasury,400);await apply(importBody([bankRow('FUTURE-BANK',{day:future})]),treasury,400);await apply(importBody([bankRow('DUP'),bankRow('DUP')]),treasury,409);assert.equal(objects.size,0,'Rejected original/preview does not leave an accepted bank statement');
  const pos=bankRow('POS-001'),posImport=importBody([pos]);const imported=await importStatement(posImport,treasury);assert.equal(imported.imported,1);assert.equal(cleared().length,1,'POS import credits one actual bank settlement');
@@ -154,7 +195,7 @@ async function verifyWorkbookExtraction(tools,principal){
  seed('legacy-manual-duplicate','sales_payment',{agentId:'buyer-a',method:'bank',state:'pending',day:today,amount:payment.data.amount,reference:payment.data.reference,normalizedReference:payment.data.normalizedReference,bank:'Different legacy typed bank',normalizedBank:'differentlegacytypedbank',fileId:claimData.fileId,receivingAccountId:''});
  await post(sales,'/api/sales',body('payment_review',{agentId:'buyer-a',paymentId:'legacy-manual-duplicate',revision:1,approved:true,notes:'Legacy destination is missing; must not duplicate actual POS settlement'}),finance,409);assert.equal(entity('legacy-manual-duplicate').data.state,'pending');assert.equal(entity(payment.id).data.state,'cleared','Legacy unknown destination and a different bank label cannot duplicate a bank-linked clearance');
  // Future/expired mappings are evaluated on the bank transaction day, not today.
- await apply(terminal({terminalCode:'FUTURE',validFrom:future}),manager);await apply(terminal({terminalCode:'EXPIRED',validTo:yesterday}),manager);
+ await apply(terminal({terminalCode:'FUTURE',validFrom:future}),finance);await apply(terminal({terminalCode:'EXPIRED',validTo:yesterday}),finance);
  const protectedCount=cleared().length;await importStatement(importBody([bankRow('FUTURE-ROW',{terminalCode:'FUTURE'}),bankRow('EXPIRED-ROW',{terminalCode:'EXPIRED'}),bankRow('OUTGOING',{direction:'out'})]),treasury);assert.equal(cleared().length,protectedCount,'Outflows and temporally invalid terminals never credit a buyer');
  // A legacy ambiguous mapping never guesses ownership; every conflicting row remains queued.
  seed(crypto.randomUUID(),'sales_bank_terminal',{...entity(t.id).data,agentId:'buyer-b'});
@@ -162,7 +203,7 @@ async function verifyWorkbookExtraction(tools,principal){
  const view=await get();assert.ok(!JSON.stringify(view).includes('objectKey'),'Private R2 keys are not disclosed by the catalog');assert.ok(objects.size>0,'Original bank file is retained as private evidence');
  const amb=view.rows.find(r=>r.data.bankId==='AMBIGUOUS-TERMINAL');assert.ok(amb);assert.notEqual(amb.assessment.status,'ready');
  // Explicit reconciliation can process a previously unknown terminal exactly once under a race.
- await apply(terminal({terminalCode:'UNKNOWN'}),manager);
+ await apply(terminal({terminalCode:'UNKNOWN'}),finance);
  const unknown=(await get()).rows.find(r=>r.data.bankId==='UNKNOWN');const race=await Promise.all([1,2].map(()=>context.run(treasury,()=>bank.POST(request('/api/sales/bank',body('reconcile',{rowIds:[unknown.id]}))))));const raceBodies=await Promise.all(race.map(r=>r.json()));assert.ok(race.every(r=>[200,409].includes(r.status)),JSON.stringify(raceBodies));assert.equal(cleared().length,protectedCount+1,'Concurrent reconcile creates one credit effect');
  const countsAfterRace=rows('sales_payment').length;await apply(body('reconcile',{rowIds:[unknown.id]}),treasury);assert.equal(rows('sales_payment').length,countsAfterRace);
  // Ambiguous old claims and duplicate bank evidence must never create a second buyer credit.
@@ -183,7 +224,7 @@ async function verifyWorkbookExtraction(tools,principal){
  assert.equal(account('buyer-a').debt,'300','Reversed credit allocations no longer settle the invoice');
  const clearedAfterReverse=cleared().length;await importStatement(importBody([pos]),treasury);await apply(body('reconcile',{rowIds:[posRecord.id]}),treasury);assert.equal(cleared().length,clearedAfterReverse,'Reversed bank row cannot be approved again');
  // Reconciliation deliberately caps one transaction, with truthful continuation counts.
- await apply(terminal({terminalCode:'BULK',agentId:'buyer-b'}),manager);
+ await apply(terminal({terminalCode:'BULK',agentId:'buyer-b'}),finance);
  const bulkEntries=Array.from({length:26},(_,i)=>bankRow('BULK-'+i,{terminalCode:'BULK',amount:'1'})),bulkRequest=importBody(bulkEntries),bulk=await apply(bulkRequest,treasury);assert.equal(bulk.imported,26);assert.equal(bulk.pendingReady,26);
  const retryImport=await apply(bulkRequest,treasury);assert.equal(retryImport.repeated,true);assert.equal(retryImport.matched,0);assert.equal(retryImport.reconciled,0);assert.equal(retryImport.pendingReady,26,'Retry after a lost import response advertises remaining work without counting another credit');
  const chunkRequest=body('reconcile'),chunk=await apply(chunkRequest,treasury);assert.equal(chunk.matched,25);assert.equal(chunk.pendingReady,1);assert.equal(account('buyer-b').debt,'475');
@@ -194,19 +235,19 @@ async function verifyWorkbookExtraction(tools,principal){
  beforeBatch=()=>sql.prepare("UPDATE flow_entities SET data=json_set(data,'$.state','review'),revision=revision+1 WHERE id='bank-a'").run();await apply(body('reconcile'),treasury,409);assert.equal(account('buyer-b').debt,'474','An account deactivated between validation and commit cannot credit a buyer');
  sql.prepare("UPDATE flow_entities SET data=json_set(data,'$.state','active'),revision=revision+1 WHERE id='bank-a'").run();await apply(body('reconcile'),treasury);assert.equal(account('buyer-b').debt,'473');
  // Deactivating a buyer must not trap an administrator in a live terminal relationship.
- seed('closing-buyer','sales_agent',{name:'Closing buyer',kind:'representative',active:true,ownerId:'staff',financeId:'finance',managerId:'manager',creditLimit:'0',termDays:0});const closingTerminal=terminal({terminalCode:'CLOSE-ME',agentId:'closing-buyer'});await apply(closingTerminal,manager);
+ seed('closing-buyer','sales_agent',{name:'Closing buyer',kind:'representative',active:true,ownerId:'staff',financeId:'finance',financeId:'manager',creditLimit:'0',termDays:0});const closingTerminal=terminal({terminalCode:'CLOSE-ME',agentId:'closing-buyer'});await apply(closingTerminal,finance);
  sql.prepare("UPDATE flow_entities SET data=json_set(data,'$.active',json('false')),revision=revision+1 WHERE id='closing-buyer'").run();
- const editClosing=extra=>terminal({terminalId:closingTerminal.id,revision:entity(closingTerminal.id).revision,terminalCode:'CLOSE-ME',agentId:'closing-buyer',...extra});
- await apply(editClosing({validTo:today}),manager);assert.equal(entity(closingTerminal.id).data.validTo,today,'Existing identity can be ended after buyer deactivation');
- await apply(editClosing({validTo:future}),manager,400);await apply(editClosing({validTo:today,active:false}),manager);assert.equal(entity(closingTerminal.id).data.active,false);
- await apply(editClosing({validTo:'',active:true}),manager,400);await apply(editClosing({terminalCode:'CHANGED-ID',active:false}),manager,400);await apply(terminal({terminalCode:'NEW-INACTIVE',agentId:'closing-buyer'}),manager,400);assert.equal(entity(closingTerminal.id).data.terminalCode,'CLOSE-ME','Inactive ownership cannot be rewritten as a new identity');
+ const editClosing=extra=>terminal({handedDay:past,terminalId:closingTerminal.id,revision:entity(closingTerminal.id).revision,terminalCode:'CLOSE-ME',agentId:'closing-buyer',...extra});
+ await apply(editClosing({validTo:today}),finance);assert.equal(entity(closingTerminal.id).data.validTo,today,'Existing identity can be ended after buyer deactivation');
+ await apply(editClosing({validTo:future}),finance,400);await apply(editClosing({validTo:today,active:false}),finance);assert.equal(entity(closingTerminal.id).data.active,false);
+ await apply(editClosing({validTo:'',active:true}),finance,400);await apply(editClosing({terminalCode:'CHANGED-ID',active:false}),finance,409);await apply(terminal({terminalCode:'NEW-INACTIVE',agentId:'closing-buyer'}),finance,400);assert.equal(entity(closingTerminal.id).data.terminalCode,'CLOSE-ME','Inactive ownership cannot be rewritten as a new identity');
  // No side effects survive a permission/account race or the existing reset freeze.
- const drift=terminal({terminalCode:'DRIFT'});beforeBatch=()=>sql.prepare("UPDATE app_members SET permissions='{}' WHERE id='manager'").run();await apply(drift,manager,409);assert.equal(entity(drift.id),null);sql.prepare('UPDATE app_members SET permissions=? WHERE id=?').run(JSON.stringify(manager.permissions),'manager');
+ const drift=terminal({terminalCode:'DRIFT'});beforeBatch=()=>sql.prepare("UPDATE app_members SET permissions='{}' WHERE id='finance'").run();await apply(drift,finance,409);assert.equal(entity(drift.id),null);sql.prepare('UPDATE app_members SET permissions=? WHERE id=?').run(JSON.stringify(finance.permissions),'finance');
  const reset=load('lib/reset-contract.ts');for(const scope of ['operations','full'])for(const type of ['sales_bank_terminal','sales_bank_row','sales_bank_statement'])assert.ok(sql.prepare('SELECT count(*) n FROM flow_entities WHERE '+reset.resetWhere('flow_entities',scope)+' AND type=?').get(type).n>0,type+' is operational reset data');
  const before=sql.prepare('SELECT count(*) n FROM flow_entities').get().n;sql.exec('BEGIN');for(const table of Object.keys(reset.resetTables))sql.exec('DELETE FROM '+table+' WHERE '+reset.resetWhere(table,'operations'));assert.equal(sql.prepare('PRAGMA foreign_key_check').all().length,0);sql.exec('ROLLBACK');assert.equal(sql.prepare('SELECT count(*) n FROM flow_entities').get().n,before);
- sql.prepare("UPDATE reset_control SET phase='maintenance',internal=0 WHERE id=1").run();await apply(terminal({terminalCode:'FROZEN'}),manager,423);sql.prepare("UPDATE reset_control SET phase='idle',internal=0 WHERE id=1").run();
+ sql.prepare("UPDATE reset_control SET phase='maintenance',internal=0 WHERE id=1").run();await apply(terminal({terminalCode:'FROZEN'}),finance,423);sql.prepare("UPDATE reset_control SET phase='idle',internal=0 WHERE id=1").run();
  const tools=load('lib/mcp/tools.ts'),principal={user:treasury,scope:'write',tokenId:null};const mcp=await tools.executeTool('get_sales_bank',{},base,{...principal,scope:'read'});assert.equal(mcp.rows.length,(await get(treasury)).rows.length);
- const mcpTerminal=terminal({terminalCode:'MCP-POS'}),args={id:mcpTerminal.id,confirmed:true,mode:'terminal',data:{...mcpTerminal,id:undefined,confirmed:undefined,mode:undefined}};await tools.executeTool('sales_bank_apply',args,base,{user:manager,scope:'write',tokenId:null});assert.equal((await tools.executeTool('sales_bank_apply',args,base,{user:manager,scope:'write',tokenId:null})).repeated,true);
+ const mcpTerminal=terminal({terminalCode:'MCP-POS'}),args={id:mcpTerminal.id,confirmed:true,mode:'terminal',data:{...mcpTerminal,id:undefined,confirmed:undefined,mode:undefined}};await tools.executeTool('sales_bank_apply',args,base,{user:finance,scope:'write',tokenId:null});assert.equal((await tools.executeTool('sales_bank_apply',args,base,{user:finance,scope:'write',tokenId:null})).repeated,true);
  await assert.rejects(()=>tools.executeTool('sales_bank_apply',{id:crypto.randomUUID(),confirmed:true,mode:'reconcile',data:{}},base,{...principal,scope:'read'}),/read-only/);
  await assert.rejects(()=>tools.executeTool('get_sales_bank',{},base,{user:rep,scope:'read',tokenId:null}));
  await verifyWorkbookExtraction(tools,principal);
@@ -222,6 +263,39 @@ async function verifyWorkbookExtraction(tools,principal){
  assert.equal(bankConflict.assessment.candidates.length,2);
  await apply(body('resolve_transfer',{rowId:bankConflict.id,revision:bankConflict.revision,paymentId:one.id,paymentRevision:entity(one.id).revision,reason:'Checked bank evidence'}),finance);
  assert.equal(entity(one.id).data.state,'cleared');assert.equal(entity(two.id).data.state,'pending');
+ const repRecord=async user=>{const response=await context.run(user,()=>sales.GET(request('/api/sales')));assert.equal(response.status,200,await response.clone().text());return response.json();};
+ const agentForm=active=>body('agent',{agentId:'buyer-b',revision:entity('buyer-b').revision,active,name:'Buyer B',kind:'representative',address:'Testing address'});
+ const issue=body('custody_issue',{agentId:'buyer-b',custodyKind:'demo',name:'Trial concentrator',serial:'DEMO-001',quantity:1,day:today,reference:'ISSUE-1'});
+ await post(sales,'/api/sales',issue,other,403);
+ await post(sales,'/api/sales',issue,manager);
+ const misc=body('custody_issue',{agentId:'buyer-b',custodyKind:'equipment',name:'Demo accessories',quantity:2,day:today,reference:'ISSUE-2'});
+ await post(sales,'/api/sales',misc,manager);
+ await post(sales,'/api/sales',agentForm(false),manager,409);
+ const start=body('custody_recall',{agentId:'buyer-b',revision:entity('buyer-b').revision,notes:'Collect assets before closure'});
+ await post(sales,'/api/sales',start,manager);
+ assert.equal(entity('buyer-b').data.custodyRecall.state,'open');
+ assert.ok(sql.prepare("SELECT id FROM duty_runs WHERE id='sales:custody-pos:buyer-b:finance:finance' AND state='open'").get());
+ assert.ok(sql.prepare("SELECT id FROM duty_runs WHERE id='sales:custody-agent:buyer-b:agent:other' AND state='open'").get());
+ const assets=(await repRecord(other)).custody;
+ assert.ok(assets.some(item=>item.data.serial==='DEMO-001'));
+ const p=assets.find(item=>item.data.serial==='SER-00123456-COVERAGE');
+ assert.equal(p.data.bankName,'Coverage Bank');
+ assert.equal(p.data.serial,'SER-00123456-COVERAGE');
+ assert.ok(!(await repRecord(rep)).custody.some(item=>item.data.serial==='DEMO-001'));
+ const returned=(custodyId,quantity=1)=>body('custody_return',{agentId:'buyer-b',custodyId,revision:entity(custodyId).revision,day:today,condition:'good',quantity,reference:'RETURN-1'});
+ await post(sales,'/api/sales',returned(p.id),manager,403);
+ await post(sales,'/api/sales',returned(p.id),finance);
+ await post(sales,'/api/sales',returned(misc.id),manager);
+ assert.equal(entity(misc.id).data.returnedQuantity,1);
+ assert.equal(entity(misc.id).data.returnedDay,'');
+ await post(sales,'/api/sales',agentForm(false),manager,409);
+ await post(sales,'/api/sales',returned(issue.id),manager);
+ await post(sales,'/api/sales',returned(misc.id),manager);
+ for(const item of (await repRecord(other)).custody.filter(item=>item.kind==='pos'||item.type==='sales_bank_terminal'))if(!item.data.returnedDay)await post(sales,'/api/sales',returned(item.id),finance);
+ assert.equal(entity('buyer-b').data.custodyRecall.state,'completed');
+ await post(sales,'/api/sales',agentForm(false),manager);
+ assert.equal(entity('buyer-b').data.active,false);
+ console.log('PASS custody: role-scoped issue/recall/returns, POS identifiers, work inbox, partial recovery, and prevention of premature deactivation');
  sql.prepare("UPDATE app_members SET status='inactive' WHERE id='treasury'").run();await get(treasury,403);await importStatement(importBody([bankRow('INACTIVE')]),treasury,403);
  console.log('PASS sales bank: authenticated roles, POS credit/allocation, overpayment, original XLSX, stable identities, conflicting reimports and exact claimed transfers');
 })().catch(e=>{console.error(e);process.exitCode=1;});

@@ -1296,7 +1296,7 @@ Object.assign(toolFieldTitles.sales_apply,{nationalId:'کد ملی مسئول ن
 Object.assign(fieldTitles,{newPassword:'رمز عبور تازه'});
 
 Object.assign(toolModeTitles.sales_apply,{branch_release:'تأیید ارسال امانی شعبه'});
-toolFieldTitles.sales_bank_apply={terminalId:'اتصال پوز برای ویرایش',accountId:'حساب بانکی مقصد شرکت',sheet:'برگهٔ فایل اکسل',rowIds:'ردیف‌های منتخب گردش بانک'};
+toolFieldTitles.sales_bank_apply={terminalId:'اتصال پوز برای ویرایش',accountId:'حساب بانکی مقصد شرکت',sheet:'برگهٔ فایل اکسل',serial:'شماره سریال دستگاه پوز',handedDay:'تاریخ تحویل امانی',coverageFrom:'شروع بازهٔ فایل',coverageTo:'پایان بازهٔ فایل',emptyStatement:'فایل بدون تراکنش',rowIds:'ردیف‌های منتخب گردش بانک'};
 
 Object.assign(fieldTitles,{consumerPriceRial:'قیمت واحد قطعه برای مصرف‌کننده (ریال)',customerTariffId:'تعرفه قیمت مصرف‌کننده',customerTariffRevision:'نسخه تعرفه مصرف‌کننده',customerPriceSource:'مبنای قیمت مشتری',sourceRow:'ردیف فایل',newMaterialCount:'قطعات جدید',newTariffCount:'قیمت‌های جدید مصرف‌کننده',unchangedCount:'قیمت‌های بدون تغییر',currency:'واحد پول'});
 

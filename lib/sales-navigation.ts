@@ -32,5 +32,6 @@ export function salesNavigation({warehouseOnly,roles}:SalesNavigationContext):{m
   ['reports','گزارش و پیگیری فروش'],['orders','سفارش‌ها'],
   ['finance','مالی فروش'],['settings','تنظیمات فروش'],
   ['returns','برگشت کالا'],['profiles','خریداران و نمایندگان'],
+  ...(rep||manager||finance?[['custody',rep?'کالاهای امانی من':'امانت‌های نمایندگان'] as SalesMenuItem]:[]),
  ],finance:financial,settings,reports};
 }

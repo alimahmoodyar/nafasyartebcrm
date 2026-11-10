@@ -34,7 +34,7 @@ function treasuryScope(){
  const context=trainingContext.getStore();
  return context?.treasuryAccounts
   ? {where:"type='sales_receiving_account' AND json_extract(data,'$.profileTestOwner')=?",args:[context.actor]}
-  : {where:'type IN ('+types+')',args:[]};
+  : {where:"type IN ("+types+") AND json_extract(data,'$.profileTestOwner') IS NULL",args:[]};
 }
 export async function treasuryRows(){
  const scope=treasuryScope();

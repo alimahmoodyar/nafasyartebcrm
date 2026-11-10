@@ -1,17 +1,20 @@
 import {requireAccess,checkOrigin,accessResponse} from '@/lib/authorization';
 import {boundedBody} from '@/lib/firmware-storage';
-import {applySalesBank,readSalesBank,previewSalesBank} from '@/lib/sales-bank';
+import {applySalesBank,readSalesBank,previewSalesBank,downloadSalesBankStatement} from '@/lib/sales-bank';
 import {MAX_SALES_BANK_BYTES} from '@/lib/sales-bank-contract';
 import {syncSalesTasks} from '@/lib/sales-tasks';
+import {syncTreasuryTasks} from '@/lib/treasury-tasks';
 import {AccessError} from '@/lib/authorization';
 import {bankTestBuyer,bankTestBuyers,openBankTestBuyer,runBankProfileTest} from '@/lib/sales-bank-profile-test';
 import {salesRows} from '@/lib/sales';
 const json=(value:any,status=200)=>Response.json(value,{status,headers:{'Cache-Control':'private, no-store','Vary':'Cookie, Authorization'}});
 export async function GET(request?:Request){try{
  const actor=await requireAccess();
- if(!request||new URL(request.url).searchParams.get('roleTest')!=='true')return json(await readSalesBank(actor));
+ const query=request?new URL(request.url).searchParams:null,statementId=query?.get('statement');
+ if(query?.get('roleTest')!=='true')return statementId?await downloadSalesBankStatement(actor,statementId):json(await readSalesBank(actor));
  const buyers=actor.profileReview?.id==='sales-finance'?await bankTestBuyers():[];
  return await runBankProfileTest(actor,async()=>{
+  if(statementId)return downloadSalesBankStatement(actor,statementId);
   const data=await readSalesBank(actor);
   if(actor.profileReview?.id!=='sales-finance')return json(data);
   const profiles=(await salesRows()).filter(row=>row.type==='sales_agent');
@@ -45,5 +48,6 @@ export async function POST(request:Request){try{
  if(body?.mode==='preview')return json(await previewSalesBank(actor,body));
  const result=await applySalesBank(actor,body);let followupPending=false;
  try{await syncSalesTasks();}catch{followupPending=true;}
+ if(['import','archive_pos'].includes(body?.mode))try{await syncTreasuryTasks();}catch{followupPending=true;}
  return json({...result,followupPending});
 }catch(e){return accessResponse(e)||json({error:'تطبیق انجام نشد؛ اطلاعات هم‌زمان تغییر کرده یا فایل معتبر نیست. فهرست را تازه‌سازی کنید.'},409);}}
