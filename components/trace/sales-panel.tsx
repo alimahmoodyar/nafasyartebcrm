@@ -150,6 +150,10 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
  </>}
 </>;
  const representativeAccount=representativeDashboard?acs[0]:undefined;
+ const representativeCredit=representativeAccount?.securedCredit;
+ const totalCredit=representativeCredit?rial(representativeCredit.ceiling)+rial(representativeCredit.cashCredit):BigInt(0);
+ const availableCredit=representativeCredit?rial(representativeCredit.available):BigInt(0);
+ const availablePercent=totalCredit>BigInt(0)?Math.min(100,Number(availableCredit*BigInt(10000)/totalCredit)/100):0;
  const netBalance=representativeAccount?rial(representativeAccount.balance):null;
  const hasReceivable=netBalance!==null&&netBalance<BigInt(0);
  const unpaidInstallment=(invoice:any)=>invoice?.installments?.filter((part:any)=>rial(part.remaining)>BigInt(0)).sort((a:any,b:any)=>a.due.localeCompare(b.due))[0];
@@ -268,7 +272,14 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
  {representativeDashboard&&rep&&<><div className="representative-account-strip">
   <dl>
    <div><dt>{hasReceivable?'مانده طلب':netBalance===BigInt(0)?'مانده حساب':'مانده بدهی'}</dt><dd>{netBalance===null?'—':money(hasReceivable?-netBalance:netBalance)}</dd></div>
-   <div><dt>اعتبار قابل استفاده</dt><dd>{acs[0]?.securedCredit?money(acs[0].securedCredit.available):'—'}</dd></div>
+   <div>
+    <dt>اعتبار قابل استفاده</dt>
+    <dd>{representativeCredit?money(availableCredit):'—'}</dd>
+    {representativeCredit&&<div className="sales-reward-progress">
+     <progress max={100} value={availablePercent} aria-label="اعتبار قابل استفاده" aria-valuetext={money(availableCredit)+' از '+money(totalCredit)}/>
+     <small>از {money(totalCredit)} کل اعتبار</small>
+    </div>}
+   </div>
   {outstandingDue&&<div><dt>اولین سررسید باز</dt><dd>{date(outstandingDue.due)}</dd><small>{dueLabel(outstandingDue)}</small></div>}
   </dl>
   <div className="representative-dashboard-actions">
