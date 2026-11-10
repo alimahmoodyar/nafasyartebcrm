@@ -8,7 +8,9 @@ import {storedAccessPermissions} from '@/lib/permissions';
 import {buildIntakeRoles} from '@/lib/build-intake-access';
 import {productProductionMode} from '@/lib/model';
 import {usesAssignedSalesAccounts} from '@/lib/sales-contract';
-import {bankCode,transferPaymentFits} from '@/lib/sales-bank-contract';
+import {bankCode,readyBankRowForPayment} from '@/lib/sales-bank-contract';
+import {bankEntities,recordSalesBankMatch} from '@/lib/sales-bank';
+import {bankPaymentReviewDue,coveredBankPeriods} from '@/lib/sales-bank-coverage';
 import {bankTestBuyer,runBankProfileTest} from '@/lib/sales-bank-profile-test';
 import {mcpActor} from '@/lib/mcp/context';
 import {digest} from '@/lib/password-auth';
@@ -48,24 +50,12 @@ async function get(request:Request){try{
  const products=(await storage().prepare("SELECT id,payload FROM records WHERE kind='product'").all()).results.map((r:any)=>{const p=JSON.parse(r.payload);return {id:r.id,name:p.name||p.model||p.code,model:p.model||'',status:p.status,productionMode:productProductionMode(p)};});
  const canOperate=await Promise.all(agents.map(a=>salesVisible(u,a)));
  const bankRowsById=new Map(rows.filter(row=>row.type==='sales_bank_row').map(row=>[row.id,row.data]));
- const bankStatements=salesRep(u)?all.filter(row=>row.type==='sales_bank_statement'&&row.data.source!=='pos'):[];
- const incomingBankRows=salesRep(u)?all.filter(row=>row.type==='sales_bank_row'&&row.data.direction==='in'):[];
+ const bankPeriods=salesRep(u)?coveredBankPeriods(all):new Map();
  const accounts=agents.map(a=>{const account=salesAccounts(rows,a.id,today);const publicReturn=(r:any)=>{if(!r.data.workflowVersion)return r;const {agentId,invoiceId,state,deviceIds,serials,amount,reason,workflowVersion}=r.data;return {...r,data:{agentId,invoiceId,state,deviceIds,serials,amount,reason,workflowVersion}};};return {agentId:a.id,...account,payments:account.payments.map(payment=>{
   const bankRow=bankRowsById.get(payment.data.bankRowId);
   const isTerminalPayment=bankRow?.kind==='pos'&&!!bankRow.terminalId&&bankRow.paymentId===payment.id;
   const claim=payment.data;
-  let bankMatchMissing=false;
-  if(salesRep(u)&&claim.method==='bank'&&claim.state==='pending'&&!claim.bankRowId&&claim.receivingAccountId&&claim.day){
-   const uploadDays=new Set<string>();
-   for(const statement of bankStatements){
-    if(statement.data.accountId===claim.receivingAccountId&&statement.created>=payment.created&&statement.data.to>=claim.day){
-     uploadDays.add(dayAt(new Date(statement.created)));
-    }
-   }
-   const consecutiveUploads=[...uploadDays].some(day=>uploadDays.has(addDay(day,1)));
-   const matchingEntry=incomingBankRows.some(row=>transferPaymentFits(row,payment));
-   bankMatchMissing=consecutiveUploads&&!matchingEntry;
-  }
+  const bankMatchMissing=salesRep(u)&&claim.method==='bank'&&claim.state==='pending'&&!!claim.receivingAccountId&&bankPaymentReviewDue(payment,bankPeriods,today);
   return {...payment,isTerminalPayment,bankMatchMissing};
  }),returns:account.returns.map(publicReturn),credits:account.credits.map(publicReturn),securedCredit:salesSecuredCredit(rows,a.id,today)};});
  const allMembers=!salesRep(u)?(await storage().prepare("SELECT id,name,permissions FROM app_members WHERE status='active'").all()).results.map((m:any)=>{const p=storedAccessPermissions(m.permissions),s={isAdmin:false,permissions:p} as any;return {id:m.id,name:m.name,sales:salesStaff(s),manager:salesManager(s),finance:salesFinance(s)};}).filter(m=>m.sales||m.finance):[];
@@ -129,7 +119,7 @@ async function post(request:Request){try{
   }
   return true;
  }
- let automaticAccount:any=null;let target=id;
+ let automaticAccount:any=null,bankPaymentState:string|undefined;let target=id;
  if(mode==='agent'){
   if(agent)revision(agent);const active=b.active;if(typeof active!=='boolean')fail('وضعیت نماینده لازم است.');const name=req(b.name),phone=txt(b.phone||'',50),address=req(b.address,2000),location=normalizeIranLocation(b.province,b.city,agent?.data),province=location.province,city=location.city,contact=txt(b.contact||'',200)||name;
   const kind=txt(b.kind||agent?.data.kind||'representative',40);if(!['representative','reseller','branch','end_customer','referrer'].includes(kind))fail('نوع خریدار معتبر نیست.');
@@ -262,6 +252,7 @@ async function post(request:Request){try{
   }
   const bank=destination?.title||(existingDestination?old!.data.bank:txt(b.bank||'',200));
   const normalizedBank=bank.toLowerCase().replace(/\s+/g,''),reference=b.method==='bank'?txt(b.reference??'',300):req(b.reference,300),normalizedReference=bankCode(reference);
+  if(b.method==='bank'&&assigned&&!normalizedReference)fail('کد رهگیری واریز لازم است.');
   if(b.method!=='cash'&&!bank)fail('بانک لازم است.');
   if(reference&&rows.some(r=>r.type==='sales_payment'&&r.id!==old?.id&&r.data.method===b.method&&(!receivingAccountId||!r.data.receivingAccountId)&&(r.data.normalizedBank||r.data.bank?.toLowerCase().replace(/\s+/g,''))===normalizedBank&&bankCode(r.data.reference||r.data.normalizedReference||'')===normalizedReference))fail('این مرجع پرداخت قبلاً ثبت شده است؛ سابقه را بررسی کنید.',409);
   const file=b.fileId?await get(req(b.fileId),'sales_file'):null;
@@ -269,6 +260,21 @@ async function post(request:Request){try{
   if(receivingAccountId&&reference&&rows.some(r=>r.type==='sales_payment'&&r.id!==old?.id&&r.data.receivingAccountId===receivingAccountId&&bankCode(r.data.reference||r.data.normalizedReference||'')===normalizedReference))fail('این تراکنش برای حساب مقصد قبلاً ثبت شده است.',409);
   if(b.method==='bank'&&reference&&rows.some(r=>r.type==='sales_payment'&&r.id!==old?.id&&r.data.bankRowId&&bankCode(r.data.reference||'')===bankCode(reference)&&(!receivingAccountId||r.data.receivingAccountId===receivingAccountId)))fail('این پیگیری قبلاً به وصول بانکی متصل شده است؛ سابقه بانک را بررسی کنید.',409);
   const checkDue=b.method==='check'?sday(b.checkDue):'';const cashOrderId=txt(b.cashOrderId||'',200),checkInvoiceId=txt(b.checkInvoiceId||'',200);if(cashOrderId){if(b.method==='check')fail('وجه نقد خرید جدید نمی‌تواند چک باشد.');const o=await get(cashOrderId,'sales_order');state(o,['sales_approved','approved']);if(!o.data.salesTerms)fail('خرید فاقد شرایط مصوب است.');if(!rows.some(r=>r.type==='sales_invoice'&&r.data.orderId===o.id))fail('ابتدا فاکتور خرید جدید صادر شود تا وجه نقد به قسط مصوب متصل شود.');}if(b.method==='check'&&b.checkPurpose==='collateral'&&checkInvoiceId)fail('چک ضمانت به فاکتور پرداخت متصل نمی‌شود.');if(checkInvoiceId)await get(checkInvoiceId,'sales_invoice');target=old?.id||id;put(target,'sales_payment',{agentId:own().id,method:b.method,receivingAccountId,amount,day,bank,normalizedBank,reference,normalizedReference,fileId:file?.id||'',checkDue,cashOrderId,checkInvoiceId,state:'pending',checkPurpose:b.method==='check'&&b.checkPurpose==='collateral'?'collateral':'payment',submittedBy:u.userId,notes:txt(b.notes||'',4000)},old);
+  if(b.method==='bank'&&receivingAccountId){
+   const all=await bankEntities(rows);
+   const payment=all.find(row=>row.id===target);
+   const ready=readyBankRowForPayment(payment,all);
+   if(ready&&ready.match.agentId===own().id){
+    const {row,match}=ready;
+    const account=all.find(entry=>entry.id===receivingAccountId);
+    guard('EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)',account.id,account.revision);
+    guard('EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)',row.id,row.revision);
+    recordSalesBankMatch({row,match:{...match,agentId:own().id},all,put,actorId:'system',operationId:id,now,today});
+    bankPaymentState='cleared';
+   }else{
+    bankPaymentState=bankPaymentReviewDue(payment,coveredBankPeriods(all),today)?'review':'pending';
+   }
+  }
  }else if(['check_disposition_request','check_disposition_review'].includes(mode)){
   const payment=await get(req(b.paymentId),'sales_payment');
   revision(payment);
@@ -338,7 +344,7 @@ async function post(request:Request){try{
   for(const [ci,c] of credits.entries()){const plan=allocationPlan(rows,agent.id,c.id,today);plan.allocations.forEach((l,i)=>put(id+':auto:'+ci+':'+i,'sales_allocation',{agentId:agent.id,creditId:c.id,...l,policy:plan.policy,by:u.userId}));plan.recoveries.forEach((r,i)=>put(id+':recovery:'+ci+':'+i,'sales_check_recovery',{agentId:agent.id,creditId:c.id,...r,by:u.userId}));}
  }
  await db.batch([db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(id,'sales_'+mode,signature,u.userId,now),...checks,...stmts,db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,target,'sales_'+mode,signature,now)]);
- let followupPending=false;if(!trainingContext.getStore()?.salesBankTest)try{await syncSalesTasks();if(b.leadId)await syncLeadTasks();await scanSalesMonitor({reports:false,source:'event'});}catch{followupPending=true;}return json({saved:true,id:target,followupPending,automaticAccount});
+ let followupPending=false;if(!trainingContext.getStore()?.salesBankTest)try{await syncSalesTasks();if(b.leadId)await syncLeadTasks();await scanSalesMonitor({reports:false,source:'event'});}catch{followupPending=true;}return json({saved:true,id:target,followupPending,automaticAccount,...(bankPaymentState?{bankPaymentState}:{})});
  }catch(e){return accessResponse(e)||json({error:/constraint|SQLITE|D1/i.test(String(e))?'اطلاعات هم‌زمان تغییر کرده است؛ فهرست را تازه و نتیجه را بررسی کنید.':'ثبت انجام نشد؛ ورودی‌ها را بررسی کنید.'},409)}}
 
 function withBankPaymentTest(handler:(request:Request)=>Promise<Response>){

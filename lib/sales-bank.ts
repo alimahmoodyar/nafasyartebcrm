@@ -95,6 +95,21 @@ export async function previewSalesBank(actor:Session,b:any){
  checkCoveredRows(b,parsed!.report.rows);
  return {...parsed!.report,filename:parsed!.file.filename,sheet:parsed!.sheet,sha256:await sha256(parsed!.file.bytes)};
 }
+export function recordSalesBankMatch({row,match,all,put,actorId,operationId,now,today,manual=false}:{
+ row:any;match:{agentId:string;paymentId?:string;terminalId?:string;reason:string};all:any[];
+ put:(id:string,type:string,data:any,old?:any)=>unknown;actorId:string;operationId:string;now:string;today:string;manual?:boolean;
+}){
+ const d=row.data,existing=match.paymentId?all.find(r=>r.id===match.paymentId&&r.type==='sales_payment'):null,paymentId=existing?.id||row.id+':payment';
+ if(existing&&existing.data.state!=='pending')fail('اعلام پرداخت هم‌زمان تغییر کرد؛ دوباره تطبیق کنید.',409);
+ const data={...(existing?.data||{}),agentId:match.agentId,method:'bank',amount:d.amount,day:existing?.data.day||d.day,bank:existing?.data.bank||all.find(r=>r.id===d.accountId)!.data.title,normalizedBank:bankCode(existing?.data.bank||all.find(r=>r.id===d.accountId)!.data.title),reference:existing?.data.reference||d.reference||'BANK:'+d.bankId,normalizedReference:bankCode(existing?.data.reference||d.reference||'BANK:'+d.bankId),receivingAccountId:d.accountId,fileId:existing?.data.fileId||'',checkDue:'',state:'cleared',bankRowId:row.id,bankStatementId:d.statementId,bankSettlementDay:d.day,bankEvidence:{bankId:d.bankId,accountId:d.accountId,statementId:d.statementId,terminalCode:d.terminalCode,provider:d.provider,day:d.day},automaticBank:!manual,reviewedBy:actorId,reviewedAt:now,reviewNotes:match.reason,submittedBy:existing?.data.submittedBy||actorId,financialEvents:[...(existing?.data.financialEvents||[]),{id:operationId+':'+row.id,day:d.day,at:now,delta:d.amount,state:'cleared',bankRowId:row.id}]};
+ put(paymentId,'sales_payment',data,existing);put(row.id,row.type,{...d,status:'matched',agentId:match.agentId,paymentId,terminalId:match.terminalId||'',matchedAt:now,matchedBy:actorId,...(manual?{resolutionReason:match.reason}:{})},row);
+ const payment=all.find(entry=>entry.id===paymentId);
+ const allocationRows=payment?.data.state==='cleared'?all:[...all.filter(entry=>entry.id!==paymentId),{id:paymentId,type:'sales_payment',data,created:existing?.created||now}];
+ const plan=allocationPlan(allocationRows,match.agentId,paymentId,today);
+ plan.allocations.forEach((l,i)=>put(operationId+':allocation:'+row.id+':'+i,'sales_allocation',{agentId:match.agentId,creditId:paymentId,...l,policy:plan.policy,by:actorId,bankRowId:row.id}));
+ plan.recoveries.forEach((r,i)=>put(operationId+':recovery:'+row.id+':'+i,'sales_check_recovery',{agentId:match.agentId,creditId:paymentId,...r,by:actorId,bankRowId:row.id}));
+}
+
 export async function applySalesBank(actor:Session,b:any){
  const roles=await salesBankRoles(actor),{u,members}=roles,db=storage(),now=new Date().toISOString(),today=dayAt();
  if(!b||b.confirmed!==true||!salesBankModes.includes(b.mode)||! /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(b.id))fail('تأیید و شناسه معتبر عملیات لازم است.');
@@ -200,13 +215,8 @@ export async function applySalesBank(actor:Session,b:any){
   for(const row of selected){
    const match=resolution?{status:'ready',agentId:resolution.agentId,paymentId:resolution.paymentId,terminalId:undefined,reason:resolution.reason}:bankMatch(row,all);
    if(match.status==='ignored'){ignored++;continue;}if(match.status!=='ready'||!match.agentId){unresolved++;continue;}if(matched>=25)continue;account(row.data.accountId);
-   const d=row.data,existing=match.paymentId?all.find(r=>r.id===match.paymentId&&r.type==='sales_payment'):null,paymentId=existing?.id||row.id+':payment';
-   if(existing&&existing.data.state!=='pending')fail('اعلام پرداخت هم‌زمان تغییر کرد؛ دوباره تطبیق کنید.',409);
-   const data={...(existing?.data||{}),agentId:match.agentId,method:'bank',amount:d.amount,day:existing?.data.day||d.day,bank:existing?.data.bank||all.find(r=>r.id===d.accountId)!.data.title,normalizedBank:bankCode(existing?.data.bank||all.find(r=>r.id===d.accountId)!.data.title),reference:existing?.data.reference||d.reference||'BANK:'+d.bankId,normalizedReference:bankCode(existing?.data.reference||d.reference||'BANK:'+d.bankId),receivingAccountId:d.accountId,fileId:existing?.data.fileId||'',checkDue:'',state:'cleared',bankRowId:row.id,bankStatementId:d.statementId,bankSettlementDay:d.day,bankEvidence:{bankId:d.bankId,accountId:d.accountId,statementId:d.statementId,terminalCode:d.terminalCode,provider:d.provider,day:d.day},automaticBank:!resolution,reviewedBy:u.userId,reviewedAt:now,reviewNotes:match.reason,submittedBy:existing?.data.submittedBy||u.userId,financialEvents:[...(existing?.data.financialEvents||[]),{id:b.id+':'+row.id,day:d.day,at:now,delta:d.amount,state:'cleared',bankRowId:row.id}]};
-   put(paymentId,'sales_payment',data,existing);put(row.id,row.type,{...d,status:'matched',agentId:match.agentId,paymentId,terminalId:match.terminalId||'',matchedAt:now,matchedBy:u.userId,...(resolution?{resolutionReason:resolution.reason}:{})},row);matched++;
-   const plan=allocationPlan(all,match.agentId,paymentId,today);
-   plan.allocations.forEach((l,i)=>put(b.id+':allocation:'+row.id+':'+i,'sales_allocation',{agentId:match.agentId,creditId:paymentId,...l,policy:plan.policy,by:u.userId,bankRowId:row.id}));
-   plan.recoveries.forEach((r,i)=>put(b.id+':recovery:'+row.id+':'+i,'sales_check_recovery',{agentId:match.agentId,creditId:paymentId,...r,by:u.userId,bankRowId:row.id}));
+   recordSalesBankMatch({row,match:{...match,agentId:match.agentId},all,put,actorId:u.userId,operationId:b.id,now,today,manual:!!resolution});
+   matched++;
   }
   const selectedIds=new Set(selected.map(r=>r.id));pendingReady=all.filter(r=>r.type==='sales_bank_row'&&r.data.status==='pending'&&selectedIds.has(r.id)&&bankMatch(r,all).status==='ready').length;
  }

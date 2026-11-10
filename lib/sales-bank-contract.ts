@@ -67,6 +67,13 @@ export function bankMatch(row:any,all:any[]){
  return answer('ready',exact.length?'واریز پوز با اعلام پرداخت همین خریدار تطبیق دارد.':'وصول پوز متعلق به خریدار مشخص است.',{agentId,paymentId:exact[0]?.id||'',terminalId:terminal.id});
 }
 
+export function readyBankRowForPayment(payment:any,all:any[]){
+ const ready=all.filter(row=>row.type==='sales_bank_row'&&row.data.status==='pending'&&row.data.direction==='in'&&transferPaymentFits(row,payment))
+  .map(row=>({row,match:bankMatch(row,all)}))
+  .filter(({match})=>match.status==='ready'&&match.paymentId===payment.id);
+ return ready.length===1?ready[0]:undefined;
+}
+
 export function bankAmbiguities(rows:any[]){
  return rows.filter(row=>row.type==='sales_bank_row'&&row.data.status==='pending'&&row.data.kind==='transfer').flatMap(row=>{
   const assessment=bankMatch(row,rows);
