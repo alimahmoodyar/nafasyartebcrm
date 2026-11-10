@@ -36,7 +36,7 @@ export function TaskNotifier({accountId,profile,onOpen}:{accountId:string;profil
     const {positionWork,tasks:personal,memberId}=taskSummary;
     setWork(profileId?positionWork:personal
      .filter(task=>!!memberId&&task.assignee===memberId&&['open','blocked'].includes(task.state))
-     .map(task=>({title:task.data.title,hint:task.guidance?.steps?.[0],...(task.data.sourceSection==='sales'&&task.data.sourceId?.startsWith('sales-view:calls:')?{section:'sales',target:task.data.sourceId}:{})})));
+     .map(task=>({title:task.data.title,hint:task.guidance?.steps?.[0],...(task.data.sourceId&&(task.data.sourceSection==='sales'&&['sales-view:calls:','sales-view:custody:'].some(prefix=>task.data.sourceId!.startsWith(prefix))||task.data.sourceSection==='sales-bank'&&task.data.sourceId.startsWith('sales-bank-gap:'))?{section:task.data.sourceSection,target:task.data.sourceId}:{})})));
    }else setWork([]);
    if(inbox.status==='fulfilled'&&inbox.value.data.accountId===accountId&&
     (profileId?inbox.value.data.me==='@profile:'+profileId:!inbox.value.data.me.startsWith('@profile:'))){

@@ -7,6 +7,7 @@ import {rewardPeriods,salesRewardProgress} from './sales-rewards';
 import {checkRecovery,salesAccounts,salesCheckPosition,salesTargetProgress,rial} from './sales-contract';
 import {bankEntities} from './sales-bank';
 import {bankAmbiguities} from './sales-bank-contract';
+import {heldSalesCustody} from './sales-custody';
 import {salesBankRowTarget} from './role-profiles';
 export async function syncSalesTasks(){
  const db=storage(),op=crypto.randomUUID(),checks=await salesLock(db,op),rows=await salesRows(),today=dayAt(),now=new Date().toISOString();
@@ -26,6 +27,13 @@ export async function syncSalesTasks(){
  for(const {row,assessment} of collisions)task(null,'bank-conflict:'+row.id,'مغایرت واریز بانکی',today,'finance',assessment.reason,salesBankRowTarget+row.id,'','','sales-bank');
  for(const a of rows.filter(r=>r.type==='sales_agent'&&r.data.active)){
   const own=rows.filter(r=>r.data.agentId===a.id),account=salesAccounts(rows,a.id,today);
+  if(a.data.custodyRecall?.state==='open'){
+   const held=heldSalesCustody(rows,a.id),target='sales-view:custody:'+a.id,due=a.data.custodyRecall.requestedDay;
+   const hasPos=held.some(row=>row.type==='sales_bank_terminal'),hasOther=held.some(row=>row.type==='sales_custody_item');
+   if(hasPos)task(a,'custody-pos:'+a.id,'دریافت پوزهای امانی',due,'finance','سریال پوز را با پرونده کنترل و دریافت واقعی دستگاه را ثبت کنید.',target);
+   if(hasOther)task(a,'custody-items:'+a.id,'دریافت کالاهای امانی',due,'manager','اقلام، تعداد و سریال را با پرونده کنترل و دریافت واقعی را ثبت کنید.',target,'',a.data.managerId&&members.some(m=>m.id===a.data.managerId&&salesManager({isAdmin:false,permissions:m.permissions} as any))?a.data.managerId:'');
+   if(held.length)task(a,'custody-agent:'+a.id,'برگرداندن کالاهای امانی',due,'agent','فهرست امانت‌ها را باز کنید و برای تحویل با شرکت هماهنگ کنید.',target);
+  }
   const contacts=own.filter(r=>r.type==='sales_contact').sort((a,b)=>b.created.localeCompare(a.created));if(isPartner(a)){
    const follow=partnerFollowup(a,rows,today),last=follow.last?.data;
    const due=last?.nextDue||follow.due;

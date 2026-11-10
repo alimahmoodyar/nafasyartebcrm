@@ -9,24 +9,25 @@ import {usesAssignedSalesAccounts} from './sales-contract';
 import {salesRep,salesManager,salesFinance} from './sales-access';
 import {financialWorkflowRole} from './financial-workflow-roles';
 import {leadMembers,leadMemberGuard} from './sales-leads';
-import {dayAt} from './duties';
+import {addDay,dayAt} from './duties';
 import {allocationPlan} from './sales-network-contract';
 import {salesBankModes,MAX_SALES_BANK_BYTES,bankCode,normalizeBankRows,bankRowIdentity,bankMatch,transferPaymentFits,isApprovedReceivingAccount as approvedAccount} from './sales-bank-contract';
-import {parseSalesBankRows} from './sales-bank-import';
+import {bankCellText,parseSalesBankRows} from './sales-bank-import';
 import {bankWorkbookFormat,readBankWorkbook,detectBankReport,extractBankReport} from './sales-bank-workbook';
+import {bankCoverage,coveredBankPeriods,uncoveredBankPeriods} from './sales-bank-coverage';
 
 export async function salesBankRoles(actor:Session){
  const test=trainingContext.getStore();
  if(test){
   if(!test.salesBankTest||test.actor!==actor.userId||test.role!==actor.profileReview?.id||!['sales-finance','treasurer'].includes(test.role))fail('پروفایل تطبیق بانکی مجاز نیست.',403);
-  return {u:actor,members:await leadMembers(),manage:false,bank:true,salesFinance:test.role==='sales-finance'};
+  return {u:actor,members:await leadMembers(),manage:test.role==='sales-finance',bank:true,salesFinance:test.role==='sales-finance',canImport:test.role==='treasurer'};
  }
  const members=await leadMembers();let u=actor;
  if(!u.isAdmin&&!u.profileReview){const m=members.find(m=>m.status==='active'&&(m.subject===u.userId||'local:'+m.id===u.userId));if(!m)fail('دسترسی فعال لازم است.',403);u={...u,permissions:storedAccessPermissions(m.permissions)};}
  if(salesRep(u)||u.permissions.serviceAgentId||u.permissions.hospitalCenterId)fail('دسترسی مالی داخلی شرکت لازم است.',403);
- const manage=salesManager(u)||salesFinance(u),bank=u.isAdmin||salesFinance(u)||financialWorkflowRole(u.permissions,'',[],'treasury');
- if(!manage&&!bank)fail('مجوز اتصال پوز یا تطبیق بانکی ندارید.',403);
- return {u,members,manage,bank,salesFinance:salesFinance(u)};
+ const manage=salesFinance(u),canImport=u.isAdmin||financialWorkflowRole(u.permissions,'',[],'treasury'),bank=salesFinance(u)||canImport;
+ if(!manage&&!bank&&!salesManager(u))fail('مجوز اتصال پوز یا تطبیق بانکی ندارید.',403);
+ return {u,members,manage,bank,salesFinance:salesFinance(u),canImport};
 }
 export async function bankEntities(salesRowsSnapshot?:any[]){
  const sales=salesRowsSnapshot||await salesRows();
@@ -38,7 +39,28 @@ const minimalAgent=(a:any)=>({id:a.id,revision:a.revision,data:{name:a.data.name
 const statementPublic=(s:any)=>{const {objectKey,...data}=s.data;return {...s,data};};
 export async function readSalesBank(actor:Session){
  const roles=await salesBankRoles(actor),all=await bankEntities();
- return {today:dayAt(),roles:{manage:roles.manage,bank:roles.bank},canAssign:roles.salesFinance,canResolve:roles.salesFinance,agents:all.filter(a=>a.type==='sales_agent'&&a.data.kind!=='referrer').map(minimalAgent),accounts:all.filter(approvedAccount).map(a=>accountPublic(a,roles.bank)),terminals:all.filter(r=>r.type==='sales_bank_terminal'),...(roles.bank?{statements:all.filter(r=>r.type==='sales_bank_statement').map(statementPublic),rows:all.filter(r=>r.type==='sales_bank_row').map(r=>({...r,assessment:bankMatch(r,all)})),payments:all.filter(r=>r.type==='sales_payment'&&r.data.method==='bank'&&r.data.state==='pending').map(r=>({id:r.id,revision:r.revision,data:{agentId:r.data.agentId,day:r.data.day,amount:r.data.amount,reference:r.data.reference,receivingAccountId:r.data.receivingAccountId||'',state:r.data.state}}))}: {})};
+ const today=dayAt();
+ return {today,roles:{manage:roles.manage,bank:roles.bank},canImport:roles.canImport,canAssign:roles.salesFinance,canResolve:roles.salesFinance,agents:all.filter(a=>a.type==='sales_agent'&&a.data.kind!=='referrer').map(minimalAgent),accounts:all.filter(approvedAccount).map(a=>accountPublic(a,roles.bank)),terminals:all.filter(r=>r.type==='sales_bank_terminal'),...(roles.bank?{coverage:bankCoverage(all,today),statements:all.filter(r=>r.type==='sales_bank_statement').map(statementPublic),rows:all.filter(r=>r.type==='sales_bank_row').map(r=>({...r,assessment:bankMatch(r,all)})),payments:all.filter(r=>r.type==='sales_payment'&&r.data.method==='bank'&&r.data.state==='pending').map(r=>({id:r.id,revision:r.revision,data:{agentId:r.data.agentId,day:r.data.day,amount:r.data.amount,reference:r.data.reference,receivingAccountId:r.data.receivingAccountId||'',state:r.data.state}}))}: {})};
+}
+export async function downloadSalesBankStatement(actor:Session,id:string){
+ if(!(await salesBankRoles(actor)).bank)fail('دسترسی به بایگانی بانک لازم است.',403);
+ const statement=(await bankEntities()).find(row=>row.id===id&&row.type==='sales_bank_statement');
+ if(!statement?.data.objectKey)fail('اصل صورتحساب پیدا نشد.',404);
+ const object=await firmwareBucket().get(statement.data.objectKey);
+ if(!object)fail('فایل بایگانی‌شده پیدا نشد.',404);
+ const filename=statement.data.filename;
+ return new Response(object!.body??await object!.arrayBuffer(),{headers:{'Content-Type':/\.xls$/i.test(filename)?'application/vnd.ms-excel':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','Content-Disposition':"attachment; filename*=UTF-8''"+encodeURIComponent(filename),'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
+}
+function declaredCoverage(b:any,today=dayAt()){
+ if(b.coverageFrom==null&&b.coverageTo==null&&b.emptyStatement!==true)return null;
+ const from=sday(b.coverageFrom),to=sday(b.coverageTo);
+ if(from>to||to>today||to>addDay(from,365))fail('بازهٔ صورتحساب باید معتبر، حداکثر ۳۶۶ روز و تا امروز باشد.');
+ return {from,to};
+}
+function checkCoveredRows(b:any,rows:any[]){
+ const coverage=declaredCoverage(b);
+ if(coverage&&rows.some(row=>row.day<coverage.from||row.day>coverage.to))fail('تاریخ ردیف‌های فایل باید داخل بازهٔ اعلام‌شدهٔ صورتحساب باشد.');
+ return coverage;
 }
 function originalBytes(b:any){
  const filename=sreq(b.filename,180);
@@ -54,6 +76,12 @@ async function parseOriginal(b:any){
   if(!sheet)throw Error('برگه انتخاب‌شده در فایل وجود ندارد.');
   const detection=detectBankReport(sheet.data);
   if(b.profile!=null&&!['auto','manual'].includes(b.profile))throw Error('روش خواندن فایل معتبر نیست.');
+  if(b.emptyStatement===true){
+   const header=detection.headerRow||1;
+   if(!sheet.data[header-1]?.some(cell=>bankCellText(cell))||sheet.data.slice(header).some(row=>row.some(cell=>bankCellText(cell))))throw Error('ثبت بدون تراکنش به فایل دارای عنوان و بدون ردیف تراکنش نیاز دارد.');
+   if(detection.kind==='pos')return {file,sheet:sheet.sheet,report:{kind:'pos' as const,headerRow:header,rows:[],excluded:[],warnings:[],summary:{total:0,eligible:0,excluded:0,accounts:[],groups:[],terminals:[],paid:'0',fee:'0',net:'0'}}};
+   return {file,sheet:sheet.sheet,report:{kind:'statement' as const,headerRow:header,rows:[],excluded:[],warnings:[],summary:{total:0,incoming:0,outgoing:0}}};
+  }
   const report=detection.kind==='pos'||b.profile==='auto'?await extractBankReport(sheet.data,b.unit,detection,b.range):{kind:'statement' as const,...parseSalesBankRows(sheet.data,b.mapping),excluded:[],summary:null,headerRow:0};
   if(report.kind==='pos'&&report.rows.some(r=>r.day>dayAt()||r.financialDay>dayAt()))throw Error('تاریخ تراکنش یا تسویه پوز در آینده نباشد.');
   return {file,sheet:sheet.sheet,report};
@@ -61,14 +89,17 @@ async function parseOriginal(b:any){
 }
 /** Preview never saves files, clears claims, allocates debt or changes permissions. */
 export async function previewSalesBank(actor:Session,b:any){
- const roles=await salesBankRoles(actor);if(!roles.bank)fail('مجوز خواندن گردش بانک لازم است.',403);
- const parsed=await parseOriginal(b);if(parsed!.report.kind==='statement')parsed!.report.rows=normalizeBankRows(parsed!.report.rows);return {...parsed!.report,filename:parsed!.file.filename,sheet:parsed!.sheet,sha256:await sha256(parsed!.file.bytes)};
+ const roles=await salesBankRoles(actor);if(!roles.canImport)fail('خواندن اکسل گردش بانک با خزانه‌دار است.',403);
+ const parsed=await parseOriginal(b);
+ if(parsed!.report.kind==='statement')parsed!.report.rows=normalizeBankRows(parsed!.report.rows,b.emptyStatement===true);
+ checkCoveredRows(b,parsed!.report.rows);
+ return {...parsed!.report,filename:parsed!.file.filename,sheet:parsed!.sheet,sha256:await sha256(parsed!.file.bytes)};
 }
 export async function applySalesBank(actor:Session,b:any){
  const roles=await salesBankRoles(actor),{u,members}=roles,db=storage(),now=new Date().toISOString(),today=dayAt();
  if(!b||b.confirmed!==true||!salesBankModes.includes(b.mode)||! /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(b.id))fail('تأیید و شناسه معتبر عملیات لازم است.');
- if(trainingContext.getStore()?.salesBankTest&&!(actor.profileReview?.id==='sales-finance'?b.mode==='receiving_accounts'||b.mode==='resolve_transfer':b.mode==='import'||b.mode==='reconcile'))fail('این عملیات در نقش آزمایشی مجاز نیست.',403);
- if(b.mode==='terminal'?!roles.manage:['receiving_accounts','resolve_transfer'].includes(b.mode)?!roles.salesFinance:!roles.bank)fail('مجوز این مرحله را ندارید.',403);
+ if(trainingContext.getStore()?.salesBankTest&&!(actor.profileReview?.id==='sales-finance'?['receiving_accounts','resolve_transfer','terminal'].includes(b.mode):['import','archive_pos','reconcile'].includes(b.mode)))fail('این عملیات در نقش آزمایشی مجاز نیست.',403);
+ if(b.mode==='terminal'?!roles.manage:['import','archive_pos'].includes(b.mode)?!roles.canImport:['receiving_accounts','resolve_transfer'].includes(b.mode)?!roles.salesFinance:!roles.bank)fail('مجوز این مرحله را ندارید.',403);
  const signature='sha256:'+await sha256(new TextEncoder().encode(JSON.stringify(b))),prior:any=await db.prepare('SELECT actor,payload FROM inventory_operations WHERE id=?').bind(b.id).first();
  if(prior){if(prior.actor!==u.userId||prior.payload!==signature)fail('شناسه قبلاً برای عملیات دیگری استفاده شده است.',409);const remaining=['import','reconcile'].includes(b.mode)?await bankEntities():[];return {saved:true,id:b.mode==='receiving_accounts'?b.agentId:b.terminalId||b.rowId||b.id,repeated:true,...(['import','reconcile'].includes(b.mode)?{reconciled:0,matched:0,pendingReady:remaining.filter(r=>r.type==='sales_bank_row'&&r.data.status==='pending'&&bankMatch(r,remaining).status==='ready').length}: {})};}
  const checks=await salesLock(db,b.id),all=await bankEntities(),writes=new Map<string,{id:string;type:string;data:any;old:any}>();checks.push(leadMemberGuard(db,b.id,members));
@@ -80,7 +111,7 @@ export async function applySalesBank(actor:Session,b:any){
   const index=all.findIndex(r=>r.id===id),r={id,type,data:next,revision:base?base.revision+1:1,created:base?.created||now,updated:now};if(index<0)all.push(r);else all[index]=r;return r;
  };
  const account=(id:string)=>{const a=all.find(r=>r.id===id&&approvedAccount(r));if(!a)fail('حساب بانکی ریالی تأییدشده لازم است.');guard('EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)',a.id,a.revision);return a;};
- let target=b.id,objectKey='',imported=0,skipped=0,matched=0,ignored=0,unresolved=0;const importedIds:string[]=[];
+ let target=b.id,objectKey='',imported=0,skipped=0,matched=0,ignored=0,unresolved=0,archived=false;
  if(b.mode==='receiving_accounts'){
   const agent=all.find(r=>r.type==='sales_agent'&&r.id===b.agentId&&r.data.active&&usesAssignedSalesAccounts(r.data.kind));
   if(!agent)fail('نماینده یا عامل فروش فعال را انتخاب کنید.');
@@ -94,26 +125,55 @@ export async function applySalesBank(actor:Session,b:any){
   if(b.revision!==(old?.revision||0))fail('نسخه اتصال پوز تغییر کرده؛ تازه‌سازی کنید.',409);
   const terminalCode=sreq(b.terminalCode,200),provider=sreq(b.provider,200),a=account(sreq(b.accountId)),agentId=sreq(b.agentId),agent=all.find(r=>r.id===agentId&&r.type==='sales_agent'&&r.data.kind!=='referrer');if(!agent)fail('خریدار معتبر لازم است.');
   const validFrom=sday(b.validFrom),validTo=b.validTo?sday(b.validTo):'';if(validTo&&validTo<validFrom||typeof b.active!=='boolean')fail('بازه و وضعیت اتصال پوز معتبر نیست.');
+  const serial=b.serial==null?old?.data.serial||'':sreq(b.serial,200);
+  if(!old&&!serial)fail('شماره سریال دستگاه پوز لازم است.');
+  const handedDay=b.handedDay?sday(b.handedDay):old?.data.handedDay||(!old?today:'');
+  if(handedDay&&(handedDay>today||old?.data.handedDay&&handedDay!==old.data.handedDay))fail('تاریخ واقعی تحویل نامعتبر است؛ تحویل ثبت‌شده قابل بازنویسی نیست.');
+  if(old?.data.returnedDay)fail('این پوز برگشت خورده است. برای تحویل دوباره، اتصال جدید ثبت کنید.',409);
+  if(!old&&agent.data.custodyRecall?.state==='open')fail('پرونده در حال جمع‌آوری امانت‌هاست.',409);
+  if(serial&&all.some(r=>(r.type==='sales_custody_item'||r.type==='sales_bank_terminal'&&(r.data.active||r.data.handedDay))&&r.id!==old?.id&&!r.data.returnedDay&&bankCode(r.data.serial||'')===bankCode(serial)))fail('دستگاه با همین سریال هنوز در امانت است.',409);
   const sameIdentity=old&&old.data.terminalCode===terminalCode&&old.data.provider===provider&&old.data.accountId===a.id&&old.data.agentId===agentId&&old.data.validFrom===validFrom;
   const closing=sameIdentity&&(!b.active||old.data.active&&validTo&&(!old.data.validTo||validTo<=old.data.validTo));
+  if(old?.data.handedDay&&!sameIdentity)fail('برای تغییر نماینده، حساب یا پایانه، اول امانت قبلی را برگشت بزنید و بعد ثبت تازه انجام دهید.',409);
   if(!agent.data.active&&!closing)fail('اتصال جدید یا تغییر مالک به خریدار فعال نیاز دارد؛ اتصال قبلی خریدار غیرفعال فقط قابل پایان دادن است.');
   if(old&&all.some(r=>r.type==='sales_bank_row'&&r.data.terminalId===old.id)&&[old.data.terminalCode!==terminalCode,old.data.provider!==provider,old.data.accountId!==a.id,old.data.agentId!==agentId,old.data.validFrom!==validFrom].some(Boolean))fail('مالک و شناسه اتصال دارای وصول قابل بازنویسی نیست؛ بازه قبلی را پایان دهید و اتصال جدید بسازید.');
   if(validTo&&old&&all.some(r=>r.type==='sales_bank_row'&&r.data.terminalId===old.id&&r.data.day>validTo))fail('پایان بازه قبل از وصول ثبت‌شده نباشد.');
-  if(b.active&&all.some(r=>r.type==='sales_bank_terminal'&&r.id!==old?.id&&r.data.active&&r.data.accountId===a.id&&bankCode(r.data.terminalCode)===bankCode(terminalCode)&&bankCode(r.data.provider)===bankCode(provider)&&r.data.validFrom<=(validTo||'9999-12-31')&&(!r.data.validTo||r.data.validTo>=validFrom)))fail('این ترمینال در بازه انتخاب‌شده اتصال فعال دیگری دارد.',409);
-  target=old?.id||b.id;put(target,'sales_bank_terminal',{terminalCode,provider,accountId:a.id,agentId,validFrom,validTo,active:b.active,notes:stxt(b.notes??'',2000)},old);
- }else if(b.mode==='import'){
+  if(b.active&&all.some(r=>r.type==='sales_bank_terminal'&&r.id!==old?.id&&(r.data.active||r.data.validTo)&&r.data.accountId===a.id&&bankCode(r.data.terminalCode)===bankCode(terminalCode)&&bankCode(r.data.provider)===bankCode(provider)&&r.data.validFrom<=(validTo||'9999-12-31')&&(!r.data.validTo||r.data.validTo>=validFrom)))fail('این ترمینال در بازه انتخاب‌شده اتصال فعال دیگری دارد.',409);
+  target=old?.id||b.id;put(target,'sales_bank_terminal',{...old?.data,terminalCode,serial,provider,bankName:a.data.title,accountId:a.id,agentId,handedDay,validFrom,validTo,active:b.active,notes:stxt(b.notes??'',2000)},old);
+ }else if(b.mode==='import'||b.mode==='archive_pos'){
   const a=account(sreq(b.accountId)),parsed=await parseOriginal(b),file=parsed!.file;
-  if(parsed!.report.kind!=='statement')fail('گزارش تراکنش پوز گردش حساب بانک نیست؛ فقط پیش‌نمایش آن مجاز است و وصول ایجاد نمی‌کند.');
-  const entries=normalizeBankRows(parsed!.report.rows),preview=normalizeBankRows(b.rows);
+  const source=b.mode==='archive_pos'?'pos':'bank',pos=source==='pos',report=parsed!.report;
+  if(report.kind!==(pos?'pos':'statement'))fail('نوع فایل با گردش حساب بانک یا گزارش پوز انتخاب‌شده یکسان نیست.');
+  const entries=pos?report.rows:normalizeBankRows(report.rows,b.emptyStatement===true),preview=pos?b.rows:normalizeBankRows(b.rows,b.emptyStatement===true);
+  const coverage=checkCoveredRows(b,entries),covered=coveredBankPeriods(all,source).get(a.id)||[];
   if(JSON.stringify(entries)!==JSON.stringify(preview))fail('پیش‌نمایش با ردیف‌های فایل اصلی یکسان نیست؛ فایل را دوباره بخوانید و تأیید کنید.',409);
-  const hash=await sha256(file.bytes),ids=new Set(all.filter(r=>r.type==='sales_bank_row'&&r.data.accountId===a.id).map(r=>r.data.bankId));
-  for(const [i,d] of entries.entries()){
-   if(ids.has(d.bankId)){const existing=all.find(r=>r.type==='sales_bank_row'&&r.data.accountId===a.id&&r.data.bankId===d.bankId)!;if(bankRowIdentity(existing.data)!==bankRowIdentity(d))fail('ردیف بانک با همین شناسه قبلاً با اطلاعات متفاوت وارد شده است: '+d.bankId,409);skipped++;continue;}
-   const row=put(b.id+':row:'+i,'sales_bank_row',{...d,accountId:a.id,statementId:b.id,status:d.direction==='in'?'pending':'ignored'});importedIds.push(row.id);imported++;
+  if(pos){
+   if(!coverage)fail('بازهٔ واقعی گزارش پوز لازم است.');
+   const period=coverage!;
+   const linked=all.filter(r=>r.type==='sales_bank_terminal'&&r.data.accountId===a.id&&(r.data.active||r.data.validTo)&&r.data.validFrom<=period.to&&(!r.data.validTo||r.data.validTo>=period.from));
+   const iban=bankCode(a.data.iban||'');
+   if(!linked.length)fail('برای حساب و بازهٔ انتخاب‌شده پایانهٔ پوز ثبت نشده است.');
+   if(entries.some(row=>(iban&&iban!==bankCode(row.iban))||!linked.some(r=>bankCode(r.data.terminalCode)===bankCode(row.terminalCode)&&r.data.validFrom<=row.day&&(!r.data.validTo||r.data.validTo>=row.day))))fail('شبا یا پایانهٔ بعضی ردیف‌ها با حساب مقصد و تاریخ تراکنش منطبق نیست.');
   }
-  objectKey='private/sales-bank/'+b.id+'/'+crypto.randomUUID()+'/'+hash+'.'+file.format;
-  put(b.id,'sales_bank_statement',{accountId:a.id,currency:'IRR',filename:file.filename,sha256:hash,byteSize:file.bytes.byteLength,objectKey,rowCount:entries.length,imported,skipped,from:entries.map(r=>r.day).sort()[0],to:entries.map(r=>r.day).sort().at(-1),actor:u.userId,mapping:b.mapping,profile:b.profile||'manual',unit:b.unit||b.mapping?.unit,range:b.range});
-  await firmwareBucket().put(objectKey,file.bytes.buffer,{httpMetadata:{contentType:file.format==='xls'?'application/vnd.ms-excel':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'},customMetadata:{sha256:hash,filename:file.filename}});
+  const rowType=pos?'sales_bank_pos_row':'sales_bank_row';
+  const identity=(d:any)=>pos?JSON.stringify([bankCode(d.providerCode),bankCode(d.terminalCode),bankCode(d.reference)]):d.bankId;
+  const contents=(d:any)=>pos?JSON.stringify(['day','financialDay','iban','tracking','serial','time','gross','paid','fee','net','paymentId'].map(key=>d[key])):bankRowIdentity(d);
+  const hash=await sha256(file.bytes),existingRows=new Map(all.filter(r=>r.type===rowType&&r.data.accountId===a.id).map(r=>[identity(r.data),r]));
+  for(const [i,d] of entries.entries()){
+   const key=identity(d),existing=existingRows.get(key);
+   if(existing){if(contents(existing.data)!==contents(d))fail('این تراکنش قبلاً با اطلاعات متفاوت وارد شده است.',409);skipped++;continue;}
+   existingRows.set(key,{data:d});
+   put(b.id+':row:'+i,rowType,{...d,accountId:a.id,statementId:b.id,...(pos?{}:{status:d.direction==='in'?'pending':'ignored'})});imported++;
+  }
+  const newCoverage=coverage?uncoveredBankPeriods(coverage.from,coverage.to,covered):[];
+  if(imported||newCoverage.length){
+   archived=true;
+   const previous=all.find(r=>r.type==='sales_bank_statement'&&r.data.accountId===a.id&&(r.data.source||'bank')===source&&r.data.sha256===hash&&r.data.objectKey);
+   if(!previous)objectKey='private/sales-bank/'+b.id+'/'+crypto.randomUUID()+'/'+hash+'.'+file.format;
+   const days=entries.map(r=>r.day).sort();
+   put(b.id,'sales_bank_statement',{source,accountId:a.id,currency:'IRR',filename:file.filename,sha256:hash,byteSize:file.bytes.byteLength,objectKey:previous?.data.objectKey||objectKey,rowCount:entries.length,imported,skipped,from:coverage?.from||days[0],to:coverage?.to||days.at(-1),...(coverage?{coverageFrom:coverage.from,coverageTo:coverage.to,newCoverage}:{}),actor:u.userId,mapping:b.mapping,profile:b.profile||'manual',unit:b.unit||b.mapping?.unit,range:b.range});
+   if(objectKey)await firmwareBucket().put(objectKey,file.bytes.buffer,{httpMetadata:{contentType:file.format==='xls'?'application/vnd.ms-excel':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'},customMetadata:{sha256:hash,filename:file.filename}});
+  }
  }else if(b.mode==='reverse'){
   const row=all.find(r=>r.type==='sales_bank_row'&&r.id===b.rowId);if(!row)fail('ردیف بانک پیدا نشد.',404);if(row.revision!==b.revision)fail('نسخه ردیف تغییر کرده؛ تازه‌سازی کنید.',409);
   if(row.data.status!=='matched')fail('فقط ردیف تطبیق‌شده قابل برگشت است.');
@@ -155,5 +215,5 @@ export async function applySalesBank(actor:Session,b:any){
  if(inserts.length)stmts.push(db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) SELECT json_extract(value,'$.id'),json_extract(value,'$.type'),json_extract(value,'$.data'),1,?,? FROM json_each(?)").bind(now,now,JSON.stringify(inserts)));
  try{await db.batch([db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(b.id,'sales_bank_'+b.mode,signature,u.userId,now),...checks,...stmts,db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,target,'sales_bank_'+b.mode,JSON.stringify({mode:b.mode,signature,imported,skipped,matched,unresolved,ignored,reason:b.mode==='reverse'?b.reason:undefined}),now)]);}catch(e){if(objectKey)try{await firmwareBucket().delete(objectKey);}catch{/* Original remains private if cleanup is unavailable. */}throw e;}
  if(b.mode==='import')pendingReady=all.filter(r=>r.type==='sales_bank_row'&&r.data.status==='pending'&&bankMatch(r,all).status==='ready').length;
- return {saved:true,id:target,...(['import','reconcile','resolve_transfer'].includes(b.mode)?{imported,skipped,matched,reconciled:matched,pendingReady,unresolved,ignored}: {})};
+ return {saved:true,id:target,...(['import','archive_pos'].includes(b.mode)?{archived}:{}),...(['import','archive_pos','reconcile','resolve_transfer'].includes(b.mode)?{imported,skipped,matched,reconciled:matched,pendingReady,unresolved,ignored}: {})};
 }

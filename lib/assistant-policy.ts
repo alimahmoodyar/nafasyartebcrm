@@ -24,7 +24,7 @@ export function assistantToolAvailable(u:Session,name:string){
  if(name==='sales_lead_apply')return salesStaff(u);
  if(['sales_apply','preview_sales_order'].includes(name))return salesStaff(u)||salesFinance(u)||salesRep(u)||name==='sales_apply'&&salesWarehouse(u);
  if(name==='sales_network_apply')return salesStaff(u)||salesFinance(u)||salesRep(u);
- if(name==='sales_bank_apply')return salesManager(u)||salesFinance(u)||!salesRep(u)&&!!accessPermissions(u.permissions).treasuryWorkflowRoles?.includes('treasury');
+ if(name==='sales_bank_apply')return salesFinance(u)||!salesRep(u)&&!!accessPermissions(u.permissions).treasuryWorkflowRoles?.includes('treasury');
  if(['register_hospital_installation','save_hospital_service_contract','save_hospital_profile_template','save_hospital_service_kit','save_hospital_technical_profile','preview_hospital_periodic_quote'].includes(name)){const p=accessPermissions(u.permissions),internal=!p.hospitalCenterId&&!p.serviceAgentId&&!p.salesAgentId&&!p.serviceRoles?.includes('agent')&&!p.salesRoles?.includes('agent');return internal&&(u.isAdmin||domainWriteAccess({...u,permissions:p},'hospital')&&p.serviceRoles?.some(r=>(name==='preview_hospital_periodic_quote'?['manager','coordinator','technician','support']:['manager','coordinator']).includes(r)));}
  return true;
 }

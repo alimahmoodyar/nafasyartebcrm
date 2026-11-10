@@ -3,7 +3,7 @@ import {warehouseTarget} from './warehouse-workspace';
 import {mcpActor} from './mcp/context';
 import type {DispatchRow} from './warehouse-dispatch';
 import {transportCanSee} from './transport';
-import {roleProfiles,materialProfileWork,treasuryTestTarget,salesBankRowTarget,salesBankTestTarget,type ProfileWork} from './role-profiles';
+import {roleProfiles,materialProfileWork,treasuryTestTarget,salesBankRowTarget,salesBankTestTarget,bankGapTarget,bankTestGapTarget,type ProfileWork} from './role-profiles';
 import {coverage,nextWork} from './sourcing';
 import type {Session} from './permissions';
 import {rewardPeriods,salesRewardProgress} from './sales-rewards';
@@ -12,6 +12,8 @@ import {rial,salesAccounts,salesOrderProgress} from './sales-contract';
 import {shortageRoles,canActOnShortage,shortageStages,type Shortage} from './handoff-shortage';
 import {treasuryProfileTest,treasuryRows} from './treasury';
 import {bankEntities} from './sales-bank';
+import {bankCoverage,missingBankDays} from './sales-bank-coverage';
+import {formatDate} from './persian-date';
 import {bankAmbiguities} from './sales-bank-contract';
 import {runBankProfileTest} from './sales-bank-profile-test';
 
@@ -35,6 +37,16 @@ export async function profileWork(user:Session){
  if(profile.id==='finance-director'){
   const accounts=await treasuryProfileTest(user,treasuryRows);
   for(const account of accounts.filter(row=>row.data.state==='review'))work.push({id:account.id+':treasury-test',title:'تأیید حساب آزمایشی · '+account.data.title,section:'treasury',target:treasuryTestTarget+account.id,sourceId:account.id,state:'review'});
+ }
+ if(profile.id==='treasurer'){
+  const live=await bankEntities(),test=await runBankProfileTest(user,()=>bankEntities());
+  for(const [records,prefix] of [[live,bankGapTarget],[test,bankTestGapTarget]] as const){
+   for(const gap of missingBankDays(bankCoverage(records,dayAt()))){
+    const target=prefix+gap.accountId+':'+gap.day+':'+gap.source;
+    const kind=gap.source==='pos'?'پوز':'گردش حساب';
+    work.push({id:target,title:'اکسل '+kind+' دریافت‌نشده'+(prefix===bankTestGapTarget?' آزمایشی':'')+' · '+gap.title+' · '+formatDate(gap.day),section:'sales-bank',target,sourceId:target,state:'pending'});
+   }
+  }
  }
  if(profile.id==='sales-finance'){
   const live=await bankEntities(),test=await runBankProfileTest(user,()=>bankEntities());

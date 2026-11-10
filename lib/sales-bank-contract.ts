@@ -2,7 +2,7 @@ import {salesFail as fail,sreq,stxt,sday,money} from './sales';
 import {dayAt} from './duties';
 import {latinDigits} from './persian-date';
 
-export const salesBankModes=['terminal','import','reconcile','resolve_transfer','reverse','receiving_accounts'] as const;
+export const salesBankModes=['terminal','import','archive_pos','reconcile','resolve_transfer','reverse','receiving_accounts'] as const;
 export const MAX_SALES_BANK_BYTES=10*1024*1024;
 export const isApprovedReceivingAccount=(a:any)=>['treasury_account','sales_receiving_account'].includes(a.type)&&a.data.state==='active'&&a.data.kind==='bank'&&a.data.currency==='IRR';
 // Identifiers are strings: leading zeroes matter and punctuation is not interchangeable.
@@ -12,8 +12,8 @@ export function transferPaymentFits(row:any,payment:any){
  const d=row.data,p=payment.data,reference=bankCode(p.reference||'');
  return payment.type==='sales_payment'&&p.method==='bank'&&!p.openingId&&sameTransfer(d,{...p,accountId:p.receivingAccountId})&&(!reference||reference===bankCode(d.reference||''));
 }
-export function normalizeBankRows(input:unknown){
- if(!Array.isArray(input)||!input.length||input.length>500)fail('فایل باید بین ۱ تا ۵۰۰ ردیف بانکی داشته باشد؛ فایل بزرگ‌تر را به بازه‌های کوچک‌تر تقسیم کنید.');
+export function normalizeBankRows(input:unknown,allowEmpty=false){
+ if(!Array.isArray(input)||!allowEmpty&&!input.length||input.length>500)fail('فایل باید حداکثر ۵۰۰ ردیف بانکی داشته باشد. ثبت بدون تراکنش به بازهٔ تأییدشده نیاز دارد.');
  const seen=new Set<string>(),today=dayAt();
  return (input as any[]).map(raw=>{
   if(!raw||typeof raw!=='object'||Array.isArray(raw))fail('ردیف بانک معتبر نیست.');
