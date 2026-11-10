@@ -622,6 +622,7 @@ async function fundWithCollateral(quoted) {
   const rewardsRoute='/api/sales/rewards';
   const reward=(values={})=>({mode:'save',operation:crypto.randomUUID(),agentId:'buyer-snapshot',
     period:'quarter',year:1405,quarter:3,target:'2',targetProductId:'product',kind:'cash',rate:1000,...values});
+  seed('legacy-net-reward','sales_reward',{agentId:'buyer-snapshot',period:'quarter',year:1405,quarter:3,start:'2026-09-23',end:'2026-12-21',basis:'net',target:'1000',productIds:['product'],kind:'cash',rate:1000,state:'active'});
   const quarterReward=await post(rewardsApi,rewardsRoute,reward(),manager);
   const yearReward=await post(rewardsApi,rewardsRoute,reward({period:'year',kind:'equivalent',productId:'product',unitValue:'150'}),manager);
   await post(rewardsApi,rewardsRoute,reward(),manager,409);
@@ -637,7 +638,10 @@ async function fundWithCollateral(quoted) {
   await load('lib/sales-tasks.ts').syncSalesTasks();
   const financeTask=sql.prepare("SELECT data FROM duty_runs WHERE template_id=? AND assignee='finance' AND state='open'").get('sales:reward:'+quarterReward.id);
   assert.equal(JSON.parse(financeTask.data).sourceId,'sales-view:reward-quarter:'+quarterReward.id);
-  const ended=await financeRewards(),quarterPlan=ended.find(row=>row.id===quarterReward.id),yearPlan=ended.find(row=>row.id===yearReward.id);
+  const ended=await financeRewards();
+  assert.ok(ended.every(row=>row.data.basis==='units'));
+  assert.equal(sql.prepare('SELECT id FROM duty_runs WHERE template_id=?').get('sales:reward:legacy-net-reward'),undefined);
+  const quarterPlan=ended.find(row=>row.id===quarterReward.id),yearPlan=ended.find(row=>row.id===yearReward.id);
   assert.equal(quarterPlan.progress.result.value,'400');
   const {salesRewardProgress}=load('lib/sales-rewards.ts');
   const rewardInvoices=rows('sales_invoice');

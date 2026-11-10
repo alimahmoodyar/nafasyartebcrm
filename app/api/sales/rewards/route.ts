@@ -42,7 +42,7 @@ async function get(){
   const rows=await salesRows();
   const agents=rep?[await salesScope(user,user.permissions.salesAgentId!,'read')]:rows.filter(row=>row.type==='sales_agent');
   const ids=new Set(agents.filter(agent=>!rep||eligible(agent)).map(agent=>agent.id));
-  const rewards=rows.filter(row=>row.type==='sales_reward'&&ids.has(row.data.agentId)).map(row=>({...row,progress:salesRewardProgress(row,rows,today)}));
+  const rewards=rows.filter(row=>row.type==='sales_reward'&&row.data.basis==='units'&&ids.has(row.data.agentId)).map(row=>({...row,progress:salesRewardProgress(row,rows,today)}));
   const products=(await storage().prepare("SELECT id,payload FROM records WHERE kind='product' ORDER BY id").all<{id:string;payload:string}>()).results.map(({id,payload})=>({id,name:JSON.parse(payload).name||id}));
   return json({manager,finance,today,rewards,sample,agents:agents.map(agent=>({id:agent.id,name:agent.data.name,eligible:eligible(agent)})),products});
  }catch(error){return accessResponse(error)||json({error:'دریافت پاداش‌های فروش انجام نشد.'},503);}
@@ -85,7 +85,7 @@ export async function POST(request:Request){
    for(const product of new Set([...productIds,...(productId?[productId]:[])])){
     if(!await db.prepare("SELECT id FROM records WHERE kind='product' AND id=?").bind(sreq(product)).first())fail('کالا یافت نشد.');
    }
-   if(rows.some(row=>row.type==='sales_reward'&&row.id!==id&&row.data.agentId===agent.id&&row.data.period===period&&row.data.year===year&&row.data.quarter===quarter))fail('برای همین نماینده و دوره قبلاً هدف ثبت شده است.',409);
+   if(rows.some(row=>row.type==='sales_reward'&&row.data.basis==='units'&&row.id!==id&&row.data.agentId===agent.id&&row.data.period===period&&row.data.year===year&&row.data.quarter===quarter))fail('برای همین نماینده و دوره قبلاً هدف ثبت شده است.',409);
    data={agentId:agent.id,period,year,quarter,start,end,basis:'units',target:String(integer(Number(money(body.target,true)),1,1000000000)),productIds,kind:body.kind,productId,
     rate:body.kind==='fixed'?0:integer(body.rate,1,10000),quantity:body.kind==='fixed'?integer(body.quantity,1,100000):0,
     unitValue:body.kind==='equivalent'?money(body.unitValue,true):'0',state:'active'};
