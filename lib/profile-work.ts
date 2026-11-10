@@ -80,7 +80,7 @@ export async function profileWork(user:Session){
    const seen=new Set<string>();
    for(const delivery of await salesDelivery(own,[...buyerIds])){
     const mission=delivery.transport;
-    if(mission&&!seen.has(mission.id)&&['carrier','offered'].includes(mission.state)){seen.add(mission.id);addWork({id:mission.id,data:{state:mission.state}},'تأیید دریافت محموله '+mission.code,'transport',mission.id);}
+    if(mission&&!mission.awaitingWaybill&&!seen.has(mission.id)&&['carrier','offered'].includes(mission.state)){seen.add(mission.id);addWork({id:mission.id,data:{state:mission.state}},'تأیید دریافت محموله '+mission.code,'transport',mission.id);}
    }
   }
  }
