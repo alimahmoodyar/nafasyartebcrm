@@ -91,6 +91,14 @@ export async function profileWork(user:Session){
     if(follow.reasons.length&&follow.due<=dayAt())addWork(buyer,'پیگیری '+buyer.data.name+' · '+follow.reasons.join('؛ '),'sales','sales-view:calls:'+buyer.id);
    }
   }
+  if(profile.id==='sales-manager'){
+   const {readSalesCalls}=await import('./sales-calls');
+   const {withSalesCallSample}=await import('./sales-call-sample');
+   const callReview=await withSalesCallSample(user,()=>readSalesCalls(user));
+   for(const call of callReview.referrals.filter(row=>row.data.referral.state==='open')){
+    addWork(call,'رسیدگی به ارجاع تماس · '+call.data.name,'sales','sales-view:calls:referral:'+call.id);
+   }
+  }
   if(profile.id==='home-sales'){
    const today=dayAt(),deliveries=await salesDelivery(own,[...buyerIds]);
    for(const order of own.filter(row=>row.type==='sales_order'&&!['cancelled','rejected'].includes(row.data.state))){

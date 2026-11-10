@@ -615,5 +615,6 @@ button.hospital-network-option { cursor: pointer; }
 .sales-call-followup{margin-block:16px;padding:12px 16px;border:1px solid var(--input);border-radius:10px;min-inline-size:0}
 .sales-call-followup legend{padding-inline:6px;font-weight:600}
 .sales-call-followup-toggle{display:inline-flex;align-items:center;gap:8px;cursor:pointer}
+.sales-call-followup-toggle + .sales-call-followup-toggle{margin-inline-start:16px}
 .sales-call-followup-toggle input[type='checkbox']{inline-size:1.1em;block-size:1.1em;padding:0;margin:0;flex:none}
 .sales-call-followup>.formgrid,.sales-call-followup>.subtle{margin-block-start:8px}

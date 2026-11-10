@@ -6,7 +6,7 @@ type ProfileScope={id:string;buyerId?:string;missionId?:string};
 type Work={title:string;hint?:string;section?:string;target?:string};
 type TaskSummary={
  accountId:string;profileReview?:ProfileScope|null;positionWork:Work[];memberId:string;
- tasks:{assignee:string;state:string;data:{title:string};guidance?:{steps?:string[]}}[];
+ tasks:{assignee:string;state:string;data:{title:string;sourceSection?:string;sourceId?:string};guidance?:{steps?:string[]}}[];
 };
 type InboxSummary={accountId:string;me:string;threads:{kind:string;recipientType:string;isRecipient:boolean;unread:boolean}[]};
 
@@ -36,7 +36,7 @@ export function TaskNotifier({accountId,profile,onOpen}:{accountId:string;profil
     const {positionWork,tasks:personal,memberId}=taskSummary;
     setWork(profileId?positionWork:personal
      .filter(task=>!!memberId&&task.assignee===memberId&&['open','blocked'].includes(task.state))
-     .map(task=>({title:task.data.title,hint:task.guidance?.steps?.[0]})));
+     .map(task=>({title:task.data.title,hint:task.guidance?.steps?.[0],...(task.data.sourceSection==='sales'&&task.data.sourceId?.startsWith('sales-view:calls:')?{section:'sales',target:task.data.sourceId}:{})})));
    }else setWork([]);
    if(inbox.status==='fulfilled'&&inbox.value.data.accountId===accountId&&
     (profileId?inbox.value.data.me==='@profile:'+profileId:!inbox.value.data.me.startsWith('@profile:'))){

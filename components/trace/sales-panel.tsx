@@ -347,7 +347,10 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
   }else{setError('');if(['finance','settings','reports','terms'].includes(next)){setDraft(null);setQuote(null);setFile(null);}setView(next);}
  };
 
- if(directView==='calls'&&staff)return <SalesCallsPanel buyer={targetId.split(':').slice(2).join(':')} onNavigate={onNavigate}/>;
+ if(directView==='calls'&&staff){
+  const entry=targetId.slice('sales-view:calls'.length+1);
+  return <SalesCallsPanel buyer={entry.startsWith('referral:')?'':entry} referralId={entry.startsWith('referral:')?entry.slice('referral:'.length):''} onNavigate={onNavigate}/>;
+ }
  return <ProgramWorkspace programId="sales" direct={!!targetId} title="فروش" status={<>{error&&!draft&&<p className="notice error" role="alert">{error}</p>}{!data.orderSample&&!data.warehouseOnly&&(staff||finance)&&!writableAgents.length&&<p className="notice" role="status">نقش فروش شما فعال است؛ برای ثبت فروش، مدیر فروش باید از مسیر «فروش ← تنظیمات فروش ← تخصیص خریدار به کارشناس» خریدار موجود را به شما تخصیص دهد. مجوز مشاهده گزارش به‌تنهایی اختیار ثبت در پرونده همکاران را نمی‌دهد.</p>}</>}><section className={representativeDashboard?'panel sales-portal representative-dashboard':'panel sales-portal'} dir="rtl"><div className="panelhead"><h2>{representativeDashboard?'پنل نماینده فروش':openOrderList?'پیگیری سفارش‌ها':view==='orders'?'سفارش‌ها':representativeEntry?.view==='account'?'حساب و اعتبار نماینده':representativeEntry?.view==='returns'?'مرجوعی دستگاه':rep?'پرتال نماینده فروش':'فروش و نمایندگان'}</h2></div><div className="inside">
  {representativeDashboard&&rep&&<>
  <div className="representative-dashboard-actions" role="group" aria-label="اقدام‌های اصلی نماینده">
