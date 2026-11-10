@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),ts=require('typescript'),React=require('react');
-const root=path.resolve(__dirname,'..'),leaves={};let slots=[],cursor=0,effects=[],response,navigation=[],profileRequests=[];
+const root=path.resolve(__dirname,'..'),leaves={};let slots=[],cursor=0,effects=[],response,inboxResponse,navigation=[],profileRequests=[];
 const leaf=n=>leaves[n]||(leaves[n]=function Leaf(){}),react={...React,useState:init=>{const i=cursor++;if(!(i in slots))slots[i]=typeof init==='function'?init():init;return[slots[i],v=>slots[i]=typeof v==='function'?v(slots[i]):v]},useRef:init=>{const i=cursor++;if(!(i in slots))slots[i]={current:init};return slots[i]},useEffect:(fn,deps)=>{const i=cursor++,old=slots[i];if(!old||deps.some((v,j)=>v!==old[j]))effects.push(fn);slots[i]=deps}};
-function load(file){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(root,file),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText,{exports,require:n=>n==='react'?react:n==='react/jsx-runtime'?require(n):new Proxy({},{get:(_,key)=>leaf(key)}),fetch:async(url,options)=>{profileRequests.push({url,options});return {ok:true,json:async()=>response}},crypto:globalThis.crypto,Date,Intl,console,window:{addEventListener(){},removeEventListener(){},dispatchEvent(){}},Event,CustomEvent:class{},setTimeout,clearTimeout});return exports;}
+function load(file){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(root,file),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText,{exports,require:n=>n==='react'?react:n==='react/jsx-runtime'?require(n):new Proxy({},{get:(_,key)=>leaf(key)}),fetch:async(url,options)=>{profileRequests.push({url,options});return {ok:true,headers:{get:()=>null},json:async()=>url==='/api/inbox'?inboxResponse:response}},crypto:globalThis.crypto,Date,Intl,console,window:{addEventListener(){},removeEventListener(){},dispatchEvent(){}},Event,CustomEvent:class{},AbortController,document:{hidden:false,addEventListener(){},removeEventListener(){}},setInterval:()=>0,clearInterval(){},setTimeout,clearTimeout});return exports;}
 const nodes=x=>Array.isArray(x)?x.flatMap(nodes):React.isValidElement(x)?[x,...nodes(x.props.children)]:[],text=x=>Array.isArray(x)?x.map(text).join(''):React.isValidElement(x)?text(x.props.children):x==null?'':String(x);
 async function mount(render){slots=[];effects=[];render();for(let i=0;i<5;i++){for(const fn of effects.splice(0))fn();await new Promise(r=>setImmediate(r));render();}}
 const navigate=(...args)=>navigation.push(args),{RoleTestingPanel}=load('components/trace/role-testing-panel.tsx'),{TasksPanel}=load('components/trace/tasks-panel.tsx');
@@ -54,5 +54,20 @@ const renderInbox=()=>{cursor=0;return TasksPanel({demo:false,onNavigate:navigat
 await mount(renderInbox);
 assert.ok(nodes(renderInbox()).some(n=>n.type===leaves.SubprogramNavigation&&n.props.value==='inbox'),'Direct navigation opens the inbox tab for the role profile');
 assert.ok(nodes(renderInbox()).some(n=>n.type===leaves.DirectMessages));
+const {TaskNotifier}=load('components/trace/task-notifier.tsx');
+const scope={id:'home-sales'},callTarget='sales-view:calls:sample-buyer';
+response={accountId:'admin',profileReview:scope,positionWork:[{title:'تماس دوره‌ای',section:'sales',target:callTarget}],tasks:[]};
+inboxResponse={accountId:'admin',me:'@profile:home-sales',threads:[{kind:'message',recipientType:'person',isRecipient:true,unread:true}]};
+const renderNotice=()=>{cursor=0;return TaskNotifier({accountId:'admin',profile:scope,onOpen:navigate})};
+await mount(renderNotice);
+const noticeButtons=nodes(renderNotice()).filter(n=>n.type==='button');
+assert.equal(noticeButtons.length,2);
+noticeButtons[0].props.onClick();
+assert.deepEqual(navigation.pop(),['sales',callTarget]);
+noticeButtons[1].props.onClick();
+assert.deepEqual(navigation.pop(),['tasks','inbox']);
+const renderOtherNotice=()=>{cursor=0;return TaskNotifier({accountId:'admin',profile:{id:'central-store'},onOpen:navigate})};
+await mount(renderOtherNotice);
+assert.equal(renderOtherNotice(),null,'A different role cannot display the sales work or message count');
 console.log('PASS clear cartable entry for operational/personal profiles, no duplicate role queue, shared direct/process tabs, useful pending-QC empty state, exact domain task navigation.');
 })().catch(e=>{console.error(e);process.exitCode=1});

@@ -37,6 +37,7 @@ export function TasksPanel({demo,onNavigate,targetId='',roleSample=false}:{demo:
   else if(targetId.startsWith('receipt-note:'))setTab('receipt-notes');
   else setTab('mine');
  },[targetId]);
+ useEffect(()=>{const open=(event:Event)=>{const view=(event as CustomEvent).detail;if(view==='mine'||view==='inbox')setTab(view);};window.addEventListener('nafasyar-open-cartable-view',open);return()=>window.removeEventListener('nafasyar-open-cartable-view',open)},[]);
  useEffect(()=>{const open=()=>setTab('inbox-workflow');window.addEventListener('nafasyar-compose-message',open);return()=>window.removeEventListener('nafasyar-compose-message',open)},[]);
  useEffect(()=>{if(tab==='purchase-services'&&data?.canPurchaseServices!==true)setTab('mine');},[tab,data?.canPurchaseServices]);
  async function load(){if(demo)return;setLoading(true);try{let r=await fetch('/api/tasks',{cache:'no-store'}),d=await r.json() as any;if(!r.ok)throw new Error(d.error);if(d.isAdmin&&!d.starterInstalled){const install=await fetch('/api/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:crypto.randomUUID(),mode:'install_starter'})});const result=await install.json() as any;if(!install.ok)throw new Error(result.error||'تعریف برنامه‌های اولیه انجام نشد؛ تازه‌سازی کنید.');r=await fetch('/api/tasks',{cache:'no-store'});d=await r.json() as any;if(!r.ok)throw new Error(d.error);}setData(d)}catch(e){setData(null);setError((e as Error).message)}finally{setLoading(false)}}

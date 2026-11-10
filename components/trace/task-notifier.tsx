@@ -3,14 +3,14 @@ import {useEffect,useState} from 'react';
 import {Bell} from 'lucide-react';
 
 type ProfileScope={id:string;buyerId?:string;missionId?:string};
-type Work={title:string;hint?:string};
+type Work={title:string;hint?:string;section?:string;target?:string};
 type TaskSummary={
  accountId:string;profileReview?:ProfileScope|null;positionWork:Work[];memberId:string;
  tasks:{assignee:string;state:string;data:{title:string};guidance?:{steps?:string[]}}[];
 };
 type InboxSummary={accountId:string;me:string;threads:{kind:string;recipientType:string;isRecipient:boolean;unread:boolean}[]};
 
-export function TaskNotifier({accountId,profile,onOpen}:{accountId:string;profile?:ProfileScope;onOpen:(target?:string)=>void}){
+export function TaskNotifier({accountId,profile,onOpen}:{accountId:string;profile?:ProfileScope;onOpen:(section:string,target?:string)=>void}){
  const profileId=profile?.id||'',buyerId=profile?.buyerId||'',missionId=profile?.missionId||'';
  const [work,setWork]=useState<Work[]>([]),[messages,setMessages]=useState(0);
  useEffect(()=>{
@@ -56,6 +56,15 @@ export function TaskNotifier({accountId,profile,onOpen}:{accountId:string;profil
   };
  },[accountId,profileId,buyerId,missionId]);
  if(!work.length&&!messages)return null;
- const counts=work.length.toLocaleString('fa-IR')+' کار فرایندی باز · '+messages.toLocaleString('fa-IR')+' پیام مستقیم خوانده‌نشده';
- return <div className="task-nudge"><button className="link" onClick={()=>onOpen(work.length?'':'inbox')} title={work[0]?.title} aria-label={counts+'؛ باز کردن کارتابل'}><Bell size={18}/>{work[0]&&<span className="task-question">{work[0].title}{work[0].hint&&' · '+work[0].hint}</span>}<span>{counts}</span></button></div>;
+ const first=work[0];
+ return <div className="task-nudge">
+  {first&&<button type="button" className="link" onClick={()=>onOpen(first.section||'tasks',first.section?first.target:'mine')}
+   title={first.title} aria-label={'باز کردن کار فرایندی: '+first.title}>
+   <Bell size={18}/><span className="task-question">{first.title}{first.hint&&' · '+first.hint}</span>
+   <span>{work.length.toLocaleString('fa-IR')} کار فرایندی باز</span>
+  </button>}
+  {messages>0&&<button type="button" className="link" onClick={()=>onOpen('tasks','inbox')} aria-label="باز کردن پیام‌های مستقیم">
+   {!first&&<Bell size={18}/>}<span>{messages.toLocaleString('fa-IR')} پیام مستقیم خوانده‌نشده</span>
+  </button>}
+ </div>;
 }
