@@ -1,6 +1,7 @@
 export function needsSalesWaybill(mission:{kind?:string;salesAgentId?:string;inbound?:boolean;route?:string}){
  return mission.kind==='sale'&&!!mission.salesAgentId&&!mission.inbound&&mission.route==='carrier';
 }
+export const driverPreviewActions:ReadonlySet<string>=new Set(['checklist','collect','offer','carrier','documents']);
 export const transportRoles:Record<string,string>={manager:'مسئول تدارکات و حمل‌ونقل',driver:'کارشناس تدارکات و حمل‌ونقل'};
 export const transportBlockerReasons:Record<string,string>={recipient_absent:'گیرنده حضور ندارد',wrong_address:'نشانی اشتباه است',cargo_not_ready:'بار آماده نیست',vehicle_fault:'خودرو مشکل دارد',carrier_delay:'تأخیر باربری',other:'سایر موانع'};
 export const transportChecklistLabels:Record<string,string>={packagesChecked:'تعداد بسته با مأموریت تطبیق داده شد',itemsChecked:'محتویات و سریال‌ها با فهرست تطبیق داده شد',documentsChecked:'مدارک لازم برای این مرحله بررسی شد',conditionChecked:'وضعیت ظاهری بسته‌ها بررسی شد'};

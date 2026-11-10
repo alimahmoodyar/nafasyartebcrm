@@ -13,6 +13,11 @@ import {transportStates,transportRoles,transportBlockerReasons} from './transpor
 export const transportManager=(u:Session)=>u.isAdmin||!!u.permissions.transportRoles?.includes('manager');
 export const transportDriver=(u:Session)=>!!u.permissions.transportRoles?.includes('driver')||!!u.permissions.flowRoles?.includes('logistics');
 export const transportDriverPreview=(u:Session)=>u.profileReview?.id==='driver';
+export function transportDriverCanAct(u:Session,mission:{id:string;data:{driverId?:string}},member:string){
+ if(!transportDriver(u)||!mission.data.driverId)return false;
+ if(transportDriverPreview(u))return u.profileReview?.missionId===mission.id;
+ return member===mission.data.driverId;
+}
 export const transportFinancialRead=(u:Session)=>financialAccess(u,'transport');
 export const transportFinance=(u:Session)=>u.isAdmin||!isAgent(u)&&financialAccess(u,'transport',true);
 export const purchaseTransportRequester=(u:Session,s?:any)=>!isAgent(u)&&(!!u.permissions.supplyRoles?.includes('inventory')||!!u.permissions.supplyRoles?.includes(s?.data.route)||!s&&!!u.permissions.supplyRoles?.some(r=>['domestic','foreign'].includes(r)));
