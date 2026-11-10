@@ -605,3 +605,6 @@ button.hospital-network-option { cursor: pointer; }
 .sales-reward-progress progress::-webkit-progress-bar{background:#e7edf6}
 .sales-reward-progress progress::-webkit-progress-value{background:var(--rep-accent,#394ab4);border-radius:999px}
 .sales-reward-progress progress::-moz-progress-bar{background:var(--rep-accent,#394ab4);border-radius:999px}
+.representative-order-due{display:block}
+.representative-order-due[data-overdue="true"]{--rep-accent:#b42318;color:#b42318}
+.representative-order-due[data-overdue="true"] small{color:inherit}

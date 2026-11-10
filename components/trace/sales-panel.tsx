@@ -234,8 +234,13 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
  {representativeTracking&&visibleOrders.length>0&&<div className="representative-order-columns representative-order-column-labels" aria-hidden="true"><span>شماره سفارش</span><span>تاریخ</span><span>مبلغ</span><span>وضعیت</span>{representativeDashboard&&<span>وضعیت مالی</span>}<span/></div>}
  {visibleOrders.map((o:any)=>{const ds=data.deliveries.filter((s:any)=>s.orderId===o.id&&s.state!=='cancelled');const progress=pipeline.find((p:any)=>p.orderId===o.id);const invoice=representativeAccount?.invoices.find((item:any)=>item.id===o.data.invoiceId);
  const due=unpaidInstallment(invoice);
+ const dueTerm=due?Math.max(1,Math.round((Date.parse(due.due)-Date.parse(invoice.data.day))/86400000)||1):1;
+ const dueElapsed=due?Math.max(0,Math.min(dueTerm,dueTerm-due.days)):0;
  const financeSummary=invoice
-  ?rial(invoice.remaining)>BigInt(0)?<><span>ماندهٔ فاکتور {money(invoice.remaining)}</span>{due&&<small>سررسید {date(due.due)} · {dueLabel(due)}</small>}</>:<span>تسویه‌شده</span>
+  ?rial(invoice.remaining)>BigInt(0)?<><span>ماندهٔ فاکتور {money(invoice.remaining)}</span>{due&&<span className="sales-reward-progress representative-order-due" data-overdue={due.days<0}>
+   <small>سررسید {date(due.due)} · {dueLabel(due)}</small>
+   <progress max={dueTerm} value={dueElapsed} aria-label="مهلت پرداخت قسط" aria-valuetext={dueLabel(due)}/>
+  </span>}</>:<span>تسویه‌شده</span>
   :!o.data.invoiceId&&!ds.some((shipment:any)=>['in_transit','delivered','consignment_received'].includes(shipment.state))&&!['cancelled','rejected'].includes(o.data.state)&&o.data.deliveryMode!=='consignment'?<span>فاکتور صادر نشده</span>:null;
  const linkedReturns=relatedReturns.filter(row=>row.invoiceId&&row.invoiceId===o.data.invoiceId||ds.some((shipment:any)=>shipment.deviceIds?.includes(row.deviceId)));
  const heading=<h3>{o.data.code} · {agentName(o.data.agentId)} <span className="badge">{salesStates[o.data.state]}</span>{o.data.deliveryMode==='consignment'&&<span className="badge">امانی شعبه</span>}</h3>; const details=<><p>{progress&&<>{salesPipelineStages[progress.stage]} · {n(progress.daysSinceRequest)} روز از درخواست · {progress.late?'موعد تحویل گذشته است':'تحویل باقیمانده: '+n(progress.remaining)} · </>}{date(o.created)} · جمع خرید {money(o.data.amount)} · تخفیف {money(o.data.discount)} · مهلت پرداخت {n(o.data.termDays)} روز</p><p>موعد وعده داده‌شده: {date(o.data.promisedDay)} · {o.data.lines.every((l:any)=>ds.filter((s:any)=>s.productId===l.productId&&s.state==='delivered').reduce((v:number,s:any)=>v+s.count,0)>=l.quantity)?'تحویل کامل':ds.some((s:any)=>s.state==='in_transit'||s.state==='delivered')?'در حال ارسال / تحویل جزئی':ds.some((s:any)=>s.state==='reserved')?'رزرو انبار / آماده‌سازی':salesMilestones[o.data.milestone]} · {o.data.progressNote||''}</p>
