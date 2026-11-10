@@ -8,10 +8,13 @@ const nodes=x=>Array.isArray(x)?x.flatMap(nodes):React.isValidElement(x)?[x,...n
 const text=x=>Array.isArray(x)?x.map(text).join(''):React.isValidElement(x)?text(x.props.children):x==null?'':String(x);
 function render(initialBuyerId=''){cursor=0;return out.SalesBuyerDirectory({agents,members,initialBuyerId,createAction:React.createElement('button',{},'CREATE'),renderDossier:a=>{opened.push(a.id);return React.createElement('div',{'data-buyer':a.id},'PROFILE_'+a.id)}});}
 const field=label=>nodes(render()).find(n=>n.type==='label'&&text(n).startsWith(label));
-const change=(label,value)=>nodes(field(label)).find(n=>n.type==='select'||n.type==='NumberInput').props.onChange({target:{value}});
+const edit=(label,value)=>nodes(field(label)).find(n=>n.type==='select'||n.type==='NumberInput').props.onChange({target:{value}});
+const search=()=>{const form=nodes(render()).find(n=>n.type==='form'&&n.props.role==='search');assert.ok(nodes(form).find(n=>n.type==='button'&&n.props.type==='submit'&&text(n).includes('جست‌وجو')));form.props.onSubmit({preventDefault(){}})};
+const change=(label,value)=>{edit(label,value);search()};
 const cards=()=>nodes(render()).filter(n=>n.type==='article');
 const before=JSON.stringify(agents);
 assert.equal(cards().length,4);assert.deepEqual(opened,[],'Listing/searching does not open or mutate business records');
+edit('جست‌وجوی نام','باران');assert.equal(cards().length,4,'Draft search waits for the search button');search();assert.equal(cards().length,1);
 change('جست‌وجوی نام','علی کریمی');assert.equal(cards().length,1,'Persian/Arabic names match');assert.ok(text(cards()[0]).includes('علي كريمي'));
 change('جست‌وجوی نام','سولماز ابراهیم زاده');assert.equal(cards().length,4,'Search includes assigned expert and normalizes zero-width spaces');
 change('جست‌وجوی نام','۰۹۱۲۳۴۵۶۷۸۹');assert.equal(cards().length,4,'Persian phone digits match');
@@ -19,6 +22,7 @@ change('جست‌وجوی نام','');change('نوع خریدار','branch');ass
 change('نوع خریدار','');change('وضعیت پرونده','inactive');assert.equal(cards().length,1);change('وضعیت پرونده','');
 change('جست‌وجوی نام','باران');const open=nodes(cards()[0]).find(n=>n.type==='button');open.props.onClick();assert.ok(text(render()).includes('PROFILE_baran'));assert.equal(nodes(render()).filter(n=>n.type==='article').length,0,'Only selected dossier is shown');assert.ok(back,'Header back returns to directory');back();assert.equal(cards().length,1,'Back preserves directory search');
 change('جست‌وجوی نام','missing');assert.ok(text(render()).includes('پرونده‌ای پیدا نشد'));assert.equal(cards().length,0);
+nodes(render()).find(n=>n.type==='button'&&text(n)==='پاک کردن').props.onClick();assert.equal(cards().length,4);
 slots=[];render('baran');assert.ok(text(render('baran')).includes('PROFILE_baran'),'Existing selected buyer opens directly');agents=agents.filter(a=>a.id!=='baran');assert.ok(text(render()).includes('این پرونده در فهرست فعلی شما نیست'));assert.ok(!text(render()).includes('PROFILE_baran'),'Removed authority never renders stale dossier');
 agents=[];slots=[];assert.ok(text(render()).includes('پرونده‌ای در دسترسی شما نیست'));assert.deepEqual(JSON.stringify([row('baran','باران سلامت'),row('branch','شعبه اصفهان','branch'),row('consumer','علي كريمي','end_customer',false),row('referrer','معرف سلامت','referrer')]),before,'Filtering and opening preserve source records');
 console.log('PASS unified buyer directory: Persian name/expert/phone search, kind/status filters, selected dossier, retained search on back, direct selection, missing permission and empty states without mutations.');

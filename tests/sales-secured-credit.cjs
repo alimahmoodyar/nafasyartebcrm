@@ -26,7 +26,7 @@ const version=id=>entity(id).revision;
 async function upload(u=rep,extra={},status=201){const meta={id:crypto.randomUUID(),agentId:a,confirmed:true,title:'Evidence',...extra},form=new FormData();form.set('metadata',JSON.stringify(meta));form.set('file',new File(['%PDF-test'],'receipt.pdf'));const r=await context.run(u,()=>files.POST(new Request(base+'/api/sales/files',{method:'POST',headers:{origin:base},body:form})));const d=await r.json();assert.equal(r.status,status,JSON.stringify(d));return {...d,meta};}
 (async()=>{
  for(const u of [manager,staff,finance])member(u);
- const create={name:'Rep A',phone:'02112345678',contact:'Sales contact',province:'تهران',city:'تهران',address:'Address',contractRef:'C1',active:true,ownerId:'staff',financeId:'finance'};
+ const create={name:'نمایندگی آزمایشی سپهر',phone:'02112345678',contact:'Sales contact',province:'تهران',city:'تهران',address:'Address',contractRef:'C1',active:true,ownerId:'staff',financeId:'finance',managerId:'manager'};
  a=(await op('agent',{...create,agentId:''},manager)).id;
  b=(await op('agent',{...create,agentId:'',name:'Rep B'},manager)).id;
  rep=actor('rep',['agent'],{salesAgentId:a});other=actor('other',['agent'],{salesAgentId:b});member(rep);member(other);
@@ -77,6 +77,31 @@ async function upload(u=rep,extra={},status=201){const meta={id:crypto.randomUUI
   seed(did,'build',{state:'finished',receivedAt:now});
   sql.prepare("INSERT INTO inventory_balances(id,item_id,warehouse,quantity) VALUES(?,?,'finished',1000)").run(did+'@finished',did);
  }
+ const tasksApi=load('app/api/tasks/route.ts');
+ const taskPage=async u=>{const r=await context.run(u,()=>tasksApi.GET(request('/api/tasks')));assert.equal(r.status,200,await r.clone().text());return r.json();};
+ const worklist=async u=>(await taskPage(u)).tasks;
+ const sepehrQuote=await quote(1);
+ const sepehr=await op('order',{items:sepehrQuote.body.items,quoteHash:sepehrQuote.quoteHash},rep);
+ assert.equal(entity(sepehr.id).data.state,'submitted');
+ const orderLink='order:'+sepehr.id;
+ assert.ok((await worklist(manager)).some(t=>t.assignee==='manager'&&t.state==='open'&&t.data.sourceId===orderLink),'Manager worklist opens this submitted order');
+ assert.ok(!(await worklist(other)).some(t=>t.data.sourceId===orderLink),'Unrelated representative sees no task');
+ const homePreview=profileSession({...admin,userId:staff.userId},'home-sales',[]);
+ assert.ok((await taskPage(homePreview)).positionWork.some(work=>work.sourceId===sepehr.id&&work.target===orderLink),'Home sales profile worklist resolves to the saved order');
+ for(const role of [rep,staff,homePreview]){
+  const data=await get(role);
+  const matches=load('lib/buyer-search.ts').searchBuyers(data.agents.map(b=>({id:b.id,name:b.data.name})),'سپهر');
+  assert.equal(matches[0]?.id,a);
+  assert.ok(data.orders.some(o=>o.id===sepehr.id&&o.data.agentId===matches[0].id),'Buyer search and tracking resolve to the same saved order');
+  assert.ok(data.pipeline.some(o=>o.orderId===sepehr.id));
+ }
+ assert.ok(!(await get(other)).orders.some(o=>o.id===sepehr.id));
+ await op('order_review',{orderId:sepehr.id,revision:version(sepehr.id),approved:true},manager);
+ assert.ok(!(await worklist(manager)).some(t=>t.assignee==='manager'&&t.state==='open'&&t.data.sourceId===orderLink));
+ assert.ok((await worklist(finance)).some(t=>t.assignee==='finance'&&t.state==='open'&&t.data.sourceId===orderLink),'Finance receives the same order after approval');
+ await op('order_cancel',{orderId:sepehr.id,revision:version(sepehr.id)},rep);
+ assert.ok(!(await worklist(finance)).some(t=>t.state==='open'&&t.data.sourceId===orderLink));
+ console.log('PASS Sepehr: manager creates and assigns buyer, representative submits, home sales finds the saved order, manager and finance worklists link to the same order, another buyer cannot see it');
  const place=async(count)=>{const q=await quote(count,staff);return op('order',{items:q.body.items,quoteHash:q.quoteHash,requestSource:{channel:'phone',day:today}},staff);};
  const reserved=await place(1);
  assert.equal(entity(reserved.id).data.state,'sales_approved');
