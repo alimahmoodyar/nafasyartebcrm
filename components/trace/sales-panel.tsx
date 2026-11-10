@@ -47,7 +47,10 @@ const representativeEntries={
 
 export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:boolean;onNavigate:(s:string,target?:string)=>void}){
  const [credentials,setCredentials]=useState<{username:string;mobile:string;name:string}|null>(null);
- const [data,setData]=useState<any>(null),[selected,setSelected]=useState(''),[view,setView]=useState('home'),[error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[draft,setDraft]=useState<any>(null),[quote,setQuote]=useState<any>(null),[file,setFile]=useState<File|null>(null),[accounts,setAccounts]=useState<any[]>([]),[search,setSearch]=useState(''),[province,setProvince]=useState(''),[from,setFrom]=useState(''),[to,setTo]=useState(''),[stage,setStage]=useState('');
+ const [baseData,setData]=useState<any>(null),[selected,setSelected]=useState(''),[view,setView]=useState('home'),[error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[draft,setDraft]=useState<any>(null),[quote,setQuote]=useState<any>(null),[file,setFile]=useState<File|null>(null),[accounts,setAccounts]=useState<any[]>([]),[search,setSearch]=useState(''),[province,setProvince]=useState(''),[from,setFrom]=useState(''),[to,setTo]=useState(''),[stage,setStage]=useState('');
+ const emptyOrderFilters={buyer:'',province:'',stage:'',product:'',query:''};
+ const [orderFilters,setOrderFilters]=useState(emptyOrderFilters),[appliedOrderFilters,setAppliedOrderFilters]=useState(emptyOrderFilters);
+ const data=baseData?.orderSample&&view==='orders'&&(!targetId||targetId==='sales-view:orders')?{...baseData,...baseData.orderSample}:baseData;
  const [orderList,setOrderList]=useState<'open'|'history'>('open');
  const [orderProduct,setOrderProduct]=useState('');
  const [paymentView,setPaymentView]=useState<'open'|'history'>('open');
@@ -67,7 +70,7 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
    .catch(()=>{if(!controller.signal.aborted)setReturnsUnavailable(true);});
   return ()=>controller.abort();
  },[representativeDashboard,data]);
- async function load(){if(demo)return;const r=await fetch('/api/sales'+(targetId==='sales-view:orders'?'?orderPreview=1':''),{cache:'no-store'}),d=await r.json() as any;if(!r.ok){setData(null);setDraft(null);setQuote(null);throw Error(d.error)}setData(d.orderSample?{...d,...d.orderSample}:d);setError('');if(d.roles.manager){const a=await fetch('/api/sales/accounts',{cache:'no-store'});if(a.ok)setAccounts(((await a.json()) as any).accounts);}if(d.roles.agent&&d.agents[0])setSelected(d.agents[0].id);}
+ async function load(){if(demo)return;const r=await fetch('/api/sales?orderPreview=1',{cache:'no-store'}),d=await r.json() as any;if(!r.ok){setData(null);setDraft(null);setQuote(null);throw Error(d.error)}setData(d);setError('');if(d.roles.manager){const a=await fetch('/api/sales/accounts',{cache:'no-store'});if(a.ok)setAccounts(((await a.json()) as any).accounts);}if(d.roles.agent&&d.agents[0])setSelected(d.agents[0].id);}
  useEffect(()=>{if(!demo)void load().catch(e=>setError(e.message))},[demo]);
  useEffect(()=>{if(targetId&&!targetId.startsWith('sales-view:')&&!Object.hasOwn(representativeEntries,targetId)){if(targetId.startsWith('lead:')){setSelected('');setView('leads')}else if(targetId.startsWith('account:')){setSelected(targetId.slice('account:'.length));setView('account')}else if(targetId.startsWith('order:')){setSelected('');setView('orders')}else{setSelected(targetId);setView('orders')}}},[targetId]);
  const representativeEntry=data?.roles.agent&&Object.hasOwn(representativeEntries,targetId)
@@ -214,7 +217,7 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
   }catch{setError('ساخت خروجی اکسل سوابق پرداخت انجام نشد.');}
  }
  const representativeTracking=rep&&(targetId==='rep-orders'||representativeDashboard);
- const staffTracking=staff&&!rep&&targetId==='sales-view:orders';
+ const staffTracking=staff&&!rep&&view==='orders'&&(!targetId||targetId==='sales-view:orders');
  const openOrderList=representativeTracking||staffTracking;
  const orders=[...records('orders')].sort((a:any,b:any)=>b.created.localeCompare(a.created)||a.id.localeCompare(b.id));
  const orderStages=new Map<string,string>(pipeline.map((progress:any)=>[progress.orderId,progress.stage]));
@@ -227,7 +230,17 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
   if(openOrderList){
    const closed=closedStages.has(orderStages.get(order.id)||order.data.state);
    if(closed!==(orderList==='history'))return false;
-   if(orderProduct&&!order.data.lines.some((line:any)=>line.productId===orderProduct))return false;
+   const product=staffTracking?appliedOrderFilters.product:orderProduct;
+   if(product&&!order.data.lines.some((line:any)=>line.productId===product))return false;
+   if(staffTracking){
+    const f=appliedOrderFilters,buyer=data.agents.find((a:any)=>a.id===order.data.agentId);
+    const progress=orderStages.get(order.id);
+    if(f.buyer&&f.buyer!==order.data.agentId||f.province&&f.province!==buyer?.data.province)return false;
+    const selectedStage=f.stage||stage; if(selectedStage&&(selectedStage==='late'?!pipeline.some((row:any)=>row.orderId===order.id&&row.late):progress!==selectedStage))return false;
+    const normalize=(value:string)=>value.toLowerCase().replace(/[۰-۹٠-٩]/g,c=>String(c.charCodeAt(0)%16)).replace(/ي/g,'ی').replace(/ك/g,'ک').trim();
+    const fields=[order.data.code,buyer?.data.name,order.data.customerReference].filter(Boolean).map((x:string)=>normalize(x)).join(' ');
+    return fields.includes(normalize(f.query));
+   }
   }else if(stage&&!pipeline.some((progress:any)=>progress.orderId===order.id&&(stage==='late'?progress.late:progress.stage===stage)))return false;
   return (order.data.code+' '+agentName(order.data.agentId)+' '+(order.data.customerReference||'')).includes(search);
  });
@@ -236,13 +249,20 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
    <button type="button" className={orderList==='open'?'btn primary':'btn'} aria-pressed={orderList==='open'} onClick={()=>setOrderList('open')}><ClipboardList size={16} aria-hidden="true"/>سفارش‌های باز</button>
    <button type="button" className={orderList==='history'?'btn primary':'btn'} aria-pressed={orderList==='history'} onClick={()=>setOrderList('history')}><History size={16} aria-hidden="true"/>سوابق سفارش‌ها</button>
   </div>
-  <label className="field"><span className="representative-order-search-label"><Search size={16} aria-hidden="true"/>جست‌وجو بر اساس کالا</span>
+  {!staffTracking&&<label className="field"><span className="representative-order-search-label"><Search size={16} aria-hidden="true"/>جست‌وجو بر اساس کالا</span>
    <select value={orderProduct} onChange={e=>setOrderProduct(e.target.value)}>
     <option value="">همه کالاها</option>
     {[...productsInOrders].sort((a,b)=>a[1].localeCompare(b[1],'fa')).map(([id,name])=><option key={id} value={id}>{name}</option>)}
    </select>
-  </label>
- {staffTracking&&<label className="field">جست‌وجوی سفارش<NumberInput fieldKey="search" value={search} onChange={e=>setSearch(e.target.value)}/></label>}
+  </label>}
+  {staffTracking&&<form className="sales-order-filters" onSubmit={event=>{event.preventDefault();setAppliedOrderFilters({...orderFilters})}}>
+   <label className="field">نماینده یا خریدار<select value={orderFilters.buyer} onChange={event=>setOrderFilters({...orderFilters,buyer:event.target.value})}><option value="">همه نمایندگان</option>{data.agents.map((a:any)=><option key={a.id} value={a.id}>{a.data.name}</option>)}</select></label>
+   <label className="field">استان<select value={orderFilters.province} onChange={event=>setOrderFilters({...orderFilters,province:event.target.value})}><option value="">همه استان‌ها</option>{Array.from(new Set<string>(data.agents.map((a:any)=>a.data.province).filter(Boolean))).map(name=><option key={name}>{name}</option>)}</select></label>
+   <label className="field">مرحله سفارش<select value={orderFilters.stage} onChange={event=>setOrderFilters({...orderFilters,stage:event.target.value})}><option value="">همه مراحل</option>{Object.entries(salesPipelineStages).map(([key,label])=><option key={key} value={key}>{label}</option>)}<option value="late">تحویل عقب‌افتاده</option></select></label>
+   <label className="field">کالا<select value={orderFilters.product} onChange={event=>setOrderFilters({...orderFilters,product:event.target.value})}><option value="">همه کالاها</option>{[...productsInOrders].map(([key,name])=><option key={key} value={key}>{name}</option>)}</select></label>
+   <label className="field">جست‌وجوی سفارش<input value={orderFilters.query} placeholder="شماره سفارش، نام خریدار یا مرجع سفارش" onChange={event=>setOrderFilters({...orderFilters,query:event.target.value})}/></label>
+   <div className="tools"><button className="btn primary" type="submit"><Search size={16} aria-hidden="true"/> جستجو</button><button className="btn" type="button" onClick={()=>{setOrderFilters(emptyOrderFilters);setAppliedOrderFilters(emptyOrderFilters);setSelected('');setProvince('');setStage('');setSearch('')}}>پاک کردن فیلترها</button></div>
+  </form>}
  </div>;
  const ordersPage=<>{!data.warehouseOnly&&view==='orders'&&<>{data.orderSample&&<p className="notice">پیش‌نمایش با سفارش‌های آزمایشی</p>}{openOrderList?representativeOrderToolbar:
   <div className="sales-order-toolbar">
@@ -281,7 +301,7 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
    <div className="representative-order-detail"><h3>شناسنامهٔ سفارش</h3>{details}</div>
   </details>
   :<article className="flow-card" key={o.id}>{heading}{details}</article>;
- })}{!visibleOrders.length&&<p className="empty">{representativeTracking&&!search&&!orderProduct?(orderList==='open'?'سفارش بازی ندارید.':'سفارش بسته‌شده‌ای ندارید.'):'سفارشی مطابق فیلتر پیدا نشد.'}</p>}</>}
+ })}{!visibleOrders.length&&<p className="empty">{openOrderList&&!search&&!orderProduct&&!Object.values(appliedOrderFilters).some(Boolean)?(orderList==='open'?'سفارش بازی ندارید.':'سفارش بسته‌شده‌ای ندارید.'):'سفارشی مطابق فیلتر پیدا نشد.'}</p>}</>}
 </>;
  const returnsPage=<> {(data.warehouseOnly||view==='returns')&&<>{!data.warehouseOnly&&(rep||staff)&&action('return_request','درخواست برگشت')}<button className="btn" onClick={()=>onNavigate('sales-returns')}>کارتابل مرجوعی دستگاه</button><p className="notice">برای هر سریال یک درخواست ثبت کنید. خدمات پس از فروش ابتدا درخواست را بررسی می‌کند.</p>{(data.warehouseOnly?data.returns:acs.flatMap((a:any)=>a.returns)).filter((r:any)=>agentIds.has(r.data.agentId)&&!r.data.workflowVersion).map((r:any)=><article className="flow-card" key={r.id}><h3>{agentName(r.data.agentId)} · {salesStates[r.data.state]}</h3><p>{r.data.serials.join('، ')} · {r.data.reason}</p>{!data.warehouseOnly&&<p>{money(r.data.amount)}</p>}<IconActions inline scope="sales-panel-actions-36a7e8c630">{data.roles.warehouse&&r.data.state==='requested'&&action('return_receive','ثبت دریافت فیزیکی',{agentId:r.data.agentId,returnId:r.id,revision:r.revision,physicallyReceived:false})}{finance&&['requested','returned'].includes(r.data.state)&&action('return_review',r.data.state==='returned'?'تأیید اعتبار برگشت':'رد درخواست برگشت',{agentId:r.data.agentId,returnId:r.id,revision:r.revision,approved:r.data.state==='returned'})}</IconActions>{!data.warehouseOnly&&history(r)}</article>)}</>}
 </>;
@@ -295,7 +315,7 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
  };
 
  if(directView==='calls'&&staff)return <SalesCallsPanel buyer={targetId.split(':').slice(2).join(':')} onNavigate={onNavigate}/>;
- return <ProgramWorkspace programId="sales" direct={!!targetId} title="فروش" status={<>{error&&!draft&&<p className="notice error" role="alert">{error}</p>}{!data.orderSample&&!data.warehouseOnly&&(staff||finance)&&!writableAgents.length&&<p className="notice" role="status">نقش فروش شما فعال است؛ برای ثبت فروش، مدیر فروش باید از مسیر «فروش ← تنظیمات فروش ← تخصیص خریدار به کارشناس» خریدار موجود را به شما تخصیص دهد. مجوز مشاهده گزارش به‌تنهایی اختیار ثبت در پرونده همکاران را نمی‌دهد.</p>}</>}><section className={representativeDashboard?'panel sales-portal representative-dashboard':'panel sales-portal'} dir="rtl"><div className="panelhead"><h2>{representativeDashboard?'پنل نماینده فروش':representativeTracking?'پیگیری سفارش‌ها':view==='orders'?'سفارش‌ها':representativeEntry?.view==='account'?'حساب و اعتبار نماینده':representativeEntry?.view==='returns'?'مرجوعی دستگاه':rep?'پرتال نماینده فروش':'فروش و نمایندگان'}</h2></div><div className="inside">
+ return <ProgramWorkspace programId="sales" direct={!!targetId} title="فروش" status={<>{error&&!draft&&<p className="notice error" role="alert">{error}</p>}{!data.orderSample&&!data.warehouseOnly&&(staff||finance)&&!writableAgents.length&&<p className="notice" role="status">نقش فروش شما فعال است؛ برای ثبت فروش، مدیر فروش باید از مسیر «فروش ← تنظیمات فروش ← تخصیص خریدار به کارشناس» خریدار موجود را به شما تخصیص دهد. مجوز مشاهده گزارش به‌تنهایی اختیار ثبت در پرونده همکاران را نمی‌دهد.</p>}</>}><section className={representativeDashboard?'panel sales-portal representative-dashboard':'panel sales-portal'} dir="rtl"><div className="panelhead"><h2>{representativeDashboard?'پنل نماینده فروش':openOrderList?'پیگیری سفارش‌ها':view==='orders'?'سفارش‌ها':representativeEntry?.view==='account'?'حساب و اعتبار نماینده':representativeEntry?.view==='returns'?'مرجوعی دستگاه':rep?'پرتال نماینده فروش':'فروش و نمایندگان'}</h2></div><div className="inside">
  {representativeDashboard&&rep&&<>
  <div className="representative-dashboard-actions" role="group" aria-label="اقدام‌های اصلی نماینده">
   <button type="button" className="btn primary" disabled={!writableAgents.length} onClick={()=>begin('order')}><ShoppingCart aria-hidden="true"/><span>ثبت درخواست خرید</span></button>
