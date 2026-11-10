@@ -16,16 +16,16 @@ const eligible=(agent:any)=>agent.data.active&&['representative','reseller'].inc
 async function seedRewardPreview(agentId:string,today:string){
  const {year,month}=solarParts(today),quarter=Math.ceil(month/3),now=new Date().toISOString(),db=storage();
  const plans=[
-  {period:'quarter',quarter,target:'10',netTarget:'100000000',kind:'cash',rate:200,unitValue:'0',productId:''},
-  {period:'year',quarter:0,target:'30',netTarget:'300000000',kind:'equivalent',rate:300,unitValue:'10000000',productId:'training-product-1'},
+  {period:'quarter',quarter,target:'10',kind:'cash',rate:200,unitValue:'0',productId:''},
+  {period:'year',quarter:0,target:'30',kind:'equivalent',rate:300,unitValue:'10000000',productId:'training-product-1'},
  ];
  const missing=[];
  for(const plan of plans){
   const id=agentId+':reward-demo:'+year+':'+plan.quarter;
   const existing=await db.prepare('SELECT data FROM flow_entities WHERE id=?').bind(id).first<{data:string}>();
-  if(existing&&JSON.parse(existing.data).netTarget)continue;
+  if(existing&&JSON.parse(existing.data).basis==='units')continue;
   const data={...plan,...salesRewardDates(year,plan.quarter),year,agentId,basis:'units',productIds:['training-product-1'],quantity:0,state:'active'};
-  missing.push(db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'sales_reward',?,1,?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data,revision=flow_entities.revision+1,updated=excluded.updated WHERE json_extract(flow_entities.data,'$.netTarget') IS NULL").bind(id,JSON.stringify(data),now,now));
+  missing.push(db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'sales_reward',?,1,?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data,revision=flow_entities.revision+1,updated=excluded.updated WHERE json_extract(flow_entities.data,'$.basis')='net'").bind(id,JSON.stringify(data),now,now));
  }
  if(missing.length)await db.batch(missing);
 }
@@ -81,13 +81,12 @@ export async function POST(request:Request){
    const {start,end}=salesRewardDates(year,quarter);
    if(!['cash','fixed','equivalent'].includes(body.kind))fail('نوع پاداش معتبر نیست.');
    const productIds=[sreq(body.targetProductId)];
-   const netTarget=money(body.netTarget,true);
    const productId=body.kind==='cash'?'':sreq(body.productId);
    for(const product of new Set([...productIds,...(productId?[productId]:[])])){
     if(!await db.prepare("SELECT id FROM records WHERE kind='product' AND id=?").bind(sreq(product)).first())fail('کالا یافت نشد.');
    }
    if(rows.some(row=>row.type==='sales_reward'&&row.id!==id&&row.data.agentId===agent.id&&row.data.period===period&&row.data.year===year&&row.data.quarter===quarter))fail('برای همین نماینده و دوره قبلاً هدف ثبت شده است.',409);
-   data={agentId:agent.id,period,year,quarter,start,end,basis:'units',target:String(integer(Number(money(body.target,true)),1,1000000000)),netTarget,productIds,kind:body.kind,productId,
+   data={agentId:agent.id,period,year,quarter,start,end,basis:'units',target:String(integer(Number(money(body.target,true)),1,1000000000)),productIds,kind:body.kind,productId,
     rate:body.kind==='fixed'?0:integer(body.rate,1,10000),quantity:body.kind==='fixed'?integer(body.quantity,1,100000):0,
     unitValue:body.kind==='equivalent'?money(body.unitValue,true):'0',state:'active'};
   }else{
