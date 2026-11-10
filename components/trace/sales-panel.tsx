@@ -140,6 +140,8 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
  </>}
 </>;
  const representativeAccount=representativeDashboard?acs[0]:undefined;
+ const netBalance=representativeAccount?rial(representativeAccount.balance):null;
+ const hasReceivable=netBalance!==null&&netBalance<BigInt(0);
  const unpaidInstallment=(invoice:any)=>invoice?.installments?.filter((part:any)=>rial(part.remaining)>BigInt(0)).sort((a:any,b:any)=>a.due.localeCompare(b.due))[0];
  const outstandingDue=representativeAccount?.invoices.flatMap((invoice:any)=>unpaidInstallment(invoice)||[]).sort((a:any,b:any)=>a.due.localeCompare(b.due))[0];
  const dueLabel=(part:any)=>part.days<0?n(-part.days)+' روز معوق':part.days===0?'امروز':n(part.days)+' روز مانده';
@@ -255,7 +257,7 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
  return <ProgramWorkspace programId="sales" direct={!!targetId} title="فروش" status={<>{error&&!draft&&<p className="notice error" role="alert">{error}</p>}{!data.warehouseOnly&&(staff||finance)&&!writableAgents.length&&<p className="notice" role="status">نقش فروش شما فعال است؛ برای ثبت فروش، مدیر فروش باید از مسیر «فروش ← تنظیمات فروش ← تخصیص خریدار به کارشناس» خریدار موجود را به شما تخصیص دهد. مجوز مشاهده گزارش به‌تنهایی اختیار ثبت در پرونده همکاران را نمی‌دهد.</p>}</>}><section className={representativeDashboard?'panel sales-portal representative-dashboard':'panel sales-portal'} dir="rtl"><div className="panelhead"><h2>{representativeDashboard?'پنل نماینده فروش':representativeTracking?'پیگیری سفارش‌ها':view==='orders'?'سفارش‌ها':representativeEntry?.view==='account'?'حساب و اعتبار نماینده':representativeEntry?.view==='returns'?'مرجوعی دستگاه':rep?'پرتال نماینده فروش':'فروش و نمایندگان'}</h2></div><div className="inside">
  {representativeDashboard&&rep&&<><div className="representative-account-strip">
   <dl>
-   <div><dt>مانده بدهی</dt><dd>{representativeAccount?money(representativeAccount.debt):'—'}</dd></div>
+   <div><dt>{hasReceivable?'مانده طلب':netBalance===BigInt(0)?'مانده حساب':'مانده بدهی'}</dt><dd>{netBalance===null?'—':money(hasReceivable?-netBalance:netBalance)}</dd></div>
    <div><dt>اعتبار قابل استفاده</dt><dd>{acs[0]?.securedCredit?money(acs[0].securedCredit.available):'—'}</dd></div>
   {outstandingDue&&<div><dt>اولین سررسید باز</dt><dd>{date(outstandingDue.due)}</dd><small>{dueLabel(outstandingDue)}</small></div>}
   </dl>
