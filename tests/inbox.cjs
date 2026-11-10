@@ -88,8 +88,14 @@ let chain=Promise.resolve();const batch=db.batch.bind(db);db.batch=s=>{const p=c
  assert.ok(representativeDirectory.data.people.some(p=>p.id==='@profile:logistics'));
  assert.ok(representativeDirectory.data.people.some(p=>p.id==='@profile:home-service'));
  assert.ok(!representativeDirectory.data.people.some(p=>p.id==='@profile:quality'));
+ assert.ok(!representativeDirectory.data.people.some(p=>['@profile:hospital-sales','@profile:hospital-service'].includes(p.id)));
  const representativeMessage={id:crypto.randomUUID(),mode:'create',recipientType:'person',recipientId:'@profile:logistics',kind:'message',priority:'normal',title:'Preview message',body:'Preview only',expectedMailbox:representativeDirectory.data.me};
  assert.equal((await post(representativePreview,{...representativeMessage,recipientId:'@profile:quality'})).status,400);
+ const hospitalPreview=profileSession(admin,'hospital-sales',[]);
+ const previousHospitalMessage=await post(hospitalPreview,{...representativeMessage,id:crypto.randomUUID(),expectedMailbox:'@profile:hospital-sales',recipientId:representativeDirectory.data.me});
+ assert.equal(previousHospitalMessage.status,200);
+ assert.equal((await get(representativePreview,previousHospitalMessage.data.threadId)).status,200);
+ assert.equal((await act(representativePreview,previousHospitalMessage.data.threadId,'reply')).status,403);
  assert.equal((await post(representativePreview,representativeMessage)).status,200);
  assert.equal((await get(admin,representativeMessage.id)).status,404);
  const storeBox=(await get(store,'','&view=directory')).data;

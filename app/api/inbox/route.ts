@@ -38,7 +38,13 @@ export async function POST(request:Request){try{checkOrigin(request);const u=awa
    if(mode==='convert'){if(d.kind!=='message')fail('قبلاً درخواست کاری است.');d.kind='request';d.due=due(b.due);body=required(b.body,12000);}
    if(mode==='reschedule'){if(d.kind!=='request')fail('فقط درخواست کاری مهلت دارد.');d.due=due(b.due);body=required(b.body,12000);}
    if(mode==='close'){if(d.kind!=='message')fail('درخواست کاری باید اعلام انجام و تأیید شود.');d.state='closed';body=required(b.body,12000);}
-   if(mode==='reply')body=required(b.body,12000);
+   if(mode==='reply'){
+    if(d.kind==='message'&&d.recipientType==='person'&&(u.permissions.salesAgentId||u.profileReview?.id==='sales-representative')){
+     const peer=t.isSender?d.recipientId:d.sender;
+     if(!(await inboxDirectory(u)).people.some(contact=>contact.id===peer))fail('این مخاطب برای ارسال پیام در دسترس نیست.',403);
+    }
+    body=required(b.body,12000);
+   }
    if(d.recipientType==='position'&&t.isRecipient&&!t.isSender)guard("EXISTS(SELECT 1 FROM flow_entities p,json_each(p.data,'$.members') m WHERE p.id=? AND p.type='position' AND json_extract(p.data,'$.active')=1 AND m.value=?)",d.recipientId,me);
   }
   if(d.kind==='message'&&d.recipientType==='person')d.lastMessage=body.slice(0,160);

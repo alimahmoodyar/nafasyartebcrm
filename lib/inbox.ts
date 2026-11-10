@@ -11,7 +11,7 @@ export const inboxDecode=(r:any)=>r?({...r,data:JSON.parse(r.data)}):null;
 export async function inboxIdentity(u:Session){const id=await memberId(u);if(id)return id;if(u.isAdmin||u.profileReview)return '@owner';throw new AccessError('حساب فعال برای مکاتبه یافت نشد.',403);}
 // Operational notices still use the authenticated account. Interactive previews use a separate mailbox.
 const profileAddress=(id:string)=>'@profile:'+id;
-const representativeInboxProfiles=new Set(['sales','home-sales','hospital-sales','sales-manager','sales-finance','logistics','home-service','hospital-service']);
+const representativeInboxProfiles=new Set(['sales','home-sales','sales-manager','sales-finance','logistics','home-service']);
 export async function requireInboxAccess(){
  const user=await session();
  if(user.permissions.hospitalCenterId)throw new AccessError('این حساب فقط به پنل مرکز بیمارستانی دسترسی دارد.',403);
@@ -34,8 +34,10 @@ export async function accountInboxDirectory(u:Session){const me=await inboxIdent
   users=users.filter(r=>{
    const p=storedAccessPermissions(r.permissions),actor={isAdmin:false,permissions:p} as Session;
    if(p.salesAgentId||p.serviceAgentId||p.hospitalCenterId)return false;
-   return salesStaff(actor)||salesFinance(actor)||p.transportRoles?.includes('manager')||
-    p.serviceRoles?.some(role=>['manager','coordinator','support','intake'].includes(role));
+   const roles=p.roleAssignment?.roles;
+   const hospitalSalesOnly=roles?.includes('hospital_sales')&&!roles.some(role=>['sales','home_sales','sales_manager','sales_manager_assistant'].includes(role));
+   return salesStaff(actor)&&!hospitalSalesOnly||salesFinance(actor)||p.transportRoles?.includes('manager')||
+    p.serviceDomains?.includes('home')&&p.serviceRoles?.some(role=>['manager','coordinator','support','intake'].includes(role));
   });
  }
  const photoUrl=(id:string)=>'/api/inbox?avatar='+encodeURIComponent(id);
