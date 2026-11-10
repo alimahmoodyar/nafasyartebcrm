@@ -593,3 +593,9 @@ button.hospital-network-option { cursor: pointer; }
 @media(max-width:780px){.representative-dashboard .representative-order-column-labels{display:none}.representative-dashboard .representative-order-row summary{grid-template-columns:1fr 1fr}.representative-dashboard .representative-order-chevron{display:none}}
 
 .representative-payment-status{display:inline-flex;align-items:center;gap:6px}.representative-payment-status[data-tone="confirmed"]{color:#146551}.representative-payment-status[data-tone="warning"]{color:#8a4708}
+
+.representative-rewards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:10px;margin-block:12px}
+.representative-rewards>div{padding:10px 12px;border:1px solid var(--rep-line);border-radius:10px}
+.representative-rewards h3{font-size:1rem;margin:0 0 4px}
+.representative-rewards .flow-card{border:0;background:none;margin:0;padding:0}
+.representative-rewards p{margin:3px 0}

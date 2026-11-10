@@ -4,13 +4,13 @@ type SalesNavigationContext={warehouseOnly?:boolean;roles:{agent?:boolean;staff?
 export function salesViewGroup(view:string,reportOnly=false){
  if(['reports','home','monitor','periodic'].includes(view)||reportOnly&&['orders','account','returns'].includes(view))return 'reports';
  if(['finance','new_payment','bank','account','opening'].includes(view))return 'finance';
- if(['settings','terms','targets','assignments','prices','resources','monitor_goals','monitor_settings'].includes(view))return 'settings';
+ if(['settings','terms','targets','assignments','prices','resources','reward-quarter','reward-year','monitor_goals','monitor_settings'].includes(view))return 'settings';
  return '';
 }
 
 export function directSalesView(target:string,context:SalesNavigationContext){
  if(!target.startsWith('sales-view:'))return '';
- const view=target.slice('sales-view:'.length);
+ const view=target.slice('sales-view:'.length).split(':')[0];
  const navigation=salesNavigation(context);
  return [...navigation.main,...navigation.finance,...navigation.settings,...navigation.reports].some(([key])=>key===view)?view:'';
 }
@@ -27,6 +27,7 @@ export function salesNavigation({warehouseOnly,roles}:SalesNavigationContext):{m
   ...(!rep&&(manager||finance)?[['opening','مانده‌های قبلی خریداران'] as SalesMenuItem]:[]),
  ];
  const settings:SalesMenuItem[]=[
+  ...(!rep&&(manager||finance)?[['reward-quarter','هدف و پاداش فصلی'],['reward-year','هدف و پاداش سالانه']] as SalesMenuItem[]:[]),
   ...(staff||manager?[['resources','فایل‌های فروش و آموزش'] as SalesMenuItem]:[]),
   ...(manager?[['terms','الگوهای فروش'] as SalesMenuItem]:[]),
   ['targets','تارگت و تخفیف'],

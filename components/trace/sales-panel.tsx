@@ -23,6 +23,7 @@ import {pricingKinds} from '@/lib/pricing-contract';
 import {SalesLeadsPanel} from './sales-leads-panel';
 import {SalesMonitorPanel} from './sales-monitor-panel';
 import {useEffect,useState} from 'react';
+import {SalesRewards} from './sales-rewards';
 import {RepresentativeResources,SalesResources} from './sales-resources';
 import {Dialog,DialogContent,DialogTitle,DialogDescription} from '@/components/ui/dialog';
 import {SolarDate} from './solar-date';
@@ -274,7 +275,7 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
    <button type="button" className="btn primary" disabled={!writableAgents.length} onClick={()=>begin('order')}>ثبت درخواست خرید</button>
    <button type="button" className="btn" disabled={!writableAgents.length} onClick={()=>begin('payment',{agentId:writableAgents[0]?.id||''})}>ثبت پرداخت یا چک</button>
   </div>
- </div>{['representative','reseller'].includes(data.agents[0]?.data.kind)&&<RepresentativeResources/>}<h3 className="representative-orders-heading">سفارش‌ها</h3></>}
+ </div>{['representative','reseller'].includes(data.agents[0]?.data.kind)&&<><RepresentativeResources/><SalesRewards/></>}<h3 className="representative-orders-heading">سفارش‌ها</h3></>}
  {!representativeEntry&&!group&&view!=='orders'&&buyerFilters}
  {!representativeEntry&&<SubprogramNavigation items={navigation.main} value={data.warehouseOnly?'returns':group||view} onChange={openView}/>}
  {error&&!draft&&<p className="notice error" role="alert">{error}</p>}{message&&<p className="notice" role="status">{message}</p>}{credentials&&<RepresentativeCredentials credentials={credentials} onClose={()=>setCredentials(null)}/>}
@@ -294,6 +295,7 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
  {!data.warehouseOnly&&group==='settings'&&<ProgramWorkspace key={view==='settings'?'settings-menu':'settings-content'} programId="sales-settings" title="تنظیمات فروش" direct={view!=='settings'}>
  <SubprogramNavigation items={navigation.settings} value={view==='settings'?'targets':view} onChange={openView}/>
  {['targets','prices'].includes(view)&&buyerFilters}
+ {(finance||data.roles.manager)&&['reward-quarter','reward-year'].includes(view)&&<SalesRewards key={view+targetId} period={view==='reward-quarter'?'quarter':'year'} manage focusId={targetId.split(':')[2]||''}/>}
  {(staff||data.roles.manager)&&view==='resources'&&<SalesResources management/>}
  {!data.warehouseOnly&&data.roles.manager&&view==='terms'&&<SalesNetworkPanel templatesOnly openCatalog={directView==='terms'} selected="" members={data.members||[]} onChange={()=>void load().catch(e=>setError(e.message))}/> }
  {!data.warehouseOnly&&view==='targets'&&<><IconSections scope="sales-panel-sections-1" items={[{key:"section-0",title:"اهداف مصوب فروش",content:<><h3>اهداف مصوب فروش</h3>{records('goals').map((g:any)=><article className="flow-card" key={g.id}><h4>{g.data.title} · {agentName(g.data.agentId)}</h4><p>{date(g.data.start)} تا {date(g.data.end)} · هدف {g.data.basis==='net'?money(g.data.amount):n(Number(g.data.amount))+' دستگاه'} · تحقق {n(g.progress.achievementBps/100)}٪ · مانده {g.data.basis==='net'?money(g.progress.remaining):n(Number(g.progress.remaining))+' دستگاه'}</p></article>)}{!records('goals').length&&<p>هدف مصوب مستقلی در این فیلتر تعریف نشده است.</p>}</>},{key:"section-1",title:"پلکان تخفیف",content:<><h3>پلکان تخفیف</h3>{data.roles.manager&&action('target','تارگت جدید',{start:data.today,end:plusDay(data.today,30)})}<p className="notice">مبنای تخفیف: خرید خالص فاکتورشده دوره، برای سفارش بعدی. بدهی معوق تخفیف جدید را متوقف می‌کند. هر ۱۰۰ واحد نرخ برابر ۱٪ است؛ در فرم درصد نمایش داده می‌شود.</p>{records('targets').map((t:any)=><article className="flow-card" key={t.id}><h3>{t.data.title} · {agentName(t.data.agentId)} · نسخه {n(t.data.version)} {t.data.state==='retired'?'· جایگزین‌شده':''}</h3><p>{date(t.data.start)} تا {date(t.data.end)} · {t.data.productIds.length?t.data.productIds.map(productName).join('، '):'همه محصولات'}</p><p>عملکرد: {t.data.basis==='units'?n(Number(t.progress.progress))+' دستگاه':money(t.progress.progress)} · تخفیف پلکان کسب‌شده: {n(t.progress.earnedBps/100)}٪{t.progress.overdue&&' · به علت بدهی معوق، تخفیف سفارش جدید متوقف است'}</p>{t.progress.next?<p>تا تخفیف {n(t.progress.next.discountBps/100)}٪: {t.data.basis==='units'?n(Number(t.progress.next.remaining))+' دستگاه':money(t.progress.next.remaining)} باقی مانده است.</p>:<p>پلکان پایانی تکمیل شده است.</p>}<div className="tools">{t.data.tiers.map((v:any,i:number)=><span className="notice" key={i}>{t.data.basis==='units'?n(Number(v.threshold))+' دستگاه':money(v.threshold)} ← {n(v.discountBps/100)}٪</span>)}</div>{data.roles.manager&&t.data.state==='active'&&action('target','انتشار نسخه جدید',{...t.data,previousId:t.id,revision:t.revision})}</article>)}</>}]}/></>}

@@ -32,7 +32,8 @@ export const rial=(v:unknown)=>BigInt(String(v||'0'));
 export const total=(items:any[],value:(i:any)=>unknown)=>items.reduce((n,i)=>n+rial(value(i)),BigInt(0));
 export function salesAccounts(rows:any[],agentId:string,today:string){
  const own=rows.filter(r=>r.data.agentId===agentId),payments=own.filter(r=>r.type==='sales_payment'),returns=own.filter(r=>r.type==='sales_return'),allocations=own.filter(r=>r.type==='sales_allocation');
- const credits=[...payments.filter(r=>r.data.state==='cleared'),...returns.filter(r=>r.data.state==='credited')];
+ const credits=[...payments.filter(r=>r.data.state==='cleared'),...returns.filter(r=>r.data.state==='credited'),
+  ...own.filter(r=>r.type==='sales_reward'&&r.data.kind==='cash'&&r.data.state==='approved')];
  const valid=new Set(credits.map(r=>r.id));
  const invoices=own.filter(r=>r.type==='sales_invoice').map(r=>{const installments=r.data.installments.map((i:any)=>{const paid=total(allocations.filter(a=>a.data.invoiceId===r.id&&a.data.installmentId===i.id&&valid.has(a.data.creditId)),a=>a.data.amount);const remaining=rial(i.amount)-paid;const days=Math.round((Date.parse(i.due)-Date.parse(today))/86400000);return {...i,paid:String(paid),remaining:String(remaining),days,overdue:remaining>BigInt(0)&&days<0};});return {...r,installments,remaining:String(total(installments,i=>i.remaining))};});
  const creditRows=credits.map(c=>({...c,available:String(rial(c.data.settlement?.offset??c.data.amount)-total(allocations.filter(a=>a.data.creditId===c.id),a=>a.data.amount))}));

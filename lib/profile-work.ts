@@ -6,6 +6,8 @@ import {transportCanSee} from './transport';
 import {roleProfiles,materialProfileWork,type ProfileWork} from './role-profiles';
 import {coverage,nextWork} from './sourcing';
 import type {Session} from './permissions';
+import {rewardPeriods,salesRewardProgress} from './sales-rewards';
+import {dayAt} from './duties';
 import {shortageRoles,canActOnShortage,shortageStages,type Shortage} from './handoff-shortage';
 
 export async function handoffShortageWork(user:Session):Promise<ProfileWork[]>{
@@ -67,6 +69,10 @@ export async function profileWork(user:Session){
    work.push({id:row.id+':'+profile!.id,title,section,target,sourceId:row.id,state:row.data.state});
   }
   for(const row of own){
+   if(profile.id==='sales-finance'&&row.type==='sales_reward'&&row.data.state==='active'&&salesRewardProgress(row,sales,dayAt()).ready){
+    const period=row.data.period as keyof typeof rewardPeriods;
+    addWork(row,'تأیید '+rewardPeriods[period],'sales','sales-view:reward-'+period+':'+row.id);
+   }
    if(profile.id==='sales-manager'&&row.type==='sales_order'&&row.data.state==='submitted')addWork(row,'بررسی سفارش '+row.data.code,'sales','order:'+row.id);
    if(profile.id==='sales-finance'&&row.type==='sales_order'&&['credit_review','sales_approved'].includes(row.data.state))addWork(row,'بررسی مالی سفارش '+row.data.code,'sales','order:'+row.id);
    if(profile.id==='sales-finance'&&row.type==='sales_payment'&&(row.data.state==='pending'||row.data.disposition?.state==='pending'))addWork(row,'بررسی پرداخت یا چک','sales','account:'+row.data.agentId);

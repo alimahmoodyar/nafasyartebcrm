@@ -4,6 +4,7 @@ export type RoleLink={title:string;section:string;target?:string;taskOnly?:boole
 export type RoleProfile={id:string;title:string;group:string;operational:boolean;links:RoleLink[];gaps:string[];workflowRoles:string[];buyerScope?:'optional'|'required';missionScope?:true};
 const link=(title:string,section:string,target=''):RoleLink=>({title,section,target});
 const salesLink=(title:string,view:string)=>link(title,'sales','sales-view:'+view);
+const salesRewardLinks=[salesLink('هدف و پاداش فصلی','reward-quarter'),salesLink('هدف و پاداش سالانه','reward-year')];
 const salesOrderLinks=[
  salesLink('ثبت فروش و پیش‌فاکتور','new_order'),
  salesLink('پیگیری و بررسی سفارش‌ها','orders'),
@@ -30,8 +31,8 @@ export const roleProfiles:RoleProfile[]=[
  {id:'home-sales',title:'کارشناس فروش خانگی',group:'فروش',operational:true,workflowRoles:['sales'],links:[...salesOrderLinks,link('مرجوعی دستگاه','sales-returns')],gaps:[]},
  {id:'hospital-sales',title:'کارشناس فروش بیمارستانی',group:'فروش',operational:true,workflowRoles:['sales'],buyerScope:'optional',links:[salesLink('فایل‌های فروش و آموزش','resources'),link('ظرفیت‌سنجی گازهای بیمارستانی','oxygen-capacity'),link('مشخصات سفارش ساخت','build-intake'),link('سفارش‌ها و پرونده فروش','sales'),link('مرجوعی دستگاه','sales-returns')],gaps:[]},
  {id:'sales-representative',title:'نماینده فروش',group:'فروش',operational:true,workflowRoles:[],buyerScope:'required',links:[link('ثبت درخواست خرید','sales','rep-new-order'),link('پیگیری سفارش‌ها','sales','rep-orders'),link('حساب و اعتبار نماینده','sales','rep-account'),link('ثبت پرداخت یا چک','sales','rep-new-payment'),link('درخواست مرجوعی دستگاه','sales','rep-new-return'),link('پیگیری مرجوعی‌ها','sales-returns'),link('پیگیری ارسال و دریافت','transport','rep-shipments')],gaps:[]},
- {id:'sales-manager',title:'مدیر فروش',group:'فروش',operational:true,workflowRoles:['sales'],links:[...salesOrderLinks,salesLink('الگوهای فروش و تخفیف پایه','terms'),salesLink('قیمت فروش','prices'),salesLink('تخصیص خریدار به کارشناس','assignments'),link('بررسی تجاری سفارش ساخت','build-intake'),link('ظرفیت‌سنجی گازهای بیمارستانی','oxygen-capacity'),link('مرجوعی دستگاه','sales-returns')],gaps:[]},
- {id:'sales-finance',title:'مالی فروش',group:'فروش',operational:true,workflowRoles:[],links:[link('حساب‌ها، فاکتورها و پرداخت‌های فروش','sales'),link('تطبیق بانکی فروش','sales-bank'),link('مرجوعی دستگاه','sales-returns')],gaps:[]},
+ {id:'sales-manager',title:'مدیر فروش',group:'فروش',operational:true,workflowRoles:['sales'],links:[...salesOrderLinks,...salesRewardLinks,salesLink('الگوهای فروش و تخفیف پایه','terms'),salesLink('قیمت فروش','prices'),salesLink('تخصیص خریدار به کارشناس','assignments'),link('بررسی تجاری سفارش ساخت','build-intake'),link('ظرفیت‌سنجی گازهای بیمارستانی','oxygen-capacity'),link('مرجوعی دستگاه','sales-returns')],gaps:[]},
+ {id:'sales-finance',title:'مالی فروش',group:'فروش',operational:true,workflowRoles:[],links:[...salesRewardLinks,link('حساب‌ها، فاکتورها و پرداخت‌های فروش','sales'),link('تطبیق بانکی فروش','sales-bank'),link('مرجوعی دستگاه','sales-returns')],gaps:[]},
  {id:'home-service',title:'خدمات پس از فروش خانگی',group:'نقش‌های مرتبط',operational:true,workflowRoles:[],links:[link('پرونده و درخواست قطعه خدمات خانگی','after-sales')],gaps:[]},
  {id:'hospital-service',title:'خدمات پس از فروش بیمارستانی',group:'نقش‌های مرتبط',operational:true,workflowRoles:[],links:[link('پرونده و درخواست قطعه خدمات بیمارستانی','after-sales')],gaps:[]},
  {id:'driver',title:'راننده تدارکات',group:'تدارکات',operational:true,workflowRoles:[],missionScope:true,links:[link('مأموریت‌های حمل و ثبت گزارش راننده','transport')],gaps:[]},
