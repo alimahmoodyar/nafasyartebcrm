@@ -20,6 +20,7 @@ export async function runRepresentativeSample<T>(position:Session,work:(actor:Se
     .bind(buyerId,JSON.stringify({kind:'representative',name:'نمایندگی آزمایشی',active:true,creditLimit:'0',termDays:0,phone:'',city:'تهران',address:'نشانی آزمایشی'}),now,now).run();
   }
   await seedRepresentativeFinance(buyerId,position.userId);
+  await seedRepresentativeShipment(buyerId);
   return mcpActor.run(actor,()=>work(actor));
  });
 }
@@ -55,6 +56,33 @@ async function seedRepresentativeFinance(agentId:string,actor:string){
  }
  try{await db.batch(writes);}
  catch(error){if(!await db.prepare('SELECT id FROM flow_entities WHERE id=?').bind(prefix).first())throw error;}
+}
+
+// Separate from finance examples so existing previews get the shipment as well.
+async function seedRepresentativeShipment(agentId:string){
+ const db=storage(),missionId=agentId+':shipment-demo';
+ const exists=()=>db.prepare('SELECT id FROM flow_entities WHERE id=?').bind(missionId).first();
+ if(await exists())return;
+ const product=await db.prepare("SELECT id,payload FROM records WHERE kind='product' AND id='training-product-1'").first<{id:string;payload:string}>();
+ if(!product)return;
+ const today=dayAt(),now=new Date().toISOString(),orderId=agentId+':finance-demo:order:1',invoiceId=agentId+':finance-demo:invoice:1',saleId=missionId+':sale';
+ const name=JSON.parse(product.payload).name;
+ const items=[1,2].map(number=>({deviceId:missionId+':device:'+number,serial:'DEMO-SN-00'+number,quantity:1,part:name,productId:product.id}));
+ const deviceIds=items.map(item=>item.deviceId);
+ const lines=[{productId:product.id,name,quantity:2,unitNet:'5000000',net:'10000000',discount:'0'}];
+ const entity=(id:string,type:string,data:object)=>db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?)").bind(id,type,JSON.stringify(data),now,now);
+ const writes=[
+  ...[orderId,invoiceId].map(id=>db.prepare("UPDATE flow_entities SET data=json_set(data,'$.lines',json(?)),revision=revision+1,updated=? WHERE id=?").bind(JSON.stringify(lines),now,id)),
+  entity(saleId,'sale',{salesAgentId:agentId,salesOrderId:orderId,productId:product.id,count:2,deviceIds,transportId:missionId,state:'in_transit',dispatchedAt:now}),
+  entity(missionId,'transport',{kind:'sale',code:'حمل-آزمایشی',salesAgentId:agentId,sourceId:saleId,sourceIds:[saleId],state:'offered',route:'direct',due:today,offeredDay:today,packages:2,items,serialHandover:true,collectedDeviceIds:deviceIds,receivedDeviceIds:[],history:[],recipient:'نمایندگی آزمایشی',pickup:'انبار آزمایشی',destination:'نمایندگی آزمایشی',requestingUnit:'فروش'}),
+  ...items.flatMap(item=>[
+   db.prepare("INSERT INTO records(id,kind,payload,created) VALUES(?,'device',?,?)").bind(item.deviceId,JSON.stringify({code:item.serial,product:product.id}),now),
+   entity(item.deviceId,'build',{state:'in_transit',saleId}),
+   db.prepare("INSERT INTO inventory_balances(id,item_id,warehouse,quantity) VALUES(?,?,'in_transit',1000)").bind(item.deviceId+'@in_transit',item.deviceId),
+  ]),
+ ];
+ try{await db.batch(writes);}
+ catch(error){if(!await exists())throw error;}
 }
 
 // The normal session still rejects access to operational data for this preview.

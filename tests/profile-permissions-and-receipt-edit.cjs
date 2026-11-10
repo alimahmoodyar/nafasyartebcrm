@@ -88,6 +88,25 @@ for(const path of ['sales','sales/returns','transport','tasks']){
  }
 
 }
+const shipmentApi=load('app/api/transport/route.ts');
+const shipmentId=sampleId+':shipment-demo';
+const shipmentUrl='https://test.local/api/transport?id='+encodeURIComponent(shipmentId);
+const shipmentResponse=await ctx.run(admin,()=>shipmentApi.GET(new Request(shipmentUrl)));
+assert.equal(shipmentResponse.status,200);
+const {mission}=await shipmentResponse.json();
+assert.equal(mission.data.state,'offered');
+const serialIds=mission.data.items.map(item=>item.deviceId);
+assert.equal(serialIds.length,2);
+const receive=ids=>ctx.run(admin,()=>shipmentApi.POST(request('/api/transport',{
+ id:crypto.randomUUID(),mode:'receipt',missionId:shipmentId,revision:mission.revision,
+ day:mission.data.offeredDay,deviceIds:ids,packages:ids.length,result:'complete',
+})));
+assert.equal((await receive(serialIds.slice(0,1))).status,400);
+const received=await receive(serialIds);
+assert.equal(received.status,200,await received.text());
+const delivered=await ctx.run(admin,()=>shipmentApi.GET(new Request(shipmentUrl)));
+assert.equal((await delivered.json()).mission.data.state,'delivered');
+assert.equal(sql.prepare('SELECT id FROM flow_entities WHERE id=?').get(shipmentId),undefined);
 const samplePayment=sampleId+':finance-demo:payment:3';
 const bankDay='2026-11-06', bankAccount='test-claim-account';
 sql.prepare("UPDATE training_flow_entities SET created=?,data=json_set(data,'$.day',?,'$.receivingAccountId',?,'$.reference','MATCH-123') WHERE id=?").run(bankDay+'T00:00:00Z',bankDay,bankAccount,samplePayment);

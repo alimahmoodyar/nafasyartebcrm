@@ -90,6 +90,7 @@ function load(file) {
 const context = load('lib/mcp/context.ts').mcpActor;
 const network = load('app/api/sales/network/route.ts');
 const sales = load('app/api/sales/route.ts');
+const salesFiles = load('app/api/sales/files/route.ts');
 const quoteApi = load('app/api/sales/quote/route.ts');
 const catalog = load('lib/mcp/tools.ts');
 const duties = load('lib/duties.ts');
@@ -178,6 +179,48 @@ async function expectQuote(templateId, rate, cashBps, months, agentId = 'buyer-r
   assert.equal(sql.prepare('SELECT COUNT(*) n FROM flow_entities').get().n, recordCount, 'Previews must not save or reserve sales records');
   assert.equal(sql.prepare('SELECT COUNT(*) n FROM inventory_operations').get().n, operationCount, 'Previews must not issue sales operations');
   return quoted;
+}
+
+async function fundWithCollateral(quoted) {
+  const agentId = quoted.agentId;
+  const rep = actor('rep-' + agentId, ['agent'], {salesAgentId: agentId});
+  member(rep);
+  const available = async () => {
+    const response = await context.run(rep, () => sales.GET(new Request(base + '/api/sales')));
+    assert.equal(response.status, 200);
+    return (await response.json()).accounts[0].securedCredit;
+  };
+  const fileId = crypto.randomUUID();
+  const fileForm = new FormData();
+  fileForm.set('metadata', JSON.stringify({id: fileId, agentId, title: 'Test collateral cheque', confirmed: true}));
+  fileForm.set('file', new Blob(['%PDF-1.4 test collateral cheque']), 'test-collateral.pdf');
+  const upload = await context.run(rep, () => salesFiles.POST(new Request(base + '/api/sales/files', {
+    method: 'POST', headers: {origin: base}, body: fileForm,
+  })));
+  assert.equal(upload.status, 201, await upload.text());
+  const cheque = salesBody('payment', {
+    agentId, method: 'check', checkPurpose: 'collateral', amount: quoted.amount,
+    day: duties.dayAt(), checkDue: '2026-11-01', bank: 'Test bank', reference: 'TEST-COLLATERAL-' + agentId, fileId,
+  });
+  await post(sales, '/api/sales', cheque, rep);
+  assert.equal(entity(cheque.id).data.state, 'pending');
+  assert.equal((await available()).ceiling, '0');
+  const approveCheque = () => salesBody('payment_review', {agentId, paymentId: cheque.id, revision: 1, approved: true});
+  await post(sales, '/api/sales', approveCheque(), rep, 403);
+  await post(sales, '/api/sales', approveCheque(), finance);
+  assert.equal(entity(cheque.id).data.state, 'check_collateral');
+  assert.equal((await available()).available, quoted.amount);
+
+  for (let i = 1; i <= 2; i++) {
+    const id = 'test-collateral-device-' + agentId + '-' + i;
+    const now = new FrozenDate().toISOString();
+    sql.prepare("INSERT INTO records(id,kind,payload,created) VALUES(?,'device',?,?)")
+      .run(id, JSON.stringify({code: id, product: 'product'}), now);
+    seed(id, 'build', {state: 'finished', receivedAt: now});
+    sql.prepare("INSERT INTO inventory_balances(id,item_id,warehouse,quantity) VALUES(?,?,'finished',1000)")
+      .run(id + '@finished', id);
+  }
+  return available;
 }
 
 (async () => {
@@ -383,7 +426,17 @@ async function expectQuote(templateId, rate, cashBps, months, agentId = 'buyer-r
   const historicalQuote = await quote('buyer-snapshot');
   const historicalOrder = await order(historicalQuote);
   assert.equal(historicalOrder.record.data.salesTerms.templateId, promotion.body.id);
-  await post(sales, '/api/sales', salesBody('order_review', {agentId: 'buyer-snapshot', orderId: historicalOrder.body.id, revision: 1, approved: true}));
+  const reviewOrder = () => salesBody('order_review', {
+    agentId: historicalQuote.agentId, orderId: historicalOrder.body.id, revision: 1, approved: true,
+  });
+  const blocked = await post(sales, '/api/sales', reviewOrder(), manager, 409);
+  assert.match(blocked.error, /اعتبار کافی نیست/);
+  const available = await fundWithCollateral(historicalQuote);
+  await post(sales, '/api/sales', reviewOrder(), manager);
+  assert.equal((await available()).held, historicalQuote.amount);
+  assert.equal((await available()).available, '0');
+  assert.equal(rows('sale').find(row => row.data.salesOrderId === historicalOrder.body.id).data.deviceIds.length, 2);
+  console.log('PASS collateral workflow: representative upload and submission, finance approval, manager reservation');
   const approvedSnapshot = entity(historicalOrder.body.id).data;
   assert.equal(approvedSnapshot.amount, historicalQuote.amount);
   assert.equal(approvedSnapshot.salesTerms.cashBps, 7000);
@@ -489,7 +542,9 @@ async function expectQuote(templateId, rate, cashBps, months, agentId = 'buyer-r
   for(const days of [61,-1,0.5,'47'])await post(quoteApi,'/api/sales/quote',{agentId:'buyer-representative',items,salesTerms:{cashBps:5000,days}},staff,400);
   const earlyDaily=await post(quoteApi,'/api/sales/quote',{agentId:'buyer-representative',items,salesTerms:{cashBps:10000,days:0}},staff);assert.ok(earlyDaily.installments.every(p=>p.due==='2026-10-26'));
   const atLimit=await post(quoteApi,'/api/sales/quote',{agentId:'buyer-representative',items,salesTerms:{cashBps:5000,days:60}},staff);assert.equal(atLimit.salesTerms.days,60);
-  const dailyOrder=await order(dailyQuote);await post(sales,'/api/sales',salesBody('order_review',{orderId:dailyOrder.body.id,revision:1,approved:true}));
+  const dailyOrder=await order(dailyQuote);
+  await fundWithCollateral(dailyQuote);
+  await post(sales,'/api/sales',salesBody('order_review',{orderId:dailyOrder.body.id,revision:1,approved:true}));
   at('2026-10-27T08:00:00Z');
   const dailyInvoiceBody=salesBody('invoice',{orderId:dailyOrder.body.id,revision:entity(dailyOrder.body.id).revision,reference:'DAY-BASED-INVOICE'});
   await post(sales,'/api/sales',dailyInvoiceBody,finance);assert.equal(entity(dailyInvoiceBody.id).data.installments.find(p=>p.kind==='balance').due,'2026-12-13');assert.equal(entity(dailyInvoiceBody.id).data.salesTerms.days,47);
