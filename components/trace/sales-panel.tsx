@@ -35,6 +35,7 @@ const plusDay=(day:string,days:number)=>new Date(Date.parse(day+'T12:00:00Z')+da
 const representativeEntries={
  'rep-new-order':{view:'orders',mode:'order'},
  'rep-orders':{view:'orders'},
+ 'rep-dashboard':{view:'orders'},
  'rep-account':{view:'account'},
  'rep-new-payment':{view:'account',mode:'payment'},
  'rep-new-return':{view:'returns',mode:'return_request'},
@@ -45,6 +46,19 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
  const [data,setData]=useState<any>(null),[selected,setSelected]=useState(''),[view,setView]=useState('home'),[error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[draft,setDraft]=useState<any>(null),[quote,setQuote]=useState<any>(null),[file,setFile]=useState<File|null>(null),[accounts,setAccounts]=useState<any[]>([]),[search,setSearch]=useState(''),[province,setProvince]=useState(''),[from,setFrom]=useState(''),[to,setTo]=useState(''),[stage,setStage]=useState('');
  const [orderList,setOrderList]=useState<'open'|'history'>('open');
  const [orderProduct,setOrderProduct]=useState('');
+ const [relatedReturns,setRelatedReturns]=useState<any[]>([]);
+ const [returnsUnavailable,setReturnsUnavailable]=useState(false);
+ const representativeDashboard=targetId==='rep-dashboard';
+ useEffect(()=>{
+  if(!representativeDashboard||!data?.roles.agent)return;
+  const controller=new AbortController();
+  setReturnsUnavailable(false);
+  fetch('/api/sales/returns',{cache:'no-store',signal:controller.signal})
+   .then(async response=>{if(!response.ok)throw Error();return response.json() as Promise<{items:any[]}>;})
+   .then(value=>{if(!controller.signal.aborted)setRelatedReturns(value.items);})
+   .catch(()=>{if(!controller.signal.aborted)setReturnsUnavailable(true);});
+  return ()=>controller.abort();
+ },[representativeDashboard,data]);
  async function load(){if(demo)return;const r=await fetch('/api/sales',{cache:'no-store'}),d=await r.json() as any;if(!r.ok){setData(null);setDraft(null);setQuote(null);throw Error(d.error)}setData(d);setError('');if(d.roles.manager){const a=await fetch('/api/sales/accounts',{cache:'no-store'});if(a.ok)setAccounts(((await a.json()) as any).accounts);}if(d.roles.agent&&d.agents[0])setSelected(d.agents[0].id);}
  useEffect(()=>{if(!demo)void load().catch(e=>setError(e.message))},[demo]);
  useEffect(()=>{if(targetId&&!Object.hasOwn(representativeEntries,targetId)){if(targetId.startsWith('lead:')){setSelected('');setView('leads')}else if(targetId.startsWith('account:')){setSelected(targetId.slice('account:'.length));setView('account')}else if(targetId.startsWith('order:')){setSelected('');setView('orders')}else{setSelected(targetId);setView('orders')}}},[targetId]);
@@ -59,7 +73,7 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
  },[representativeEntry]);
  const agents=(data?.agents||[]).filter((a:any)=>(!selected||a.id===selected)&&(!province||a.data.province===province)),agentIds=new Set(agents.map((a:any)=>a.id));
  const acs=(data?.accounts||[]).filter((a:any)=>agentIds.has(a.agentId));const records=(kind:string)=>(data?.[kind]||[]).filter((r:any)=>agentIds.has(r.data.agentId)&&(kind!=='orders'||!targetId.startsWith('order:')||r.id===targetId.slice(6)));const agentName=(id:string)=>data?.agents.find((a:any)=>a.id===id)?.data.name||'—';const productName=(id:string)=>data?.products?.find((p:any)=>p.id===id)?.name||id;
- const action=(mode:string,label:string,extra:any={},disabled=false)=>{const buyerId=extra.agentId||selected;if(buyerId&&data?.agents.find((a:any)=>a.id===buyerId)?.canOperate===false)return null;return <button type="button" className="btn" disabled={disabled} onClick={()=>begin(mode,extra)}>{label}</button>};
+ const action=(mode:string,label:string,extra:any={},disabled=false)=>{const buyerId=extra.agentId||selected;if(buyerId&&data?.agents.find((a:any)=>a.id===buyerId)?.canOperate===false)return null;return <button type="button" className={representativeDashboard&&mode==='receipt'?'btn primary':'btn'} disabled={disabled} onClick={()=>begin(mode,extra)}>{label}</button>};
  async function send(path:string,body:any){const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),d=await r.json() as any;if(!r.ok)throw Error(d.error||'ثبت انجام نشد.');return d;}
  async function save(e:React.FormEvent){e.preventDefault();if(busy)return;setBusy(true);setError('');try{
   let {fileRequestId,...b}=draft;
@@ -121,7 +135,7 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
  {!data.agents.length&&<p className="empty">برای شروع، مدیر فروش پرونده نماینده و قیمت محصولات را تعریف کند. سپس مالی سقف اعتبار و مهلت خرید را تعیین کند.</p>}
  </>}
 </>;
- const representativeTracking=rep&&targetId==='rep-orders';
+ const representativeTracking=rep&&(targetId==='rep-orders'||representativeDashboard);
  const orders=records('orders');
  const orderStages=new Map<string,string>(pipeline.map((progress:any)=>[progress.orderId,progress.stage]));
  const closedStages=new Set(['delivered','cancelled','rejected']);
@@ -157,12 +171,24 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
     <label className="field">جست‌وجوی سفارش<NumberInput fieldKey="search" value={search} onChange={e=>setSearch(e.target.value)}/></label>
    </div>
   </div>}
- {visibleOrders.map((o:any)=>{const ds=data.deliveries.filter((s:any)=>s.orderId===o.id&&s.state!=='cancelled');const progress=pipeline.find((p:any)=>p.orderId===o.id);const heading=<h3>{o.data.code} · {agentName(o.data.agentId)} <span className="badge">{salesStates[o.data.state]}</span>{o.data.deliveryMode==='consignment'&&<span className="badge">امانی شعبه</span>}</h3>; const details=<><p>{progress&&<>{salesPipelineStages[progress.stage]} · {n(progress.daysSinceRequest)} روز از درخواست · {progress.late?'موعد تحویل گذشته است':'تحویل باقیمانده: '+n(progress.remaining)} · </>}{date(o.created)} · جمع خرید {money(o.data.amount)} · تخفیف {money(o.data.discount)} · مهلت پرداخت {n(o.data.termDays)} روز</p><p>موعد وعده داده‌شده: {date(o.data.promisedDay)} · {o.data.lines.every((l:any)=>ds.filter((s:any)=>s.productId===l.productId&&s.state==='delivered').reduce((v:number,s:any)=>v+s.count,0)>=l.quantity)?'تحویل کامل':ds.some((s:any)=>s.state==='in_transit'||s.state==='delivered')?'در حال ارسال / تحویل جزئی':ds.some((s:any)=>s.state==='reserved')?'رزرو انبار / آماده‌سازی':salesMilestones[o.data.milestone]} · {o.data.progressNote||''}</p>
+ {representativeTracking&&visibleOrders.length>0&&<div className="representative-order-columns representative-order-column-labels" aria-hidden="true"><span>شماره سفارش</span><span>تاریخ</span><span>مبلغ</span><span>وضعیت</span><span/></div>}
+ {visibleOrders.map((o:any)=>{const ds=data.deliveries.filter((s:any)=>s.orderId===o.id&&s.state!=='cancelled');const progress=pipeline.find((p:any)=>p.orderId===o.id);const linkedReturns=relatedReturns.filter(row=>row.invoiceId&&row.invoiceId===o.data.invoiceId||ds.some((shipment:any)=>shipment.deviceIds?.includes(row.deviceId)));
+ const heading=<h3>{o.data.code} · {agentName(o.data.agentId)} <span className="badge">{salesStates[o.data.state]}</span>{o.data.deliveryMode==='consignment'&&<span className="badge">امانی شعبه</span>}</h3>; const details=<><p>{progress&&<>{salesPipelineStages[progress.stage]} · {n(progress.daysSinceRequest)} روز از درخواست · {progress.late?'موعد تحویل گذشته است':'تحویل باقیمانده: '+n(progress.remaining)} · </>}{date(o.created)} · جمع خرید {money(o.data.amount)} · تخفیف {money(o.data.discount)} · مهلت پرداخت {n(o.data.termDays)} روز</p><p>موعد وعده داده‌شده: {date(o.data.promisedDay)} · {o.data.lines.every((l:any)=>ds.filter((s:any)=>s.productId===l.productId&&s.state==='delivered').reduce((v:number,s:any)=>v+s.count,0)>=l.quantity)?'تحویل کامل':ds.some((s:any)=>s.state==='in_transit'||s.state==='delivered')?'در حال ارسال / تحویل جزئی':ds.some((s:any)=>s.state==='reserved')?'رزرو انبار / آماده‌سازی':salesMilestones[o.data.milestone]} · {o.data.progressNote||''}</p>
  <div className="sales-table"><table><thead><tr><th>کالا</th><th>سفارش</th><th>رزرو/ارسال</th><th>تحویل‌شده</th><th>قیمت واحد پس از تخفیف</th><th>اقدام</th></tr></thead><tbody>{o.data.lines.map((l:any)=>{const reserved=ds.filter((s:any)=>s.productId===l.productId).reduce((n:number,s:any)=>n+s.count,0),delivered=ds.filter((s:any)=>s.productId===l.productId&&s.state==='delivered').reduce((n:number,s:any)=>n+s.count,0);return <tr key={l.productId}><td>{l.name}</td><td>{n(l.quantity)}</td><td>{n(reserved)}</td><td>{n(delivered)}</td><td>{money(l.unitNet)}</td><td>{staff&&o.data.state==='approved'&&reserved<l.quantity&&action('reserve','رزرو و حواله جزئی',{agentId:o.data.agentId,orderId:o.id,productId:l.productId,count:Math.min(100,l.quantity-reserved),remaining:l.quantity-reserved})}</td></tr>})}</tbody></table></div>
  <IconActions inline scope="sales-panel-actions-a082117b88">{finance&&o.data.state==='credit_review'&&action('order_finance_review','بررسی بدهی معوق',{agentId:o.data.agentId,orderId:o.id,revision:o.revision,approved:true})}{o.data.securedPolicy&&o.data.salesReview&&<p>{o.data.salesReview}</p>}{staff&&data.roles.buildIntake&&['sales_approved','approved'].includes(o.data.state)&&o.data.lines.some((line:any)=>data.products.find((product:any)=>product.id===line.productId)?.productionMode==='project')&&<button className="btn" onClick={()=>onNavigate('build-intake','order:'+o.id)}>مشخصات سفارش ساخت</button>}{staff&&o.data.state==='submitted'&&action('order_review','بررسی فروش',{agentId:o.data.agentId,orderId:o.id,revision:o.revision})}{(finance||data.roles.manager)&&o.data.state==='sales_approved'&&o.data.deliveryMode==='consignment'&&action('branch_release','تأیید ارسال امانی شعبه',{agentId:o.data.agentId,orderId:o.id,revision:o.revision})}{finance&&o.data.state==='sales_approved'&&o.data.deliveryMode!=='consignment'&&action('invoice','تأیید مالی و فاکتور',{agentId:o.data.agentId,orderId:o.id,revision:o.revision,amount:o.data.amount,installments:[{due:plusDay(data.today,o.data.termDays),amount:o.data.amount}],creditException:false})}{staff&&['sales_approved','approved'].includes(o.data.state)&&action('order_progress','موعد و مرحله',{agentId:o.data.agentId,orderId:o.id,revision:o.revision,milestone:o.data.milestone,promisedDay:o.data.promisedDay})}{(rep||staff||finance)&&['submitted','sales_approved'].includes(o.data.state)&&action('order_cancel','لغو سفارش',{agentId:o.data.agentId,orderId:o.id,revision:o.revision})}{staff&&o.data.state==='approved'&&<button className="btn" onClick={()=>onNavigate('fulfillment')}>انبار و ارسال</button>}</IconActions>
- {ds.map((s:any)=><div className="notice" key={s.id}><p>{productName(s.productId)} · {n(s.count)} دستگاه · {salesStates[s.state]}{s.transport&&<> · باربری: {s.transport.carrier||'تحویل مستقیم'} · بارنامه: <bdi>{s.transport.waybill||'ثبت نشده'}</bdi> · موعد حمل: {date(s.transport.due)}</>}</p>{(rep||staff)&&s.transport&&!s.transport.awaitingWaybill&&['carrier','offered'].includes(s.transport.state)&&action('receipt','تأیید دریافت / اعلام مغایرت',{agentId:o.data.agentId,missionId:s.transport.id,revision:s.transport.revision,items:s.transport.items,receivedDeviceIds:s.transport.receivedDeviceIds,deviceIds:[],packages:s.transport.packages,result:'complete',day:data.today})}{s.transport?.receipt&&<p>نتیجه دریافت: {s.transport.receipt.result==='complete'?'کامل':s.transport.receipt.result==='shortage'?'کسری':'آسیب‌دیدگی'} · {s.transport.receipt.byName||s.transport.receipt.by}{submission(s.transport.receipt.submission)}{s.transport.receipt.fileId&&<a className="link" href={'/api/transport/files?mission='+encodeURIComponent(s.transport.id)+'&id='+encodeURIComponent(s.transport.receipt.fileId)}> · مستند دریافت</a>}</p>}</div>)}{history(o)}</>;
+ {ds.map((s:any)=><div className="notice" key={s.id}><p>{productName(s.productId)} · {n(s.count)} دستگاه · {salesStates[s.state]}{s.transport&&<> · باربری: {s.transport.carrier||'تحویل مستقیم'} · بارنامه: <bdi>{s.transport.waybill||'ثبت نشده'}</bdi> · موعد حمل: {date(s.transport.due)}</>}</p>{(rep||staff)&&s.transport&&!s.transport.awaitingWaybill&&['carrier','offered'].includes(s.transport.state)&&action('receipt',representativeDashboard?'تأیید دریافت سریال‌ها':'تأیید دریافت / اعلام مغایرت',{agentId:o.data.agentId,missionId:s.transport.id,revision:s.transport.revision,items:s.transport.items,receivedDeviceIds:s.transport.receivedDeviceIds,deviceIds:[],packages:s.transport.packages,result:'complete',day:data.today})}{representativeDashboard&&s.transport&&<div className="representative-order-links">
+ {s.transport.waybillFileId&&<a className="btn" href={'/api/transport/files?mission='+encodeURIComponent(s.transport.id)+'&id='+encodeURIComponent(s.transport.waybillFileId)}>بارنامه</a>}
+ <button type="button" className="btn" onClick={()=>onNavigate('transport',s.transport.id)}>جزئیات ارسال</button>
+ </div>}{s.transport?.receipt&&<p>نتیجه دریافت: {s.transport.receipt.result==='complete'?'کامل':s.transport.receipt.result==='shortage'?'کسری':'آسیب‌دیدگی'} · {s.transport.receipt.byName||s.transport.receipt.by}{submission(s.transport.receipt.submission)}{s.transport.receipt.fileId&&<a className="link" href={'/api/transport/files?mission='+encodeURIComponent(s.transport.id)+'&id='+encodeURIComponent(s.transport.receipt.fileId)}> · مستند دریافت</a>}</p>}</div>)}{representativeDashboard&&<div className="representative-order-links">
+ {o.data.invoiceId&&ds.some((shipment:any)=>shipment.state==='delivered'||shipment.transport?.receivedDeviceIds?.length)&&action('return_request','درخواست مرجوعی',{agentId:o.data.agentId,invoiceId:o.data.invoiceId})}
+ {linkedReturns.map(row=><button key={row.id} type="button" className="btn" onClick={()=>onNavigate('sales-returns',row.id)}>مرجوعی {row.serial} · {row.status}</button>)}
+ {returnsUnavailable&&<small role="status">مرجوعی‌های مرتبط فعلاً در دسترس نیستند.</small>}
+ </div>}{history(o)}</>;
  return representativeTracking
-  ?<details className="flow-card" key={o.id}><summary><strong>{o.data.code}</strong> · {date(o.created)} · {money(o.data.amount)} · {salesPipelineStages[progress?.stage]||salesStates[o.data.state]}</summary><h3>شناسنامهٔ سفارش</h3>{details}</details>
+  ?<details className="representative-order-row" key={o.id}>
+   <summary className="representative-order-columns"><strong>{o.data.code}</strong><span>{date(o.created)}</span><span>{money(o.data.amount)}</span><span className="representative-order-status" data-stage={progress?.stage}>{salesPipelineStages[progress?.stage]||salesStates[o.data.state]}</span><span aria-hidden="true" className="representative-order-chevron">‹</span></summary>
+   <div className="representative-order-detail"><h3>شناسنامهٔ سفارش</h3>{details}</div>
+  </details>
   :<article className="flow-card" key={o.id}>{heading}{details}</article>;
  })}{!visibleOrders.length&&<p className="empty">{representativeTracking&&!search&&!orderProduct?(orderList==='open'?'سفارش بازی ندارید.':'سفارش بسته‌شده‌ای ندارید.'):'سفارشی مطابق فیلتر پیدا نشد.'}</p>}</>}
 </>;
@@ -177,7 +203,17 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
   }else{setError('');if(['finance','settings','reports','terms'].includes(next)){setDraft(null);setQuote(null);setFile(null);}setView(next);}
  };
 
- return <ProgramWorkspace programId="sales" direct={!!targetId} title="فروش" status={<>{error&&!draft&&<p className="notice error" role="alert">{error}</p>}{!data.warehouseOnly&&(staff||finance)&&!writableAgents.length&&<p className="notice" role="status">نقش فروش شما فعال است؛ برای ثبت فروش، مدیر فروش باید از مسیر «فروش ← تنظیمات فروش ← تخصیص خریدار به کارشناس» خریدار موجود را به شما تخصیص دهد. مجوز مشاهده گزارش به‌تنهایی اختیار ثبت در پرونده همکاران را نمی‌دهد.</p>}</>}><section className="panel sales-portal" dir="rtl"><div className="panelhead"><h2>{representativeTracking?'پیگیری سفارش‌ها':view==='orders'?'سفارش‌ها':representativeEntry?.view==='account'?'حساب و اعتبار نماینده':representativeEntry?.view==='returns'?'مرجوعی دستگاه':rep?'پرتال نماینده فروش':'فروش و نمایندگان'}</h2></div><div className="inside">
+ return <ProgramWorkspace programId="sales" direct={!!targetId} title="فروش" status={<>{error&&!draft&&<p className="notice error" role="alert">{error}</p>}{!data.warehouseOnly&&(staff||finance)&&!writableAgents.length&&<p className="notice" role="status">نقش فروش شما فعال است؛ برای ثبت فروش، مدیر فروش باید از مسیر «فروش ← تنظیمات فروش ← تخصیص خریدار به کارشناس» خریدار موجود را به شما تخصیص دهد. مجوز مشاهده گزارش به‌تنهایی اختیار ثبت در پرونده همکاران را نمی‌دهد.</p>}</>}><section className={representativeDashboard?'panel sales-portal representative-dashboard':'panel sales-portal'} dir="rtl"><div className="panelhead"><h2>{representativeDashboard?'پنل نماینده فروش':representativeTracking?'پیگیری سفارش‌ها':view==='orders'?'سفارش‌ها':representativeEntry?.view==='account'?'حساب و اعتبار نماینده':representativeEntry?.view==='returns'?'مرجوعی دستگاه':rep?'پرتال نماینده فروش':'فروش و نمایندگان'}</h2></div><div className="inside">
+ {representativeDashboard&&rep&&<><div className="representative-account-strip">
+  <dl>
+   <div><dt>مانده حساب</dt><dd>{acs[0]?money(acs[0].balance):'—'}</dd><button type="button" className="link" onClick={()=>onNavigate('sales','rep-account')}>جزئیات حساب و چک‌ها</button></div>
+   <div><dt>اعتبار قابل استفاده</dt><dd>{acs[0]?.securedCredit?money(acs[0].securedCredit.available):'—'}</dd></div>
+  </dl>
+  <div className="representative-dashboard-actions">
+   <button type="button" className="btn primary" disabled={!writableAgents.length} onClick={()=>begin('order')}>ثبت درخواست خرید</button>
+   <button type="button" className="btn" disabled={!writableAgents.length} onClick={()=>begin('payment',{agentId:writableAgents[0]?.id||''})}>ثبت پرداخت یا چک</button>
+  </div>
+ </div><h3 className="representative-orders-heading">سفارش‌ها</h3></>}
  {!representativeEntry&&!group&&view!=='orders'&&buyerFilters}
  {!representativeEntry&&<SubprogramNavigation items={navigation.main} value={data.warehouseOnly?'returns':group||view} onChange={openView}/>}
  {error&&!draft&&<p className="notice error" role="alert">{error}</p>}{message&&<p className="notice" role="status">{message}</p>}{credentials&&<RepresentativeCredentials credentials={credentials} onClose={()=>setCredentials(null)}/>}
