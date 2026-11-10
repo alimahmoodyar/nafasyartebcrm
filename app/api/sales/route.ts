@@ -35,14 +35,14 @@ function orderPreview(today:string){
  ];
  const specs=[
   {age:1,model:0,quantity:4,state:'submitted',milestone:'waiting_stock'},
-  {age:3,model:1,quantity:2,state:'approved',milestone:'preparing'},
+  {age:3,model:1,quantity:2,state:'approved',milestone:'waiting_stock'},
   {age:5,model:0,quantity:3,state:'approved',milestone:'preparing'},
   {age:9,model:1,quantity:1,state:'approved',milestone:'preparing'},
  ];
  const orders=specs.map((spec,i)=>{
   const {age,model,quantity,state,milestone}=spec,product=products[model],unitNet=model?'350000000':'220000000';
   const day=addDay(today,-age),amount=String(BigInt(unitNet)*BigInt(quantity)),id='order-preview-'+(i+1);
-  return {id,created:day+'T10:00:00.000Z',revision:1,data:{sample:true,agentId,code:'نمونه-'+(104-i),state,milestone,day,amount,discount:'0',termDays:15,promisedDay:addDay(today,4-i),deliveryMode:'sale',customerReference:'تمرین پیگیری سفارش',lines:[{productId:product.id,name:product.name,quantity,unitNet,net:amount}]}};
+  return {id,created:day+'T10:00:00.000Z',revision:1,data:{sample:true,agentId,code:'نمونه-'+(104-i),state,milestone,day,amount,discount:'0',termDays:15,promisedDay:state==='submitted'?'':addDay(today,4-i),deliveryMode:'sale',customerReference:'تمرین پیگیری سفارش',lines:[{productId:product.id,name:product.name,quantity,unitNet,net:amount}]}};
  });
  const deliveries=[
   {id:'order-preview-shipment-3',orderId:orders[2].id,productId:products[0].id,state:'in_transit',count:3,transport:{id:'order-preview-carrier',state:'carrier',waybill:'آزمایشی-۱۲۵',carrier:'باربری نمونه',due:today,items:[],packages:3}},

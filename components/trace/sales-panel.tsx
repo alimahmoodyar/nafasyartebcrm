@@ -284,8 +284,32 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
   </span>}</>:<span>تسویه‌شده</span>
   :!o.data.invoiceId&&!ds.some((shipment:any)=>['in_transit','delivered','consignment_received'].includes(shipment.state))&&!['cancelled','rejected'].includes(o.data.state)&&o.data.deliveryMode!=='consignment'?<span>فاکتور صادر نشده</span>:null;
  const linkedReturns=relatedReturns.filter(row=>row.invoiceId&&row.invoiceId===o.data.invoiceId||ds.some((shipment:any)=>shipment.deviceIds?.includes(row.deviceId)));
- const heading=<h3>{o.data.code} · {agentName(o.data.agentId)} <span className="badge">{salesStates[o.data.state]}</span>{o.data.deliveryMode==='consignment'&&<span className="badge">امانی شعبه</span>}</h3>; const details=<><p>{progress&&<>{salesPipelineStages[progress.stage]} · {n(progress.daysSinceRequest)} روز از درخواست · {progress.late?'موعد تحویل گذشته است':'تحویل باقیمانده: '+n(progress.remaining)} · </>}{date(o.created)} · جمع خرید {money(o.data.amount)} · تخفیف {money(o.data.discount)} · مهلت پرداخت {n(o.data.termDays)} روز</p><p>موعد وعده داده‌شده: {date(o.data.promisedDay)} · {o.data.lines.every((l:any)=>ds.filter((s:any)=>s.productId===l.productId&&s.state==='delivered').reduce((v:number,s:any)=>v+s.count,0)>=l.quantity)?'تحویل کامل':ds.some((s:any)=>s.state==='in_transit'||s.state==='delivered')?'در حال ارسال / تحویل جزئی':ds.some((s:any)=>s.state==='reserved')?'رزرو انبار / آماده‌سازی':salesMilestones[o.data.milestone]} · {o.data.progressNote||''}</p>
- <div className="sales-table"><table><thead><tr><th>کالا</th><th>سفارش</th><th>رزرو/ارسال</th><th>تحویل‌شده</th><th>قیمت واحد پس از تخفیف</th><th>اقدام</th></tr></thead><tbody>{o.data.lines.map((l:any)=>{const reserved=ds.filter((s:any)=>s.productId===l.productId).reduce((n:number,s:any)=>n+s.count,0),delivered=ds.filter((s:any)=>s.productId===l.productId&&s.state==='delivered').reduce((n:number,s:any)=>n+s.count,0);return <tr key={l.productId}><td>{l.name}</td><td>{n(l.quantity)}</td><td>{n(reserved)}</td><td>{n(delivered)}</td><td>{money(l.unitNet)}</td><td>{staff&&o.data.state==='approved'&&reserved<l.quantity&&action('reserve','رزرو و حواله جزئی',{agentId:o.data.agentId,orderId:o.id,productId:l.productId,count:Math.min(100,l.quantity-reserved),remaining:l.quantity-reserved})}</td></tr>})}</tbody></table></div>
+ const stageLabel=salesPipelineStages[progress?.stage]||salesStates[o.data.state];
+ const orderStopped=['cancelled','rejected'].includes(o.data.state);
+ const heading=<h3>{o.data.code} · {agentName(o.data.agentId)}</h3>;
+ const details=<>
+  <p><strong>وضعیت سفارش</strong> {stageLabel}
+   {o.data.deliveryMode==='consignment'&&<span className="badge">امانی شعبه</span>}
+   {progress&&<> · {n(progress.daysSinceRequest)} روز از ثبت درخواست</>}
+   {progress?.late&&<> · موعد تحویل گذشته است</>}
+  </p>
+  <p>تاریخ ثبت {date(o.created)} · جمع خرید {money(o.data.amount)} · تخفیف {money(o.data.discount)}</p>
+  <p>مهلت توافق‌شدهٔ پرداخت {n(o.data.termDays)} روز</p>
+  <p>تاریخ اعلام‌شده برای تحویل {o.data.promisedDay?date(o.data.promisedDay):'هنوز اعلام نشده'}</p>
+  {o.data.progressNote&&<p>{o.data.progressNote}</p>}
+  <div className="sales-table"><table>
+   <thead><tr><th>کالا</th><th>تعداد سفارش</th><th>رزرو/ارسال</th><th>تحویل‌شده</th><th>باقی‌مانده برای تحویل</th><th>قیمت واحد پس از تخفیف</th><th>اقدام</th></tr></thead>
+   <tbody>{o.data.lines.map((line:any)=>{
+    const shipments=ds.filter((shipment:any)=>shipment.productId===line.productId);
+    const reserved=shipments.reduce((sum:number,shipment:any)=>sum+shipment.count,0);
+    const delivered=shipments.filter((shipment:any)=>shipment.state==='delivered').reduce((sum:number,shipment:any)=>sum+shipment.count,0);
+    return <tr key={line.productId}>
+     <td>{line.name||productName(line.productId)}</td><td>{n(line.quantity)}</td><td>{n(reserved)}</td><td>{n(delivered)}</td>
+     <td>{orderStopped?'—':n(Math.max(0,line.quantity-delivered))}</td><td>{money(line.unitNet)}</td>
+     <td>{staff&&o.data.state==='approved'&&reserved<line.quantity&&action('reserve','رزرو و حواله جزئی',{agentId:o.data.agentId,orderId:o.id,productId:line.productId,count:Math.min(100,line.quantity-reserved),remaining:line.quantity-reserved})}</td>
+    </tr>;
+   })}</tbody>
+  </table></div>
  <IconActions inline scope="sales-panel-actions-a082117b88">{finance&&o.data.state==='credit_review'&&action('order_finance_review','بررسی بدهی معوق',{agentId:o.data.agentId,orderId:o.id,revision:o.revision,approved:true})}{o.data.securedPolicy&&o.data.salesReview&&<p>{o.data.salesReview}</p>}{staff&&data.roles.buildIntake&&['sales_approved','approved'].includes(o.data.state)&&o.data.lines.some((line:any)=>data.products.find((product:any)=>product.id===line.productId)?.productionMode==='project')&&<button className="btn" onClick={()=>onNavigate('build-intake','order:'+o.id)}>مشخصات سفارش ساخت</button>}{staff&&o.data.state==='submitted'&&action('order_review','بررسی فروش',{agentId:o.data.agentId,orderId:o.id,revision:o.revision})}{(finance||data.roles.manager)&&o.data.state==='sales_approved'&&o.data.deliveryMode==='consignment'&&action('branch_release','تأیید ارسال امانی شعبه',{agentId:o.data.agentId,orderId:o.id,revision:o.revision})}{finance&&o.data.state==='sales_approved'&&o.data.deliveryMode!=='consignment'&&action('invoice','تأیید مالی و فاکتور',{agentId:o.data.agentId,orderId:o.id,revision:o.revision,amount:o.data.amount,installments:[{due:plusDay(data.today,o.data.termDays),amount:o.data.amount}],creditException:false})}{staff&&['sales_approved','approved'].includes(o.data.state)&&action('order_progress','موعد و مرحله',{agentId:o.data.agentId,orderId:o.id,revision:o.revision,milestone:o.data.milestone,promisedDay:o.data.promisedDay})}{(rep||staff||finance)&&['submitted','sales_approved'].includes(o.data.state)&&action('order_cancel','لغو سفارش',{agentId:o.data.agentId,orderId:o.id,revision:o.revision})}{staff&&!o.data.sample&&o.data.state==='approved'&&<button className="btn" onClick={()=>onNavigate('fulfillment')}>انبار و ارسال</button>}</IconActions>
  {ds.map((s:any)=><div className="notice" key={s.id}><p>{productName(s.productId)} · {n(s.count)} دستگاه · {salesStates[s.state]}{s.transport&&<> · باربری: {s.transport.carrier||'تحویل مستقیم'} · بارنامه: <bdi>{s.transport.waybill||'ثبت نشده'}</bdi> · موعد حمل: {date(s.transport.due)}</>}</p>{(rep||staff)&&s.transport&&!s.transport.awaitingWaybill&&['carrier','offered'].includes(s.transport.state)&&action('receipt',representativeDashboard?'تأیید دریافت سریال‌ها':'تأیید دریافت / اعلام مغایرت',{agentId:o.data.agentId,missionId:s.transport.id,revision:s.transport.revision,items:s.transport.items,receivedDeviceIds:s.transport.receivedDeviceIds,deviceIds:[],packages:s.transport.packages,result:'complete',day:data.today})}{(representativeDashboard||staff)&&s.transport&&!o.data.sample&&<div className="representative-order-links">
  {s.transport.waybillFileId&&<a className="btn" href={'/api/transport/files?mission='+encodeURIComponent(s.transport.id)+'&id='+encodeURIComponent(s.transport.waybillFileId)}>بارنامه</a>}
@@ -297,7 +321,7 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
  </div>}{history(o)}</>;
  return openOrderList
   ?<details className="representative-order-row" key={o.id}>
-   <summary className="representative-order-columns"><strong>{o.data.code}{staffTracking&&<small> · {agentName(o.data.agentId)}</small>}</strong><span>{date(o.created)}</span><span>{money(o.data.amount)}</span><span className="representative-order-status" data-stage={progress?.stage}>{salesPipelineStages[progress?.stage]||salesStates[o.data.state]}</span>{representativeDashboard&&<span className="representative-order-finance">{financeSummary}</span>}<span aria-hidden="true" className="representative-order-chevron">‹</span></summary>
+   <summary className="representative-order-columns"><strong>{o.data.code}{staffTracking&&<small> · {agentName(o.data.agentId)}</small>}</strong><span>{date(o.created)}</span><span>{money(o.data.amount)}</span><span className="representative-order-status" data-stage={progress?.stage}>{stageLabel}</span>{representativeDashboard&&<span className="representative-order-finance">{financeSummary}</span>}<span aria-hidden="true" className="representative-order-chevron">‹</span></summary>
    <div className="representative-order-detail"><h3>شناسنامهٔ سفارش</h3>{details}</div>
   </details>
   :<article className="flow-card" key={o.id}>{heading}{details}</article>;
