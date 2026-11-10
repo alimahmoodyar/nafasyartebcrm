@@ -145,7 +145,7 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
  const unpaidInstallment=(invoice:any)=>invoice?.installments?.filter((part:any)=>rial(part.remaining)>BigInt(0)).sort((a:any,b:any)=>a.due.localeCompare(b.due))[0];
  const outstandingDue=representativeAccount?.invoices.flatMap((invoice:any)=>unpaidInstallment(invoice)||[]).sort((a:any,b:any)=>a.due.localeCompare(b.due))[0];
  const dueLabel=(part:any)=>part.days<0?n(-part.days)+' روز معوق':part.days===0?'امروز':n(part.days)+' روز مانده';
- const searchingPayments=!!(paymentDay||paymentAmount||paymentReference.trim());
+ const searchingPayments=paymentView==='history'&&!!(paymentDay||paymentAmount||paymentReference.trim());
  const referenceQuery=digits(paymentReference.trim()).toLowerCase();
  const isSystemConfirmed=(entry:any)=>entry.state==='cleared'&&!!entry.bankRowId;
  const sortedPayments=(representativeAccount?.payments||[]).filter((payment:any)=>paymentView==='history'
@@ -302,11 +302,14 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
    <button type="button" className={paymentView==='open'?'btn primary':'btn'} aria-pressed={paymentView==='open'} onClick={()=>setPaymentView('open')}>پرداخت‌های باز</button>
    <button type="button" className={paymentView==='history'?'btn primary':'btn'} aria-pressed={paymentView==='history'} onClick={()=>setPaymentView('history')}>سوابق پرداخت‌ها</button>
   </div>
-  <div className="formgrid representative-payment-filters" role="group" aria-label="جست‌وجوی پرداخت‌ها">
+  {paymentView==='history'&&<details>
+   <summary className="btn"><Search size={16} aria-hidden="true"/> جست‌وجوی سوابق پرداخت</summary>
+   <div className="formgrid representative-payment-filters" role="group" aria-label="جست‌وجوی پرداخت‌ها">
    <SolarDate label="تاریخ پرداخت" value={paymentDay} onChange={setPaymentDay}/>
    <label className="field">مبلغ، ریال<input value={paymentAmount} inputMode="numeric" onChange={event=>setPaymentAmount(digits(event.target.value).replace(/[^0-9]/g,'').replace(/^0+(?=\d)/,''))}/></label>
    <label className="field">شماره پیگیری، رسید یا شناسه چک<input value={paymentReference} onChange={event=>setPaymentReference(event.target.value)}/></label>
   </div>
+  </details>}
   {recentPayments.length>0?<div className="sales-table"><table><thead><tr><th>تاریخ</th><th>مبلغ</th><th>شماره پیگیری / شناسه</th><th>منبع</th><th>وضعیت</th></tr></thead><tbody>
    {recentPayments.map((payment:any)=>{
     const entry=payment.data;
