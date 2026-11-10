@@ -4,7 +4,7 @@ import {mcpActor} from './mcp/context';
 import {inboxAccess,inboxView} from './inbox';
 import {guidanceOutline,guidanceProfiles,type GuideCheck} from './workflow-guidance';
 import type {Session} from './permissions';
-import {treasuryDestinationTarget} from './role-profiles';
+import {treasuryDestinationTarget,salesBankRowTarget} from './role-profiles';
 type Source={load:()=>Promise<any>;path:string;keys:string[];single?:string[]};
 const sources:Record<string,Source>={
  buildIntake:{load:()=>import('@/app/api/build-intake/route'),path:'build-intake',keys:['intakes']},
@@ -19,6 +19,7 @@ const sources:Record<string,Source>={
  foreign:{load:()=>import('@/app/api/foreign-purchases/route'),path:'foreign-purchases',keys:['shipments','selections']},
  material:{load:()=>import('@/app/api/flow/route'),path:'flow',keys:['entities']},
  sales:{load:()=>import('@/app/api/sales/route'),path:'sales',keys:['agents','orders','returns','targets']},
+ salesBank:{load:()=>import('@/app/api/sales/bank/route'),path:'sales/bank',keys:['rows']},
  salesMonitor:{load:()=>import('@/app/api/sales/monitor/route'),path:'sales/monitor',keys:['alerts','reports']},
  salesLead:{load:()=>import('@/app/api/sales/leads/route'),path:'sales/leads',keys:['records']},
  service:{load:()=>import('@/app/api/after-sales/route'),path:'after-sales',keys:['cases','orders','shipments','claims']},
@@ -30,6 +31,7 @@ const sources:Record<string,Source>={
  development:{load:()=>import('@/app/api/development/route'),path:'development',keys:['requests'],single:['request']}
 };
 export function guideSource(t:any,kind:string){const d=t.data;let id=d.serviceId||d.recordId||d.payableId||d.caseId||d.guaranteeId||d.leadId||d.transportMissionId||d.sourcePlanId||d.salesAlertId||d.salesReportId||d.sourceId||d.salesAgentId||'';
+ if(kind==='salesBank'&&id.startsWith(salesBankRowTarget))id=id.slice(salesBankRowTarget.length);
  if(kind==='service'&&!id)id=t.id.startsWith('after-sales:')?t.id.split(':')[1]:'';
  if(kind==='supplierQuality'&&!id)id=t.id.startsWith('supplier-quality:')?t.id.split(':')[1]:'';
  return {id,kind:kind==='replenishment'?'sourcing':d.sourceSection==='build-projects'?'projects':kind};

@@ -16,6 +16,8 @@ const assigned=(entry:RoleLink):RoleLink=>({...entry,taskOnly:true});
 const warehouse=(title:string,source:string,view:string)=>link(title,'warehouse',warehouseTarget(source,'',view));
 export const treasuryTestTarget='treasury-test:';
 export const treasuryDestinationTarget='treasury-destination:';
+export const salesBankTestTarget='sales-bank-test:';
+export const salesBankRowTarget='sales-bank-row:';
 // A review catalog, deliberately separate from account permissions/jobRoles.
 // Profiles do not create accounts or grant authority to ordinary users.
 export const roleProfiles:RoleProfile[]=[
@@ -37,10 +39,10 @@ export const roleProfiles:RoleProfile[]=[
   salesLink('تارگت و تخفیف','targets'),salesLink('فایل‌های فروش و آموزش','resources')
  ],gaps:[]},
  {id:'hospital-sales',title:'کارشناس فروش بیمارستانی',group:'فروش',operational:true,workflowRoles:['sales'],buyerScope:'optional',links:[salesLink('فایل‌های فروش و آموزش','resources'),link('ظرفیت‌سنجی گازهای بیمارستانی','oxygen-capacity'),link('مشخصات سفارش ساخت','build-intake'),link('سفارش‌ها و پرونده فروش','sales'),link('مرجوعی دستگاه','sales-returns')],gaps:[]},
- {id:'sales-representative',title:'نماینده فروش',group:'فروش',operational:true,workflowRoles:[],buyerScope:'required',links:[link('ثبت درخواست خرید','sales','rep-new-order'),link('پیگیری سفارش‌ها','sales','rep-orders'),link('حساب و اعتبار نماینده','sales','rep-account'),link('ثبت پرداخت یا چک','sales','rep-new-payment'),link('درخواست مرجوعی دستگاه','sales','rep-new-return'),link('پیگیری مرجوعی‌ها','sales-returns'),link('پیگیری ارسال و دریافت','transport','rep-shipments')],gaps:[]},
+ {id:'sales-representative',title:'نماینده فروش',group:'فروش',operational:true,workflowRoles:[],buyerScope:'required',links:[link('ثبت درخواست خرید','sales','rep-new-order'),link('پیگیری سفارش‌ها','sales','rep-orders'),link('حساب و اعتبار نماینده','sales','rep-account'),link('ثبت پرداخت یا چک','sales','rep-new-payment'),link('درخواست مرجوعی دستگاه','sales','rep-new-return'),link('پیگیری مرجوعی‌ها','sales-returns'),link('پیگیری ارسال و دریافت','transport','rep-shipments'),link('آزمون واریز بانکی','sales','rep-test-payment')],gaps:[]},
  {id:'sales-manager',title:'مدیر فروش',group:'فروش',operational:true,workflowRoles:['sales'],links:[...salesOrderLinks,...salesRewardLinks,salesLink('الگوهای فروش و تخفیف پایه','terms'),salesLink('قیمت فروش','prices'),salesLink('تخصیص خریدار به کارشناس','assignments'),link('بررسی تجاری سفارش ساخت','build-intake'),link('ظرفیت‌سنجی گازهای بیمارستانی','oxygen-capacity'),link('مرجوعی دستگاه','sales-returns')],gaps:[]},
- {id:'sales-finance',title:'مالی فروش',group:'فروش',operational:true,workflowRoles:[],links:[...salesRewardLinks,link('حساب‌ها، فاکتورها و پرداخت‌های فروش','sales'),link('تطبیق بانکی فروش','sales-bank'),link('مرجوعی دستگاه','sales-returns')],gaps:[]},
- {id:'treasurer',title:'خزانه‌دار',group:'مالی',operational:true,workflowRoles:[],links:[link('ثبت و تطبیق اکسل بانک','sales-bank'),link('خزانه‌داری','treasury'),link('ثبت حساب مقصد آزمایشی','treasury',treasuryTestTarget)],gaps:[]},
+ {id:'sales-finance',title:'مالی فروش',group:'فروش',operational:true,workflowRoles:[],links:[...salesRewardLinks,link('حساب‌ها، فاکتورها و پرداخت‌های فروش','sales'),link('تطبیق بانکی فروش','sales-bank'),link('مرجوعی دستگاه','sales-returns'),link('تخصیص حساب مقصد آزمایشی','sales-bank',salesBankTestTarget)],gaps:[]},
+ {id:'treasurer',title:'خزانه‌دار',group:'مالی',operational:true,workflowRoles:[],links:[link('ثبت و تطبیق اکسل بانک','sales-bank'),link('خزانه‌داری','treasury'),link('ثبت حساب مقصد آزمایشی','treasury',treasuryTestTarget),link('تطبیق اکسل آزمایشی','sales-bank',salesBankTestTarget)],gaps:[]},
  {id:'home-service',title:'خدمات پس از فروش خانگی',group:'نقش‌های مرتبط',operational:true,workflowRoles:[],links:[link('پرونده و درخواست قطعه خدمات خانگی','after-sales')],gaps:[]},
  {id:'hospital-service',title:'خدمات پس از فروش بیمارستانی',group:'نقش‌های مرتبط',operational:true,workflowRoles:[],links:[link('پرونده و درخواست قطعه خدمات بیمارستانی','after-sales')],gaps:[]},
  {id:'driver',title:'راننده تدارکات',group:'تدارکات',operational:true,workflowRoles:[],missionScope:true,links:[link('مأموریت‌های حمل و ثبت گزارش راننده','transport')],gaps:[]},
