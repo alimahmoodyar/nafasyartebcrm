@@ -17,15 +17,19 @@ async function seedRewardPreview(agentId:string,today:string){
  const {year,month}=solarParts(today),quarter=Math.ceil(month/3),now=new Date().toISOString(),db=storage();
  const plans=[
   {period:'quarter',quarter,target:'10',kind:'cash',rate:200,unitValue:'0',productId:''},
-  {period:'year',quarter:0,target:'30',kind:'equivalent',rate:300,unitValue:'10000000',productId:'training-product-1'},
+  {period:'year',quarter:0,target:'30',kind:'cash',rate:300,unitValue:'0',productId:''},
  ];
  const missing=[];
  for(const plan of plans){
   const id=agentId+':reward-demo:'+year+':'+plan.quarter;
   const existing=await db.prepare('SELECT data FROM flow_entities WHERE id=?').bind(id).first<{data:string}>();
-  if(existing&&JSON.parse(existing.data).basis==='units')continue;
+  if(existing){
+   const previous=JSON.parse(existing.data);
+   const legacyAnnualSample=plan.period==='year'&&previous.kind==='equivalent'&&previous.state==='active';
+   if(previous.basis==='units'&&!legacyAnnualSample)continue;
+  }
   const data={...plan,...salesRewardDates(year,plan.quarter),year,agentId,basis:'units',productIds:['training-product-1'],quantity:0,state:'active'};
-  missing.push(db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'sales_reward',?,1,?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data,revision=flow_entities.revision+1,updated=excluded.updated WHERE json_extract(flow_entities.data,'$.basis')='net'").bind(id,JSON.stringify(data),now,now));
+  missing.push(db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'sales_reward',?,1,?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data,revision=flow_entities.revision+1,updated=excluded.updated WHERE flow_entities.data=?").bind(id,JSON.stringify(data),now,now,existing?.data??null));
  }
  if(missing.length)await db.batch(missing);
 }
