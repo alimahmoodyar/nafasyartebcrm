@@ -5,7 +5,7 @@ const objects=new Map();const bucket={async put(k,b){objects.set(k,b.slice(0));r
 let identity=null;const env={TRACE_OWNER_EMAIL:'owner@example.com',LLM_CONFIG_ENCRYPTION_KEY:require('node:crypto').randomBytes(32).toString('base64'),DB:db,BUCKET:bucket};
 const cache={};function load(file){file=path.resolve(root,file);if(cache[file])return cache[file];const exports={};cache[file]=exports;const source=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
 vm.runInNewContext(source,{exports,require:n=>{if(n==='cloudflare:workers')return {env};if(n==='@/app/chatgpt-auth')return {getChatGPTUser:async()=>identity};if(n.startsWith('@/')||n.startsWith('.')){const p=n.startsWith('@/')?path.join(root,n.slice(2)):path.resolve(path.dirname(file),n);return load(p+(path.extname(p)?'':'.ts'));}return require(n)},Response,Request,URL,URLSearchParams,Error,crypto:globalThis.crypto,Date,Intl,Set,Map,FormData,Blob,File,TextEncoder,TextDecoder,Uint8Array,ArrayBuffer,AbortController,ReadableStream,btoa,atob,setTimeout:(f,n)=>setTimeout(f,Math.min(n,10)),clearTimeout,console},{filename:file});return exports;}
-const context=load('lib/mcp/context.ts').mcpActor,permissions=load('lib/permissions.ts'),sales=load('app/api/sales/route.ts'),quoteApi=load('app/api/sales/quote/route.ts'),files=load('app/api/sales/files/route.ts'),accounts=load('app/api/sales/accounts/route.ts'),fulfillment=load('app/api/fulfillment/route.ts'),transport=load('app/api/transport/route.ts'),catalog=load('lib/mcp/tools.ts');
+const context=load('lib/mcp/context.ts').mcpActor,permissions=load('lib/permissions.ts'),sales=load('app/api/sales/route.ts'),quoteApi=load('app/api/sales/quote/route.ts'),accounts=load('app/api/sales/accounts/route.ts'),fulfillment=load('app/api/fulfillment/route.ts'),transport=load('app/api/transport/route.ts'),catalog=load('lib/mcp/tools.ts');
 let tail=Promise.resolve();const batch=db.batch.bind(db);db.batch=stmts=>{const next=tail.then(()=>batch(stmts));tail=next.catch(()=>{});return next;};
 const base='https://test.local',today=load('lib/duties.ts').dayAt(),past=load('lib/duties.ts').addDay(today,-20),future=load('lib/duties.ts').addDay(today,20),now=new Date().toISOString();
 const request=(path,body,origin=base)=>new Request(base+path,{method:body?'POST':'GET',headers:{origin,...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});
@@ -23,7 +23,6 @@ const get=async(u=rep,agent='',status=200)=>{const r=await context.run(u,()=>sal
 const balance=async()=>((await get()).accounts[0]);
 const quote=(qty=3,u=rep)=>post(quoteApi,'/api/sales/quote',{agentId:a,items:[{productId:'product',quantity:qty}]},u);
 const version=id=>entity(id).revision;
-async function upload(u=rep,extra={},status=201){const meta={id:crypto.randomUUID(),agentId:a,confirmed:true,title:'Evidence',...extra},form=new FormData();form.set('metadata',JSON.stringify(meta));form.set('file',new File(['%PDF-test'],'receipt.pdf'));const r=await context.run(u,()=>files.POST(new Request(base+'/api/sales/files',{method:'POST',headers:{origin:base},body:form})));const d=await r.json();assert.equal(r.status,status,JSON.stringify(d));return {...d,meta};}
 (async()=>{
  for(const u of [manager,staff,finance])member(u);
  const create={name:'نمایندگی آزمایشی سپهر',phone:'02112345678',contact:'Sales contact',province:'تهران',city:'تهران',address:'Address',contractRef:'C1',active:true,ownerId:'staff',financeId:'finance',managerId:'manager'};
@@ -230,8 +229,8 @@ async function upload(u=rep,extra={},status=201){const meta={id:crypto.randomUUI
  const bankAction=(mode,fields={},role=treasurer,status=200)=>post(bank,'/api/sales/bank',{id:crypto.randomUUID(),confirmed:true,mode,...fields},role,status);
  await bankAction('receiving_accounts',{agentId:a,revision:version(a),receivingAccountIds:[bankAccount]},scopedFinance);
  const accountView=async()=>(await get(scopedRep)).accounts.find(account=>account.agentId===a);
- const claimFile=await upload(scopedRep);
- const claim=await op('payment',{method:'bank',amount:'5000000',day:today,reference:'SEPEHR-TRANSFER',receivingAccountId:bankAccount,fileId:claimFile.id},scopedRep);
+ const claim=await op('payment',{method:'bank',amount:'5000000',day:today,reference:'SEPEHR-TRANSFER',receivingAccountId:bankAccount},scopedRep);
+ assert.equal(entity(claim.id).data.fileId,'');
  const beforeMatch=await accountView();
  assert.equal(beforeMatch.payments.find(payment=>payment.id===claim.id).data.state,'pending');
  assert.ok((await taskPage(scopedFinance)).positionWork.some(work=>work.sourceId===claim.id));

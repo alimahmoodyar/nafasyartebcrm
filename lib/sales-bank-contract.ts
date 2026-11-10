@@ -38,7 +38,6 @@ export function bankMatch(row:any,all:any[]){
   if(!code)return answer('unmatched','شماره پیگیری بانک لازم است؛ مبلغ به‌تنهایی کافی نیست.');
   if(exact.length!==1)return answer('unmatched','اعلام پرداخت یکتا با حساب مقصد، مبلغ، تاریخ و شماره پیگیری منطبق پیدا نشد.');
   const p=exact[0];if(!agents.some(a=>a.id===p.data.agentId))return answer('unmatched','خریدار این اعلام پرداخت فعال نیست.');
-  if(!p.data.fileId)return answer('unmatched','اعلام پرداخت فاقد مدرک است.');
   return answer('ready','اعلام پرداخت با گردش بانک به‌طور یکتا تطبیق دارد.',{agentId:p.data.agentId,paymentId:p.id});
  }
  if(!d.terminalCode||!d.provider)return answer('unmatched','کد ترمینال و شرکت ارائه‌دهنده پوز لازم است.');
