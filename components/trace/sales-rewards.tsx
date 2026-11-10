@@ -119,12 +119,13 @@ export function SalesRewards({period,manage=false,focusId=''}:{period?:Period;ma
      const periodLabel=(p.quarter?seasons[p.quarter-1]+' ':'')+format(p.year);
      const product=library.products.find(item=>item.id===p.productId)?.name||p.productId;
      const status=p.state==='approved'?'ثبت‌شده':reward.progress.ready?'در انتظار تأیید مالی':reward.progress.ended?'پایان دوره · پاداش قابل ثبت ندارد':reward.progress.started?'در جریان':'هنوز شروع نشده';
+     const showCashEncouragement=!manage&&p.kind==='cash'&&p.state!=='approved'&&!reward.progress.ended&&BigInt(r.actual)<BigInt(p.target);
      return <article key={reward.id} className="flow-card">
       <strong>{periodLabel}{library.sample?' · آزمایشی':''}{manage?' · '+(library.agents.find(a=>a.id===p.agentId)?.name||''):''}</strong>
       {p.productIds.length===1&&<p>مدل هدف · {library.products.find(item=>item.id===p.productIds[0])?.name||p.productIds[0]}</p>}
       {progressLine('تعداد دستگاه',r.actual,p.target,'دستگاه')}
       <p>{status}{reward.progress.started&&!reward.progress.ended&&<> · {format(reward.progress.daysLeft)} روز باقی مانده</>}</p>
-      <p>{kinds[p.kind]} · {p.kind==='cash'?format(r.value)+' ریال':format(r.quantity)+' دستگاه '+product}
+      <p>{showCashEncouragement?'با رسیدن به هدف، پاداش ریالی در انتظار شماست!':<>{kinds[p.kind]} · {p.kind==='cash'?format(r.value)+' ریال':format(r.quantity)+' دستگاه '+product}</>}
        {p.kind==='equivalent'&&r.remainder!=='0'&&<> · ماندهٔ کمتر از ارزش یک دستگاه {format(r.remainder)} ریال</>}
       </p>
       {manage&&<p className="subtle">{formatDate(p.start)} تا {formatDate(p.end)} · خرید خالص مشمول {format(r.net)} ریال</p>}
