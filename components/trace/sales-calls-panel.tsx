@@ -3,6 +3,8 @@
 import {useEffect,useState} from 'react';
 import {callResultLabels,leadCallResults,partnerCallResults} from '@/lib/sales-call-results';
 import {ArrowDownLeft,ArrowUpRight,Phone,Users} from 'lucide-react';
+import {SolarDate} from '@/components/trace/solar-date';
+import {isIsoDay} from '@/lib/persian-date';
 
 const kinds=[['incoming','تماس ورودی',ArrowDownLeft],['partner','نماینده یا عامل فروش',Users],['outreach','تماس بازاریابی',ArrowUpRight]] as const;
 
@@ -11,6 +13,7 @@ export function SalesCallsPanel({buyer='',referralId='',compact=false,onNavigate
  const [data,setData]=useState<any>(null),[error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false);
  const [kind,setKind]=useState(buyer?'partner':'incoming'),[contact,setContact]=useState(buyer?'agent:'+buyer:''),[result,setResult]=useState('');
  const [follow,setFollow]=useState(false),[refer,setRefer]=useState(false),[id,setId]=useState(''),[showReport,setShowReport]=useState(false);
+ const [nextDue,setNextDue]=useState('');
  async function refresh(){
   const response=await fetch('/api/sales/calls',{cache:'no-store'});
   const body=await response.json() as {error?:string};
@@ -73,8 +76,9 @@ export function SalesCallsPanel({buyer='',referralId='',compact=false,onNavigate
    {data.open.map((a:any)=><p key={a.id}><button type="button" className="link" onClick={()=>{setKind('partner');setContact('agent:'+a.id);setShowReport(false)}}>{a.name}</button> · {a.reasons.join('؛ ')} · {a.due}</p>)}
   </div>:<form onSubmit={async e=>{
    e.preventDefault();const form=e.currentTarget,f=new FormData(form);
-   const ok=await save({mode:'call',callKind:kind,result,agentId:contact.startsWith('agent:')?contact.slice(6):'',leadId:contact.startsWith('lead:')?contact.slice(5):'',name:f.get('name'),phone:f.get('phone'),productId:f.get('product'),notes:f.get('notes'),nextAction:f.get('nextAction'),nextDue:f.get('nextDue'),nextTime:f.get('nextTime'),managerRequest:f.get('managerRequest')});
-   if(ok){form.reset();setResult('');setFollow(false);setRefer(false);await refresh().catch(e=>setError(e.message));}
+   if(follow&&(!isIsoDay(nextDue)||nextDue<data.today)){setMessage('');setError('برای موعد پیگیری، تاریخ امروز یا بعد از آن را انتخاب کنید.');return;}
+   const ok=await save({mode:'call',callKind:kind,result,agentId:contact.startsWith('agent:')?contact.slice(6):'',leadId:contact.startsWith('lead:')?contact.slice(5):'',name:f.get('name'),phone:f.get('phone'),productId:f.get('product'),notes:f.get('notes'),nextAction:f.get('nextAction'),nextDue:follow?nextDue:null,nextTime:f.get('nextTime'),managerRequest:f.get('managerRequest')});
+   if(ok){form.reset();setResult('');setFollow(false);setNextDue('');setRefer(false);await refresh().catch(e=>setError(e.message));}
   }}>
    <fieldset><legend>نوع تماس</legend><div className="tools">{kinds.map(([key,label,Icon])=><button key={key} type="button" aria-pressed={kind===key} className={'btn '+(kind===key?'primary':'')} onClick={()=>{setKind(key);setContact('');setResult('');setRefer(false)}}><Icon size={18}/> {label}</button>)}</div></fieldset>
    {data.open.find((a:any)=>'agent:'+a.id===contact)&&<p className="notice">{data.open.find((a:any)=>'agent:'+a.id===contact).reasons.join('؛ ')}</p>}
@@ -88,18 +92,18 @@ export function SalesCallsPanel({buyer='',referralId='',compact=false,onNavigate
    <fieldset className="sales-call-followup">
     <legend>پیگیری بعدی</legend>
     <label className="sales-call-followup-toggle">
-     <input type="checkbox" checked={follow} disabled={result==='no_answer'} onChange={e=>{setFollow(e.target.checked);if(e.target.checked)setRefer(false)}}/>
+     <input type="checkbox" checked={follow} disabled={result==='no_answer'} onChange={e=>{setFollow(e.target.checked);if(e.target.checked)setRefer(false);else setNextDue('')}}/>
      <span>{partner?'پیگیری با من':'برای این تماس پیگیری ثبت شود'}</span>
     </label>
     {partner&&result!=='no_answer'&&<label className="sales-call-followup-toggle">
-     <input type="checkbox" checked={refer} onChange={e=>{setRefer(e.target.checked);if(e.target.checked)setFollow(false)}}/>
+     <input type="checkbox" checked={refer} onChange={e=>{setRefer(e.target.checked);if(e.target.checked){setFollow(false);setNextDue('')}}}/>
      <span>ارجاع به مدیر فروش</span>
     </label>}
     {refer&&<label className="field">چه تصمیم یا اقدامی از مدیر می‌خواهید؟<textarea name="managerRequest" maxLength={1000} required/></label>}
     {result==='no_answer'&&<p className="subtle">برای تماس بی‌پاسخ، اقدام بعدی و موعد پیگیری را ثبت کنید.</p>}
     {follow&&<div className="formgrid">
      <label>اقدام بعدی<input name="nextAction" required maxLength={300} placeholder="مثلاً تماس مجدد"/></label>
-     <label>موعد پیگیری<input name="nextDue" type="date" min={data.today} required/></label>
+     <SolarDate label="موعد پیگیری" value={nextDue} onChange={setNextDue}/>
      <label>ساعت<input name="nextTime" type="time"/></label>
     </div>}
    </fieldset>
