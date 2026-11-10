@@ -18,6 +18,18 @@ const renderHospital=()=>{cursor=0;return RoleTestingPanel({targetId:hospital.id
 assert.ok(nodes(renderHospital()).some(n=>n.type==='button'&&text(n).startsWith('کارتابل')));
 nodes(renderHospital()).find(n=>n.type==='button'&&text(n)==='انتخاب پرونده خریدار').props.onClick();await new Promise(r=>setImmediate(r));
 assert.ok(nodes(renderHospital()).some(n=>n.type==='option'&&n.props.value==='buyer'));
+const home={...hospital,id:'home-sales',title:'کارشناس فروش خانگی'};
+response={activeProfile:home.id,profile:home,work:[],unverified:[],buyerChoices:[{id:'sepehr',name:'نمایندگی آزمایشی سپهر'}]};
+const renderHome=()=>{cursor=0;return RoleTestingPanel({targetId:home.id,onNavigate:navigate,onProfile(){}})};
+await mount(renderHome);
+assert.ok(!nodes(renderHome()).some(n=>n.type==='select'),'Home sales opens directly');
+nodes(renderHome()).find(n=>n.type==='button'&&text(n)==='انتخاب پرونده برای آزمون').props.onClick();
+await new Promise(r=>setImmediate(r));
+nodes(renderHome()).find(n=>n.type==='select').props.onChange({target:{value:'sepehr'}});
+profileRequests=[];
+nodes(renderHome()).find(n=>n.type==='button'&&text(n)==='ورود به پروفایل').props.onClick();
+await new Promise(r=>setImmediate(r));
+assert.equal(JSON.parse(profileRequests[0].options.body).buyerId,'sepehr');
 // Layout back can reach the role catalog while the server still has the previous role cookie.
 for(const activeProfile of ['home-sales','central-store']){
  response={profiles:[hospital],activeProfile};

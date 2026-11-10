@@ -24,7 +24,7 @@ export async function GET(request:Request){try{
  if(!await validProfileScope(profile.id,buyerId)&&buyerId)throw new AccessError('پرونده خریدار یا مأموریت معتبر برای این پروفایل لازم است.',400);
  if(profile.id==='sales-representative'&&!buyerId){
   const work=active?.id===profile.id?await runRepresentativeSample(profileSession(admin,profile.id,[]),async position=>(await profileWork(position)).work):[];
-  return json({profile:visibleProfile(profile),work,activeProfile:active?.id||'',sample:true,unverified:[],personalPreview:false});
+  return json({profile:visibleProfile(profile),work,activeProfile:active?.id||'',buyerChoices:await profileScopeChoices(profile.id),sample:true,unverified:[],personalPreview:false});
  }
  const templateSync=await syncReceiptTemplates(admin);if(templateSync.needsTaskSync)await syncMaterialTasks();await syncInventoryCounts();
  const buyerChoices=await profileScopeChoices(profile.id);

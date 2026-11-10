@@ -39,7 +39,7 @@ for(const profile of profiles.roleProfiles){
 cookieValues={};
 const card=await ctx.run(admin,()=>profileApi.GET(request('/api/role-profiles?profile=sales-representative')));
 const cardData=await card.json();assert.equal(card.status,200,JSON.stringify(cardData));assert.equal(cardData.sample,true);
-assert.equal(cardData.buyerChoices,undefined);
+assert.deepEqual(cardData.buyerChoices.map(b=>b.id),['scope-buyer-a','scope-buyer-b']);
 const {directSalesView}=load('lib/sales-navigation.ts');
 for(const [id,manager] of [['home-sales',false],['sales-manager',true]]){
  const session=review.profileSession(admin,id,ws());
@@ -60,6 +60,22 @@ assert.equal(repProfile.userId,admin.userId);assert.equal(repProfile.permissions
 assert.equal(navigation.canOpenSection(repProfile,'build-intake'),false);
 assert.equal(navigation.canOpenSection(hospitalProfile,'build-intake'),true);
 assert.equal(await salesView.salesVisible(hospitalProfile,row('scope-buyer-a')),true);assert.equal(await salesView.salesVisible(hospitalProfile,row('scope-buyer-b')),false);
+const salesApi=load('app/api/sales/route.ts');
+for(const profileId of ['home-sales','sales-representative']){
+ const selectId=crypto.randomUUID();
+ const selected=await ctx.run(admin,()=>profileApi.POST(request('/api/role-profiles',{id:selectId,mode:'select_profile',profileId,buyerId:'scope-buyer-a',confirmed:true})));
+ assert.equal(selected.status,200);
+ cookieValues[review.profileReviewCookie]=selected.headers.get('set-cookie').split(';',1)[0].split('=')[1];
+ const session=await ctx.run(admin,()=>auth.session());
+ assert.equal(session.profileReview.buyerId,'scope-buyer-a');
+ assert.equal(session.userId,admin.userId);
+ const directory=await ctx.run(admin,()=>salesApi.GET(new Request('https://test.local/api/sales')));
+ const data=await directory.json();
+ assert.equal(directory.status,200,JSON.stringify(data));
+ assert.deepEqual(data.agents.map(a=>a.id),['scope-buyer-a']);
+ assert.equal(sql.prepare('SELECT actor FROM access_audit WHERE id=?').get(selectId).actor,admin.userId);
+}
+cookieValues={};
 for(const buyerId of ['scope-inactive']){const r=await ctx.run(admin,()=>profileApi.POST(request('/api/role-profiles',{id:crypto.randomUUID(),mode:'select_profile',profileId:'sales-representative',buyerId,confirmed:true})));assert.equal(r.status,400);}
 const unscoped=await ctx.run(admin,()=>profileApi.POST(request('/api/role-profiles',{id:crypto.randomUUID(),mode:'select_profile',profileId:'sales-representative',buyerId:'',confirmed:true})));
 assert.equal(unscoped.status,200);assert.match(unscoped.headers.get('set-cookie'),/sales-representative;/);
