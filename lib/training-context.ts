@@ -1,6 +1,6 @@
 import {AsyncLocalStorage} from 'node:async_hooks';
 import {trainingTables} from './training-tables';
-export const trainingContext=new AsyncLocalStorage<{actor:string;role:string}>();
+export const trainingContext=new AsyncLocalStorage<{actor:string;role:string;treasuryAccounts?:true}>();
 const tables=new Set<string>(trainingTables);
 // SQL lexer: rewrite identifiers only, never literal values or comments.
 export function trainingSQL(sql:string){return sql.replace(/'(?:''|[^'])*'|--[^\n]*|\/\*[\s\S]*?\*\/|"(?:""|[^"])*"|`[^`]*`|\[[^\]]*\]|\b[A-Za-z_][A-Za-z_0-9]*\b/g,token=>{

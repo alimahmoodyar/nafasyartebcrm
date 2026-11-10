@@ -14,6 +14,8 @@ const salesOrderLinks=[
 ];
 const assigned=(entry:RoleLink):RoleLink=>({...entry,taskOnly:true});
 const warehouse=(title:string,source:string,view:string)=>link(title,'warehouse',warehouseTarget(source,'',view));
+export const treasuryTestTarget='treasury-test:';
+export const treasuryDestinationTarget='treasury-destination:';
 // A review catalog, deliberately separate from account permissions/jobRoles.
 // Profiles do not create accounts or grant authority to ordinary users.
 export const roleProfiles:RoleProfile[]=[
@@ -23,7 +25,7 @@ export const roleProfiles:RoleProfile[]=[
  ...[['warehouse-worker','کارگر انبار'],['production-worker','کارگر خط تولید'],['packaging-worker','کارگر بسته‌بندی'],['repair-worker','کارگر متخصص اصلاح قطعه']].map(([id,title]):RoleProfile=>({id,title,group:'کارکنان',operational:false,workflowRoles:[],links:[],gaps:[]})),
  {id:'quality',title:'مسئول کنترل کیفیت',group:'کیفیت',operational:true,workflowRoles:['qc'],links:[assigned(warehouse('کنترل کیفیت ورودی','flow','receipts')),warehouse('کنترل سریالی محصول','flow','builds'),assigned(link('کیفیت نیمه‌آماده','routine-production')),assigned(link('کیفیت پروژه','build-projects'))],gaps:[]},
  {id:'technical',title:'مسئول فنی تحقیق و توسعه',group:'فنی',operational:true,workflowRoles:['engineering'],links:[warehouse('شناسنامه، عکس، نقشه و معیارهای کالا','flow','materials'),link('بررسی فنی و طراحی','qms'),link('مسیر ساخت و کارسنجی','routine-production'),link('BOM پروژه','build-projects'),link('شناسنامه محصولات','product'),link('ظرفیت‌سنجی گازهای بیمارستانی','oxygen-capacity')],gaps:[]},
- {id:'finance-director',title:'مدیر مالی',group:'نقش‌های مرتبط',operational:true,workflowRoles:['finance'],links:[link('انبارگردانی و گزارش مغایرت‌ها','routine-production','inventory-counts'),link('کارتابل مالی خرید','finance-control'),link('بهای تولید و پروژه','build-projects')],gaps:[]},
+ {id:'finance-director',title:'مدیر مالی',group:'نقش‌های مرتبط',operational:true,workflowRoles:['finance'],links:[link('انبارگردانی و گزارش مغایرت‌ها','routine-production','inventory-counts'),link('کارتابل مالی خرید','finance-control'),link('بهای تولید و پروژه','build-projects'),assigned(link('تأیید حساب آزمایشی','treasury',treasuryTestTarget))],gaps:[]},
  {id:'ceo',title:'مدیرعامل',group:'نقش‌های مرتبط',operational:true,workflowRoles:['ceo'],links:[link('گزارش مغایرت و پایان انبارگردانی','routine-production','inventory-counts'),assigned(link('تصمیم‌های تأمین','sourcing'))],gaps:[]},
  {id:'domestic',title:'بازرگانی داخلی',group:'نقش‌های مرتبط',operational:true,workflowRoles:['domestic'],links:[assigned(link('کارتابل بازرگانی داخلی','sourcing','domestic:'))],gaps:[]},
  {id:'foreign',title:'بازرگانی خارجی',group:'نقش‌های مرتبط',operational:true,workflowRoles:['foreign'],links:[assigned(link('کارتابل بازرگانی خارجی','sourcing','foreign:'))],gaps:[]},
@@ -38,7 +40,7 @@ export const roleProfiles:RoleProfile[]=[
  {id:'sales-representative',title:'نماینده فروش',group:'فروش',operational:true,workflowRoles:[],buyerScope:'required',links:[link('ثبت درخواست خرید','sales','rep-new-order'),link('پیگیری سفارش‌ها','sales','rep-orders'),link('حساب و اعتبار نماینده','sales','rep-account'),link('ثبت پرداخت یا چک','sales','rep-new-payment'),link('درخواست مرجوعی دستگاه','sales','rep-new-return'),link('پیگیری مرجوعی‌ها','sales-returns'),link('پیگیری ارسال و دریافت','transport','rep-shipments')],gaps:[]},
  {id:'sales-manager',title:'مدیر فروش',group:'فروش',operational:true,workflowRoles:['sales'],links:[...salesOrderLinks,...salesRewardLinks,salesLink('الگوهای فروش و تخفیف پایه','terms'),salesLink('قیمت فروش','prices'),salesLink('تخصیص خریدار به کارشناس','assignments'),link('بررسی تجاری سفارش ساخت','build-intake'),link('ظرفیت‌سنجی گازهای بیمارستانی','oxygen-capacity'),link('مرجوعی دستگاه','sales-returns')],gaps:[]},
  {id:'sales-finance',title:'مالی فروش',group:'فروش',operational:true,workflowRoles:[],links:[...salesRewardLinks,link('حساب‌ها، فاکتورها و پرداخت‌های فروش','sales'),link('تطبیق بانکی فروش','sales-bank'),link('مرجوعی دستگاه','sales-returns')],gaps:[]},
- {id:'treasurer',title:'خزانه‌دار',group:'مالی',operational:true,workflowRoles:[],links:[link('ثبت و تطبیق اکسل بانک','sales-bank'),link('خزانه‌داری','treasury')],gaps:[]},
+ {id:'treasurer',title:'خزانه‌دار',group:'مالی',operational:true,workflowRoles:[],links:[link('ثبت و تطبیق اکسل بانک','sales-bank'),link('خزانه‌داری','treasury'),link('ثبت حساب مقصد آزمایشی','treasury',treasuryTestTarget)],gaps:[]},
  {id:'home-service',title:'خدمات پس از فروش خانگی',group:'نقش‌های مرتبط',operational:true,workflowRoles:[],links:[link('پرونده و درخواست قطعه خدمات خانگی','after-sales')],gaps:[]},
  {id:'hospital-service',title:'خدمات پس از فروش بیمارستانی',group:'نقش‌های مرتبط',operational:true,workflowRoles:[],links:[link('پرونده و درخواست قطعه خدمات بیمارستانی','after-sales')],gaps:[]},
  {id:'driver',title:'راننده تدارکات',group:'تدارکات',operational:true,workflowRoles:[],missionScope:true,links:[link('مأموریت‌های حمل و ثبت گزارش راننده','transport')],gaps:[]},

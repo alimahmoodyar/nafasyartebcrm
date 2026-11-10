@@ -6,9 +6,10 @@ import {AccessError} from './authorization';
 import {costRead,costWrite,moneyMicro,moneyText} from './costing';
 import {apView,active,releaseBasis} from './purchase-payables';
 import {trainingContext} from './training-context';
+import {latinDigits} from './persian-date';
 import type {Session} from './permissions';
 
-export const treasuryModes=['account','approve_account','request','approve','ceo_approve','ceo_reject','reject','cancel','execute','statement','match','unmatch','check','check_issue','check_settle','check_cancel','expense','expense_review','advance_return'] as const;
+export const treasuryModes=['account','approve_account','destination_account','approve_destination_account','request','approve','ceo_approve','ceo_reject','reject','cancel','execute','statement','match','unmatch','check','check_issue','check_settle','check_cancel','expense','expense_review','advance_return'] as const;
 export const treasuryHelp=[
  'مدیر مالی درخواست و حساب مقصد را مستقل تأیید می‌کند؛ مدیرعامل مجوز نهایی پرداخت را مستقل صادر می‌کند؛ خزانه‌دار پس از این مجوز اجرای واقعی را با مدرک ثبت می‌کند؛ مدیر حسابداری تطبیق بانکی را مستقل تأیید می‌کند. نقش مرحله‌ای انتخاب‌شده در حساب کاربر لازم است؛ حساب‌های قدیمی با عضویت در سمت و مجوز نوشتن مالی نیز پشتیبانی می‌شوند.',
  'ثبت در این دفتر انتقال بانکی یا سند حسابداری ایجاد نمی‌کند. ارقام و پیش‌بینی هر ارز جداست؛ مانده دفتر با مانده تأییدشده بانک یکسان فرض نمی‌شود.',
@@ -23,9 +24,28 @@ export const tToday=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tehran',
 export function tMoney(v:unknown,zero=false){try{const n=moneyMicro(v);if(n<BigInt(0)||!zero&&n===BigInt(0))tFail('مبلغ مثبت لازم است.');return moneyText(n);}catch{return tFail('مبلغ عددی معتبر بدون جداکننده لازم است.');}}
 export const tUUID=(v:unknown)=>{if(typeof v!=='string'||!/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(v))tFail('UUID معتبر لازم است.');return v as string;};
 const norm=(v:string)=>v.replace(/[\s\u200c]/g,'').replace(/ي/g,'ی').replace(/ك/g,'ک');
-const types="'treasury_account','treasury_request','treasury_movement','treasury_statement','treasury_check','treasury_expense','treasury_file','position','purchase_payable','payable_file','purchase_order','receipt','hr_payroll','hr_request','purchase_service'";
-export async function treasuryRows(){return (await storage().prepare('SELECT * FROM flow_entities WHERE type IN ('+types+') ORDER BY id').all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}));}
+const types="'treasury_account','sales_receiving_account','treasury_request','treasury_movement','treasury_statement','treasury_check','treasury_expense','treasury_file','position','purchase_payable','payable_file','purchase_order','receipt','hr_payroll','hr_request','purchase_service'";
+export function treasuryProfileTest<T>(u:Session,work:()=>Promise<T>){
+ const role=u.profileReview?.id;
+ if(role!=='treasurer'&&role!=='finance-director')tFail('پروفایل آزمایشی خزانه‌دار یا مدیر مالی لازم است.',403);
+ return trainingContext.run({actor:u.userId,role:role!,treasuryAccounts:true},work);
+}
+function treasuryScope(){
+ const context=trainingContext.getStore();
+ return context?.treasuryAccounts
+  ? {where:"type='sales_receiving_account' AND json_extract(data,'$.profileTestOwner')=?",args:[context.actor]}
+  : {where:'type IN ('+types+')',args:[]};
+}
+export async function treasuryRows(){
+ const scope=treasuryScope();
+ return (await storage().prepare('SELECT * FROM flow_entities WHERE '+scope.where+' ORDER BY id').bind(...scope.args).all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}));
+}
 export async function treasuryRoles(u:Session,rows:any[]){
+ const test=trainingContext.getStore();
+ if(test?.treasuryAccounts){
+  if(test.actor!==u.userId||test.role!==u.profileReview?.id||!financialAccess(u,'treasury'))tFail('پروفایل آزمایشی معتبر نیست.',403);
+  return {read:true,write:false,treasury:test.role==='treasurer',manager:test.role==='finance-director',accountant:false,ceo:false,memberId:'',membersSnapshot:'[]'};
+ }
  if(trainingContext.getStore()||!financialAccess(u,'treasury'))tFail('دسترسی مالی داخلی شرکت لازم است.',403);
  const members=(await storage().prepare('SELECT id,subject,status,permissions FROM app_members ORDER BY id').all()).results as any[];
  const m=members.find(m=>m.status==='active'&&(m.subject===u.userId||m.id===(u.userId.startsWith('local:')?u.userId.slice(6):u.userId)));
@@ -63,11 +83,14 @@ function signed(v:string){return v.startsWith('-')?-moneyMicro(v.slice(1)):money
 export async function applyTreasury(u:Session,b:any){
  const db=storage(),rows=await treasuryRows(),roles=await treasuryRoles(u,rows);
  if(b.confirmed!==true||!treasuryModes.includes(b.mode))tFail('عملیات معتبر و تأیید لازم است.');tUUID(b.id);
+ const test=trainingContext.getStore()?.treasuryAccounts;
+ if(test&&!(roles.treasury&&b.mode==='destination_account'||roles.manager&&b.mode==='approve_destination_account'))tFail('این مرحله در آزمون حساب مقصد برای این نقش مجاز نیست.',403);
  const payload=JSON.stringify(b),prior:any=await db.prepare('SELECT payload,actor FROM inventory_operations WHERE id=?').bind(b.id).first();if(prior){if(prior.payload!==payload||prior.actor!==u.userId)tFail('شناسه برای عملیات دیگری استفاده شده است.',409);return {saved:true,repeated:true,id:b.entityId||b.id};}
- const old=b.entityId?rows.find(r=>r.id===b.entityId&&r.type.startsWith('treasury_')):null;if(b.entityId&&!old)tFail('پرونده یافت نشد.',404);if(!Number.isInteger(b.revision)||b.revision!==(old?.revision||0))tFail('نسخه تغییر کرده؛ تازه‌سازی کنید.',409);
+ const old=b.entityId?rows.find(r=>r.id===b.entityId&&(r.type.startsWith('treasury_')||r.type==='sales_receiving_account')):null;if(b.entityId&&!old)tFail('پرونده یافت نشد.',404);if(!Number.isInteger(b.revision)||b.revision!==(old?.revision||0))tFail('نسخه تغییر کرده؛ تازه‌سازی کنید.',409);
  const requireRole=(role:'write'|'treasury'|'manager'|'accountant'|'ceo')=>{if(!roles[role])tFail('سمت و دسترسی مجاز این مرحله لازم است.',403);};
  const independent=(...actors:string[])=>{if(actors.includes(u.userId))tFail('این مرحله باید توسط فرد دیگری انجام شود.',403);};
- const notes=tText(b.notes,4000),now=new Date().toISOString(),id=old?.id||b.id,stamp={actor:u.userId,at:now,notes};let type=old?.type||'',d:any=old?structuredClone(old.data):{};const extra:any[]=[];
+ const destinationMode=['destination_account','approve_destination_account'].includes(b.mode);
+ const notes=destinationMode&&(b.notes==null||b.notes==='')?'':tText(b.notes,4000),now=new Date().toISOString(),id=old?.id||b.id,stamp={actor:u.userId,at:now,notes,...(test?{testProfile:u.profileReview!.id}:{})};let type=old?.type||'',d:any=old?structuredClone(old.data):{};const extra:any[]=[];
  const get=(rid:string,kind:string)=>{const r=rows.find(r=>r.id===rid&&r.type===kind);if(!r)tFail('مرجع مرتبط یافت نشد.');return r!;};
  const account=(rid:string,currency?:string)=>{const a=get(rid,'treasury_account');if(a.data.state!=='active'||currency&&a.data.currency!==currency)tFail('حساب تأییدشده با ارز منطبق لازم است.');return a;};
  const evidence=(fid:string)=>{const f=get(fid,'treasury_file');if(f.data.caseId!==id)tFail('مدرک همین پرونده لازم است.');return f.id;};
@@ -93,7 +116,22 @@ export async function applyTreasury(u:Session,b:any){
  if(b.mode==='account'){
   requireRole('treasury');if(old)tFail('حساب قابل بازنویسی نیست؛ حساب جدید با تأیید مستقل ثبت کنید.');type='treasury_account';const currency=tText(b.currency,3);if(!['IRR','USD','EUR','AED','CNY','GBP','TRY'].includes(currency)||!['bank','cash'].includes(b.kind))tFail('نوع حساب یا ارز نامعتبر است.');
   const number=tText(b.number,100);if(rowsOf(rows,type).some(a=>norm(a.data.number)===norm(number)))tFail('حساب قبلاً ثبت شده است.',409);d={title:tText(b.title,200),number,currency,kind:b.kind,opening:tMoney(b.opening,true),openingDay:realDay(),state:'review',createdBy:u.userId};
- }else if(b.mode==='approve_account'){requireRole('manager');insist('treasury_account','review');independent(d.createdBy);d.state='active';d.approvedBy=u.userId;
+ }else if(b.mode==='destination_account'){
+  requireRole('treasury');if(old)tFail('حساب مقصد قابل بازنویسی نیست.');
+  type='sales_receiving_account';
+  const number=latinDigits(tText(b.number,100)).replace(/\s/g,''),title=tText(b.title,200);
+  const iban=latinDigits(tText(b.iban,80)).replace(/\s/g,'').toUpperCase().replace(/^(?=\d)/,'IR');
+  if(!/^IR\d{24}$/.test(iban)||BigInt(iban.slice(4)+'1827'+iban.slice(2,4))%BigInt(97)!==BigInt(1))tFail('شماره شبای معتبر وارد کنید.');
+  const cardNumber=b.cardNumber==null||b.cardNumber===''?'':latinDigits(tText(b.cardNumber,40)).replace(/[\s-]/g,'');
+  if(cardNumber&&!/^\d{16}$/.test(cardNumber))tFail('شماره کارت باید ۱۶ رقم باشد.');
+  if(rows.some(a=>(a.type===type||a.type==='treasury_account'&&a.data.kind==='bank'&&a.data.currency==='IRR')&&(a.data.iban===iban||norm(a.data.title)===norm(title)&&norm(a.data.number)===norm(number))))tFail('این حساب یا شبا قبلاً ثبت شده است.',409);
+  d={title,number,iban,...(cardNumber?{cardNumber}:{}),currency:'IRR',kind:'bank',state:'review',createdBy:u.userId,...(test?{profileTestOwner:u.userId}:{})};
+ }else if(b.mode==='approve_account'||b.mode==='approve_destination_account'){
+  requireRole('manager');insist(b.mode==='approve_destination_account'?'sales_receiving_account':'treasury_account','review');
+  if(test){
+   if(d.history?.[0]?.testProfile!=='treasurer')tFail('ثبت حساب از پروفایل آزمایشی خزانه‌دار لازم است.',403);
+  }else independent(d.createdBy);
+  d.state='active';d.approvedBy=u.userId;
  }else if(b.mode==='request'){
   requireRole('write');if(old)tFail('درخواست جدید بسازید.');type='treasury_request';if(!['in','out'].includes(b.direction)||!['purchase','expense','advance','foreign','sales','other'].includes(b.category))tFail('جهت یا گروه نامعتبر است.');const currency=tText(b.currency,3);if(!['IRR','USD','EUR','AED','CNY','GBP','TRY'].includes(currency))tFail('ارز نامعتبر است.');
   const source=b.sourceKey?treasurySources(rows).find(s=>s.key===b.sourceKey):null;if(b.sourceKey&&!source)tFail('منبع خرید آزادشده یافت نشد.',409);const amount=tMoney(b.amount);if(source&&(b.direction!=='out'||b.category!=='purchase'||currency!=='IRR'||moneyMicro(amount)>moneyMicro(source.amount)))tFail('مبلغ، ارز یا گروه با منبع خرید منطبق نیست.');
@@ -133,7 +171,9 @@ export async function applyTreasury(u:Session,b:any){
   requireRole('treasury');insist('treasury_request','paid','partial','cancelled');if(d.category!=='advance'||d.direction!=='out')tFail('درخواست تنخواه لازم است.');const used=rowsOf(rows,'treasury_expense').filter(e=>e.data.requestId===id&&['approved','review'].includes(e.data.state)).reduce((n,e)=>n+moneyMicro(e.data.amount),BigInt(0)),returned=rowsOf(rows,'treasury_movement').filter(m=>m.data.requestId===id&&m.data.kind==='advance_return').reduce((n,m)=>n+moneyMicro(m.data.amount),BigInt(0)),amount=tMoney(b.amount);if(used+returned+moneyMicro(amount)>tPaid(id,rows))tFail('برگشت بیشتر از مانده آزاد تنخواه است.');movement(old,amount,b.accountId,'advance_return');
  }
  d.history=[...(d.history||[]),{mode:b.mode,...stamp,fileId:b.fileId||''}];if(d.history.length>2000)tFail('سقف تاریخچه پرونده رسیده است.');
- const snapshot=rows.reduce((n,r)=>n+r.revision,0),guard="(SELECT COUNT(*) FROM flow_entities WHERE type IN ("+types+"))=? AND (SELECT COALESCE(SUM(revision),0) FROM flow_entities WHERE type IN ("+types+"))=? AND (SELECT json_group_array(json_object('id',id,'subject',subject,'status',status,'permissions',permissions)) FROM (SELECT id,subject,status,permissions FROM app_members ORDER BY id))=?";
- await db.batch([db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,CASE WHEN '+guard+' THEN 1 ELSE 0 END)').bind(b.id,'treasury_'+b.mode,payload,u.userId,now,rows.length,snapshot,roles.membersSnapshot),...extra,old?db.prepare('UPDATE flow_entities SET data=?,revision=revision+1,updated=? WHERE id=?').bind(JSON.stringify(d),now,id):db.prepare('INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?)').bind(id,type,JSON.stringify(d),now,now),db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,id,'treasury_'+b.mode,JSON.stringify(d),now)]);
+ const snapshot=rows.reduce((n,r)=>n+r.revision,0),scope=treasuryScope();
+ const memberGuard="(SELECT json_group_array(json_object('id',id,'subject',subject,'status',status,'permissions',permissions)) FROM (SELECT id,subject,status,permissions FROM app_members ORDER BY id))=?";
+ const guard='(SELECT COUNT(*) FROM flow_entities WHERE '+scope.where+')=? AND (SELECT COALESCE(SUM(revision),0) FROM flow_entities WHERE '+scope.where+')=?'+(test?'':' AND '+memberGuard);
+ await db.batch([db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,CASE WHEN '+guard+' THEN 1 ELSE 0 END)').bind(b.id,'treasury_'+b.mode,payload,u.userId,now,...scope.args,rows.length,...scope.args,snapshot,...(test?[]:[roles.membersSnapshot])),...extra,old?db.prepare('UPDATE flow_entities SET data=?,revision=revision+1,updated=? WHERE id=?').bind(JSON.stringify(d),now,id):db.prepare('INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?)').bind(id,type,JSON.stringify(d),now,now),db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,id,'treasury_'+b.mode,JSON.stringify(d),now)]);
  return {saved:true,id};
 }

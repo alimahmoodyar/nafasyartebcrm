@@ -11,7 +11,7 @@ import {financialWorkflowRole} from './financial-workflow-roles';
 import {leadMembers,leadMemberGuard} from './sales-leads';
 import {dayAt} from './duties';
 import {allocationPlan} from './sales-network-contract';
-import {salesBankModes,MAX_SALES_BANK_BYTES,bankCode,normalizeBankRows,bankRowIdentity,bankMatch} from './sales-bank-contract';
+import {salesBankModes,MAX_SALES_BANK_BYTES,bankCode,normalizeBankRows,bankRowIdentity,bankMatch,isApprovedReceivingAccount as approvedAccount} from './sales-bank-contract';
 import {parseSalesBankRows} from './sales-bank-import';
 import {bankWorkbookFormat,readBankWorkbook,detectBankReport,extractBankReport} from './sales-bank-workbook';
 
@@ -25,8 +25,7 @@ export async function salesBankRoles(actor:Session){
  return {u,members,manage,bank};
 }
 async function bankEntities(){return [...await salesRows(),...(await storage().prepare("SELECT * FROM flow_entities WHERE type='treasury_account' ORDER BY id").all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}))];}
-const accountPublic=(a:any,bank:boolean)=>({id:a.id,revision:a.revision,data:{title:a.data.title,...(bank?{number:a.data.number}:{}),currency:a.data.currency,kind:a.data.kind,state:a.data.state}});
-const approvedAccount=(a:any)=>a.type==='treasury_account'&&a.data.state==='active'&&a.data.kind==='bank'&&a.data.currency==='IRR';
+const accountPublic=(a:any,bank:boolean)=>({id:a.id,revision:a.revision,data:{title:a.data.title,...(bank?{number:a.data.number,iban:a.data.iban,cardNumber:a.data.cardNumber}:{}),currency:a.data.currency,kind:a.data.kind,state:a.data.state}});
 const minimalAgent=(a:any)=>({id:a.id,revision:a.revision,data:{name:a.data.name,active:a.data.active,kind:a.data.kind||'representative',receivingAccountIds:a.data.receivingAccountIds||[]}});
 const statementPublic=(s:any)=>{const {objectKey,...data}=s.data;return {...s,data};};
 export async function readSalesBank(actor:Session){

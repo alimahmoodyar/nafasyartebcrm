@@ -3,6 +3,7 @@ import {dayAt} from './duties';
 
 export const salesBankModes=['terminal','import','reconcile','reverse','receiving_accounts'] as const;
 export const MAX_SALES_BANK_BYTES=10*1024*1024;
+export const isApprovedReceivingAccount=(a:any)=>['treasury_account','sales_receiving_account'].includes(a.type)&&a.data.state==='active'&&a.data.kind==='bank'&&a.data.currency==='IRR';
 // Identifiers are strings: leading zeroes matter and punctuation is not interchangeable.
 export const bankCode=(value:string)=>value.trim().toLowerCase().replace(/\s+/g,'');
 export function normalizeBankRows(input:unknown){
@@ -25,7 +26,7 @@ export function bankMatch(row:any,all:any[]){
  if(d.status==='reversed')return answer('reversed','تأیید این ردیف برگشت خورده و دوباره خودکار تأیید نمی‌شود.');
  if(d.direction!=='in')return answer('ignored','برداشت بانک، وصول خریدار نیست.');
  if(!['pos','transfer'].includes(d.kind))return answer('unmatched','نوع واریز مشخص نیست؛ مالی باید بررسی کند.');
- if(!all.some(a=>a.id===d.accountId&&a.type==='treasury_account'&&a.data.state==='active'&&a.data.kind==='bank'&&a.data.currency==='IRR'))return answer('unmatched','حساب مقصد بانکی ریالی تأییدشده نیست.');
+ if(!all.some(a=>a.id===d.accountId&&isApprovedReceivingAccount(a)))return answer('unmatched','حساب مقصد بانکی ریالی تأییدشده نیست.');
  const code=bankCode(d.reference||''),payments=all.filter(r=>r.type==='sales_payment'&&r.data.method==='bank'&&!r.data.openingId),agents=all.filter(r=>r.type==='sales_agent'&&r.data.active&&r.data.kind!=='referrer');
  const exact=payments.filter(p=>code&&bankCode(p.data.reference||'')===code&&p.data.amount===d.amount&&p.data.day===d.day&&p.data.receivingAccountId===d.accountId);
  candidates.push(...exact.map(p=>({id:p.id,agentId:p.data.agentId,amount:p.data.amount,day:p.data.day,reference:p.data.reference,state:p.data.state})));
