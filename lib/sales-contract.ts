@@ -31,6 +31,11 @@ export const salesHelp=[
 ];
 export const rial=(v:unknown)=>BigInt(String(v||'0'));
 export const total=(items:any[],value:(i:any)=>unknown)=>items.reduce((n,i)=>n+rial(value(i)),BigInt(0));
+export function checkRecovery(payment:any,rows:any[]){
+ const valid=rows.filter(r=>r.type==='sales_check_recovery'&&r.data.paymentId===payment.id&&rows.some(p=>p.type==='sales_payment'&&p.id===r.data.creditId&&p.data.agentId===payment.data.agentId&&p.data.state==='cleared'));
+ const recovered=total(valid,r=>r.data.amount),remaining=rial(payment.data.amount)-recovered;
+ return {recovered:String(recovered),remaining:String(remaining>BigInt(0)?remaining:BigInt(0))};
+}
 export function salesAccounts(rows:any[],agentId:string,today:string){
  const own=rows.filter(r=>r.data.agentId===agentId),payments=own.filter(r=>r.type==='sales_payment'),returns=own.filter(r=>r.type==='sales_return'),allocations=own.filter(r=>r.type==='sales_allocation');
  const credits=[...payments.filter(r=>r.data.state==='cleared'),...returns.filter(r=>r.data.state==='credited'),
@@ -47,8 +52,9 @@ export function salesSecuredCredit(rows:any[],agentId:string,today:string,exclud
  const ceiling=total(account.payments.filter(row=>row.data.state==='check_collateral'),row=>row.data.disposition?.amount);
  const held=total(rows.filter(row=>row.type==='sales_order'&&row.id!==excludeOrderId&&row.data.agentId===agentId&&row.data.state==='sales_approved'),row=>row.data.securedHold);
  const used=rial(account.debt)+held;
- const funded=ceiling+rial(account.credit);
- return {ceiling:String(ceiling),held:String(held),debt:account.debt,available:String(funded>used?funded-used:BigInt(0)),cashCredit:account.credit};
+ const bouncedHold=total(account.payments.filter(p=>p.data.method==='check'&&p.data.state==='bounced'&&p.data.disposition?.state!=='approved'),p=>checkRecovery(p,rows).remaining);
+ const funded=ceiling+rial(account.credit),net=funded-used-bouncedHold;
+ return {ceiling:String(ceiling),held:String(held),debt:account.debt,available:String(net>BigInt(0)?net:BigInt(0)),netAvailable:String(net),bouncedHold:String(bouncedHold),cashCredit:account.credit};
 }
 
 export function salesCheckPosition(payment:any, account:ReturnType<typeof salesAccounts>, today:string){

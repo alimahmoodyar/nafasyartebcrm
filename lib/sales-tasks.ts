@@ -3,7 +3,7 @@ import {storage} from './storage';
 import {dayAt,addDay} from './duties';
 import {salesRows,salesLock,salesStaff,salesFinance,salesRep,salesManager} from './sales';
 import {rewardPeriods,salesRewardProgress} from './sales-rewards';
-import {salesAccounts,salesCheckPosition,salesTargetProgress,rial} from './sales-contract';
+import {checkRecovery,salesAccounts,salesCheckPosition,salesTargetProgress,rial} from './sales-contract';
 export async function syncSalesTasks(){
  const db=storage(),op=crypto.randomUUID(),checks=await salesLock(db,op),rows=await salesRows(),today=dayAt(),now=new Date().toISOString();
  const members=(await db.prepare("SELECT id,name,permissions FROM app_members WHERE status='active'").all()).results.map((m:any)=>({...m,permissions:storedAccessPermissions(m.permissions)}));
@@ -23,9 +23,13 @@ export async function syncSalesTasks(){
   for(const o of own.filter(r=>r.type==='sales_order'))if(['submitted','credit_review','sales_approved'].includes(o.data.state))task(a,'order:'+o.id+':'+o.data.state,o.data.state==='submitted'?'بررسی سفارش '+o.data.code:'تأیید مالی سفارش '+o.data.code,addDay(o.created.slice(0,10),1),o.data.state==='submitted'?(o.data.securedPolicy||o.data.salesTerms?'manager':'staff'):'finance','قیمت، مهلت پرداخت و موجودی قابل تحویل را بررسی کنید.');else if(o.data.state==='approved'){
    const sales=(await db.prepare("SELECT data FROM flow_entities WHERE type='sale' AND json_extract(data,'$.salesOrderId')=?").bind(o.id).all()).results.map((s:any)=>JSON.parse(s.data));const complete=o.data.lines.every((l:any)=>sales.filter(s=>!s.replacementReturnId&&s.productId===l.productId&&s.state==='delivered').reduce((n,s)=>n+s.count,0)>=l.quantity);if(!complete)task(a,'delivery:'+o.id,'پیگیری تحویل '+o.data.code,o.data.promisedDay||addDay(o.created.slice(0,10),2),'staff','رزرو سریال، ارسال و تأیید دریافت هر محموله را پیگیری کنید. اگر نماینده از سامانه استفاده نمی‌کند، مستند دریافت را بگیرید و از حساب خودتان ثبت کنید. مانع یا موعد جدید را ثبت کنید.');
   }
-  for(const p of account.payments)if(p.data.state==='pending')task(a,'payment:'+p.id,p.data.checkPurpose==='collateral'?'تأیید چک ضمانت':'بررسی رسید پرداخت',addDay(p.created.slice(0,10),1),'finance',p.data.checkPurpose==='collateral'?'اعتبار و مدرک چک ضمانت '+p.data.reference+' را بررسی کنید.':'رسید '+p.data.reference+' را با بانک تطبیق دهید؛ سپس تأیید و به اقساط تخصیص دهید.');else if(p.data.state==='received'){
+  for(const p of account.payments)if(p.data.state==='pending')task(a,'payment:'+p.id,p.data.method==='check'?'بررسی دریافت و ثبت سامانه‌ای چک':'بررسی رسید پرداخت',addDay(p.created.slice(0,10),1),'finance',p.data.method==='check'?'دریافت اصل و ثبت یا انتقال سامانه‌ای چک '+p.data.reference+' را جداگانه تأیید کنید.':'رسید '+p.data.reference+' را با بانک تطبیق دهید؛ سپس تأیید و به اقساط تخصیص دهید.');else if(p.data.state==='received'){
    const review=p.data.disposition?.state==='pending'||salesCheckPosition(p,account,today).requiresReview;
    task(a,'check:'+p.id,review?'تعیین تکلیف چک':'پیگیری وصول چک',review?today:p.data.checkDue,'finance',review?'درخواست یا اختلاف مبلغ چک '+p.data.reference+' را در حساب نماینده بررسی کنید.':'نتیجه وصول یا برگشت چک '+p.data.reference+' را ثبت کنید.');
+  }
+  for(const p of account.payments.filter(p=>p.data.state==='bounced')){
+   const recovery=checkRecovery(p,rows);
+   if(rial(recovery.remaining)>BigInt(0))task(a,'check:bounced:'+p.id,'هشدار چک برگشتی',p.updated.slice(0,10),'agent','چک '+p.data.reference+' برگشت خورده است. مانده تعیین‌تکلیف '+recovery.remaining+' ریال.');
   }
   for(const i of account.invoices)for(const p of i.installments)if(rial(p.remaining)>BigInt(0)&&p.days<=7){for(const role of ['agent','staff','finance'])task(a,'due:'+i.id+':'+p.id,'سررسید فاکتور '+i.data.reference,p.due,role,'مانده قسط '+p.id+': '+p.remaining+' ریال. پرداخت اعلامی تنها پس از تأیید و تخصیص مالی در مانده اثر دارد.');}
   for(const t of own.filter(r=>r.type==='sales_target')){const progress=salesTargetProgress(t,rows,today);if(progress.active&&progress.next)for(const role of ['agent','staff'])task(a,'target:'+t.id,'پیگیری تارگت '+t.data.title,t.data.end,role,'تا پلکان بعدی '+progress.next.remaining+(t.data.basis==='units'?' دستگاه':' ریال')+' باقی مانده است.');}

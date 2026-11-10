@@ -2,6 +2,7 @@ import {salesVisible,liveSalesUser,salesViewer,salesReportRead,salesScope} from 
 import {requireAccess,checkOrigin,accessResponse} from '@/lib/authorization';
 import {storage} from '@/lib/storage';
 import {boundedBody} from '@/lib/firmware-storage';
+import {syncSalesTasks} from '@/lib/sales-tasks';
 import {memberId,dayAt} from '@/lib/duties';
 import {salesFail as fail,salesManager,salesStaff,salesFinance,salesRep,salesRows,salesEntity,salesLock,sreq as req,stxt as txt,integer,money,sday} from '@/lib/sales';
 import {rial,total} from '@/lib/sales-contract';
@@ -60,5 +61,5 @@ export async function POST(request:Request){try{
   put(alert.id,'sales_alert',d,alert);
  }
  await db.batch([db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(id,'sales_monitor_'+mode,signature,u.userId,now),...checks,...stmts,db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,target,'sales_monitor_'+mode,signature,now)]);
- let followupPending=false;try{await scanSalesMonitor({reports:false,source:'event'});}catch{followupPending=true;}return json({saved:true,id:target,followupPending});
+ let followupPending=false;try{await scanSalesMonitor({reports:false,source:'event'});if(mode==='recover_check')await syncSalesTasks();}catch{followupPending=true;}return json({saved:true,id:target,followupPending});
  }catch(e){return accessResponse(e)||json({error:'ثبت انجام نشد؛ ممکن است اطلاعات هم‌زمان تغییر کرده باشد. نتیجه را بررسی و تازه‌سازی کنید.'},409)}}

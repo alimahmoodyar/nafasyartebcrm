@@ -205,9 +205,12 @@ async function fundWithCollateral(quoted) {
   await post(sales, '/api/sales', cheque, rep);
   assert.equal(entity(cheque.id).data.state, 'pending');
   assert.equal((await available()).ceiling, '0');
-  const approveCheque = () => salesBody('payment_review', {agentId, paymentId: cheque.id, revision: 1, approved: true});
-  await post(sales, '/api/sales', approveCheque(), rep, 403);
-  await post(sales, '/api/sales', approveCheque(), finance);
+  const approveCheque = (checkEvidence, revision=1) => salesBody('payment_review', {agentId, paymentId: cheque.id, revision, approved: true, checkEvidence});
+  await post(sales, '/api/sales', approveCheque('physical'), rep, 403);
+  await post(sales, '/api/sales', approveCheque('physical'), finance);
+  assert.equal(entity(cheque.id).data.state, 'pending');
+  assert.equal((await available()).ceiling, '0');
+  await post(sales, '/api/sales', approveCheque('registry', 2), finance);
   assert.equal(entity(cheque.id).data.state, 'check_collateral');
   assert.equal((await available()).available, quoted.amount);
 

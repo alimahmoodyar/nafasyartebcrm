@@ -1,4 +1,4 @@
-import {salesAccounts,salesOrderProgress,rial,total} from './sales-contract';
+import {checkRecovery,salesAccounts,salesOrderProgress,rial,total} from './sales-contract';
 import {localDay,solarParts,solarToIso,solarMonthDays,formatDate} from './persian-date';
 export const reportKinds:Record<string,string>={daily:'روزانه',weekly:'هفتگی',quarterly:'فصلی'};
 export const alertKinds:Record<string,string>={bounced_check:'چک برگشتی',overdue:'مطالبات معوق',goal_gap:'فاصله از هدف فروش',late_delivery:'تأخیر تحویل',pending_payment:'رسید منتظر مالی',repeat_returns:'برگشتی پرتکرار'};
@@ -35,7 +35,7 @@ export function dueReports(now:Date,policy:any){
  const today=localDay(now),time=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Tehran',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(now),startDay=policy.startedDay||today;
  return Object.keys(reportKinds).flatMap(kind=>{let scheduled=kind==='daily'?today:kind==='weekly'?shiftDay(today,-((new Date(today+'T12:00:00Z').getUTCDay()+1)%7)):quarterStart(today);const at=policy[kind+'Time'];if(scheduled===today&&time<at){scheduled=kind==='daily'?shiftDay(today,-1):kind==='weekly'?shiftDay(today,-7):previousQuarter(scheduled).start;}return scheduled<startDay?[]:[{kind,scheduled,...reportPeriod(kind,scheduled)}];});
 }
-export function checkRecovery(payment:any,rows:any[]){const valid=rows.filter(r=>r.type==='sales_check_recovery'&&r.data.paymentId===payment.id&&rows.some(p=>p.type==='sales_payment'&&p.id===r.data.creditId&&p.data.agentId===payment.data.agentId&&p.data.state==='cleared'));return {recovered:String(total(valid,r=>r.data.amount)),remaining:String(positive(rial(payment.data.amount)-total(valid,r=>r.data.amount)))};}
+export {checkRecovery} from './sales-contract';
 export function detectSalesAlerts(rows:any[],deliveries:any[],now:Date,policy:any){
  const today=localDay(now),agents=rows.filter(r=>r.type==='sales_agent'),result:any[]=[];
  const add=(kind:string,agent:any,sourceId:string,severity:string,summary:string,evidence:any,action:string,weight:bigint=BigInt(0))=>result.push({key:kind+':'+sourceId,kind,agentId:agent.id,sourceId,severity,title:alertKinds[kind]+' · '+agent.data.name,summary,evidence,action,weight:String(weight)});

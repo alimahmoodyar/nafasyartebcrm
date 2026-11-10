@@ -88,7 +88,7 @@ async function post(request:Request){try{
  const installments=(items:any[],amount:string)=>{const result=arr(items,36).map((i,index)=>({id:String(index+1),due:sday(i.due),amount:money(i.amount,true)}));if(total(result,i=>i.amount)!==rial(amount))fail('جمع اقساط باید دقیقاً برابر مبلغ فاکتور باشد.');return result;};
  function canHold(order:any, orderId?:string){
   const credit=salesSecuredCredit(rows,own().id,today,orderId);
-  return rial(order.amount)+rial(credit.debt)+rial(credit.held)<=rial(credit.ceiling)+rial(account().credit);
+  return rial(order.amount)<=rial(credit.netAvailable);
  }
  async function reserveOrder(orderId:string,order:any){
   const reservations:{line:any;devices:any[];qualityChecks:D1PreparedStatement[]}[]=[];
@@ -222,7 +222,7 @@ async function post(request:Request){try{
   if(b.method!=='cash'&&!file)fail('تصویر رسید یا چک همین نماینده لازم است.');
   if(receivingAccountId&&rows.some(r=>r.type==='sales_payment'&&r.id!==old?.id&&r.data.receivingAccountId===receivingAccountId&&r.data.normalizedReference===normalizedReference))fail('این تراکنش برای حساب مقصد قبلاً ثبت شده است.',409);
   if(b.method==='bank'&&rows.some(r=>r.type==='sales_payment'&&r.id!==old?.id&&r.data.bankRowId&&bankCode(r.data.reference||'')===bankCode(reference)&&(!receivingAccountId||r.data.receivingAccountId===receivingAccountId)))fail('این پیگیری قبلاً به وصول بانکی متصل شده است؛ سابقه بانک را بررسی کنید.',409);
-  const checkDue=b.method==='check'?sday(b.checkDue):'';const cashOrderId=txt(b.cashOrderId||'',200),checkInvoiceId=txt(b.checkInvoiceId||'',200);if(cashOrderId){if(b.method==='check')fail('وجه نقد خرید جدید نمی‌تواند چک باشد.');const o=await get(cashOrderId,'sales_order');state(o,['sales_approved','approved']);if(!o.data.salesTerms)fail('خرید فاقد شرایط مصوب است.');if(!rows.some(r=>r.type==='sales_invoice'&&r.data.orderId===o.id))fail('ابتدا فاکتور خرید جدید صادر شود تا وجه نقد به قسط مصوب متصل شود.');}if(b.method==='check'&&b.checkPurpose==='collateral'&&checkInvoiceId)fail('چک ضمانت به فاکتور پرداخت متصل نمی‌شود.');if(checkInvoiceId)await get(checkInvoiceId,'sales_invoice');target=old?.id||id;put(target,'sales_payment',{agentId:own().id,method:b.method,receivingAccountId,amount,day,bank,normalizedBank,reference,normalizedReference,fileId:file?.id||'',checkDue,cashOrderId,checkInvoiceId,state:'pending',checkPurpose:b.method==='check'&&b.checkPurpose==='collateral'?'collateral':'payment',submittedBy:u.userId,notes:txt(b.notes||'',4000)},old);
+  const checkDue=b.method==='check'?sday(b.checkDue):'';const cashOrderId=txt(b.cashOrderId||'',200),checkInvoiceId=txt(b.checkInvoiceId||'',200);if(cashOrderId){if(b.method==='check')fail('وجه نقد خرید جدید نمی‌تواند چک باشد.');const o=await get(cashOrderId,'sales_order');state(o,['sales_approved','approved']);if(!o.data.salesTerms)fail('خرید فاقد شرایط مصوب است.');if(!rows.some(r=>r.type==='sales_invoice'&&r.data.orderId===o.id))fail('ابتدا فاکتور خرید جدید صادر شود تا وجه نقد به قسط مصوب متصل شود.');}if(b.method==='check'&&b.checkPurpose==='collateral'&&checkInvoiceId)fail('چک ضمانت به فاکتور پرداخت متصل نمی‌شود.');if(checkInvoiceId)await get(checkInvoiceId,'sales_invoice');target=old?.id||id;put(target,'sales_payment',{agentId:own().id,method:b.method,receivingAccountId,amount,day,bank,normalizedBank,reference,normalizedReference,fileId:file?.id||'',checkDue,cashOrderId,checkInvoiceId,...(b.method==='check'?{checkVerification:{}}:{}),state:'pending',checkPurpose:b.method==='check'&&b.checkPurpose==='collateral'?'collateral':'payment',submittedBy:u.userId,notes:txt(b.notes||'',4000)},old);
  }else if(['check_disposition_request','check_disposition_review'].includes(mode)){
   const payment=await get(req(b.paymentId),'sales_payment');
   revision(payment);
@@ -254,14 +254,26 @@ async function post(request:Request){try{
   target=payment.id;
   put(payment.id,'sales_payment',{...payment.data,state:next,disposition,previousDispositions:mode==='check_disposition_request'&&previous?[...(payment.data.previousDispositions||[]),previous]:payment.data.previousDispositions},payment);
  }else if(['payment_review','check_status','payment_reverse'].includes(mode)){
-  const p=await get(req(b.paymentId),'sales_payment');revision(p);target=p.id;let next='';
+  const p=await get(req(b.paymentId),'sales_payment');revision(p);target=p.id;let next='',checkVerification=p.data.checkVerification;
   if(mode==='payment_review'&&b.approved===true&&p.data.method==='bank'&&rows.some(r=>r.type==='sales_payment'&&r.id!==p.id&&r.data.bankRowId&&bankCode(r.data.reference||'')===bankCode(p.data.reference||'')&&(!p.data.receivingAccountId||r.data.receivingAccountId===p.data.receivingAccountId)))fail('این پرداخت با وصول بانکی دیگری تعارض دارد؛ از بخش تطبیق بانک بررسی کنید.',409);
-  if(mode==='payment_review'){state(p,['pending']);if(typeof b.approved!=='boolean')fail('نتیجه بررسی لازم است.');next=b.approved?(p.data.method==='check'?(p.data.checkPurpose==='collateral'?'check_collateral':'received'):'cleared'):'rejected';}
-  if(mode==='check_status'){if(p.data.method!=='check')fail('این پرداخت چک نیست.');if(!['cleared','bounced'].includes(b.state))fail('وضعیت چک معتبر نیست.');state(p,b.state==='cleared'?['received']:['received','cleared']);if(b.state==='cleared'&&salesCheckPosition(p,account(),today).requiresReview)fail('مبلغ چک بیشتر از مانده فاکتور است؛ ابتدا چک را تعیین تکلیف کنید.',409);if(b.state==='cleared'&&p.data.checkDue>today)fail('تاریخ وصول چک هنوز نرسیده است.');next=b.state;}
+  if(mode==='payment_review'){
+   state(p,['pending']);
+   if(typeof b.approved!=='boolean')fail('نتیجه بررسی لازم است.');
+   if(!b.approved)next='rejected';
+   else if(p.data.method!=='check')next='cleared';
+   else {
+    const evidence=b.checkEvidence;
+    if(evidence!=='physical'&&evidence!=='registry')fail('دریافت اصل چک یا تأیید سامانه‌ای را جداگانه ثبت کنید.');
+    if(checkVerification?.[evidence])fail('این مرحله قبلاً ثبت شده است.',409);
+    checkVerification={...checkVerification,[evidence]:{by:u.userId,at:now}};
+    next=checkVerification.physical&&checkVerification.registry?(p.data.checkPurpose==='collateral'?'check_collateral':'received'):'pending';
+   }
+  }
+  if(mode==='check_status'){if(p.data.method!=='check')fail('این پرداخت چک نیست.');if(!['cleared','bounced'].includes(b.state))fail('وضعیت چک معتبر نیست.');state(p,b.state==='cleared'?['received']:['received','cleared','check_collateral']);if(b.state==='cleared'&&salesCheckPosition(p,account(),today).requiresReview)fail('مبلغ چک بیشتر از مانده فاکتور است؛ ابتدا چک را تعیین تکلیف کنید.',409);if(p.data.checkDue>today)fail('تاریخ وصول چک هنوز نرسیده است.');next=b.state;}
   if(p.data.bankRowId)fail('وصول متصل به بانک را از بخش پوز و تطبیق دریافت‌ها بررسی یا برگشت بزنید.');
   if(mode==='payment_reverse'){state(p,['cleared']);next='reversed';}
   const events=[...(p.data.financialEvents||[])];if(next==='cleared'||p.data.state==='cleared')events.push({id,day:today,at:now,delta:next==='cleared'?p.data.amount:String(-rial(p.data.amount)),state:next});
-  put(p.id,'sales_payment',{...p.data,financialEvents:events,state:next,...(next==='check_collateral'?{disposition:{kind:'collateral',state:'approved',amount:p.data.amount,reviewedBy:u.userId,reviewedAt:now}}:{}),reviewedBy:u.userId,reviewedAt:now,reviewNotes:notes()},p);
+  put(p.id,'sales_payment',{...p.data,financialEvents:events,state:next,...(checkVerification?{checkVerification}:{}),...(next==='check_collateral'?{disposition:{kind:'collateral',state:'approved',amount:p.data.amount,reviewedBy:u.userId,reviewedAt:now}}:{}),reviewedBy:u.userId,reviewedAt:now,reviewNotes:notes()},p);
  }else if(mode==='allocate'){
   const plan=allocationPlan(rows,own().id,req(b.creditId),today);if(!plan.allocations.length)fail('اعتبار آزاد قابل تخصیص وجود ندارد.');
   if(b.allocations&&JSON.stringify(b.allocations)!==JSON.stringify(plan.allocations))fail('تخصیص باید مطابق اولویت خودکار باشد؛ پیش‌نمایش را تازه کنید.',409);
