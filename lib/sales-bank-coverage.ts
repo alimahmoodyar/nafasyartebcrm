@@ -45,6 +45,12 @@ export function uncoveredBankPeriods(from:string,to:string,covered:BankPeriod[])
  return result;
 }
 
+export function bankPaymentReviewDue(payment:any,periods:ReturnType<typeof coveredBankPeriods>,today:string){
+ const {receivingAccountId,day}=payment.data;
+ if(!receivingAccountId)return true;
+ return isIsoDay(day)&&day<=addDay(today,-2)&&(periods.get(receivingAccountId)||[]).some(range=>range.from<=day&&range.to>=day);
+}
+
 export function bankCoverage(rows:any[],today:string){
  const covered=coveredBankPeriods(rows),posCovered=coveredBankPeriods(rows,'pos'),through=addDay(today,-1);
  const terminals=rows.filter(row=>row.type==='sales_bank_terminal');

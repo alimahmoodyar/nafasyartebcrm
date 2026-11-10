@@ -6,7 +6,8 @@ import {salesRows,salesLock,salesStaff,salesFinance,salesRep,salesManager} from 
 import {rewardPeriods,salesRewardProgress} from './sales-rewards';
 import {checkRecovery,salesAccounts,salesCheckPosition,salesTargetProgress,rial} from './sales-contract';
 import {bankEntities} from './sales-bank';
-import {bankAmbiguities} from './sales-bank-contract';
+import {bankAmbiguities,readyBankRowForPayment} from './sales-bank-contract';
+import {bankPaymentReviewDue,coveredBankPeriods} from './sales-bank-coverage';
 import {heldSalesCustody} from './sales-custody';
 import {salesBankRowTarget} from './role-profiles';
 export async function syncSalesTasks(){
@@ -22,8 +23,10 @@ export async function syncSalesTasks(){
    else stmts.push(db.prepare("INSERT INTO duty_runs(id,template_id,period,assignee,supervisor,due,state,data,revision,created,updated) VALUES(?,?,?,?,?,?,'open',?,1,?,?)").bind(tid,'sales:'+key,today,m.id,supervisor,at,JSON.stringify(data),now,now));
   }
  }
- const collisions=rows.some(r=>r.type==='sales_bank_row'&&r.data.status==='pending')?bankAmbiguities(await bankEntities(rows)):[];
- const competing=new Set(collisions.flatMap(({assessment})=>assessment.candidates.map(candidate=>candidate.id)));
+ const bankRows=await bankEntities(rows),bankPeriods=coveredBankPeriods(bankRows);
+ const bankReviews=new Set(rows.filter(r=>r.type==='sales_payment'&&r.data.method==='bank'&&r.data.state==='pending'&&bankPaymentReviewDue(r,bankPeriods,today)&&!readyBankRowForPayment(r,bankRows)).map(r=>r.id));
+ const collisions=bankAmbiguities(bankRows).filter(({assessment})=>assessment.candidates.some(candidate=>bankReviews.has(candidate.id)));
+ const competing=new Set(collisions.flatMap(({assessment})=>assessment.candidates.filter(candidate=>bankReviews.has(candidate.id)).map(candidate=>candidate.id)));
  for(const {row,assessment} of collisions)task(null,'bank-conflict:'+row.id,'مغایرت واریز بانکی',today,'finance',assessment.reason,salesBankRowTarget+row.id,'','','sales-bank');
  for(const a of rows.filter(r=>r.type==='sales_agent'&&r.data.active)){
   const own=rows.filter(r=>r.data.agentId===a.id),account=salesAccounts(rows,a.id,today);
@@ -46,7 +49,7 @@ export async function syncSalesTasks(){
   for(const o of own.filter(r=>r.type==='sales_order'))if(['submitted','credit_review','sales_approved'].includes(o.data.state))task(a,'order:'+o.id+':'+o.data.state,o.data.state==='submitted'?'بررسی سفارش '+o.data.code:'تأیید مالی سفارش '+o.data.code,addDay(o.created.slice(0,10),1),o.data.state==='submitted'?(o.data.securedPolicy||o.data.salesTerms?'manager':'staff'):'finance','قیمت، مهلت پرداخت و موجودی قابل تحویل را بررسی کنید.','order:'+o.id);else if(o.data.state==='approved'){
    const sales=(await db.prepare("SELECT data FROM flow_entities WHERE type='sale' AND json_extract(data,'$.salesOrderId')=?").bind(o.id).all()).results.map((s:any)=>JSON.parse(s.data));const complete=o.data.lines.every((l:any)=>sales.filter(s=>!s.replacementReturnId&&s.productId===l.productId&&s.state==='delivered').reduce((n,s)=>n+s.count,0)>=l.quantity);if(!complete)task(a,'delivery:'+o.id,'پیگیری تحویل '+o.data.code,o.data.promisedDay||addDay(o.created.slice(0,10),2),'staff','رزرو سریال، ارسال و تأیید دریافت هر محموله را پیگیری کنید. اگر نماینده از سامانه استفاده نمی‌کند، مستند دریافت را بگیرید و از حساب خودتان ثبت کنید. مانع یا موعد جدید را ثبت کنید.','order:'+o.id);
   }
-  for(const p of account.payments)if(p.data.state==='pending'&&!competing.has(p.id))task(a,'payment:'+p.id,p.data.method==='check'?'بررسی دریافت و ثبت سامانه‌ای چک':'بررسی اعلام واریز',addDay(p.created.slice(0,10),1),'finance',p.data.method==='check'?'دریافت اصل و ثبت یا انتقال سامانه‌ای چک '+p.data.reference+' را جداگانه تأیید کنید.':'حساب مقصد، مبلغ، تاریخ و شماره پیگیری ثبت‌شده را با گردش بانک بررسی کنید.');else if(p.data.state==='received'){
+  for(const p of account.payments)if(p.data.state==='pending'&&!competing.has(p.id)&&(p.data.method!=='bank'||bankReviews.has(p.id)))task(a,'payment:'+p.id,p.data.method==='check'?'بررسی دریافت و ثبت سامانه‌ای چک':'بررسی اعلام واریز',addDay(p.created.slice(0,10),1),'finance',p.data.method==='check'?'دریافت اصل و ثبت یا انتقال سامانه‌ای چک '+p.data.reference+' را جداگانه تأیید کنید.':'حساب مقصد، مبلغ، تاریخ و کد رهگیری ثبت‌شده را با گردش بانک بررسی کنید.');else if(p.data.state==='received'){
    const review=p.data.disposition?.state==='pending'||salesCheckPosition(p,account,today).requiresReview;
    task(a,'check:'+p.id,review?'تعیین تکلیف چک':'پیگیری وصول چک',review?today:p.data.checkDue,'finance',review?'درخواست یا اختلاف مبلغ چک '+p.data.reference+' را در حساب نماینده بررسی کنید.':'نتیجه وصول یا برگشت چک '+p.data.reference+' را ثبت کنید.');
   }

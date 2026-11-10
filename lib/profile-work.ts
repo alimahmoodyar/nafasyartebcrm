@@ -12,9 +12,9 @@ import {rial,salesAccounts,salesOrderProgress} from './sales-contract';
 import {shortageRoles,canActOnShortage,shortageStages,type Shortage} from './handoff-shortage';
 import {treasuryProfileTest,treasuryRows} from './treasury';
 import {bankEntities} from './sales-bank';
-import {bankCoverage,missingBankDays} from './sales-bank-coverage';
+import {bankCoverage,bankPaymentReviewDue,coveredBankPeriods,missingBankDays} from './sales-bank-coverage';
 import {formatDate} from './persian-date';
-import {bankAmbiguities} from './sales-bank-contract';
+import {bankAmbiguities,readyBankRowForPayment} from './sales-bank-contract';
 import {runBankProfileTest} from './sales-bank-profile-test';
 
 export async function handoffShortageWork(user:Session):Promise<ProfileWork[]>{
@@ -33,7 +33,7 @@ export async function profileWork(user:Session){
  const profile=roleProfiles.find(p=>p.id===user.profileReview?.id);if(!profile?.operational)return {work:[],pendingQuality:0};
  const db=storage(),rows=(await db.prepare("SELECT id,type,data FROM flow_entities WHERE type IN ('receipt','request','sourcing_plan','sourcing_quote','purchase_order','worker_output','scrap_transfer','scrap_sale_request','build','inventory_count','build_project','handoff','worker_nonconforming','line_return','worker_count_round','receipt_observation','routine_lot','transport') ORDER BY id").all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}));
  const work:ProfileWork[]=materialProfileWork(profile.id,rows);
- const competing=new Set<string>();
+ const competing=new Set<string>(),liveBankReviews=new Set<string>();
  if(profile.id==='finance-director'){
   const accounts=await treasuryProfileTest(user,treasuryRows);
   for(const account of accounts.filter(row=>row.data.state==='review'))work.push({id:account.id+':treasury-test',title:'تأیید حساب آزمایشی · '+account.data.title,section:'treasury',target:treasuryTestTarget+account.id,sourceId:account.id,state:'review'});
@@ -51,12 +51,18 @@ export async function profileWork(user:Session){
  if(profile.id==='sales-finance'){
   const live=await bankEntities(),test=await runBankProfileTest(user,()=>bankEntities());
   for(const [records,target] of [[live,salesBankRowTarget],[test,salesBankTestTarget]] as const){
+   const testMode=target===salesBankTestTarget,today=dayAt(),periods=coveredBankPeriods(records);
+   const review=records.filter(row=>row.type==='sales_payment'&&row.data.method==='bank'&&row.data.state==='pending'&&bankPaymentReviewDue(row,periods,today)&&!readyBankRowForPayment(row,records));
+   const reviewIds=new Set(review.map(row=>row.id));
+   if(!testMode)for(const id of reviewIds)liveBankReviews.add(id);
    for(const {row,assessment} of bankAmbiguities(records)){
-    for(const candidate of assessment.candidates)competing.add(candidate.id);
-    work.push({id:row.id+':bank-conflict',title:'مغایرت واریز بانکی'+(target===salesBankTestTarget?' آزمایشی':''),section:'sales-bank',target:target+row.id,sourceId:row.id,state:'pending'});
+    const candidates=assessment.candidates.filter(candidate=>reviewIds.has(candidate.id));
+    if(!candidates.length)continue;
+    for(const candidate of candidates)competing.add(candidate.id);
+    work.push({id:row.id+':bank-conflict',title:'مغایرت واریز بانکی'+(testMode?' آزمایشی':''),section:'sales-bank',target:target+row.id,sourceId:row.id,state:'pending'});
    }
+   if(testMode)for(const payment of review.filter(row=>!competing.has(row.id)))work.push({id:payment.id+':payment-test',title:'بررسی اعلام واریز آزمایشی',section:'sales-bank',target:salesBankTestTarget,sourceId:payment.id,state:'pending'});
   }
-  for(const payment of test.filter(row=>row.type==='sales_payment'&&row.data.state==='pending'&&!competing.has(row.id)))work.push({id:payment.id+':payment-test',title:'بررسی اعلام واریز آزمایشی',section:'sales-bank',target:salesBankTestTarget,sourceId:payment.id,state:'pending'});
  }
  if(profile.workflowRoles.length){for(const plan of rows.filter(r=>r.type==='sourcing_plan')){
   const steps=nextWork(plan,rows.filter(r=>r.type==='sourcing_quote'&&r.data.planId===plan.id),rows.filter(r=>r.type==='purchase_order'&&r.data.planId===plan.id),await coverage(plan));
@@ -107,7 +113,7 @@ export async function profileWork(user:Session){
    }
    if(profile.id==='sales-manager'&&row.type==='sales_order'&&row.data.state==='submitted')addWork(row,'بررسی سفارش '+row.data.code,'sales','order:'+row.id);
    if(profile.id==='sales-finance'&&row.type==='sales_order'&&['credit_review','sales_approved'].includes(row.data.state))addWork(row,'بررسی مالی سفارش '+row.data.code,'sales','order:'+row.id);
-   if(profile.id==='sales-finance'&&row.type==='sales_payment'&&!competing.has(row.id)&&(row.data.state==='pending'||row.data.disposition?.state==='pending'))addWork(row,'بررسی پرداخت یا چک','sales','account:'+row.data.agentId);
+   if(profile.id==='sales-finance'&&row.type==='sales_payment'&&!competing.has(row.id)&&(row.data.state==='pending'||row.data.disposition?.state==='pending')&&(row.data.method!=='bank'||liveBankReviews.has(row.id)))addWork(row,row.data.method==='bank'?'بررسی اعلام واریز':'بررسی پرداخت یا چک','sales','account:'+row.data.agentId);
 
   }
   if(['home-sales','hospital-sales'].includes(profile.id)){
