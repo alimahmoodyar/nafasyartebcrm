@@ -55,7 +55,7 @@ export async function returnWorkspace(u:Session,id='',device=''){
    if(!w||!warehouseMember(u,w,'inventory'))for(const a of ['factory','line','pack']){const i=actions.indexOf(a as ReturnAction);if(i>=0)actions.splice(i,1);}
   }
   if(!access.commercial&&!roles.service&&!roles.technical&&!actions.length&&!id)continue;
-  items.push({id:row.id,revision:row.revision,serial:d.serials[0],deviceId:d.deviceIds[0],buyer:access.buyer.data.name,agentId:d.agentId,reason:d.reason,resolution:d.resolution,status:returnStatus(d,state),intake:d.intake,deviceStage:d.deviceStage,
+  items.push({id:row.id,revision:row.revision,serial:d.serials[0],deviceId:d.deviceIds[0],invoiceId:d.invoiceId,buyer:access.buyer.data.name,agentId:d.agentId,reason:d.reason,resolution:d.resolution,status:returnStatus(d,state),intake:d.intake,deviceStage:d.deviceStage,
    waybill:d.waybill,inspection:d.inspection,technical:d.technical?{action:d.technical.action,...(roles.technical?{personnel:d.technical.personnel}:{})}:undefined,
    settlement:access.commercial?d.settlement:undefined,replacement:access.commercial?d.replacement:undefined,actions});
  }

@@ -554,3 +554,24 @@ button.hospital-network-option { cursor: pointer; }
 }
 
 .representative-order-toolbar{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:end;margin-block:12px 20px}.representative-order-tabs{display:flex;flex-wrap:wrap;gap:8px}.representative-order-tabs .btn,.representative-order-search-label{display:inline-flex;align-items:center;gap:6px}.representative-order-toolbar .field{flex:1 1 220px;max-width:320px;margin:0;min-width:0}.representative-order-toolbar select{width:100%}
+.representative-dashboard{--rep-line:#dbe2ee;--rep-tint:#f6f8fd;--rep-ink:#17254a;--rep-accent:#394ab4}
+.representative-dashboard .panelhead h2,.representative-orders-heading{color:var(--rep-ink)}
+.representative-account-strip{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;padding:16px;border:1px solid var(--rep-line);border-radius:12px;background:var(--rep-tint);margin-block:8px 22px}
+.representative-account-strip dl,.representative-dashboard-actions,.representative-order-links{display:flex;flex-wrap:wrap;gap:10px;margin:0;align-items:center}
+.representative-account-strip dl>div{min-width:145px;padding:6px 12px;border-inline-start:2px solid #c4cdef}
+.representative-account-strip dt{font-size:.85rem;color:#475578}
+.representative-account-strip dd{margin:0;font-size:1.15rem;font-weight:700;color:var(--rep-ink)}
+.representative-dashboard .btn.primary{background:var(--rep-accent);border-color:var(--rep-accent)}
+.representative-order-toolbar{justify-content:space-between}
+.representative-order-columns{display:grid;grid-template-columns:minmax(100px,1fr) minmax(85px,.8fr) minmax(108px,1fr) minmax(134px,1.35fr) 16px;gap:10px;align-items:center;padding:10px 14px}
+.representative-order-column-labels{border-radius:8px;background:#edf1f8;font-weight:650;color:#344369;font-size:.85rem}
+.representative-order-row{margin-block:8px;border:1px solid #dbe2ee;border-radius:10px;background:#fff}
+.representative-order-row summary{cursor:pointer;list-style:none}
+.representative-order-row summary::-webkit-details-marker{display:none}
+.representative-order-row[open]{border-color:#9ca9e6}
+.representative-order-row[open] .representative-order-chevron{transform:rotate(-90deg)}
+.representative-order-status{justify-self:start;border-radius:999px;padding:2px 10px;background:#e7f4f0;color:#145648;font-size:.82rem;font-weight:650}
+.representative-order-status[data-stage="awaiting_receipt"],.representative-order-status[data-stage="awaiting_waybill"]{background:#fff0d9;color:#804508}
+.representative-order-detail{background:#f7f9fd;border-top:1px solid #dbe2ee;border-radius:0 0 10px 10px;padding:14px}
+.representative-order-links{margin-block:8px}
+@media(max-width:650px){.representative-order-column-labels{display:none}.representative-order-row summary{grid-template-columns:1fr 1fr;gap:6px 10px}.representative-order-chevron{display:none}.representative-account-strip dl>div{min-width:120px}.representative-order-detail{padding:10px}}
