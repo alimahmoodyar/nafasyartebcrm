@@ -269,7 +269,7 @@ async function post(request:Request){try{
    const all=await bankEntities(rows);
    const payment=all.find(row=>row.id===target);
    const ready=readyBankRowForPayment(payment,all);
-   if(ready?.match.agentId===own().id){
+   if(ready&&ready.match.agentId===own().id){
     const {row,match}=ready;
     const account=all.find(entry=>entry.id===receivingAccountId);
     guard('EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)',account.id,account.revision);
