@@ -573,7 +573,7 @@ async function fundWithCollateral(quoted) {
   await catalog.executeTool('sales_network_apply',{id:dailyBody.id,mode:'template',confirmed:true,data:dailyBody},base,principal());
   assert.equal(entity(dailyBody.id).data.days,47);assert.equal(entity(dailyBody.id).data.maxDays,60);assert.equal(entity(dailyBody.id).data.months,undefined);
   const repeatedDaily=await post(network,'/api/sales/network',dailyBody);assert.equal(repeatedDaily.repeated,true);
-  const dailyQuote=await quote();assert.equal(dailyQuote.salesTerms.days,47);assert.equal(dailyQuote.salesTerms.maxDays,60);assert.equal(dailyQuote.termDays,47);assert.equal(dailyQuote.due,'2026-12-12');assert.equal(dailyQuote.installments.find(p=>p.kind==='balance').due,'2026-12-12');
+  const dailyQuote=await quote();assert.equal(dailyQuote.salesTerms.days,47);assert.equal(dailyQuote.salesTerms.maxDays,60);assert.equal(dailyQuote.termDays,47);assert.equal(dailyQuote.dispatchPaymentDays,47);assert.equal(dailyQuote.due,'');assert.equal(dailyQuote.installments.find(p=>p.kind==='balance').due,'');
   assert.equal((await catalog.executeTool('preview_sales_order',{agentId:'buyer-representative',items},base,principal(staff,'read'))).quoteHash,dailyQuote.quoteHash);
   for(const days of [61,-1,0.5,'47'])await post(quoteApi,'/api/sales/quote',{agentId:'buyer-representative',items,salesTerms:{cashBps:5000,days}},staff,400);
   const earlyDaily=await post(quoteApi,'/api/sales/quote',{agentId:'buyer-representative',items,salesTerms:{cashBps:10000,days:0}},staff);assert.ok(earlyDaily.installments.every(p=>p.due==='2026-10-26'));
@@ -583,7 +583,7 @@ async function fundWithCollateral(quoted) {
   await post(sales,'/api/sales',salesBody('order_review',{orderId:dailyOrder.body.id,revision:1,approved:true}));
   at('2026-10-27T08:00:00Z');
   const dailyInvoiceBody=salesBody('invoice',{orderId:dailyOrder.body.id,revision:entity(dailyOrder.body.id).revision,reference:'DAY-BASED-INVOICE'});
-  await post(sales,'/api/sales',dailyInvoiceBody,finance);assert.equal(entity(dailyInvoiceBody.id).data.installments.find(p=>p.kind==='balance').due,'2026-12-13');assert.equal(entity(dailyInvoiceBody.id).data.salesTerms.days,47);
+  await post(sales,'/api/sales',dailyInvoiceBody,finance);assert.equal(entity(dailyInvoiceBody.id).data.installments.find(p=>p.kind==='balance').due,'');assert.equal(entity(dailyInvoiceBody.id).data.salesTerms.days,47);
   const beforeNewVersion=sql.prepare('SELECT data FROM flow_entities WHERE id=?').get(dailyInvoiceBody.id).data;
   await saveTemplate('representative',{effectiveFrom:'2026-10-27',days:15,maxDays:60});assert.equal((await quote()).salesTerms.days,15);assert.equal(sql.prepare('SELECT data FROM flow_entities WHERE id=?').get(dailyInvoiceBody.id).data,beforeNewVersion);
   for(const previous of oldSnapshots)assert.equal(sql.prepare('SELECT data FROM flow_entities WHERE id=?').get(previous.id).data,previous.data,'Legacy order/invoice snapshot '+previous.id);

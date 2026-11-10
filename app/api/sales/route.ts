@@ -1,3 +1,4 @@
+import {deferDispatchBalance} from '@/lib/sales-dispatch-terms';
 import {withRepresentativeSample} from '@/lib/representative-sample';
 import {returnTaskStatements} from '@/lib/sales-return-tasks';
 import {qmsDispatchGuard} from '@/lib/qms-release';
@@ -176,7 +177,7 @@ async function post(request:Request){try{
    }else{
     if(!canHold(order.data,order.id))fail('اعتبار کافی نیست؛ پرداخت یا ضمانت تکمیلی را ثبت کنید.',409);
     const reserved=await reserveOrder(order.id,order.data);
-    if(!reserved)fail('موجودی آزاد برای رزرو کل سفارش کافی نیست.',409);
+    if(!reserved&&order.data.dispatchPaymentDays===undefined)fail('موجودی آزاد برای رزرو کل سفارش کافی نیست.',409);
     put(order.id,'sales_order',{...order.data,state:'sales_approved',securedHold:order.data.amount,salesBlock:'',salesReview:reason,...(financial?{overdueApprovedBy:u.userId,overdueApprovedAt:now}:{})},order);
    }
   }else if(mode==='order_review'){if(order.data.salesTerms&&!salesManager(u))fail('تأیید پیش‌فاکتور فقط با مدیر فروش است.',403);if(order.data.salesTerms&&order.data.createdBy===u.userId)fail('پیشنهاد خود را مدیر دیگری تأیید کند.',403);state(order,['submitted']);if(typeof b.approved!=='boolean')fail('نتیجه بررسی لازم است.');put(order.id,'sales_order',{...order.data,state:b.approved?'sales_approved':'rejected',salesReview:notes()},order);
@@ -202,12 +203,16 @@ async function post(request:Request){try{
   }else{
    if(order.data.deliveryMode==='consignment'||agent!.data.kind==='branch')fail('سفارش شعبه امانی فاکتور فروش قطعی ندارد؛ از تأیید ارسال امانی استفاده کنید.');
    state(order,['sales_approved']);if(!own().data.active)fail('نمایندگی غیرفعال است.');const a=account(),exposure=rial(a.balance)+rial(order.data.amount),limit=rial(order.data.securedPolicy?salesSecuredCredit(rows,own().id,today,order.id).ceiling:agent!.data.creditLimit);const exception=order.data.securedPolicy?rial(a.overdue)>BigInt(0):exposure>limit||rial(a.overdue)>BigInt(0);if(order.data.securedPolicy&&(!canHold(order.data,order.id)||exception&&!order.data.overdueApprovedBy))fail('شرایط مالی یا سقف ضمانت تغییر کرده است؛ سفارش نیاز به بررسی دارد.',409);if(!order.data.securedPolicy&&exception&&(b.creditException!==true||!txt(b.exceptionReason||'',2000)))fail('سقف اعتبار یا بدهی معوق مانع تأیید است؛ تصمیم استثنای مستند مالی لازم است.');
-   const reference=req(b.reference,300);if(rows.some(r=>r.type==='sales_invoice'&&r.data.reference===reference))fail('شماره فاکتور تکراری است.');const plan=order.data.salesTerms?termsPlan(order.data.amount,order.data.salesTerms,today):installments(b.installments,order.data.amount);if(order.data.salesTerms&&b.installments&&JSON.stringify(b.installments.map((p:any)=>({due:p.due,amount:p.amount})))!==JSON.stringify(plan.map(p=>({due:p.due,amount:p.amount}))))fail('اقساط باید عین شرایط مصوب مدیر باشد.');if(plan.some(i=>i.due<today))fail('سررسید فاکتور جدید در گذشته نباشد.');
-   put(id,'sales_invoice',{agentId:own().id,orderId:order.id,reference,day:today,salesTerms:order.data.salesTerms||null,referral:order.data.referral||null,lines:order.data.lines,amount:order.data.amount,discount:order.data.discount,installments:plan,openingId:'',creditReview:{exposure:String(exposure),limit:String(limit),overdue:a.overdue,exception,reason:exception?(order.data.securedPolicy?order.data.salesReview:req(b.exceptionReason,2000)):'',by:u.userId},province:own().data.province});
+   const reference=req(b.reference,300);if(rows.some(r=>r.type==='sales_invoice'&&r.data.reference===reference))fail('شماره فاکتور تکراری است.');const dispatchPaymentDays=order.data.dispatchPaymentDays;
+   const plan=order.data.salesTerms||dispatchPaymentDays!==undefined
+    ?termsPlan(order.data.amount,order.data.salesTerms||{cashBps:0,days:dispatchPaymentDays},today)
+    :installments(b.installments,order.data.amount);
+   if((order.data.salesTerms||dispatchPaymentDays!==undefined)&&b.installments&&JSON.stringify(b.installments.map((p:any)=>({due:p.due,amount:p.amount})))!==JSON.stringify(plan.map(p=>({due:p.due,amount:p.amount}))))fail('اقساط باید عین شرایط مصوب مدیر باشد.');if(plan.some(i=>i.due<today))fail('سررسید فاکتور جدید در گذشته نباشد.');
+   put(id,'sales_invoice',{agentId:own().id,orderId:order.id,reference,day:today,salesTerms:order.data.salesTerms||null,referral:order.data.referral||null,lines:order.data.lines,amount:order.data.amount,discount:order.data.discount,installments:dispatchPaymentDays===undefined?plan:deferDispatchBalance(plan),dispatchPaymentDays,openingId:'',creditReview:{exposure:String(exposure),limit:String(limit),overdue:a.overdue,exception,reason:exception?(order.data.securedPolicy?order.data.salesReview:req(b.exceptionReason,2000)):'',by:u.userId},province:own().data.province});
    if(order.data.securedPolicy){
     const held=(await db.prepare("SELECT id,revision,data FROM flow_entities WHERE type='sale' AND json_extract(data,'$.salesOrderId')=? AND json_extract(data,'$.state')='reserved'").bind(order.id).all()).results;
     for(const line of order.data.lines){
-     if(held.filter(row=>JSON.parse(String(row.data)).productId===line.productId).reduce((count,row)=>count+Number(JSON.parse(String(row.data)).count),0)!==line.quantity)fail('رزرو کامل سفارش لازم است.',409);
+     if(dispatchPaymentDays===undefined&&held.filter(row=>JSON.parse(String(row.data)).productId===line.productId).reduce((count,row)=>count+Number(JSON.parse(String(row.data)).count),0)!==line.quantity)fail('رزرو کامل سفارش لازم است.',409);
     }
     for(const row of held){
      guard("EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)",row.id,row.revision);

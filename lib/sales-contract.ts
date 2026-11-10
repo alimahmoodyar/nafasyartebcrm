@@ -44,7 +44,9 @@ export function salesAccounts(rows:any[],agentId:string,today:string){
  const invoices=own.filter(r=>r.type==='sales_invoice').map(r=>{const installments=r.data.installments.map((i:any)=>{const paid=total(allocations.filter(a=>a.data.invoiceId===r.id&&a.data.installmentId===i.id&&valid.has(a.data.creditId)),a=>a.data.amount);const remaining=rial(i.amount)-paid;const days=Math.round((Date.parse(i.due)-Date.parse(today))/86400000);return {...i,paid:String(paid),remaining:String(remaining),days,overdue:remaining>BigInt(0)&&days<0};});return {...r,installments,remaining:String(total(installments,i=>i.remaining))};});
  const creditRows=credits.map(c=>({...c,available:String(rial(c.data.settlement?.offset??c.data.amount)-total(allocations.filter(a=>a.data.creditId===c.id),a=>a.data.amount))}));
  const debt=total(invoices,i=>i.remaining),available=total(creditRows,c=>c.available),overdue=total(invoices.flatMap(i=>i.installments).filter(i=>i.overdue),i=>i.remaining);
+ const awaiting=total(invoices.flatMap(i=>i.installments).filter(i=>!i.due),i=>i.remaining);
  const aging=[{label:'سررسید نشده',min:-Infinity,max:0},{label:'۱ تا ۳۰ روز',min:1,max:30},{label:'۳۱ تا ۶۰ روز',min:31,max:60},{label:'۶۱ تا ۹۰ روز',min:61,max:90},{label:'بیش از ۹۰ روز',min:91,max:Infinity}].map(b=>({label:b.label,amount:String(total(invoices.flatMap(i=>i.installments).filter(i=>-i.days>=b.min&&-i.days<=b.max),i=>i.remaining))}));
+ if(awaiting>BigInt(0))aging.unshift({label:'در انتظار خروج کالا',amount:String(awaiting)});
  return {invoices,credits:creditRows,payments,returns,allocations,debt:String(debt),credit:String(available),balance:String(debt-available),overdue:String(overdue),pending:String(total(payments.filter(p=>p.data.state==='pending'),p=>p.data.amount)),uncollectedChecks:String(total(payments.filter(p=>p.data.state==='received'),p=>p.data.amount)),aging};
 }
 export function salesSecuredCredit(rows:any[],agentId:string,today:string,excludeOrderId=''){

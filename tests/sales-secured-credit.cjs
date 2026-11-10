@@ -104,5 +104,45 @@ async function upload(u=rep,extra={},status=201){const meta={id:crypto.randomUUI
  assert.equal(entity(overdue.id).data.state,'approved');
  assert.equal((await balance()).securedCredit.held,'0');
  assert.equal((await balance()).debt,'15001000');
+ // A new credit order can be invoiced with partial stock, but its term is
+ // activated only by actual dispatch. The existing cheque controls stay in force.
+ await op('terms',{revision:version(a),creditLimit:'0',termDays:15});
+ const partial=await place(1);
+ assert.equal(entity(partial.id).data.dispatchPaymentDays,15);
+ const {dispatchInstallments,deferDispatchBalance}=load('lib/sales-dispatch-terms.ts');
+ const {termsPlan,allocationPlan}=load('lib/sales-network-contract.ts');
+ const {salesAccounts}=load('lib/sales-contract.ts');
+ const parts=deferDispatchBalance(termsPlan('1001',{cashBps:2000,days:15},'2026-01-01'));
+ const sample={amount:'1001',dispatchPaymentDays:15,lines:[{productId:'model-a',quantity:2,net:'601'},{productId:'model-b',quantity:1,net:'400'}],installments:parts};
+ const first=dispatchInstallments(sample,'one','2026-02-01',[{productId:'model-a',deviceIds:['A1']}]);
+ assert.deepEqual(JSON.parse(JSON.stringify(first.map(p=>[p.amount,p.due]))),[['200','2026-01-01'],['240','2026-02-16'],['561','']]);
+ const second=dispatchInstallments({...sample,installments:first},'two','2026-02-07',[{productId:'model-a',deviceIds:['A2']},{productId:'model-b',deviceIds:['B1']}]);
+ assert.deepEqual(JSON.parse(JSON.stringify(second.map(p=>[p.amount,p.due]))),[['200','2026-01-01'],['240','2026-02-16'],['561','2026-02-22']]);
+ assert.equal(dispatchInstallments({...sample,installments:first},'one','2026-02-01',[{productId:'model-a',deviceIds:['A1']}]),first);
+ assert.throws(()=>dispatchInstallments({...sample,installments:first},'duplicate','2026-02-01',[{productId:'model-a',deviceIds:['A1']}]),/سریال/);
+ const rows=[{id:'invoice',type:'sales_invoice',created:'2026-01-01',data:{...sample,agentId:'agent',day:'2026-01-01',installments:first}},
+  {id:'credit',type:'sales_payment',data:{agentId:'agent',state:'cleared',amount:'1001'}}];
+ assert.equal(salesAccounts(rows,'agent','2026-02-17').overdue,'440');
+ assert.equal(salesAccounts(rows,'agent','2026-02-17').debt,'1001');
+ assert.equal(allocationPlan(rows,'agent','credit','2026-02-17').unallocated,'561');
+ a=b;
+ member(driver);
+ await op('terms',{revision:version(a),creditLimit:'0',termDays:15});
+ seed('dispatch-guarantee','sales_payment',{agentId:a,method:'check',state:'check_collateral',amount:'50000000',disposition:{amount:'50000000'}});
+ const multi=await place(3);
+ assert.equal(entity(multi.id).data.state,'submitted','Full order is not in stock');
+ await op('order_review',{orderId:multi.id,revision:version(multi.id),approved:true},manager);
+ await op('invoice',{orderId:multi.id,revision:version(multi.id),reference:'PARTIAL-DISPATCH'});
+ const invoiceId=entity(multi.id).data.invoiceId;
+ assert.equal(entity(invoiceId).data.installments[0].due,'');
+ const reserve=await post(fulfillment,'/api/fulfillment',{id:crypto.randomUUID(),mode:'reserve',salesOrderId:multi.id,productId:'product',count:1,notes:''},staff);
+ const shipment=entity(reserve.body.id);
+ const dispatch={id:crypto.randomUUID(),mode:'dispatch',saleId:shipment.id,deviceIds:shipment.data.deviceIds,carrierId:'driver',handedOver:true};
+ await post(fulfillment,'/api/fulfillment',dispatch,admin);
+ await post(fulfillment,'/api/fulfillment',dispatch,admin);
+ const paymentParts=entity(invoiceId).data.installments;
+ assert.deepEqual(paymentParts.map(p=>[p.amount,p.due]),[['15000000',load('lib/duties.ts').addDay(today,15)],['30000000','']]);
+ assert.equal(paymentParts[0].shipments[0].deviceIds[0],shipment.data.deviceIds[0]);
+ console.log('PASS independent dispatch due dates, proportional rounding, duplicate serial rejection and exclusion of unshipped credit from overdue amounts');
  console.log('PASS secured cheque: partial payment, collection guard, isolation, duplicate request, finance review, conversion and return');
 })().catch(error=>{console.error(error);process.exitCode=1;});

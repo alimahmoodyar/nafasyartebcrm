@@ -36,7 +36,7 @@ export async function syncSalesTasks(){
    const recovery=checkRecovery(p,rows);
    if(rial(recovery.remaining)>BigInt(0))task(a,'check:bounced:'+p.id,'هشدار چک برگشتی',p.updated.slice(0,10),'agent','چک '+p.data.reference+' برگشت خورده است. مانده تعیین‌تکلیف '+recovery.remaining+' ریال.');
   }
-  for(const i of account.invoices)for(const p of i.installments)if(rial(p.remaining)>BigInt(0)&&p.days<=7){for(const role of ['agent','staff','finance'])task(a,'due:'+i.id+':'+p.id,'سررسید فاکتور '+i.data.reference,p.due,role,'مانده قسط '+p.id+': '+p.remaining+' ریال. پرداخت اعلامی تنها پس از تأیید و تخصیص مالی در مانده اثر دارد.');}
+  for(const i of account.invoices)for(const p of i.installments)if(p.due&&rial(p.remaining)>BigInt(0)&&p.days<=7){for(const role of ['agent','staff','finance'])task(a,'due:'+i.id+':'+p.id,'سررسید فاکتور '+i.data.reference,p.due,role,'مانده قسط '+p.id+': '+p.remaining+' ریال. پرداخت اعلامی تنها پس از تأیید و تخصیص مالی در مانده اثر دارد.');}
   for(const t of own.filter(r=>r.type==='sales_target')){const progress=salesTargetProgress(t,rows,today);if(progress.active&&progress.next)for(const role of ['agent','staff'])task(a,'target:'+t.id,'پیگیری تارگت '+t.data.title,t.data.end,role,'تا پلکان بعدی '+progress.next.remaining+(t.data.basis==='units'?' دستگاه':' ریال')+' باقی مانده است.');}
   for(const reward of own.filter(r=>r.type==='sales_reward'&&r.data.state==='active')){
    if(!salesRewardProgress(reward,rows,today).ready)continue;
