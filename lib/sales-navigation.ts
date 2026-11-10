@@ -4,7 +4,7 @@ type SalesNavigationContext={warehouseOnly?:boolean;roles:{agent?:boolean;staff?
 export function salesViewGroup(view:string,reportOnly=false){
  if(['reports','home','monitor','periodic'].includes(view)||reportOnly&&['orders','account','returns'].includes(view))return 'reports';
  if(['finance','new_payment','bank','account','opening'].includes(view))return 'finance';
- if(['settings','terms','targets','assignments','prices','monitor_goals','monitor_settings'].includes(view))return 'settings';
+ if(['settings','terms','targets','assignments','prices','resources','monitor_goals','monitor_settings'].includes(view))return 'settings';
  return '';
 }
 
@@ -27,6 +27,7 @@ export function salesNavigation({warehouseOnly,roles}:SalesNavigationContext):{m
   ...(!rep&&(manager||finance)?[['opening','مانده‌های قبلی خریداران'] as SalesMenuItem]:[]),
  ];
  const settings:SalesMenuItem[]=[
+  ...(staff||manager?[['resources','فایل‌های فروش و آموزش'] as SalesMenuItem]:[]),
   ...(manager?[['terms','الگوهای فروش'] as SalesMenuItem]:[]),
   ['targets','تارگت و تخفیف'],
   ...(manager?[['monitor_goals','اهداف مصوب فروش'],['monitor_settings','قواعد گزارش و هشدارها']] as SalesMenuItem[]:[]),

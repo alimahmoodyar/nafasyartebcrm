@@ -231,6 +231,39 @@ async function fundWithCollateral(quoted) {
       termDays: 30, creditLimit: '1000000', phone: '02112345678', address: 'Actual address', province: 'Tehran', city: 'Tehran',
     });
   }
+  const library = load('app/api/sales/resources/route.ts');
+  const repReader = actor('library-representative', ['agent'], {salesAgentId:'buyer-representative'});
+  const resellerReader = actor('library-reseller', ['agent'], {salesAgentId:'buyer-reseller'});
+  member(repReader);
+  member(resellerReader);
+  function publishResource(user, audience, contents, previous){
+    const form = new FormData();
+    form.set('title','Sales catalog');
+    form.set('category','catalog');
+    form.set('audience',audience);
+    form.set('file',new Blob([contents]),'catalog.pdf');
+    if(previous){form.set('id',previous.id);form.set('revision',String(previous.revision));}
+    return context.run(user,()=>library.POST(new Request(base+'/api/sales/resources',{method:'POST',headers:{origin:base},body:form})));
+  }
+  const readLibrary=(user,id='')=>context.run(user,()=>library.GET(new Request(base+'/api/sales/resources'+(id?'?id='+id:''))));
+  assert.equal((await publishResource(repReader,'all','Unauthorised')).status,403);
+  assert.equal((await readLibrary(finance)).status,403);
+  assert.equal((await publishResource(staff,'representative','Original')).status,201);
+  const repLibrary=await (await readLibrary(repReader)).json();
+  const catalogFile=repLibrary.files[0];
+  assert.equal(repLibrary.manage,false);
+  assert.equal(catalogFile.title,'Sales catalog');
+  const rolePreview=load('lib/profile-review.ts').profileSession({...manager,isAdmin:true},'sales-representative',[]);
+  assert.equal(await (await readLibrary(rolePreview,catalogFile.id)).text(),'Original');
+  assert.equal((await publishResource(rolePreview,'all','Unauthorised')).status,403);
+  assert.equal('objectKey' in catalogFile,false);
+  assert.equal(await (await readLibrary(repReader,catalogFile.id)).text(),'Original');
+  assert.deepEqual((await (await readLibrary(resellerReader)).json()).files,[]);
+  assert.equal((await readLibrary(resellerReader,catalogFile.id)).status,404);
+  assert.equal((await publishResource(manager,'all','Replacement',catalogFile)).status,200);
+  assert.equal(await (await readLibrary(resellerReader,catalogFile.id)).text(),'Replacement');
+  assert.equal((await publishResource(staff,'all','Stale',catalogFile)).status,409);
+  assert.equal((await (await readLibrary(repReader)).json()).files.length,1);
   seed('buyer-snapshot', 'sales_agent', {...entity('buyer-representative').data, name: 'Historical buyer'});
   sql.prepare("INSERT INTO records(id,kind,payload,created) VALUES('product','product',?,?)")
     .run(JSON.stringify({name: 'Device', model: 'N1', code: 'P1', status: 'فعال'}), new FrozenDate().toISOString());
