@@ -2,7 +2,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
 const root=path.resolve(__dirname,'..'),cache={};let slots=[],cursor=0,back;
 function pure(file){if(cache[file])return cache[file];const exports={};cache[file]=exports;vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports,Intl,Date,require:n=>pure(path.resolve(path.dirname(file),n+'.ts'))});return exports;}
 const out={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(root,'components/trace/sales-buyer-directory.tsx'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText,{exports:out,Set,require:n=>n==='react'?{useState:init=>{const i=cursor++;if(!(i in slots))slots[i]=init;return [slots[i],v=>slots[i]=v]}}:n==='react/jsx-runtime'?require(n):n.includes('buyer-search')?pure(path.join(root,'lib/buyer-search.ts')):n.includes('sales-network-contract')?pure(path.join(root,'lib/sales-network-contract.ts')):n==='./program-workspace'?{useWorkspaceBack:(fn,enabled)=>{back=enabled?fn:null;return ()=>{}}}:{NumberInput:'NumberInput'}});
-const row=(id,name,kind='representative',active=true)=>({id,canOperate:true,data:{name,kind,active,ownerId:'seller',contact:'هماهنگ‌کننده',mobile:'09123456789',province:'تهران',city:'تهران'}});
+const row=(id,name,kind='representative',active=true)=>({id,canOperate:true,data:{name,kind,active,ownerId:'seller',contact:'هماهنگ‌کننده',mobile:'09123456789',province:id==='baran'?'البرز':'تهران',city:id==='baran'?'کرج':'تهران'}});
 let agents=[row('baran','باران سلامت'),row('branch','شعبه اصفهان','branch'),row('consumer','علي كريمي','end_customer',false),row('referrer','معرف سلامت','referrer')],members=[{id:'seller',name:'سولماز ابراهیم‌زاده'}],opened=[];
 const nodes=x=>Array.isArray(x)?x.flatMap(nodes):React.isValidElement(x)?[x,...nodes(x.props.children)]:[];
 const text=x=>Array.isArray(x)?x.map(text).join(''):React.isValidElement(x)?text(x.props.children):x==null?'':String(x);
@@ -16,6 +16,7 @@ const before=JSON.stringify(agents);
 assert.equal(cards().length,4);assert.deepEqual(opened,[],'Listing/searching does not open or mutate business records');
 edit('جست‌وجوی نام','باران');assert.equal(cards().length,4,'Draft search waits for the search button');search();assert.equal(cards().length,1);
 change('جست‌وجوی نام','علی کریمی');assert.equal(cards().length,1,'Persian/Arabic names match');assert.ok(text(cards()[0]).includes('علي كريمي'));
+change('جست‌وجوی نام','البرز');assert.equal(cards().length,1,'Province search works when the province differs from the city');assert.ok(text(cards()[0]).includes('باران سلامت'));
 change('جست‌وجوی نام','سولماز ابراهیم زاده');assert.equal(cards().length,4,'Search includes assigned expert and normalizes zero-width spaces');
 change('جست‌وجوی نام','۰۹۱۲۳۴۵۶۷۸۹');assert.equal(cards().length,4,'Persian phone digits match');
 change('جست‌وجوی نام','');change('نوع خریدار','branch');assert.equal(cards().length,1);assert.ok(text(cards()[0]).includes('شعبه اصفهان'));

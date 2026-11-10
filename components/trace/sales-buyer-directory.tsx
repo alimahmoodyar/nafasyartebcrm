@@ -22,7 +22,7 @@ export function SalesBuyerDirectory({agents,members,initialBuyerId='',createActi
   </>:<>
    <div className="sales-buyer-directory-heading"><div><h3>خریداران و نمایندگان</h3><p className="subtle">هر شخص یک پرونده دارد؛ برای دیدن اطلاعات، تماس‌ها، پیگیری‌ها و حساب، پرونده‌اش را باز کنید.</p></div>{createAction}</div>
    <form className="sales-buyer-directory-filters" role="search" onSubmit={e=>{e.preventDefault();setFilters({query,kind,status})}}>
-    <label className="field">جست‌وجوی نام، تماس، شهر یا کارشناس<NumberInput fieldKey="buyerSearch" type="search" placeholder="مثلاً نام نماینده یا شماره تماس" value={query} onChange={e=>setQuery(e.target.value)}/></label>
+    <label className="field">جست‌وجوی نام، استان، شهر، تماس یا کارشناس<NumberInput fieldKey="buyerSearch" type="search" placeholder="مثلاً تهران یا نام نماینده" value={query} onChange={e=>setQuery(e.target.value)}/></label>
     <label className="field">نوع خریدار<select value={kind} onChange={e=>setKind(e.target.value)}><option value="">همه انواع</option>{Object.entries(partnerKinds).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
     <label className="field">وضعیت پرونده<select value={status} onChange={e=>setStatus(e.target.value)}><option value="">فعال و غیرفعال</option><option value="active">فعال</option><option value="inactive">غیرفعال</option></select></label>
     <div className="tools" style={{alignSelf:'end'}}><button type="submit" className="btn primary"><Search size={16} aria-hidden="true"/> جست‌وجو</button><button type="button" className="btn" onClick={()=>{setQuery('');setKind('');setStatus('');setFilters(emptyFilters)}}>پاک کردن</button></div>

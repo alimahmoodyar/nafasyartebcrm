@@ -102,14 +102,30 @@ async function upload(u=rep,extra={},status=201){const meta={id:crypto.randomUUI
  await op('order_cancel',{orderId:sepehr.id,revision:version(sepehr.id)},rep);
  assert.ok(!(await worklist(finance)).some(t=>t.state==='open'&&t.data.sourceId===orderLink));
  console.log('PASS Sepehr: manager creates and assigns buyer, representative submits, home sales finds the saved order, manager and finance worklists link to the same order, another buyer cannot see it');
- const place=async(count)=>{const q=await quote(count,staff);return op('order',{items:q.body.items,quoteHash:q.quoteHash,requestSource:{channel:'phone',day:today}},staff);};
- const reserved=await place(1);
+ const place=async(count,expert=staff)=>{const q=await quote(count,expert);return op('order',{items:q.body.items,quoteHash:q.quoteHash,requestSource:{channel:'phone',day:today}},expert);};
+ const reserved=await place(1,homePreview);
  assert.equal(entity(reserved.id).data.state,'sales_approved');
+ const repPreview=profileSession(admin,'sales-representative',[],a);
+ const savedByExpert=entity(reserved.id).data;
+ assert.equal(savedByExpert.submission.onBehalf,true);
+ assert.equal(savedByExpert.submission.actor,homePreview.userId);
+ assert.equal(savedByExpert.submission.agentId,a);
+ for(const role of [rep,repPreview]){
+  const portal=await get(role);
+  assert.equal(portal.orders.find(o=>o.id===reserved.id)?.data.code,savedByExpert.code,'Representative sees the same staff-created order on the first read');
+  assert.ok(portal.pipeline.some(o=>o.orderId===reserved.id&&o.stage!=='delivered'),'Order appears among the open requests');
+ }
+ assert.ok((await taskPage(homePreview)).positionWork.some(work=>work.sourceId===reserved.id&&work.target==='order:'+reserved.id),'Home sales profile worklist links to the staff-created order');
+ assert.ok((await worklist(finance)).some(t=>t.assignee==='finance'&&t.state==='open'&&t.data.sourceId==='order:'+reserved.id),'Approved and reserved order immediately reaches finance');
+ assert.ok(!(await get(other)).orders.some(o=>o.id===reserved.id));
+ console.log('PASS home sales profile submits on behalf of Sepehr: same open order in representative portal, home sales follow-up and finance worklist');
  assert.equal((await balance()).securedCredit.held,'15000000');
  const reservedSale=all('sale').find(x=>x.data.salesOrderId===reserved.id);
  await post(fulfillment,'/api/fulfillment',{id:crypto.randomUUID(),mode:'dispatch',saleId:reservedSale.id,deviceIds:reservedSale.data.deviceIds},admin,409);
- const blocked=await place(2);
+ const blocked=await place(2,homePreview);
  assert.equal(entity(blocked.id).data.state,'submitted');
+ assert.ok((await get(repPreview)).orders.some(o=>o.id===blocked.id&&o.data.state==='submitted'),'Pending expert order also appears to the representative');
+ assert.ok((await worklist(manager)).some(t=>t.assignee==='manager'&&t.state==='open'&&t.data.sourceId==='order:'+blocked.id),'Insufficient credit routes the new order to the sales manager');
  assert.equal(all('sale').some(x=>x.data.salesOrderId===blocked.id),false);
  await op('order_cancel',{orderId:reserved.id,revision:version(reserved.id),requestSource:{channel:'phone',contactName:'Rep',day:today}},staff);
  assert.equal(entity(reservedSale.data.deviceIds[0]).data.state,'finished');
