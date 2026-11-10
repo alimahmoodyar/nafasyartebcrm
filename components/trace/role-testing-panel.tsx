@@ -52,7 +52,6 @@ export function RoleTestingPanel({targetId='',onNavigate,onProfile,onAccessChang
  {snapshot&&!choosing&&<>
   {snapshot.sample&&<p className="subtle">داده‌های نمونهٔ نقش نماینده فروش</p>}
   {snapshot.profile.id==='sales-representative'&&representativeDashboard?<>
-   {snapshot.work.length>0&&<button type="button" className="btn" onClick={()=>onNavigate('tasks')}>کارتابل ({snapshot.work.length.toLocaleString('fa-IR')})</button>}
    {representativeDashboard}
   </>:<>
   {(snapshot.profile.buyerScope==='optional'||snapshot.profile.missionScope)&&<div className="tools"><p>{snapshot.buyerChoices?.find(b=>b.id===snapshot.buyerId)?.name||(snapshot.profile.missionScope?'پیش‌نمایش بدون مأموریت':'پیش‌نمایش بدون پرونده خریدار')}</p><button className="btn" onClick={()=>void open(snapshot.profile,true)}>{snapshot.profile.missionScope?'تغییر مأموریت':snapshot.buyerId?'تغییر پرونده خریدار':'انتخاب پرونده خریدار'}</button></div>}

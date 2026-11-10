@@ -306,6 +306,7 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
   {outstandingDue&&<div><dt>اولین سررسید باز</dt><dd>{date(outstandingDue.due)}</dd><small>{dueLabel(outstandingDue)}</small></div>}
   </dl>
   <div className="representative-dashboard-actions">
+   <button type="button" className="btn" onClick={()=>onNavigate('tasks')}>کارتابل</button>
    <button type="button" className="btn primary" disabled={!writableAgents.length} onClick={()=>begin('order')}>ثبت درخواست خرید</button>
    <button type="button" className="btn" disabled={!writableAgents.length} onClick={()=>begin('payment',{agentId:writableAgents[0]?.id||''})}>ثبت پرداخت یا چک</button>
   </div>
