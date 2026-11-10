@@ -563,3 +563,5 @@ button.hospital-network-option { cursor: pointer; }
  margin: 0;
  padding: 0;
 }
+
+.representative-order-toolbar{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:end;margin-block:12px 20px}.representative-order-tabs{display:flex;flex-wrap:wrap;gap:8px}.representative-order-tabs .btn,.representative-order-search-label{display:inline-flex;align-items:center;gap:6px}.representative-order-toolbar .field{flex:1 1 220px;max-width:320px;margin:0;min-width:0}.representative-order-toolbar select{width:100%}
