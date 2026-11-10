@@ -11,6 +11,7 @@ export const inboxDecode=(r:any)=>r?({...r,data:JSON.parse(r.data)}):null;
 export async function inboxIdentity(u:Session){const id=await memberId(u);if(id)return id;if(u.isAdmin||u.profileReview)return '@owner';throw new AccessError('حساب فعال برای مکاتبه یافت نشد.',403);}
 // Operational notices still use the authenticated account. Interactive previews use a separate mailbox.
 const profileAddress=(id:string)=>'@profile:'+id;
+const representativeInboxProfiles=new Set(['sales','home-sales','hospital-sales','sales-manager','sales-finance','logistics','home-service','hospital-service']);
 export async function inboxMailbox(u:Session){
  const preview=u.profileReview;
  if(!preview)return {id:await inboxIdentity(u),name:u.name,profileTitle:null};
@@ -23,7 +24,15 @@ export function checkInboxMailbox(expected:unknown,actual:string){
 }
 export async function accountInboxDirectory(u:Session){const me=await inboxIdentity(u),db=storage();let users=(await db.prepare("SELECT m.id,m.name,m.unit,m.permissions,EXISTS(SELECT 1 FROM flow_entities f WHERE f.type='account_profile' AND f.id='profile:'||CASE WHEN EXISTS(SELECT 1 FROM password_accounts a WHERE a.member_id=m.id) THEN 'local:'||m.id ELSE m.subject END AND COALESCE(json_extract(f.data,'$.image'),'')<>'') AS hasPhoto FROM app_members m WHERE m.status='active' ORDER BY m.name,m.id").all()).results as any[];
  if(!u.isAdmin&&u.permissions.serviceAgentId)users=users.filter(r=>{const p=storedAccessPermissions(r.permissions);return !p.serviceAgentId&&p.serviceRoles?.some((x:string)=>['manager','coordinator'].includes(x))&&p.serviceDomains?.some((x:string)=>u.permissions.serviceDomains?.includes(x));});
- if(!u.isAdmin&&u.permissions.salesAgentId){await salesScope(u,u.permissions.salesAgentId);users=users.filter(r=>{const p=storedAccessPermissions(r.permissions),actor={isAdmin:false,permissions:p} as Session;return !p.salesAgentId&&!p.serviceAgentId&&(salesStaff(actor)||salesFinance(actor));});}
+ if(!u.isAdmin&&u.permissions.salesAgentId){
+  await salesScope(u,u.permissions.salesAgentId);
+  users=users.filter(r=>{
+   const p=storedAccessPermissions(r.permissions),actor={isAdmin:false,permissions:p} as Session;
+   if(p.salesAgentId||p.serviceAgentId||p.hospitalCenterId)return false;
+   return salesStaff(actor)||salesFinance(actor)||p.transportRoles?.includes('manager')||
+    p.serviceRoles?.some(role=>['manager','coordinator','support','intake'].includes(role));
+  });
+ }
  const photoUrl=(id:string)=>'/api/inbox?avatar='+encodeURIComponent(id);
  const people=users.map(({id,name,unit,hasPhoto})=>({id,name,unit,avatarUrl:hasPhoto?photoUrl(id):null}));
  const owner=await db.prepare("SELECT EXISTS(SELECT 1 FROM flow_entities f WHERE f.type='account_profile' AND f.id='profile:'||i.subject AND COALESCE(json_extract(f.data,'$.image'),'')<>'') AS hasPhoto FROM app_identity i WHERE i.id='owner'").first<{hasPhoto:number}>();
@@ -39,7 +48,7 @@ export async function inboxDirectory(u:Session){
  const mailbox=await inboxMailbox(u);
  if(!mailbox.profileTitle)return {...await accountInboxDirectory(u),mailboxName:mailbox.name,profileTitle:null};
  const people=roleProfiles
-  .filter(p=>profileAddress(p.id)!==mailbox.id)
+  .filter(p=>profileAddress(p.id)!==mailbox.id&&(u.profileReview?.id!=='sales-representative'||representativeInboxProfiles.has(p.id)))
   .map(p=>({id:profileAddress(p.id),name:p.title,unit:'آزمایشی'}));
  return {me:mailbox.id,mailboxName:mailbox.name,profileTitle:mailbox.profileTitle,people,positions:[]};
 }
