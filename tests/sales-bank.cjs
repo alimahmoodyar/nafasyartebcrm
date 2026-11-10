@@ -141,7 +141,7 @@ async function verifyWorkbookExtraction(tools,principal){
  const overlap=await importStatement(importBody([pos]),treasury);assert.equal(overlap.skipped,1);assert.equal(cleared().length,1);
  await importStatement(importBody([bankRow('POS-001',{amount:'501'})]),treasury,409);assert.equal(cleared().length,1,'Conflicting identity cannot alter a credited settlement');
  const priorCount=rows('sales_payment').length;await importStatement(importBody([bankRow('UNKNOWN',{terminalCode:'UNKNOWN'}),bankRow('UNMATCHED-TRANSFER',{kind:'transfer',terminalCode:'',provider:'',reference:'NOT-CLAIMED',amount:'400'})]),treasury);assert.equal(rows('sales_payment').length,priorCount,'Unknown terminals and transfers with no claim stay unresolved');
- // Exact account + reference + amount + date + receipt is needed; amount alone never clears.
+ // Exact account + reference + amount + date are needed; a receipt is optional.
  const claimId=await claim('buyer-a','CLAIM-001');assert.equal(entity(claimId).data.bank,'Company bank-a');await importStatement(importBody([bankRow('WRONG-REF',{kind:'transfer',terminalCode:'',provider:'',reference:'CLAIM-OTHER',amount:'400'})]),treasury);assert.equal(entity(claimId).data.state,'pending');
  const claimData=entity(claimId).data,claimCount=rows('sales_payment').length;
  await post(sales,'/api/sales',body('payment',{agentId:'buyer-a',method:'bank',day:today,amount:'400',bank:'Different user-written bank label',reference:'CLAIM-001',fileId:claimData.fileId,receivingAccountId:'bank-a'}),rep,409);assert.equal(rows('sales_payment').length,claimCount,'Changing the typed bank label cannot evade destination-account transaction uniqueness');
