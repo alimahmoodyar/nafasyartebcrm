@@ -128,6 +128,7 @@ export const resetHelp=['قطعات و قیمت مصرف‌کننده واردش
 // Operations reset preserves material passports; full reset backs up/deletes them. Existing 0016 freeze triggers
 // cover the atomic import and its audit. No new table, FK, blob, stock or preservation exception.
 
+// Sales calls use sales_contact and sales_call_policy in flow_entities. Their tasks use duty_runs. Existing generic backups, deletion ordering and freeze triggers cover these records.
 // sales_* flow entities use the generic freeze triggers (0016); sales_file is included in reset file manifests. No separate ledger tables.
 
 // Sales delegation: managerId remains in preserved sales_agent; submission metadata, transport receipt evidence and task supervisors follow existing operational rows and private transport_file manifests. Generic 0016 freeze triggers cover all writes; no new table or delete ordering.

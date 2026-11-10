@@ -79,6 +79,13 @@ export async function profileWork(user:Session){
    if(profile.id==='sales-finance'&&row.type==='sales_payment'&&(row.data.state==='pending'||row.data.disposition?.state==='pending'))addWork(row,'بررسی پرداخت یا چک','sales','account:'+row.data.agentId);
 
   }
+  if(['home-sales','hospital-sales'].includes(profile.id)){
+   const {isPartner,partnerFollowup}=await import('./sales-calls');
+   for(const buyer of sales.filter(row=>row.type==='sales_agent'&&buyerIds.has(row.id)&&isPartner(row))){
+    const follow=partnerFollowup(buyer,sales,dayAt());
+    if(follow.reasons.length&&follow.due<=dayAt())addWork(buyer,'پیگیری '+buyer.data.name+' · '+follow.reasons.join('؛ '),'sales','sales-view:calls:'+buyer.id);
+   }
+  }
   if(profile.id==='home-sales'){
    const today=dayAt(),deliveries=await salesDelivery(own,[...buyerIds]);
    for(const order of own.filter(row=>row.type==='sales_order'&&!['cancelled','rejected'].includes(row.data.state))){

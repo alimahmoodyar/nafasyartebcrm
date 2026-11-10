@@ -12,6 +12,7 @@ import {RepresentativeCredentials} from './account-credentials';
 import {IconDisclosure,IconActions} from "./program-workspace";
 import {IconSections} from "./program-workspace";
 import {ProgramWorkspace,SubprogramNavigation} from "./program-workspace";
+import {SalesCallsPanel} from './sales-calls-panel';
 import {SalesNetworkPanel} from './sales-network-panel';
 import {SalesBuyerDirectory} from './sales-buyer-directory';
 import {SalesBankPanel} from './sales-bank-panel';
@@ -78,7 +79,7 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
   setView(representativeEntry.view);
   if('mode' in representativeEntry)begin(representativeEntry.mode,{agentId:data.agents.find((a:any)=>a.canOperate!==false)?.id||''});
  },[representativeEntry]);
- const directView=data?directSalesView(targetId,data):'';
+ const directView=data?.roles.staff&&targetId.split(':')[1]==='calls'?'calls':data?directSalesView(targetId,data):'';
  useEffect(()=>{
   if(!directView)return;
   setSelected('');
@@ -290,6 +291,7 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
   }else{setError('');if(['finance','settings','reports','terms'].includes(next)){setDraft(null);setQuote(null);setFile(null);}setView(next);}
  };
 
+ if(directView==='calls'&&staff)return <SalesCallsPanel buyer={targetId.split(':')[2]||''} onNavigate={onNavigate}/>;
  return <ProgramWorkspace programId="sales" direct={!!targetId} title="فروش" status={<>{error&&!draft&&<p className="notice error" role="alert">{error}</p>}{!data.warehouseOnly&&(staff||finance)&&!writableAgents.length&&<p className="notice" role="status">نقش فروش شما فعال است؛ برای ثبت فروش، مدیر فروش باید از مسیر «فروش ← تنظیمات فروش ← تخصیص خریدار به کارشناس» خریدار موجود را به شما تخصیص دهد. مجوز مشاهده گزارش به‌تنهایی اختیار ثبت در پرونده همکاران را نمی‌دهد.</p>}</>}><section className={representativeDashboard?'panel sales-portal representative-dashboard':'panel sales-portal'} dir="rtl"><div className="panelhead"><h2>{representativeDashboard?'پنل نماینده فروش':representativeTracking?'پیگیری سفارش‌ها':view==='orders'?'سفارش‌ها':representativeEntry?.view==='account'?'حساب و اعتبار نماینده':representativeEntry?.view==='returns'?'مرجوعی دستگاه':rep?'پرتال نماینده فروش':'فروش و نمایندگان'}</h2></div><div className="inside">
  {representativeDashboard&&rep&&<>
  <div className="representative-dashboard-actions" role="group" aria-label="اقدام‌های اصلی نماینده">
