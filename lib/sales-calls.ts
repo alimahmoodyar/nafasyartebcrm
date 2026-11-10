@@ -1,3 +1,4 @@
+import {trainingContext} from './training-context';
 import {storage} from './storage';
 import {dayAt,addDay} from './duties';
 import {salesRows,salesLock,salesVisible,salesFail as fail,sreq,stxt,integer} from './sales';
@@ -18,7 +19,7 @@ export function partnerFollowup(agent:any,rows:any[],today:string){
  const contact=last?.data.nextDue||addDay(last?.data.day||agent.created.slice(0,10),agent.data.contactDays||30);
  const latest=own.filter(r=>r.type==='sales_invoice'&&!r.data.openingId&&r.data.day<=today).map(r=>r.data.day).sort().at(-1);
  const inactive=addDay(latest||agent.created.slice(0,10),agent.data.reorderDays||60);
- const policy={...followupDefaults,...rows.find(r=>r.id==='sales-call-policy')?.data};
+ const policy={...followupDefaults,...rows.find(r=>r.type==='sales_call_policy')?.data};
  const reasons:string[]=[];
  if(contact<=today)reasons.push('موعد تماس دوره‌ای رسیده');
  const since=last?.data.day||'';
@@ -41,22 +42,27 @@ export function partnerFollowup(agent:any,rows:any[],today:string){
 }
 
 async function actor(session:Session){
+ const sample=trainingContext.getStore();
+ if(sample&&session.profileReview){
+  const u={...session,name:session.profileReview.title+' · آزمایشی'};
+  return {u,members:await import('./sales-leads').then(m=>m.leadMembers()),member:{id:'sales-call-demo:'+sample.actor+':'+session.profileReview.id},sample:sample.actor};
+ }
  const {u,members}=await networkActor(session);
  if(salesRep(u)||u.permissions.serviceAgentId||u.permissions.hospitalCenterId||!salesStaff(u))fail('دسترسی کارشناس فروش لازم است.',403);
- return {u,members,member:members.find(m=>m.status==='active'&&(m.subject===u.userId||'local:'+m.id===u.userId))};
+ return {u,members,sample:'',member:members.find(m=>m.status==='active'&&(m.subject===u.userId||'local:'+m.id===u.userId))};
 }
 
 export async function readSalesCalls(session:Session){
- const {u,member}=await actor(session),manager=salesManager(u),rows=await salesRows();
+ const {u,member,sample}=await actor(session),manager=salesManager(u),rows=(await salesRows()).filter(r=>!sample||r.data.callSample===sample);
  const agents=[];
- for(const a of rows.filter(r=>r.type==='sales_agent'&&r.data.active&&r.data.kind!=='referrer'))if(await salesVisible(u,a,'write'))agents.push(a);
+ for(const a of rows.filter(r=>r.type==='sales_agent'&&r.data.active&&r.data.kind!=='referrer'))if(sample?(manager||a.data.ownerId===member?.id):await salesVisible(u,a,'write'))agents.push(a);
  const ids=new Set(agents.map(a=>a.id));
  const calls=rows.filter(r=>r.type==='sales_contact'&&r.data.callKind&&(manager||r.data.actor===u.userId||ids.has(r.data.agentId))).reverse();
  const leads=rows.filter(r=>r.type==='sales_lead'&&(manager||r.data.ownerId===member?.id)).map(r=>({id:r.id,name:r.data.contactName,stage:r.data.stage,segment:r.data.segment,orderId:r.data.orderId||''}));
  const products=(await storage().prepare("SELECT id,payload FROM records WHERE kind='product'").all()).results.map((r:any)=>{const p=JSON.parse(r.payload);return {id:r.id,name:p.name||p.model||p.code};});
  const today=dayAt();
  const report=manager?callReport(calls,rows,today):null;
- return {today,report,manager,name:u.name,agents:agents.map(a=>({id:a.id,name:a.data.name,partner:isPartner(a),ownerId:a.data.ownerId||''})),leads,products,calls,policy:{...followupDefaults,...rows.find(r=>r.id==='sales-call-policy')?.data},open:agents.filter(isPartner).map(a=>({id:a.id,name:a.data.name,...partnerFollowup(a,rows,today),last:undefined})).filter(a=>a.reasons.length)};
+ return {today,report,sample:!!sample,manager,name:u.name,agents:agents.map(a=>({id:a.id,name:a.data.name,partner:isPartner(a),ownerId:a.data.ownerId||''})),leads,products,calls,policy:{...followupDefaults,...rows.find(r=>r.type==='sales_call_policy')?.data},open:agents.filter(isPartner).map(a=>({id:a.id,name:a.data.name,...partnerFollowup(a,rows,today),last:undefined})).filter(a=>a.reasons.length)};
 }
 
 function callReport(calls:any[],rows:any[],today:string){
@@ -90,7 +96,7 @@ function callReport(calls:any[],rows:any[],today:string){
   for(const d of cases.values()){
    const lead=rows.find(r=>r.type==='sales_lead'&&r.id===d.leadId);
    if(lead&&!['lost','converted'].includes(lead.data.stage))active++;
-   if(rows.some(r=>r.type==='sales_order'&&!['cancelled','rejected'].includes(r.data.state)&&r.created.slice(0,10)>=from&&((lead&&(r.data.leadId===lead.id||r.id===lead.data.orderId))||(!lead&&d.agentId&&r.data.agentId===d.agentId&&r.data.createdBy===d.actor&&r.created>=calls.find(c=>c.data===d)?.created))))orders++;
+   if(rows.some(r=>r.type==='sales_order'&&!['cancelled','rejected'].includes(r.data.state)&&r.created.slice(0,10)>=from&&(lead&&(r.data.leadId===lead.id||r.id===lead.data.orderId))))orders++;
   }
   return {cases:cases.size,orders,active};
  };
@@ -100,22 +106,22 @@ function callReport(calls:any[],rows:any[],today:string){
 }
 
 export async function writeSalesCall(session:Session,b:any){
- const {u,members,member}=await actor(session),db=storage(),now=new Date().toISOString(),today=dayAt();
+ const {u,members,member,sample}=await actor(session),db=storage(),now=new Date().toISOString(),today=dayAt();
  if(b.confirmed!==true||! /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(b.id)||!['call','policy'].includes(b.mode))fail('شناسه و تأیید عملیات لازم است.');
  const signature=JSON.stringify(b),prior:any=await db.prepare('SELECT actor,payload FROM inventory_operations WHERE id=?').bind(b.id).first();
  if(prior){if(prior.actor!==u.userId||prior.payload!==signature)fail('شناسه قبلاً استفاده شده است.',409);return {saved:true};}
- const checks=await salesLock(db,b.id),rows=await salesRows();
+ const checks=await salesLock(db,b.id),rows=(await salesRows()).filter(r=>!sample||r.data.callSample===sample);
  let data:any,target=b.id,type='sales_contact';
  const linked:D1PreparedStatement[]=[];
  if(b.mode==='policy'){
   if(!salesManager(u))fail('تنظیم هشدار فقط با مدیر فروش است.',403);
-  target='sales-call-policy';type='sales_call_policy';
+  target=sample?'sales-call-demo:'+sample+':policy':'sales-call-policy';type='sales_call_policy';
   data={dropPercent:integer(b.dropPercent,1,100),behindPoints:integer(b.behindPoints,1,100)};
  }else{
   if(!Object.hasOwn(callKinds,b.callKind)||!Object.hasOwn(callResults,b.result))fail('نوع و نتیجه تماس لازم است.');
   const a=rows.find(r=>r.type==='sales_agent'&&r.id===b.agentId);
   let lead=rows.find(r=>r.type==='sales_lead'&&r.id===b.leadId);
-  if(b.agentId&&(!a||!a.data.active||!await salesVisible(u,a,'write')))fail('مخاطب در دسترسی شما نیست.',403);
+  if(b.agentId&&(!a||!a.data.active||!(sample?(salesManager(u)||a.data.ownerId===member?.id):await salesVisible(u,a,'write'))))fail('مخاطب در دسترسی شما نیست.',403);
   if(b.leadId&&(!lead||!salesManager(u)&&lead.data.ownerId!==member?.id))fail('سرنخ در دسترسی شما نیست.',403);
   if(b.callKind==='partner'&&(!a||!isPartner(a)))fail('نماینده یا عامل فروش را انتخاب کنید.');
   if(a&&lead)fail('یک مخاطب انتخاب کنید.');
@@ -137,7 +143,7 @@ export async function writeSalesCall(session:Session,b:any){
   const priorDue=due?.last?.data.nextDue||(due?.reasons.length?due.due:'')||lead?.data.nextDue||'';
   if(!a&&!lead&&member){
    const leadId='call-lead:'+b.id;
-   const draft={title:name,contactName:name,phone,company:'',city:'',source:'phone',segment,ownerId:member.id,agentId:'',items:[],interest:notes,stage:'contacted',createdDay:today,createdBy:u.userId,nextAction,nextDue,history:[]};
+   const draft={...(sample?{callSample:sample}:{}),title:name,contactName:name,phone,company:'',city:'',source:'phone',segment,ownerId:member.id,agentId:'',items:[],interest:notes,stage:'contacted',createdDay:today,createdBy:u.userId,nextAction,nextDue,history:[]};
    linked.push(db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'sales_lead',?,1,?,?)").bind(leadId,JSON.stringify(draft),now,now));
    lead={id:leadId,data:draft};
   }else if(lead&&!['converted','lost'].includes(lead.data.stage)){
@@ -145,12 +151,12 @@ export async function writeSalesCall(session:Session,b:any){
    const d={...lead.data,nextDue,nextAction,lastContact:{day:today,type:'call',summary:notes,actor:u.userId}};
    linked.push(db.prepare("UPDATE flow_entities SET data=?,revision=revision+1,updated=? WHERE id=? AND revision=?").bind(JSON.stringify(d),now,lead.id,lead.revision));
   }
-  data={agentId:a?.id||'',leadId:lead?.id||'',name,phone,productId,notes,day:today,channel:'call',callKind:b.callKind,result:b.result,nextAction,nextDue,nextTime,priorDue,actor:u.userId,actorName:u.name,segment:lead?.data.segment||segment,history:[{actor:u.userId,mode:'contact',notes,at:now}]};
+  data={agentId:a?.id||'',leadId:lead?.id||'',name,phone,productId,notes,day:today,channel:'call',callKind:b.callKind,result:b.result,nextAction,nextDue,nextTime,priorDue,actor:sample?member!.id:u.userId,actorName:u.name,segment:lead?.data.segment||segment,history:[{actor:u.userId,mode:'contact',notes,at:now}]};
  }
  await db.batch([
   db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(b.id,type,signature,u.userId,now),...checks,leadMemberGuard(db,b.id,members),
   ...linked,
-  db.prepare('INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data,revision=flow_entities.revision+1,updated=excluded.updated').bind(target,type,JSON.stringify(data),now,now),
+  db.prepare('INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data,revision=flow_entities.revision+1,updated=excluded.updated').bind(target,type,JSON.stringify({...data,...(sample?{callSample:sample}:{})}),now,now),
   db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,target,type,'{}',now)
  ]);
  return {saved:true};

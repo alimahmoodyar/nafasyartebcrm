@@ -52,6 +52,22 @@ const nw=(mode,extra={},u=manager,status=200)=>post(network,'/api/sales/network'
  assert.equal((await readCalls(second)).calls.length,0);
  assert.equal((await readCalls(staff)).report,null);
  assert.equal((await readCalls(manager)).report.week.find(x=>x.actor===staff.userId).counts.partner.missed,1);
+ const {profileSession}=load('lib/profile-review.ts');
+ const homePreview=profileSession(admin,'home-sales',[]),hospitalPreview=profileSession(admin,'hospital-sales',[]),managerPreview=profileSession(admin,'sales-manager',[]);
+ const homeExample=await readCalls(homePreview),hospitalExample=await readCalls(hospitalPreview),managerExample=await readCalls(managerPreview);
+ assert.equal(homeExample.sample,true);
+ assert.equal(homeExample.agents.length,1);
+ assert.ok(homeExample.open[0].reasons.some(r=>r.includes('افت فروش')));
+ assert.equal(hospitalExample.agents.length,1);
+ assert.ok(hospitalExample.open[0].reasons.some(r=>r.includes('خریدی')||r.includes('اولین خرید')));
+ assert.equal(managerExample.agents.length,2);
+ assert.equal(managerExample.report.hospitalQuarter.orders,1);
+ const realContacts=all('sales_contact').length;
+ await saveCall({agentId:homeExample.agents[0].id},homePreview);
+ assert.equal(all('sales_contact').length,realContacts);
+ assert.equal((await readCalls(homePreview)).open.length,0);
+ assert.equal((await readCalls(managerPreview)).report.week.length,2);
+ console.log('PASS isolated home, hospital and manager role samples');
  console.log('PASS sales calls: assignment, idempotency, rescheduling, lead deduplication and scoped reports');
  if(process.env.SALES_CALLS_ONLY==='1')return;
 

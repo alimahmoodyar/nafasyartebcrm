@@ -80,7 +80,12 @@ export async function profileWork(user:Session){
 
   }
   if(['home-sales','hospital-sales'].includes(profile.id)){
-   const {isPartner,partnerFollowup}=await import('./sales-calls');
+   const {isPartner,partnerFollowup,readSalesCalls}=await import('./sales-calls');
+   const {usesSalesCallSample,withSalesCallSample}=await import('./sales-call-sample');
+   if(usesSalesCallSample(user)){
+    const sample=await withSalesCallSample(user,()=>readSalesCalls(user));
+    for(const buyer of sample.open.filter(row=>row.due<=sample.today))addWork({id:buyer.id,data:{state:'open'}},'پیگیری '+buyer.name+' · '+buyer.reasons.join('؛ '),'sales','sales-view:calls:'+buyer.id);
+   }
    for(const buyer of sales.filter(row=>row.type==='sales_agent'&&buyerIds.has(row.id)&&isPartner(row))){
     const follow=partnerFollowup(buyer,sales,dayAt());
     if(follow.reasons.length&&follow.due<=dayAt())addWork(buyer,'پیگیری '+buyer.data.name+' · '+follow.reasons.join('؛ '),'sales','sales-view:calls:'+buyer.id);

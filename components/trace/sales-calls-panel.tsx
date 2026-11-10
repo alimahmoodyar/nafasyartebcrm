@@ -33,6 +33,7 @@ export function SalesCallsPanel({buyer='',compact=false,onNavigate}:{buyer?:stri
   <div className="panelhead"><div><h2><Phone size={22}/> ثبت تماس فروش</h2><p className="subtle">{data.name} · {new Intl.DateTimeFormat('fa-IR',{dateStyle:'medium',timeStyle:'short'}).format(new Date())}</p></div>
   {data.manager&&<button type="button" className="btn" onClick={()=>setShowReport(!showReport)}>{showReport?'فرم ثبت تماس':'گزارش عملکرد و پیگیری'}</button>}</div>
   <div className="inside">
+  {data.sample&&<p className="notice">پیش‌نمایش با داده‌های آزمایشی</p>}
   {error&&<p role="alert" className="notice error">{error}</p>}{message&&<p role="status" className="notice">{message}</p>}
   {showReport&&data.manager?<div>
    <form className="tools" onSubmit={async e=>{e.preventDefault();const f=new FormData(e.currentTarget);if(await save({mode:'policy',dropPercent:Number(f.get('drop')),behindPoints:Number(f.get('behind'))}))await refresh().catch(e=>setError(e.message));}}>
