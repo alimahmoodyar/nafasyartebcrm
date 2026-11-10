@@ -63,8 +63,19 @@ export function SalesCallsPanel({buyer='',compact=false,onNavigate}:{buyer?:stri
     <label>مدل دستگاه (اختیاری)<select name="product"><option value="">انتخاب مدل</option>{data.products.map((p:any)=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
     <label>توضیح (اختیاری)<input name="notes" maxLength={2000}/></label>
    </div>
-   <label><input type="checkbox" checked={follow} disabled={result==='no_answer'} onChange={e=>setFollow(e.target.checked)}/> پیگیری لازم است</label>
-   {follow&&<div className="formgrid"><label>اقدام بعدی<input name="nextAction" required maxLength={300} placeholder="مثلاً تماس مجدد"/></label><label>موعد پیگیری<input name="nextDue" type="date" min={data.today} required/></label><label>ساعت<input name="nextTime" type="time"/></label></div>}
+   <fieldset className="sales-call-followup">
+    <legend>پیگیری بعدی</legend>
+    <label className="sales-call-followup-toggle">
+     <input type="checkbox" checked={follow} disabled={result==='no_answer'} onChange={e=>setFollow(e.target.checked)}/>
+     <span>برای این تماس پیگیری ثبت شود</span>
+    </label>
+    {result==='no_answer'&&<p className="subtle">برای تماس بی‌پاسخ، اقدام بعدی و موعد پیگیری را ثبت کنید.</p>}
+    {follow&&<div className="formgrid">
+     <label>اقدام بعدی<input name="nextAction" required maxLength={300} placeholder="مثلاً تماس مجدد"/></label>
+     <label>موعد پیگیری<input name="nextDue" type="date" min={data.today} required/></label>
+     <label>ساعت<input name="nextTime" type="time"/></label>
+    </div>}
+   </fieldset>
    <div className="tools"><button className="btn primary" disabled={busy}>ثبت تماس</button><button type="button" className="btn" onClick={()=>onNavigate?.('tasks')}>انصراف</button></div>
   </form>}
   {!showReport&&contact&&contact!=='new'&&<details><summary>سابقه تماس‌های این پرونده</summary>{data.calls.filter((r:any)=>contact===('agent:'+r.data.agentId)||contact===('lead:'+r.data.leadId)).map((r:any)=><p key={r.id}>{r.data.day} · {results.find(([key])=>key===r.data.result)?.[1]} · {r.data.notes}</p>)}</details>}
