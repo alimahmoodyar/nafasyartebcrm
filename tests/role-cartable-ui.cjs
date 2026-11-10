@@ -18,6 +18,18 @@ const renderHospital=()=>{cursor=0;return RoleTestingPanel({targetId:hospital.id
 assert.ok(nodes(renderHospital()).some(n=>n.type==='button'&&text(n).startsWith('کارتابل')));
 nodes(renderHospital()).find(n=>n.type==='button'&&text(n)==='انتخاب پرونده خریدار').props.onClick();await new Promise(r=>setImmediate(r));
 assert.ok(nodes(renderHospital()).some(n=>n.type==='option'&&n.props.value==='buyer'));
+// Layout back can reach the role catalog while the server still has the previous role cookie.
+for(const activeProfile of ['home-sales','central-store']){
+ response={profiles:[hospital],activeProfile};
+ const roles=[];
+ const renderExitedCatalog=()=>{cursor=0;return RoleTestingPanel({onNavigate:navigate,onProfile:p=>roles.push(p)})};
+ await mount(renderExitedCatalog);
+ const writes=profileRequests.filter(r=>r.options?.method==='POST').map(r=>JSON.parse(r.options.body));
+ assert.equal(writes.at(-1)?.mode,'exit_profile');
+ assert.equal(roles.at(-1),null);
+ assert.deepEqual(navigation.pop(),['role-testing','']);
+ assert.ok(nodes(renderExitedCatalog()).some(n=>n.type==='button'&&text(n).includes(hospital.title)));
+}
 const representative={id:'sales-representative',title:'نماینده فروش',operational:true,buyerScope:'required',links:[{title:'ثبت درخواست خرید',section:'sales',target:'rep-new-order'},{title:'پیگیری ارسال و دریافت',section:'transport',target:'rep-shipments'}],gaps:[]};
 response={profiles:[representative]};await mount(renderCatalog);
 profileRequests=[];nodes(renderCatalog()).find(n=>n.type==='button'&&text(n).includes(representative.title)).props.onClick();await new Promise(r=>setImmediate(r));

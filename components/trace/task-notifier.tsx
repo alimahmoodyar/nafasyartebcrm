@@ -16,7 +16,7 @@ export function TaskNotifier({accountId,profile,onOpen}:{accountId:string;profil
  useEffect(()=>{
   const controller=new AbortController();
   let generation=0;
-  async function read<T>(path:string):Promise<T>{
+  async function read<T>(path:string):Promise<{data:T;isolated:boolean}>{
    const response=await fetch(path,{cache:'no-store',signal:controller.signal});
    if(!response.ok)throw Error('Cartable unavailable');
    return {data:await response.json() as T,isolated:response.headers.get('X-Training-Workspace')==='isolated'};

@@ -23,6 +23,7 @@ export function SalesCallsPanel({buyer='',compact=false,onNavigate}:{buyer?:stri
    const operation=id||crypto.randomUUID();setId(operation);
    const r=await fetch('/api/sales/calls',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...body,id:operation,confirmed:true})});
    const out=await r.json() as {error?:string;followupPending?:boolean};if(!r.ok){if(r.status<500)setId('');throw Error(out.error);}
+   window.dispatchEvent(new Event('nafasyar-tasks-changed'));
    setId('');setMessage(out.followupPending?'ثبت شد. کارتابل در بررسی بعدی تازه می‌شود.':'ثبت شد.');return true;
   }catch(e){setError((e as Error).message);return false;}finally{setBusy(false);}
  }

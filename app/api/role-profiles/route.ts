@@ -17,9 +17,9 @@ export async function GET(request:Request){try{
  const profile=id?roleProfiles.find(p=>p.id===id):undefined;
  if(id&&!profile)throw new AccessError('پروفایل جایگاه پیدا نشد.',404);
  const json=(value:unknown)=>Response.json(value,{headers:{'Cache-Control':'private, no-store','Vary':'Cookie, Authorization'}});
- if(!profile)return json({profiles:roleProfiles.map(visibleProfile)});
- if(!profile.operational)return json({profile:visibleProfile(profile),work:[],activeProfile:(await session()).profileReview?.id||'',unverified:[],personalPreview:true});
  const active=(await session()).profileReview;
+ if(!profile)return json({profiles:roleProfiles.map(visibleProfile),activeProfile:active?.id||''});
+ if(!profile.operational)return json({profile:visibleProfile(profile),work:[],activeProfile:active?.id||'',unverified:[],personalPreview:true});
  const buyerId=params.get('buyer')||(active?.id===profile.id?active.buyerId||active.missionId:'')||'';
  if(!await validProfileScope(profile.id,buyerId)&&buyerId)throw new AccessError('پرونده خریدار یا مأموریت معتبر برای این پروفایل لازم است.',400);
  if(profile.id==='sales-representative'&&!buyerId){
