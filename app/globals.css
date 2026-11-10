@@ -568,7 +568,10 @@ button.hospital-network-option { cursor: pointer; }
 .representative-dashboard{--rep-line:#dbe2ee;--rep-tint:#f6f8fd;--rep-ink:#17254a;--rep-accent:#394ab4}
 .representative-dashboard .panelhead h2,.representative-orders-heading{color:var(--rep-ink)}
 .representative-account-strip{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;padding:16px;border:1px solid var(--rep-line);border-radius:12px;background:var(--rep-tint);margin-block:8px 22px}
-.representative-account-strip dl,.representative-dashboard-actions,.representative-order-links{display:flex;flex-wrap:wrap;gap:10px;margin:0;align-items:center}
+.representative-account-strip dl,.representative-order-links{display:flex;flex-wrap:wrap;gap:10px;margin:0;align-items:center}
+.representative-dashboard-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(6px,2vw,12px);max-width:570px;margin-block:0 16px}
+.representative-dashboard-actions .btn{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:8px;min-width:0;min-height:82px;padding:8px 4px;border-radius:12px;font-size:clamp(.75rem,2.8vw,.95rem);line-height:1.4;text-align:center;white-space:normal}
+.representative-dashboard-actions svg{width:26px;height:26px;flex-shrink:0}
 .representative-account-strip dl>div{min-width:145px;padding:6px 12px;border-inline-start:2px solid #c4cdef}
 .representative-account-strip dt{font-size:.85rem;color:#475578}
 .representative-account-strip dd{margin:0;font-size:1.15rem;font-weight:700;color:var(--rep-ink)}

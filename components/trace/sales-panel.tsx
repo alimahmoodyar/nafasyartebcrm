@@ -1,5 +1,5 @@
 'use client';
-import {CircleCheck,ClipboardList,Clock,History,Search,TriangleAlert} from 'lucide-react';
+import {CircleCheck,ClipboardList,Clock,History,Search,ShoppingCart,TriangleAlert,Wallet} from 'lucide-react';
 import {CartonSerials} from './carton-serials';
 import {RefreshButton} from './refresh-button';
 import {BuyerSelect} from './buyer-select';
@@ -291,7 +291,13 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
  };
 
  return <ProgramWorkspace programId="sales" direct={!!targetId} title="فروش" status={<>{error&&!draft&&<p className="notice error" role="alert">{error}</p>}{!data.warehouseOnly&&(staff||finance)&&!writableAgents.length&&<p className="notice" role="status">نقش فروش شما فعال است؛ برای ثبت فروش، مدیر فروش باید از مسیر «فروش ← تنظیمات فروش ← تخصیص خریدار به کارشناس» خریدار موجود را به شما تخصیص دهد. مجوز مشاهده گزارش به‌تنهایی اختیار ثبت در پرونده همکاران را نمی‌دهد.</p>}</>}><section className={representativeDashboard?'panel sales-portal representative-dashboard':'panel sales-portal'} dir="rtl"><div className="panelhead"><h2>{representativeDashboard?'پنل نماینده فروش':representativeTracking?'پیگیری سفارش‌ها':view==='orders'?'سفارش‌ها':representativeEntry?.view==='account'?'حساب و اعتبار نماینده':representativeEntry?.view==='returns'?'مرجوعی دستگاه':rep?'پرتال نماینده فروش':'فروش و نمایندگان'}</h2></div><div className="inside">
- {representativeDashboard&&rep&&<><div className="representative-account-strip">
+ {representativeDashboard&&rep&&<>
+ <div className="representative-dashboard-actions" role="group" aria-label="اقدام‌های اصلی نماینده">
+  <button type="button" className="btn primary" disabled={!writableAgents.length} onClick={()=>begin('order')}><ShoppingCart aria-hidden="true"/><span>ثبت درخواست خرید</span></button>
+  <button type="button" className="btn" disabled={!writableAgents.length} onClick={()=>begin('payment',{agentId:writableAgents[0]?.id||''})}><Wallet aria-hidden="true"/><span>ثبت پرداخت یا چک</span></button>
+  <button type="button" className="btn" onClick={()=>onNavigate('tasks')}><ClipboardList aria-hidden="true"/><span>کارتابل</span></button>
+ </div>
+ <div className="representative-account-strip">
   <dl>
    <div><dt>{hasReceivable?'مانده طلب':netBalance===BigInt(0)?'مانده حساب':'مانده بدهی'}</dt><dd>{netBalance===null?'—':money(hasReceivable?-netBalance:netBalance)}</dd></div>
    <div>
@@ -305,11 +311,6 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
    </div>
   {outstandingDue&&<div><dt>اولین سررسید باز</dt><dd>{date(outstandingDue.due)}</dd><small>{dueLabel(outstandingDue)}</small></div>}
   </dl>
-  <div className="representative-dashboard-actions">
-   <button type="button" className="btn" onClick={()=>onNavigate('tasks')}>کارتابل</button>
-   <button type="button" className="btn primary" disabled={!writableAgents.length} onClick={()=>begin('order')}>ثبت درخواست خرید</button>
-   <button type="button" className="btn" disabled={!writableAgents.length} onClick={()=>begin('payment',{agentId:writableAgents[0]?.id||''})}>ثبت پرداخت یا چک</button>
-  </div>
  </div>{['representative','reseller'].includes(data.agents[0]?.data.kind)&&<SalesRewards/>}<h3 className="representative-orders-heading">سفارش‌ها</h3></>}
  {!representativeEntry&&!group&&view!=='orders'&&buyerFilters}
  {!representativeEntry&&<SubprogramNavigation items={navigation.main} value={data.warehouseOnly?'returns':group||view} onChange={openView}/>}
