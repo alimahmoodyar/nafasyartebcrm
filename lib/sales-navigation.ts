@@ -8,6 +8,13 @@ export function salesViewGroup(view:string,reportOnly=false){
  return '';
 }
 
+export function directSalesView(target:string,context:SalesNavigationContext){
+ if(!target.startsWith('sales-view:'))return '';
+ const view=target.slice('sales-view:'.length);
+ const navigation=salesNavigation(context);
+ return [...navigation.main,...navigation.finance,...navigation.settings,...navigation.reports].some(([key])=>key===view)?view:'';
+}
+
 export function salesNavigation({warehouseOnly,roles}:SalesNavigationContext):{main:SalesMenuItem[];finance:SalesMenuItem[];settings:SalesMenuItem[];reports:SalesMenuItem[]}{
  if(warehouseOnly)return {main:[['returns','دریافت برگشتی']],finance:[],settings:[],reports:[]};
  const {agent:rep,staff,finance,manager,leads,viewer,reportRead}=roles;

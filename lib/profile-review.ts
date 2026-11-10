@@ -10,7 +10,7 @@ export const profileJobRoles:Record<string,string[]>={
  'warehouse-worker':[],'production-worker':[],'packaging-worker':[],'repair-worker':[],
  quality:['qc'],technical:['engineering','product_manager'],'finance-director':['finance_director','purchase_finance'],
  ceo:['ceo'],domestic:['domestic'],foreign:['foreign'],sales:['sales'],
- 'hospital-sales':['hospital_sales'],'sales-representative':['sales_agent'],'sales-manager':['sales_manager'],'sales-finance':['sales_finance'],
+ 'home-sales':['home_sales'],'hospital-sales':['hospital_sales'],'sales-representative':['sales_agent'],'sales-manager':['sales_manager'],'sales-finance':['sales_finance'],
  'home-service':['service_support','service_intake','service_technician'],'hospital-service':['service_support','service_intake','service_technician'],logistics:['transport_manager'],driver:['driver']
 };
 /** An authenticated admin tests a position's grants; the actor never becomes a person. */

@@ -40,6 +40,20 @@ cookieValues={};
 const card=await ctx.run(admin,()=>profileApi.GET(request('/api/role-profiles?profile=sales-representative')));
 const cardData=await card.json();assert.equal(card.status,200,JSON.stringify(cardData));assert.equal(cardData.sample,true);
 assert.equal(cardData.buyerChoices,undefined);
+const {directSalesView}=load('lib/sales-navigation.ts');
+for(const [id,manager] of [['home-sales',false],['sales-manager',true]]){
+ const session=review.profileSession(admin,id,ws());
+ assert.ok(navigation.canOpenSection(session,'sales'));
+ assert.equal(session.permissions.salesRoles.includes('manager'),manager);
+ const context={roles:{staff:session.permissions.salesRoles.includes('staff'),manager}};
+ const profile=profiles.roleProfiles.find(p=>p.id===id);
+ for(const view of ['new_order','orders','profiles','targets',...(manager?['terms','prices','assignments']:[])]){
+  const target='sales-view:'+view;
+  assert.ok(profile.links.some(link=>link.section==='sales'&&link.target===target));
+  assert.equal(directSalesView(target,context),view);
+ }
+ if(!manager)for(const view of ['terms','prices','assignments'])assert.equal(directSalesView('sales-view:'+view,context),'');
+}
 const repProfile=review.profileSession(admin,'sales-representative',ws(),'scope-buyer-a'),hospitalProfile=review.profileSession(admin,'hospital-sales',ws(),'scope-buyer-a');
 const salesView=load('lib/sales.ts');
 assert.equal(repProfile.userId,admin.userId);assert.equal(repProfile.permissions.salesAgentId,'scope-buyer-a');assert.equal(navigation.canOpenSection(repProfile,'sales-returns'),true);
