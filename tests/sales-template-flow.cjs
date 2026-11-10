@@ -621,7 +621,7 @@ async function fundWithCollateral(quoted) {
   const rewardsApi=load('app/api/sales/rewards/route.ts');
   const rewardsRoute='/api/sales/rewards';
   const reward=(values={})=>({mode:'save',operation:crypto.randomUUID(),agentId:'buyer-snapshot',
-    period:'quarter',year:1405,quarter:3,basis:'units',target:'2',productIds:['product'],kind:'cash',rate:1000,...values});
+    period:'quarter',year:1405,quarter:3,target:'2',netTarget:'4000',targetProductId:'product',kind:'cash',rate:1000,...values});
   const quarterReward=await post(rewardsApi,rewardsRoute,reward(),manager);
   const yearReward=await post(rewardsApi,rewardsRoute,reward({period:'year',kind:'equivalent',productId:'product',unitValue:'150'}),manager);
   await post(rewardsApi,rewardsRoute,reward(),manager,409);
@@ -639,6 +639,13 @@ async function fundWithCollateral(quoted) {
   assert.equal(JSON.parse(financeTask.data).sourceId,'sales-view:reward-quarter:'+quarterReward.id);
   const ended=await financeRewards(),quarterPlan=ended.find(row=>row.id===quarterReward.id),yearPlan=ended.find(row=>row.id===yearReward.id);
   assert.equal(quarterPlan.progress.result.value,'400');
+  const {salesRewardProgress}=load('lib/sales-rewards.ts');
+  const rewardInvoices=rows('sales_invoice');
+  const needsMore=(thresholds)=>salesRewardProgress({...quarterPlan,data:{...quarterPlan.data,...thresholds}},rewardInvoices,duties.dayAt());
+  assert.equal(needsMore({netTarget:'4001'}).ready,false);
+  assert.equal(needsMore({target:'3'}).ready,false);
+  assert.equal(needsMore({productIds:['product-fixed']}).result.actual,'0');
+  assert.equal(salesRewardProgress(quarterPlan,rewardInvoices,quarterPlan.data.end).daysLeft,1);
   assert.equal(yearPlan.progress.result.value,'400');
   assert.equal(yearPlan.progress.result.quantity,'2');
   assert.equal(yearPlan.progress.result.remainder,'100');

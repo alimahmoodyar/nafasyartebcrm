@@ -84,6 +84,7 @@ for(const path of ['sales','sales/returns','sales/rewards','transport','tasks'])
   assert.equal(preview.sample,true);
   assert.deepEqual(preview.rewards.map(row=>row.data.period).sort(),['quarter','year']);
   assert.ok(preview.rewards.every(row=>row.data.agentId===sampleId));
+  assert.ok(preview.rewards.every(row=>row.data.netTarget&&row.data.productIds.length===1&&row.progress.daysLeft>0));
   assert.ok(preview.rewards.some(row=>BigInt(row.progress.result.actual)>0n));
   assert.equal(sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type='sales_reward'").get().n,0);
  }
