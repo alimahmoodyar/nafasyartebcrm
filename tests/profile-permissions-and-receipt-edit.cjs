@@ -73,12 +73,20 @@ const shellData=await shellCard.json();assert.equal(shellData.activeProfile,'sal
 const sampleId=review.representativeSampleId(admin.userId);
 assert.equal(sql.prepare("SELECT id FROM flow_entities WHERE id=?").get(sampleId),undefined);
 assert.equal(sql.prepare("SELECT id FROM training_flow_entities WHERE id=?").get(sampleId).id,sampleId);
-for(const path of ['sales','sales/returns','transport','tasks']){
+for(const path of ['sales','sales/returns','sales/rewards','transport','tasks']){
  const response=await ctx.run(admin,()=>load('app/api/'+path+'/route.ts').GET(new Request('https://test.local/api/'+path)));
  const body=await response.text();
  assert.equal(response.status,200,path+': '+body);
  assert.equal(response.headers.get('X-Training-Workspace'),'isolated');
  assert.ok(!body.includes('scope-buyer-a')&&!body.includes('scope-buyer-b'));
+ if(path==='sales/rewards'){
+  const preview=JSON.parse(body);
+  assert.equal(preview.sample,true);
+  assert.deepEqual(preview.rewards.map(row=>row.data.period).sort(),['quarter','year']);
+  assert.ok(preview.rewards.every(row=>row.data.agentId===sampleId));
+  assert.ok(preview.rewards.some(row=>BigInt(row.progress.result.actual)>0n));
+  assert.equal(sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type='sales_reward'").get().n,0);
+ }
  if(path==='sales'){
   const preview=JSON.parse(body),account=preview.accounts.find(row=>row.agentId===sampleId);
   assert.deepEqual(account.invoices.map(row=>row.remaining),['0','10000000','30000000']);

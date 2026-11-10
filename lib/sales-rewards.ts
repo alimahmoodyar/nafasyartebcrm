@@ -1,7 +1,15 @@
 import {goalProgress} from './sales-monitor-contract';
+import {solarToIso} from './persian-date';
+import {addDay} from './duties';
 
 export const rewardPeriods={quarter:'هدف و پاداش فصلی',year:'هدف و پاداش سالانه'} as const;
 export type RewardPeriod=keyof typeof rewardPeriods;
+
+export function salesRewardDates(year:number,quarter:number){
+ const month=quarter?1+(quarter-1)*3:1;
+ const next=quarter&&quarter<4?solarToIso(year,month+3,1):solarToIso(year+1,1,1);
+ return {start:solarToIso(year,month,1),end:addDay(next,-1)};
+}
 
 export function salesRewardProgress(reward:any,rows:any[],today:string){
  const data=reward.data;

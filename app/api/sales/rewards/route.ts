@@ -1,27 +1,49 @@
 import {accessResponse,checkOrigin,requireAccess} from '@/lib/authorization';
-import {addDay,dayAt} from '@/lib/duties';
+import {dayAt} from '@/lib/duties';
 import {boundedBody} from '@/lib/firmware-storage';
-import {solarToIso} from '@/lib/persian-date';
+import {solarParts} from '@/lib/persian-date';
+import {representativeSampleId} from '@/lib/profile-review';
+import {trainingContext} from '@/lib/training-context';
 import {withRepresentativeSample} from '@/lib/representative-sample';
 import {liveSalesUser,salesManager,salesFinance,salesRep,salesScope,salesRows,salesFail as fail,salesLock,salesEntity,integer,money,sreq} from '@/lib/sales';
 import {allocationPlan} from '@/lib/sales-network-contract';
-import {rewardPeriods,salesRewardProgress} from '@/lib/sales-rewards';
+import {rewardPeriods,salesRewardDates,salesRewardProgress} from '@/lib/sales-rewards';
 import {syncSalesTasks} from '@/lib/sales-tasks';
 import {storage} from '@/lib/storage';
 
 const json=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'private, no-store'}});
 const eligible=(agent:any)=>agent.data.active&&['representative','reseller'].includes(agent.data.kind);
+async function seedRewardPreview(agentId:string,today:string){
+ const {year,month}=solarParts(today),quarter=Math.ceil(month/3),now=new Date().toISOString(),db=storage();
+ const plans=[
+  {period:'quarter',quarter,target:'100000000',kind:'cash',rate:200,unitValue:'0',productId:''},
+  {period:'year',quarter:0,target:'300000000',kind:'equivalent',rate:300,unitValue:'10000000',productId:'training-product-1'},
+ ];
+ const missing=[];
+ for(const plan of plans){
+  const id=agentId+':reward-demo:'+year+':'+plan.quarter;
+  if(await db.prepare('SELECT id FROM flow_entities WHERE id=?').bind(id).first())continue;
+  const data={...plan,...salesRewardDates(year,plan.quarter),year,agentId,basis:'net',productIds:[],quantity:0,state:'active'};
+  missing.push(db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'sales_reward',?,1,?,?) ON CONFLICT(id) DO NOTHING").bind(id,JSON.stringify(data),now,now));
+ }
+ if(missing.length)await db.batch(missing);
+}
+
 async function get(){
  try{
   const user=await liveSalesUser(await requireAccess());
   const manager=salesManager(user),finance=salesFinance(user),rep=salesRep(user);
   if(!manager&&!finance&&!rep)fail('دسترسی به پاداش فروش ندارید.',403);
-  const rows=await salesRows(),today=dayAt();
+  const today=dayAt();
+  const sampleId=representativeSampleId(user.userId);
+  const sample=!!trainingContext.getStore()&&user.permissions.salesAgentId===sampleId;
+  if(sample)await seedRewardPreview(sampleId,today);
+  const rows=await salesRows();
   const agents=rep?[await salesScope(user,user.permissions.salesAgentId!,'read')]:rows.filter(row=>row.type==='sales_agent');
   const ids=new Set(agents.filter(agent=>!rep||eligible(agent)).map(agent=>agent.id));
   const rewards=rows.filter(row=>row.type==='sales_reward'&&ids.has(row.data.agentId)).map(row=>({...row,progress:salesRewardProgress(row,rows,today)}));
   const products=(await storage().prepare("SELECT id,payload FROM records WHERE kind='product' ORDER BY id").all<{id:string;payload:string}>()).results.map(({id,payload})=>({id,name:JSON.parse(payload).name||id}));
-  return json({manager,finance,today,rewards,agents:agents.map(agent=>({id:agent.id,name:agent.data.name,eligible:eligible(agent)})),products});
+  return json({manager,finance,today,rewards,sample,agents:agents.map(agent=>({id:agent.id,name:agent.data.name,eligible:eligible(agent)})),products});
  }catch(error){return accessResponse(error)||json({error:'دریافت پاداش‌های فروش انجام نشد.'},503);}
 }
 export const GET=withRepresentativeSample(get);
@@ -55,9 +77,7 @@ export async function POST(request:Request){
    const period=sreq(body.period);
    if(!Object.hasOwn(rewardPeriods,period))fail('دوره معتبر نیست.');
    const year=integer(body.year,1300,1600),quarter=period==='quarter'?integer(body.quarter,1,4):0;
-   const month=quarter?1+(quarter-1)*3:1;
-   const next=quarter&&quarter<4?solarToIso(year,month+3,1):solarToIso(year+1,1,1);
-   const start=solarToIso(year,month,1),end=addDay(next,-1);
+   const {start,end}=salesRewardDates(year,quarter);
    if(!['net','units'].includes(body.basis)||!['cash','fixed','equivalent'].includes(body.kind))fail('مبنای هدف یا نوع پاداش معتبر نیست.');
    const productIds=body.productIds;
    if(!Array.isArray(productIds)||productIds.length>100||new Set(productIds).size!==productIds.length)fail('کالاهای مشمول معتبر نیستند.');

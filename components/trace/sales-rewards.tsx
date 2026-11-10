@@ -10,7 +10,7 @@ type Kind='cash'|'fixed'|'equivalent';
 type Result={actual:string;net:string;value:string;quantity:string;remainder:string};
 type Plan={agentId:string;period:Period;year:number;quarter:number;start:string;end:string;basis:'net'|'units';target:string;productIds:string[];kind:Kind;productId:string;rate:number;quantity:number;unitValue:string;state:string;result?:Result};
 type Reward={id:string;revision:number;data:Plan;progress:{ready:boolean;started:boolean;ended:boolean;result:Result}};
-type Library={manager:boolean;finance:boolean;today:string;rewards:Reward[];agents:{id:string;name:string;eligible:boolean}[];products:{id:string;name:string}[]};
+type Library={sample?:boolean;manager:boolean;finance:boolean;today:string;rewards:Reward[];agents:{id:string;name:string;eligible:boolean}[];products:{id:string;name:string}[]};
 const format=(value:string|number)=>BigInt(value).toLocaleString('fa-IR');
 const seasons=['بهار','تابستان','پاییز','زمستان'];
 const kinds={cash:'ریالی',fixed:'کالایی با تعداد ثابت',equivalent:'کالایی معادل پاداش ریالی'};
@@ -67,7 +67,13 @@ export function SalesRewards({period,manage=false,focusId=''}:{period?:Period;ma
    quantity:Number(value('quantity')),productId:value('productId'),unitValue:value('unitValue'),
   });
  }
- if(!library)return manage||error?<p role={error?'alert':'status'}>{error||'در حال دریافت هدف‌ها…'}</p>:null;
+ if(!library){
+  const message=error||'در حال دریافت هدف…';
+  if(manage)return <p role={error?'alert':'status'}>{message}</p>;
+  return <section className="representative-rewards" aria-label="هدف و پاداش فروش">
+   {Object.entries(titles).map(([key,title])=><div key={key}><h3>{title}</h3><p role={error?'alert':'status'}>{message}</p></div>)}
+  </section>;
+ }
  const current=solarParts(library.today);
  const periods:Period[]=period?[period]:['quarter','year'];
  const d=draft?.data;
@@ -103,7 +109,7 @@ export function SalesRewards({period,manage=false,focusId=''}:{period?:Period;ma
      const product=library.products.find(item=>item.id===p.productId)?.name||p.productId;
      const status=p.state==='approved'?'ثبت‌شده':reward.progress.ready?'در انتظار تأیید مالی':reward.progress.ended?'پایان دوره · پاداش قابل ثبت ندارد':reward.progress.started?'در جریان':'هنوز شروع نشده';
      return <article key={reward.id} className="flow-card">
-      <strong>{periodLabel}{manage?' · '+(library.agents.find(a=>a.id===p.agentId)?.name||''):''}</strong>
+      <strong>{periodLabel}{library.sample?' · آزمایشی':''}{manage?' · '+(library.agents.find(a=>a.id===p.agentId)?.name||''):''}</strong>
       <p>{format(r.actual)} از {format(p.target)}{unit} · {status}</p>
       <p>{kinds[p.kind]} · {p.kind==='cash'?format(r.value)+' ریال':format(r.quantity)+' دستگاه '+product}
        {p.kind==='equivalent'&&r.remainder!=='0'&&<> · ماندهٔ کمتر از ارزش یک دستگاه {format(r.remainder)} ریال</>}
