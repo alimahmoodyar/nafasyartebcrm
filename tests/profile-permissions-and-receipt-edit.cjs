@@ -171,8 +171,16 @@ assert.equal(await transport.transportCanSee(review.profileSession(admin,'driver
 const driverWork=await load('lib/profile-work.ts').profileWork(driverView);
 assert.ok(driverWork.work.some(x=>x.sourceId==='preview-mission'));assert.ok(!driverWork.work.some(x=>x.sourceId==='another-mission'));
 const transportApi=load('app/api/transport/route.ts');
-const forbiddenDriverWrite=await ctx.run(driverView,()=>transportApi.POST(request('/api/transport',{mode:'checklist',missionId:'preview-mission'})));
-assert.equal(forbiddenDriverWrite.status,403);
+const checklist={mode:'checklist',revision:1,packagesChecked:true,itemsChecked:true,documentsChecked:true,conditionChecked:true};
+const driverPost=(fields)=>ctx.run(driverView,()=>transportApi.POST(request('/api/transport',{id:crypto.randomUUID(),missionId:'preview-mission',...fields})));
+assert.equal((await driverPost({...checklist,missionId:'another-mission'})).status,404);
+assert.equal((await driverPost({mode:'expense',revision:1})).status,403);
+const driverChecklist=await driverPost(checklist);
+assert.equal(driverChecklist.status,200,await driverChecklist.clone().text());
+assert.equal(row('preview-mission').data.checklist.by,admin.userId);
+const treasuryRole=review.profileSession(admin,'treasurer',ws());
+assert.ok(navigation.canOpenSection(treasuryRole,'sales-bank'));
+assert.equal(navigation.canOpenSection(treasuryRole,'sales'),false);
 cookieValues[review.profileReviewCookie]='bad-profile';await assert.rejects(()=>ctx.run(admin,()=>auth.session()),e=>e.status===403);cookieValues={};
 const central=review.profileSession(admin,'central-store',ws()),quality=review.profileSession(admin,'quality',ws()),line=review.profileSession(admin,'line-store',ws());
 assert.ok(central.permissions.warehouseResponsibilities.some(r=>r.warehouseId===wh.id));assert.ok(!central.permissions.warehouseResponsibilities.some(r=>r.warehouseId==='line-wh'));assert.deepEqual(Array.from(line.permissions.warehouseResponsibilities,r=>r.warehouseId),['line-wh']);
