@@ -1,5 +1,5 @@
 'use client';
-import {ClipboardList,History,Search} from 'lucide-react';
+import {CircleCheck,ClipboardList,Clock,History,Search,TriangleAlert} from 'lucide-react';
 import {CartonSerials} from './carton-serials';
 import {RefreshButton} from './refresh-button';
 import {BuyerSelect} from './buyer-select';
@@ -261,8 +261,12 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
    {recentPayments.map((payment:any)=>{
     const entry=payment.data;
     const origin=payment.isTerminalPayment?'پوز':entry.submission?.channel==='portal'&&entry.submission?.onBehalf===false?'اعلام نماینده':entry.bankRowId?'گردش بانک':'';
-    const status=entry.state==='cleared'&&entry.bankRowId?'تطبیق‌شده با بانک':salesStates[entry.state]||'';
-    return <tr key={payment.id}><td>{date(entry.bankSettlementDay||entry.day)}</td><td>{money(entry.amount)}</td><td>{origin||'—'}</td><td>{status||'—'}</td></tr>;
+    const matched=entry.state==='cleared'&&!!entry.bankRowId;
+    const pendingBank=entry.state==='pending'&&entry.method==='bank'&&!entry.bankRowId;
+    const late=pendingBank&&payment.bankMatchMissing===true;
+    const StatusIcon=matched?CircleCheck:late?TriangleAlert:pendingBank?Clock:null;
+    const status=matched?'تأیید سیستمی':late?'در گردش بانک پیدا نشد':pendingBank?'در انتظار تطبیق':salesStates[entry.state]||'';
+    return <tr key={payment.id}><td>{date(entry.bankSettlementDay||entry.day)}</td><td>{money(entry.amount)}</td><td>{origin||'—'}</td><td><span className="representative-payment-status" data-tone={matched?'confirmed':late?'warning':undefined}>{StatusIcon&&<StatusIcon size={16} aria-hidden="true"/>}{status||'—'}</span></td></tr>;
    })}
   </tbody></table></div>:<p className="empty">پرداختی ثبت نشده است.</p>}
  </section>}

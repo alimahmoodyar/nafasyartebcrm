@@ -74,6 +74,23 @@ for(const path of ['sales','sales/returns','transport','tasks']){
  }
 
 }
+const samplePayment=sampleId+':finance-demo:payment:3';
+const bankDay='2026-11-06', bankAccount='test-claim-account';
+sql.prepare("UPDATE training_flow_entities SET created=?,data=json_set(data,'$.day',?,'$.receivingAccountId',?,'$.reference','MATCH-123') WHERE id=?").run(bankDay+'T00:00:00Z',bankDay,bankAccount,samplePayment);
+const addBankExample=(id,type,day,data)=>sql.prepare('INSERT INTO training_flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?)').run(id,type,JSON.stringify(data),day+'T10:00:00Z',day+'T10:00:00Z');
+const warning=async()=>{
+ const r=await ctx.run(admin,()=>load('app/api/sales/route.ts').GET(new Request('https://test.local/api/sales')));
+ assert.equal(r.status,200);
+ return (await r.json()).accounts[0].payments.find(row=>row.id===samplePayment).bankMatchMissing;
+};
+addBankExample('claim-statement-1','sales_bank_statement',bankDay,{accountId:bankAccount,to:bankDay});
+addBankExample('claim-statement-same-day','sales_bank_statement',bankDay,{accountId:bankAccount,to:bankDay});
+addBankExample('claim-statement-other-account','sales_bank_statement','2026-11-07',{accountId:'another-account',to:bankDay});
+assert.equal(await warning(),false);
+addBankExample('claim-statement-2','sales_bank_statement','2026-11-07',{accountId:bankAccount,to:bankDay});
+assert.equal(await warning(),true);
+addBankExample('claim-entry','sales_bank_row','2026-11-07',{accountId:bankAccount,direction:'in',day:bankDay,amount:'30000000',reference:'MATCH-123'});
+assert.equal(await warning(),false);
 const items=[{productId:'training-product-1',quantity:1}];
 const quoteResponse=await ctx.run(admin,()=>load('app/api/sales/quote/route.ts').POST(request('/api/sales/quote',{agentId:sampleId,items})));
 const quote=await quoteResponse.json();
