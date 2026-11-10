@@ -575,3 +575,8 @@ button.hospital-network-option { cursor: pointer; }
 .representative-order-detail{background:#f7f9fd;border-top:1px solid #dbe2ee;border-radius:0 0 10px 10px;padding:14px}
 .representative-order-links{margin-block:8px}
 @media(max-width:650px){.representative-order-column-labels{display:none}.representative-order-row summary{grid-template-columns:1fr 1fr;gap:6px 10px}.representative-order-chevron{display:none}.representative-account-strip dl>div{min-width:120px}.representative-order-detail{padding:10px}}
+.representative-dashboard .representative-order-columns{grid-template-columns:minmax(100px,1fr) minmax(85px,.75fr) minmax(105px,.9fr) minmax(132px,1fr) minmax(155px,1.25fr) 16px}
+.representative-order-finance{display:grid;gap:2px;color:#344369;font-size:.85rem}
+.representative-order-finance small{color:#475578}
+.representative-payments{margin-block-start:24px;border-top:1px solid var(--rep-line);padding-block-start:14px}
+@media(max-width:780px){.representative-dashboard .representative-order-column-labels{display:none}.representative-dashboard .representative-order-row summary{grid-template-columns:1fr 1fr}.representative-dashboard .representative-order-chevron{display:none}}

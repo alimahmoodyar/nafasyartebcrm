@@ -65,6 +65,14 @@ for(const path of ['sales','sales/returns','transport','tasks']){
  assert.equal(response.status,200,path+': '+body);
  assert.equal(response.headers.get('X-Training-Workspace'),'isolated');
  assert.ok(!body.includes('scope-buyer-a')&&!body.includes('scope-buyer-b'));
+ if(path==='sales'){
+  const preview=JSON.parse(body),account=preview.accounts.find(row=>row.agentId===sampleId);
+  assert.deepEqual(account.invoices.map(row=>row.remaining),['0','10000000','30000000']);
+  assert.equal(account.debt,'40000000');
+  assert.equal(account.payments.filter(row=>row.isTerminalPayment&&row.data.state==='cleared').length,1);
+  assert.equal(account.payments.filter(row=>row.data.state==='pending').length,1);
+ }
+
 }
 const items=[{productId:'training-product-1',quantity:1}];
 const quoteResponse=await ctx.run(admin,()=>load('app/api/sales/quote/route.ts').POST(request('/api/sales/quote',{agentId:sampleId,items})));
