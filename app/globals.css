@@ -580,3 +580,5 @@ button.hospital-network-option { cursor: pointer; }
 .representative-order-finance small{color:#475578}
 .representative-payments{margin-block-start:24px;border-top:1px solid var(--rep-line);padding-block-start:14px}
 @media(max-width:780px){.representative-dashboard .representative-order-column-labels{display:none}.representative-dashboard .representative-order-row summary{grid-template-columns:1fr 1fr}.representative-dashboard .representative-order-chevron{display:none}}
+
+.representative-payment-status{display:inline-flex;align-items:center;gap:6px}.representative-payment-status[data-tone="confirmed"]{color:#146551}.representative-payment-status[data-tone="warning"]{color:#8a4708}

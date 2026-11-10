@@ -36,10 +36,25 @@ async function get(request:Request){try{
  const products=(await storage().prepare("SELECT id,payload FROM records WHERE kind='product'").all()).results.map((r:any)=>{const p=JSON.parse(r.payload);return {id:r.id,name:p.name||p.model||p.code,model:p.model||'',status:p.status,productionMode:productProductionMode(p)};});
  const canOperate=await Promise.all(agents.map(a=>salesVisible(u,a)));
  const bankRowsById=new Map(rows.filter(row=>row.type==='sales_bank_row').map(row=>[row.id,row.data]));
+ const bankStatements=salesRep(u)?all.filter(row=>row.type==='sales_bank_statement'):[];
+ const incomingBankRows=salesRep(u)?all.filter(row=>row.type==='sales_bank_row'&&row.data.direction==='in'):[];
  const accounts=agents.map(a=>{const account=salesAccounts(rows,a.id,today);const publicReturn=(r:any)=>{if(!r.data.workflowVersion)return r;const {agentId,invoiceId,state,deviceIds,serials,amount,reason,workflowVersion}=r.data;return {...r,data:{agentId,invoiceId,state,deviceIds,serials,amount,reason,workflowVersion}};};return {agentId:a.id,...account,payments:account.payments.map(payment=>{
   const bankRow=bankRowsById.get(payment.data.bankRowId);
   const isTerminalPayment=bankRow?.kind==='pos'&&!!bankRow.terminalId&&bankRow.paymentId===payment.id;
-  return {...payment,isTerminalPayment};
+  const claim=payment.data;
+  let bankMatchMissing=false;
+  if(salesRep(u)&&claim.method==='bank'&&claim.state==='pending'&&!claim.bankRowId&&claim.receivingAccountId&&claim.day&&bankCode(claim.reference||'')){
+   const uploadDays=new Set<string>();
+   for(const statement of bankStatements){
+    if(statement.data.accountId===claim.receivingAccountId&&statement.created>=payment.created&&statement.data.to>=claim.day){
+     uploadDays.add(dayAt(new Date(statement.created)));
+    }
+   }
+   const consecutiveUploads=[...uploadDays].some(day=>uploadDays.has(addDay(day,1)));
+   const matchingEntry=incomingBankRows.some(row=>row.data.accountId===claim.receivingAccountId&&row.data.amount===claim.amount&&row.data.day===claim.day&&bankCode(row.data.reference||'')===bankCode(claim.reference));
+   bankMatchMissing=consecutiveUploads&&!matchingEntry;
+  }
+  return {...payment,isTerminalPayment,bankMatchMissing};
  }),returns:account.returns.map(publicReturn),credits:account.credits.map(publicReturn),securedCredit:salesSecuredCredit(rows,a.id,today)};});
  const allMembers=!salesRep(u)?(await storage().prepare("SELECT id,name,permissions FROM app_members WHERE status='active'").all()).results.map((m:any)=>{const p=storedAccessPermissions(m.permissions),s={isAdmin:false,permissions:p} as any;return {id:m.id,name:m.name,sales:salesStaff(s),manager:salesManager(s),finance:salesFinance(s)};}).filter(m=>m.sales||m.finance):[];
  const deliveries=await salesDelivery(rows,ids),mid=await memberId(u);
