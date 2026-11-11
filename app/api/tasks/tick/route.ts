@@ -1,4 +1,4 @@
-import {syncPurchaseOrderClosures} from '@/lib/purchase-fulfillment';
+import {syncPurchaseOrderClosures} from '@/lib/purchase-order-closures';
 import {syncInventoryCounts} from '@/lib/inventory-counts';
 import {syncReminders} from '@/lib/reminders';
 import {syncTreasuryTasks} from '@/lib/treasury-tasks';

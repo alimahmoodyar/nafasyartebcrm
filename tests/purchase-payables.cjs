@@ -84,7 +84,7 @@ const targetInvoice=(await current()).data.invoices.at(-1).id;
 user=finance;await action('recognize',{itemId:targetInvoice,account:'2101',basis:'confirmed invoice'});await action('schedule',{itemId:targetInvoice,schedule:[{amount:'30',due:'2026-10-03',condition:'QC accepted'}]});await action('release',{itemId:targetInvoice});
 await action('offset_supplier_credit',{itemId:credit.id,destinationCaseId:cid,invoiceId:targetInvoice,amount:'30'});
 c=await current();assert.equal(c.view.invoices.find(i=>i.id===targetInvoice).remaining,'0');assert.equal(c.data.supplierCredits[0].movements.length,2);
-await load('lib/purchase-fulfillment.ts').syncPurchaseOrderClosures();
+await load('lib/purchase-order-closures.ts').syncPurchaseOrderClosures();
 assert.equal(JSON.parse(sql.prepare("SELECT data FROM flow_entities WHERE id='o4'").get().data).state,'closed');
 // Permissions and route isolation.
 user={userId:'other',permissions:{supplyRoles:['foreign']}};assert.equal((await get()).cases.length,0);assert.equal((await filesApi.GET(new Request('https://test.local/api/purchase-payables/files?id='+fileId))).status,404);
