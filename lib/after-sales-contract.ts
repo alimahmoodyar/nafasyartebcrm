@@ -40,8 +40,8 @@ export const serviceForms:Record<string,ServiceField[]>={
  activation_preview:[f('source','نام فایل / مرجع قبلی'),rows('rows','سوابق فعال‌سازی',[f('serial','سریال'),day,f('months','مدت گارانتی (ماه)','quantity')])],
 };
 serviceForms.activation_import=serviceForms.activation_preview;
-export function visibleServiceFields(mode:string,data:any):ServiceField[]{
- const fields=serviceForms[mode]||[];
+export function visibleServiceFields(mode:string,data:any,ownAgent=false):ServiceField[]{
+ const fields=(serviceForms[mode]||[]).filter(f=>!(mode==='create'&&ownAgent&&['agentId','province','city'].includes(f.key)));
  if(mode!=='tariff')return fields;
  return fields.filter(f=>data?.kind!=='labor'||!['partCode','consumerPriceRial'].includes(f.key)).map(f=>f.key==='priceRial'?{...f,label:data?.kind==='labor'?'اجرت مصوب نماینده (ریال)':'قیمت فروش قطعه به نماینده (ریال)',optional:data?.kind!=='labor'}:f);
 }
