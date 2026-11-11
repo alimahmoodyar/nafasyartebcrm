@@ -10,6 +10,15 @@ for(const operational of [true,false]){response={activeProfile:'central-store',p
 
 response={activeProfile:'home-service-customer-support',profile:{id:'home-service-customer-support',title:'پاسخ‌گوی مشتری نمایندگی خدمات خانگی',operational:false,pendingWorkflow:true,links:[],gaps:[]},work:[],unverified:[],personalPreview:false};const pendingRender=()=>{cursor=0;return RoleTestingPanel({targetId:'home-service-customer-support',onNavigate:navigate,onProfile(){}})};await mount(pendingRender);assert.ok(text(pendingRender()).includes('پس از تعریف فرایندها'));assert.ok(!text(pendingRender()).includes('فیش حقوقی'));assert.ok(!nodes(pendingRender()).some(n=>n.type==='button'&&text(n).startsWith('کارتابل')),'undefined customer-support workflow must not expose a cartable button');
 
+const merged={id:'home-service',title:'کارشناس خدمات پس از فروش خانگی ـ مسئول نمایندگی‌ها',operational:true,buyerScope:'optional',serviceScope:true,links:[],gaps:[]};
+response={activeProfile:merged.id,profile:merged,work:[],unverified:[],buyerChoices:[{id:'agency',name:'سپهر'}]};
+const renderMerged=()=>{cursor=0;return RoleTestingPanel({targetId:merged.id,onNavigate:navigate,onProfile(){}})};await mount(renderMerged);
+nodes(renderMerged()).find(n=>n.type==='button'&&text(n)==='انتخاب نمایندگی / بازگشت به کارشناس').props.onClick();await new Promise(r=>setImmediate(r));
+assert.ok(text(renderMerged()).includes('کارشناس مسئول نمایندگی‌ها (اطلاعات شرکت)'));
+nodes(renderMerged()).find(n=>n.type==='select').props.onChange({target:{value:'agency'}});profileRequests=[];
+nodes(renderMerged()).find(n=>n.type==='button'&&text(n)==='ورود به پروفایل').props.onClick();await new Promise(r=>setImmediate(r));
+const mergedSelection=JSON.parse(profileRequests.find(r=>r.options?.method==='POST').options.body);assert.equal(mergedSelection.profileId,'home-service');assert.equal(mergedSelection.buyerId,'agency');
+
 const hospital={id:'hospital-sales',title:'کارشناس فروش بیمارستانی',operational:true,buyerScope:'optional',links:[],gaps:[]};
 response={profiles:[hospital]};const renderCatalog=()=>{cursor=0;return RoleTestingPanel({onNavigate:navigate,onProfile(){}})};await mount(renderCatalog);
 profileRequests=[];nodes(renderCatalog()).find(n=>n.type==='button'&&text(n).includes(hospital.title)).props.onClick();await new Promise(r=>setImmediate(r));

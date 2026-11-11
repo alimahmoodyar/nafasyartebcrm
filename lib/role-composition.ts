@@ -10,7 +10,7 @@ export function compositionProfiles(input:unknown){
  const ids=[...new Set(input as string[])].sort(),profiles=ids.map(id=>roleProfiles.find(p=>p.id===id));
  if(profiles.some(p=>!p?.operational))throw Error('نقش عملیاتی معتبر انتخاب کنید.');
  const selected=profiles as NonNullable<typeof profiles[number]>[];
- if(selected.length>1&&selected.some(p=>p.buyerScope==='required'||p.serviceScope))throw Error('نمایندگی بیرونی با نقش‌های کارکنان ترکیب نمی‌شود.');
+ if(selected.length>1&&selected.some(p=>p.buyerScope==='required'))throw Error('نمایندگی بیرونی با نقش‌های کارکنان ترکیب نمی‌شود.');
  return selected;
 }
 export function compositionLinks(profiles:ReturnType<typeof compositionProfiles>){
@@ -22,6 +22,7 @@ export async function prepareRoleComposition(admin:Session,input:unknown,warehou
  if(!admin.isAdmin)throw Error('آماده‌سازی ترکیب آزمایشی فقط برای مدیر سامانه مجاز است.');
  const profiles=compositionProfiles(input);
  if(Object.keys(scopes).some(id=>!profiles.some(p=>p.id===id)))throw Error('محدوده‌ای برای نقش انتخاب‌نشده فرستاده شده است.');
+ if(profiles.length>1&&profiles.some(p=>p.serviceScope&&scopes[p.id]))throw Error('نمایندگی بیرونی با نقش‌های کارکنان ترکیب نمی‌شود.');
  const contexts:Session[]=[];
  for(const p of profiles){const scope=scopes[p.id]||'';if(!await validProfileScope(p.id,scope))throw Error('محدوده یا پرونده مربوط به نقش معتبر نیست.');contexts.push(profileSession(admin,p.id,warehouses,scope));}
  return {profileIds:profiles.map(p=>p.id),title:profiles.map(p=>p.title).join(' + '),contexts,links:compositionLinks(profiles)};
