@@ -618,3 +618,12 @@ button.hospital-network-option { cursor: pointer; }
 .sales-call-followup-toggle + .sales-call-followup-toggle{margin-inline-start:16px}
 .sales-call-followup-toggle input[type='checkbox']{inline-size:1.1em;block-size:1.1em;padding:0;margin:0;flex:none}
 .sales-call-followup>.formgrid,.sales-call-followup>.subtle{margin-block-start:8px}
+
+/* Keep account and Passkey settings reachable on short screens and phones. */
+.user-profile-card{box-sizing:border-box;max-height:calc(100dvh - 120px);overflow-y:auto;overscroll-behavior:contain;overflow-wrap:anywhere}
+.user-profile-card input,.user-profile-card select{box-sizing:border-box;min-width:0;max-width:100%}
+@media(max-width:767px){
+ .user-profile-card{position:fixed;inset: max(12px,env(safe-area-inset-top)) 12px auto;width:auto;max-width:none;max-height:calc(100dvh - max(12px,env(safe-area-inset-top)) - max(12px,env(safe-area-inset-bottom)));z-index:200;overflow-y:auto;-webkit-overflow-scrolling:touch}
+ .user-profile-card input{font-size:16px}
+ .user-profile-card .btn{max-width:100%;white-space:normal}
+}
