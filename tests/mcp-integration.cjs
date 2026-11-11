@@ -43,6 +43,12 @@ async function mint(scope='read'){return (await (await tokens.POST(request('/api
  const batch=await call('create_record',{kind:'batch',data:{part:'Compressor',date:'2026-10-01',code:'B-001',supplier:'Test',quantity:'10',unit:'عدد',status:'تأیید'},confirmed:true});assert.ok(batch.record?.id);
  const fileId=crypto.randomUUID(),bytes=btoa('date,amount\n2026-10-01,10');let uploaded=await call('upload_batch_file',{batch:batch.record.id,requestId:fileId,filename:'test.csv',base64:bytes,confirmed:true});assert.ok(!uploaded.error,JSON.stringify(uploaded));let download=await call('download_batch_file',{batch:batch.record.id,id:fileId,length:4});assert.equal(atob(download.base64),'date');assert.equal(download.nextOffset,4);
  assert.ok((await call('upload_batch_file',{batch:batch.record.id,requestId:crypto.randomUUID(),filename:'bad.csv',base64:'???',confirmed:true})).error);
+ // Sales library uses the same private upload and integrity-checked download handlers.
+ const libraryFile=await call('upload_sales_resource',{confirmed:true,title:'Training',category:'training',audience:'representative',filename:'training.txt',contentBase64:btoa('Sales training fixture')});
+ assert.ok(libraryFile.id,JSON.stringify(libraryFile));
+ assert.ok((await call('get_sales_resources')).files.some(file=>file.id===libraryFile.id));
+ assert.equal(atob((await call('download_sales_resource',{id:libraryFile.id})).base64),'Sales training fixture');
+ assert.ok(Array.isArray((await call('get_sales_rewards')).rewards));
  // Admin record management: safe edits, immutable codes and guarded deletion.
  const fresh=await call('create_record',{kind:'batch',data:{...batch.record.data,code:'B-DELETE'},confirmed:true});
  let edit=await call('update_record',{id:fresh.record.id,previous:JSON.stringify(fresh.record.data),data:{...fresh.record.data,supplier:'Corrected',quantity:'20'},confirmed:true});assert.equal(edit.record.data.quantity,'20');
@@ -63,6 +69,9 @@ async function mint(scope='read'){return (await (await tokens.POST(request('/api
  assert.ok((await call('list_users',{},restricted)).error);assert.ok((await call('create_record',{kind:'product',data:product,confirmed:true},restricted)).error);assert.ok((await call('list_llm_configs',{},restricted)).error);
  assert.ok((await call('delete_record',{id:batch.record.id,previous:JSON.stringify(notes.record.data),confirmed:true},restricted)).error);
  assert.equal((await call('get_device_passport',{serial:'TEST-001'},restricted)).product,null);
+ assert.ok((await call('get_sales_resources',{},restricted)).error);
+ assert.ok((await call('download_sales_resource',{id:libraryFile.id},restricted)).error);
+ assert.ok((await call('get_sales_rewards',{},restricted)).error);
  sql.prepare("UPDATE app_members SET status='disabled' WHERE id='reader'").run();assert.equal((await http.POST(request('/mcp','POST',rpc('tools/list'),{authorization:'Bearer '+restricted}))).status,403);
  // Full legacy SSE: endpoint, POST message, streamed response, replay, isolation and revocation.
  const streamResponse=await sse.openStream(request('/sse?token='+token));assert.equal(streamResponse.status,200);assert.match(streamResponse.headers.get('content-type'),/text\/event-stream/);let reader=streamResponse.body.getReader();const first=new TextDecoder().decode((await reader.read()).value);assert.match(first,/event: endpoint/);const endpoint=first.split('data: ')[1].split('\n')[0];

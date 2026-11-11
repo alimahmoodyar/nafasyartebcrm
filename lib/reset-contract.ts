@@ -90,7 +90,7 @@ export const resetTables:Record<string,string>={
 export const resetFlowPreserved=['hospital_center','account_profile','member_contact','position','duty_template','duty_catalog_install','transport_migration','development_request','as_agent','sales_agent'];
 // material_photo is catalog data: active and removed originals/thumbnails survive operations reset with material; full reset backs up both object keys and deletes all photo rows. Generic 0016 flow/inventory freeze protects upload/removal; no new table/FK. Training uses existing flow and bucket isolation.
 // Shared print layouts are configuration; existing flow_entities freeze and backup apply.
-export const resetFlowCatalog=['label_template','material_file','material_photo','material_warehouse','hospital_profile_template','hospital_service_kit','pricing_cost','pricing_policy','pricing_approval','qms_record','qms_file','qms_part','purchase_specification','routine_route','routine_policy','semi_bom','cost_material','cost_standard','sales_price','supplier_document','supplier_capa','supplier','supplier_material','supplier_review','material','capacity','party','as_tariff','transport_vehicle'];
+export const resetFlowCatalog=['label_template','material_file','material_photo','material_warehouse','hospital_profile_template','hospital_service_kit','pricing_cost','pricing_policy','pricing_approval','qms_record','qms_file','qms_part','purchase_specification','routine_route','routine_policy','semi_bom','cost_material','cost_standard','sales_price','sales_resource','supplier_document','supplier_capa','supplier','supplier_material','supplier_review','material','capacity','party','as_tariff','transport_vehicle'];
 // Driver checklists, blockers and vehicle observations are embedded in operational
 // transport entities: backup, both reset scopes and 0016 freeze cover them.
 // Vehicle catalog stays preserved for operations-only reset. Browser drafts are local,
@@ -248,3 +248,5 @@ resetHelp.push('راهنماهای عیب‌یابی محصول، تاریخچه
 // Versioned sales returns and replacement sales use existing flow_entities; both reset scopes back up and delete them. Existing freeze guards cover duties, inventory and sales-file waybills.
 
 // hospital_gas_survey uses operational flow_entities. Both scopes back up/delete questionnaires; 0016 freezes all create, revoke and answer writes. No new tables, files or foreign keys.
+
+// Sales calls use existing sales_contact and sales_call_policy records and duty_runs.

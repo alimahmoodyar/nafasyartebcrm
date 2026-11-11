@@ -6,11 +6,13 @@ import {transportCanSee} from './transport';
 import {roleProfiles,materialProfileWork,treasuryTestTarget,salesBankRowTarget,salesBankTestTarget,bankGapTarget,bankTestGapTarget,type ProfileWork} from './role-profiles';
 import {coverage,nextWork} from './sourcing';
 import type {Session} from './permissions';
+import {rewardPeriods,salesRewardProgress} from './sales-rewards';
+import {dayAt} from './duties';
+import {rial,salesAccounts,salesOrderProgress} from './sales-contract';
 import {shortageRoles,canActOnShortage,shortageStages,type Shortage} from './handoff-shortage';
 import {treasuryProfileTest,treasuryRows} from './treasury';
 import {bankEntities} from './sales-bank';
 import {bankCoverage,bankPaymentReviewDue,coveredBankPeriods,missingBankDays} from './sales-bank-coverage';
-import {dayAt} from './duties';
 import {formatDate} from './persian-date';
 import {bankAmbiguities,readyBankRowForPayment} from './sales-bank-contract';
 import {runBankProfileTest} from './sales-bank-profile-test';
@@ -109,7 +111,7 @@ export async function profileWork(user:Session){
   const {returnWorkspace}=await import('./sales-return-workflow'),{items=[]}=await returnWorkspace(user);
   for(const item of items)for(const action of item.actions)work.push({id:item.id+':'+action,title:returnActions[action]+' · '+item.serial,section:'sales-returns',target:item.id,sourceId:item.id,state:'open'});
  }
- if(['hospital-sales','sales-manager','sales-finance','sales-representative'].includes(profile.id)){
+ if(['home-sales','hospital-sales','sales-manager','sales-finance','sales-representative'].includes(profile.id)){
   const {salesRows,salesVisible,salesDelivery}=await import('./sales'),sales=await salesRows();
   const buyerIds=new Set<string>();
   for(const buyer of sales.filter(row=>row.type==='sales_agent'&&row.data.active))if(await salesVisible(user,buyer))buyerIds.add(buyer.id);
@@ -118,10 +120,49 @@ export async function profileWork(user:Session){
    work.push({id:row.id+':'+profile!.id,title,section,target,sourceId:row.id,state:row.data.state});
   }
   for(const row of own){
+   if(profile.id==='sales-finance'&&row.type==='sales_reward'&&row.data.state==='active'&&salesRewardProgress(row,sales,dayAt()).ready){
+    const period=row.data.period as keyof typeof rewardPeriods;
+    addWork(row,'تأیید '+rewardPeriods[period],'sales','sales-view:reward-'+period+':'+row.id);
+   }
    if(profile.id==='sales-manager'&&row.type==='sales_order'&&row.data.state==='submitted')addWork(row,'بررسی سفارش '+row.data.code,'sales','order:'+row.id);
    if(profile.id==='sales-finance'&&row.type==='sales_order'&&['credit_review','sales_approved'].includes(row.data.state))addWork(row,'بررسی مالی سفارش '+row.data.code,'sales','order:'+row.id);
    if(profile.id==='sales-finance'&&row.type==='sales_payment'&&!competing.has(row.id)&&(row.data.state==='pending'||row.data.disposition?.state==='pending')&&(row.data.method!=='bank'||liveBankReviews.has(row.id)))addWork(row,row.data.method==='bank'?'بررسی اعلام واریز':'بررسی پرداخت یا چک','sales','account:'+row.data.agentId);
 
+  }
+  if(['home-sales','hospital-sales'].includes(profile.id)){
+   const {isPartner,partnerFollowup,readSalesCalls}=await import('./sales-calls');
+   const {usesSalesCallSample,withSalesCallSample}=await import('./sales-call-sample');
+   if(usesSalesCallSample(user)){
+    const sample=await withSalesCallSample(user,()=>readSalesCalls(user));
+    for(const buyer of sample.open.filter(row=>row.due<=sample.today))addWork({id:buyer.id,data:{state:'open'}},'پیگیری '+buyer.name+' · '+buyer.reasons.join('؛ '),'sales','sales-view:calls:'+buyer.id);
+   }
+   for(const buyer of sales.filter(row=>row.type==='sales_agent'&&buyerIds.has(row.id)&&isPartner(row))){
+    const follow=partnerFollowup(buyer,sales,dayAt());
+    if(follow.reasons.length&&follow.due<=dayAt())addWork(buyer,'پیگیری '+buyer.data.name+' · '+follow.reasons.join('؛ '),'sales','sales-view:calls:'+buyer.id);
+   }
+  }
+  if(profile.id==='sales-manager'){
+   const {readSalesCalls}=await import('./sales-calls');
+   const {withSalesCallSample}=await import('./sales-call-sample');
+   const callReview=await withSalesCallSample(user,()=>readSalesCalls(user));
+   for(const call of callReview.referrals.filter(row=>row.data.referral.state==='open')){
+    addWork(call,'رسیدگی به ارجاع تماس · '+call.data.name,'sales','sales-view:calls:referral:'+call.id);
+   }
+  }
+  if(profile.id==='home-sales'){
+   const today=dayAt(),deliveries=await salesDelivery(own,[...buyerIds]);
+   for(const order of own.filter(row=>row.type==='sales_order'&&!['cancelled','rejected'].includes(row.data.state))){
+    const progress=salesOrderProgress(order,deliveries,today);
+    if(progress.stage!=='delivered')addWork(order,'پیگیری سفارش '+order.data.code,'sales','order:'+order.id);
+   }
+   for(const buyerId of buyerIds){
+    const account=salesAccounts(own,buyerId,today);
+    for(const invoice of account.invoices){
+     if(invoice.installments.some((part:any)=>part.days<=7&&rial(part.remaining)>BigInt(0))){
+      addWork(invoice,'پیگیری سررسید فاکتور '+invoice.data.reference,'sales','account:'+buyerId);
+     }
+    }
+   }
   }
   if(['hospital-sales','sales-manager'].includes(profile.id)&&buyerIds.size){
    const intakes=(await db.prepare("SELECT id,data FROM flow_entities WHERE type='build_intake' AND json_extract(data,'$.state')=?").bind(profile.id==='sales-manager'?'commercial_review':'returned').all()).results;

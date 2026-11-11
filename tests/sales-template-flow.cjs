@@ -90,6 +90,7 @@ function load(file) {
 const context = load('lib/mcp/context.ts').mcpActor;
 const network = load('app/api/sales/network/route.ts');
 const sales = load('app/api/sales/route.ts');
+const salesFiles = load('app/api/sales/files/route.ts');
 const quoteApi = load('app/api/sales/quote/route.ts');
 const catalog = load('lib/mcp/tools.ts');
 const duties = load('lib/duties.ts');
@@ -180,6 +181,51 @@ async function expectQuote(templateId, rate, cashBps, months, agentId = 'buyer-r
   return quoted;
 }
 
+async function fundWithCollateral(quoted) {
+  const agentId = quoted.agentId;
+  const rep = actor('rep-' + agentId, ['agent'], {salesAgentId: agentId});
+  member(rep);
+  const available = async () => {
+    const response = await context.run(rep, () => sales.GET(new Request(base + '/api/sales')));
+    assert.equal(response.status, 200);
+    return (await response.json()).accounts[0].securedCredit;
+  };
+  const fileId = crypto.randomUUID();
+  const fileForm = new FormData();
+  fileForm.set('metadata', JSON.stringify({id: fileId, agentId, title: 'Test collateral cheque', confirmed: true}));
+  fileForm.set('file', new Blob(['%PDF-1.4 test collateral cheque']), 'test-collateral.pdf');
+  const upload = await context.run(rep, () => salesFiles.POST(new Request(base + '/api/sales/files', {
+    method: 'POST', headers: {origin: base}, body: fileForm,
+  })));
+  assert.equal(upload.status, 201, await upload.text());
+  const cheque = salesBody('payment', {
+    agentId, method: 'check', checkPurpose: 'collateral', amount: quoted.amount,
+    day: duties.dayAt(), checkDue: '2026-11-01', bank: 'Test bank', reference: 'TEST-COLLATERAL-' + agentId, fileId,
+  });
+  await post(sales, '/api/sales', cheque, rep);
+  assert.equal(entity(cheque.id).data.state, 'pending');
+  assert.equal((await available()).ceiling, '0');
+  const approveCheque = (checkEvidence, revision=1) => salesBody('payment_review', {agentId, paymentId: cheque.id, revision, approved: true, checkEvidence});
+  await post(sales, '/api/sales', approveCheque('physical'), rep, 403);
+  await post(sales, '/api/sales', approveCheque('physical'), finance);
+  assert.equal(entity(cheque.id).data.state, 'pending');
+  assert.equal((await available()).ceiling, '0');
+  await post(sales, '/api/sales', approveCheque('registry', 2), finance);
+  assert.equal(entity(cheque.id).data.state, 'check_collateral');
+  assert.equal((await available()).available, quoted.amount);
+
+  for (let i = 1; i <= 2; i++) {
+    const id = 'test-collateral-device-' + agentId + '-' + i;
+    const now = new FrozenDate().toISOString();
+    sql.prepare("INSERT INTO records(id,kind,payload,created) VALUES(?,'device',?,?)")
+      .run(id, JSON.stringify({code: id, product: 'product'}), now);
+    seed(id, 'build', {state: 'finished', receivedAt: now});
+    sql.prepare("INSERT INTO inventory_balances(id,item_id,warehouse,quantity) VALUES(?,?,'finished',1000)")
+      .run(id + '@finished', id);
+  }
+  return available;
+}
+
 (async () => {
   for (const user of [manager, otherManager, staff, finance, viewer]) member(user);
   for (const kind of ['representative', 'reseller', 'branch', 'end_customer']) {
@@ -188,6 +234,39 @@ async function expectQuote(templateId, rate, cashBps, months, agentId = 'buyer-r
       termDays: 30, creditLimit: '1000000', phone: '02112345678', address: 'Actual address', province: 'Tehran', city: 'Tehran',
     });
   }
+  const library = load('app/api/sales/resources/route.ts');
+  const repReader = actor('library-representative', ['agent'], {salesAgentId:'buyer-representative'});
+  const resellerReader = actor('library-reseller', ['agent'], {salesAgentId:'buyer-reseller'});
+  member(repReader);
+  member(resellerReader);
+  function publishResource(user, audience, contents, previous){
+    const form = new FormData();
+    form.set('title','Sales catalog');
+    form.set('category','catalog');
+    form.set('audience',audience);
+    form.set('file',new Blob([contents]),'catalog.pdf');
+    if(previous){form.set('id',previous.id);form.set('revision',String(previous.revision));}
+    return context.run(user,()=>library.POST(new Request(base+'/api/sales/resources',{method:'POST',headers:{origin:base},body:form})));
+  }
+  const readLibrary=(user,id='')=>context.run(user,()=>library.GET(new Request(base+'/api/sales/resources'+(id?'?id='+id:''))));
+  assert.equal((await publishResource(repReader,'all','Unauthorised')).status,403);
+  assert.equal((await readLibrary(finance)).status,403);
+  assert.equal((await publishResource(staff,'representative','Original')).status,201);
+  const repLibrary=await (await readLibrary(repReader)).json();
+  const catalogFile=repLibrary.files[0];
+  assert.equal(repLibrary.manage,false);
+  assert.equal(catalogFile.title,'Sales catalog');
+  const rolePreview=load('lib/profile-review.ts').profileSession({...manager,isAdmin:true},'sales-representative',[]);
+  assert.equal(await (await readLibrary(rolePreview,catalogFile.id)).text(),'Original');
+  assert.equal((await publishResource(rolePreview,'all','Unauthorised')).status,403);
+  assert.equal('objectKey' in catalogFile,false);
+  assert.equal(await (await readLibrary(repReader,catalogFile.id)).text(),'Original');
+  assert.deepEqual((await (await readLibrary(resellerReader)).json()).files,[]);
+  assert.equal((await readLibrary(resellerReader,catalogFile.id)).status,404);
+  assert.equal((await publishResource(manager,'all','Replacement',catalogFile)).status,200);
+  assert.equal(await (await readLibrary(resellerReader,catalogFile.id)).text(),'Replacement');
+  assert.equal((await publishResource(staff,'all','Stale',catalogFile)).status,409);
+  assert.equal((await (await readLibrary(repReader)).json()).files.length,1);
   seed('buyer-snapshot', 'sales_agent', {...entity('buyer-representative').data, name: 'Historical buyer'});
   sql.prepare("INSERT INTO records(id,kind,payload,created) VALUES('product','product',?,?)")
     .run(JSON.stringify({name: 'Device', model: 'N1', code: 'P1', status: 'فعال'}), new FrozenDate().toISOString());
@@ -383,7 +462,17 @@ async function expectQuote(templateId, rate, cashBps, months, agentId = 'buyer-r
   const historicalQuote = await quote('buyer-snapshot');
   const historicalOrder = await order(historicalQuote);
   assert.equal(historicalOrder.record.data.salesTerms.templateId, promotion.body.id);
-  await post(sales, '/api/sales', salesBody('order_review', {agentId: 'buyer-snapshot', orderId: historicalOrder.body.id, revision: 1, approved: true}));
+  const reviewOrder = () => salesBody('order_review', {
+    agentId: historicalQuote.agentId, orderId: historicalOrder.body.id, revision: 1, approved: true,
+  });
+  const blocked = await post(sales, '/api/sales', reviewOrder(), manager, 409);
+  assert.match(blocked.error, /اعتبار کافی نیست/);
+  const available = await fundWithCollateral(historicalQuote);
+  await post(sales, '/api/sales', reviewOrder(), manager);
+  assert.equal((await available()).held, historicalQuote.amount);
+  assert.equal((await available()).available, '0');
+  assert.equal(rows('sale').find(row => row.data.salesOrderId === historicalOrder.body.id).data.deviceIds.length, 2);
+  console.log('PASS collateral workflow: representative upload and submission, finance approval, manager reservation');
   const approvedSnapshot = entity(historicalOrder.body.id).data;
   assert.equal(approvedSnapshot.amount, historicalQuote.amount);
   assert.equal(approvedSnapshot.salesTerms.cashBps, 7000);
@@ -484,15 +573,17 @@ async function expectQuote(templateId, rate, cashBps, months, agentId = 'buyer-r
   await catalog.executeTool('sales_network_apply',{id:dailyBody.id,mode:'template',confirmed:true,data:dailyBody},base,principal());
   assert.equal(entity(dailyBody.id).data.days,47);assert.equal(entity(dailyBody.id).data.maxDays,60);assert.equal(entity(dailyBody.id).data.months,undefined);
   const repeatedDaily=await post(network,'/api/sales/network',dailyBody);assert.equal(repeatedDaily.repeated,true);
-  const dailyQuote=await quote();assert.equal(dailyQuote.salesTerms.days,47);assert.equal(dailyQuote.salesTerms.maxDays,60);assert.equal(dailyQuote.termDays,47);assert.equal(dailyQuote.due,'2026-12-12');assert.equal(dailyQuote.installments.find(p=>p.kind==='balance').due,'2026-12-12');
+  const dailyQuote=await quote();assert.equal(dailyQuote.salesTerms.days,47);assert.equal(dailyQuote.salesTerms.maxDays,60);assert.equal(dailyQuote.termDays,47);assert.equal(dailyQuote.dispatchPaymentDays,47);assert.equal(dailyQuote.due,'');assert.equal(dailyQuote.installments.find(p=>p.kind==='balance').due,'');
   assert.equal((await catalog.executeTool('preview_sales_order',{agentId:'buyer-representative',items},base,principal(staff,'read'))).quoteHash,dailyQuote.quoteHash);
   for(const days of [61,-1,0.5,'47'])await post(quoteApi,'/api/sales/quote',{agentId:'buyer-representative',items,salesTerms:{cashBps:5000,days}},staff,400);
   const earlyDaily=await post(quoteApi,'/api/sales/quote',{agentId:'buyer-representative',items,salesTerms:{cashBps:10000,days:0}},staff);assert.ok(earlyDaily.installments.every(p=>p.due==='2026-10-26'));
   const atLimit=await post(quoteApi,'/api/sales/quote',{agentId:'buyer-representative',items,salesTerms:{cashBps:5000,days:60}},staff);assert.equal(atLimit.salesTerms.days,60);
-  const dailyOrder=await order(dailyQuote);await post(sales,'/api/sales',salesBody('order_review',{orderId:dailyOrder.body.id,revision:1,approved:true}));
+  const dailyOrder=await order(dailyQuote);
+  await fundWithCollateral(dailyQuote);
+  await post(sales,'/api/sales',salesBody('order_review',{orderId:dailyOrder.body.id,revision:1,approved:true}));
   at('2026-10-27T08:00:00Z');
   const dailyInvoiceBody=salesBody('invoice',{orderId:dailyOrder.body.id,revision:entity(dailyOrder.body.id).revision,reference:'DAY-BASED-INVOICE'});
-  await post(sales,'/api/sales',dailyInvoiceBody,finance);assert.equal(entity(dailyInvoiceBody.id).data.installments.find(p=>p.kind==='balance').due,'2026-12-13');assert.equal(entity(dailyInvoiceBody.id).data.salesTerms.days,47);
+  await post(sales,'/api/sales',dailyInvoiceBody,finance);assert.equal(entity(dailyInvoiceBody.id).data.installments.find(p=>p.kind==='balance').due,'');assert.equal(entity(dailyInvoiceBody.id).data.salesTerms.days,47);
   const beforeNewVersion=sql.prepare('SELECT data FROM flow_entities WHERE id=?').get(dailyInvoiceBody.id).data;
   await saveTemplate('representative',{effectiveFrom:'2026-10-27',days:15,maxDays:60});assert.equal((await quote()).salesTerms.days,15);assert.equal(sql.prepare('SELECT data FROM flow_entities WHERE id=?').get(dailyInvoiceBody.id).data,beforeNewVersion);
   for(const previous of oldSnapshots)assert.equal(sql.prepare('SELECT data FROM flow_entities WHERE id=?').get(previous.id).data,previous.data,'Legacy order/invoice snapshot '+previous.id);
@@ -530,6 +621,59 @@ async function expectQuote(templateId, rate, cashBps, months, agentId = 'buyer-r
   for(const [day,days,end] of [['2028-02-28',2,'2028-03-01'],['2026-12-31',1,'2027-01-01'],['2026-03-20',1,'2026-03-21'],['2026-10-27',0,'2026-10-27']])assert.equal(paymentContract.termsPlan('101',{cashBps:5000,days},day).find(p=>p.kind==='balance').due,end);
   for(const day of ['2026-03-20','2026-09-20','2028-02-28'])assert.equal(payment.addPaymentDays(day,payment.salesPaymentDays({months:1},day)),paymentContract.addSolarMonths(day,1));
   console.log('PASS day-based sales terms: exact day invoices, zero/maximum limits, invalid input rollback, month-end/year/leap boundaries, HTTP/MCP parity and immutable legacy snapshots.');
+  const rewardsApi=load('app/api/sales/rewards/route.ts');
+  const rewardsRoute='/api/sales/rewards';
+  const reward=(values={})=>({mode:'save',operation:crypto.randomUUID(),agentId:'buyer-snapshot',
+    period:'quarter',year:1405,quarter:3,target:'2',targetProductId:'product',kind:'cash',rate:1000,...values});
+  seed('legacy-net-reward','sales_reward',{agentId:'buyer-snapshot',period:'quarter',year:1405,quarter:3,start:'2026-09-23',end:'2026-12-21',basis:'net',target:'1000',productIds:['product'],kind:'cash',rate:1000,state:'active'});
+  const quarterReward=await post(rewardsApi,rewardsRoute,reward(),manager);
+  const yearReward=await post(rewardsApi,rewardsRoute,reward({period:'year',kind:'equivalent',productId:'product',unitValue:'150'}),manager);
+  const staffRewards=await context.run(staff,()=>rewardsApi.GET(new Request(base+rewardsRoute+'?buyer=buyer-snapshot')));
+  assert.equal(staffRewards.status,200);
+  const staffRewardSummary=await staffRewards.json();
+  assert.equal(staffRewardSummary.manager,false);
+  assert.equal(staffRewardSummary.finance,false);
+  assert.deepEqual(staffRewardSummary.rewards.map(row=>row.id).sort(),[quarterReward.id,yearReward.id].sort());
+  assert.equal((await context.run(staff,()=>rewardsApi.GET(new Request(base+rewardsRoute)))).status,403);
+  await post(rewardsApi,rewardsRoute,reward(),manager,409);
+  await post(rewardsApi,rewardsRoute,reward(),finance,403);
+  const financeRewards=async()=> {
+    const response=await context.run(finance,()=>rewardsApi.GET(new Request(base+rewardsRoute)));
+    assert.equal(response.status,200);
+    return (await response.json()).rewards;
+  };
+  const approve=(item,result=item.progress.result)=>({mode:'approve',operation:crypto.randomUUID(),id:item.id,revision:item.revision,result});
+  await post(rewardsApi,rewardsRoute,approve((await financeRewards()).find(row=>row.id===quarterReward.id)),finance,409);
+  at('2027-04-01T08:00:00Z');
+  await load('lib/sales-tasks.ts').syncSalesTasks();
+  const financeTask=sql.prepare("SELECT data FROM duty_runs WHERE template_id=? AND assignee='finance' AND state='open'").get('sales:reward:'+quarterReward.id);
+  assert.equal(JSON.parse(financeTask.data).sourceId,'sales-view:reward-quarter:'+quarterReward.id);
+  const ended=await financeRewards();
+  assert.ok(ended.every(row=>row.data.basis==='units'));
+  assert.equal(sql.prepare('SELECT id FROM duty_runs WHERE template_id=?').get('sales:reward:legacy-net-reward'),undefined);
+  const quarterPlan=ended.find(row=>row.id===quarterReward.id),yearPlan=ended.find(row=>row.id===yearReward.id);
+  assert.equal(quarterPlan.progress.result.value,'400');
+  const {salesRewardProgress}=load('lib/sales-rewards.ts');
+  const rewardInvoices=rows('sales_invoice');
+  const needsMore=(thresholds)=>salesRewardProgress({...quarterPlan,data:{...quarterPlan.data,...thresholds}},rewardInvoices,duties.dayAt());
+  assert.equal(needsMore({netTarget:'4001'}).ready,true,'An old amount threshold no longer blocks a quantity goal');
+  assert.equal(needsMore({target:'3'}).ready,false);
+  assert.equal(needsMore({productIds:['product-fixed']}).result.actual,'0');
+  assert.equal(salesRewardProgress(quarterPlan,rewardInvoices,quarterPlan.data.end).daysLeft,1);
+  assert.equal(yearPlan.progress.result.value,'400');
+  assert.equal(yearPlan.progress.result.quantity,'2');
+  assert.equal(yearPlan.progress.result.remainder,'100');
+  const approval=approve(quarterPlan);
+  await post(rewardsApi,rewardsRoute,approve(quarterPlan,{...quarterPlan.progress.result,value:'1'}),finance,409);
+  await post(rewardsApi,rewardsRoute,approval,finance);
+  await post(rewardsApi,rewardsRoute,approval,finance);
+  assert.equal(rows('sales_allocation').filter(row=>row.data.creditId===quarterReward.id).reduce((sum,row)=>sum+BigInt(row.data.amount),0n),400n);
+  await post(rewardsApi,rewardsRoute,approve(yearPlan),finance);
+  assert.equal(entity(yearReward.id).data.result.quantity,'2');
+  assert.equal(rows('sales_allocation').filter(row=>row.data.creditId===yearReward.id).length,0);
+  const otherRewards=await context.run(resellerReader,()=>rewardsApi.GET(new Request(base+rewardsRoute)));
+  assert.deepEqual((await otherRewards.json()).rewards,[]);
+  console.log('PASS independent quarterly and annual rewards, finance queue, stale approval, cash allocations and device conversion');
   sql.prepare("UPDATE app_members SET status='inactive' WHERE id='manager'").run();
   const revoked = templateBody();
   await post(network, '/api/sales/network', revoked, manager, 403);

@@ -39,13 +39,43 @@ for(const profile of profiles.roleProfiles){
 cookieValues={};
 const card=await ctx.run(admin,()=>profileApi.GET(request('/api/role-profiles?profile=sales-representative')));
 const cardData=await card.json();assert.equal(card.status,200,JSON.stringify(cardData));assert.equal(cardData.sample,true);
-assert.equal(cardData.buyerChoices,undefined);
+assert.deepEqual(cardData.buyerChoices.map(b=>b.id),['scope-buyer-a','scope-buyer-b']);
+const {directSalesView}=load('lib/sales-navigation.ts');
+for(const [id,manager] of [['home-sales',false],['sales-manager',true]]){
+ const session=review.profileSession(admin,id,ws());
+ assert.ok(navigation.canOpenSection(session,'sales'));
+ assert.equal(session.permissions.salesRoles.includes('manager'),manager);
+ const context={roles:{staff:session.permissions.salesRoles.includes('staff'),manager}};
+ const profile=profiles.roleProfiles.find(p=>p.id===id);
+ for(const view of ['new_order','orders','profiles','targets',...(manager?['terms','prices','assignments']:[])]){
+  const target='sales-view:'+view;
+  assert.ok(profile.links.some(link=>link.section==='sales'&&link.target===target));
+  assert.equal(directSalesView(target,context),view);
+ }
+ if(!manager)for(const view of ['terms','prices','assignments'])assert.equal(directSalesView('sales-view:'+view,context),'');
+}
 const repProfile=review.profileSession(admin,'sales-representative',ws(),'scope-buyer-a'),hospitalProfile=review.profileSession(admin,'hospital-sales',ws(),'scope-buyer-a');
 const salesView=load('lib/sales.ts');
 assert.equal(repProfile.userId,admin.userId);assert.equal(repProfile.permissions.salesAgentId,'scope-buyer-a');assert.equal(navigation.canOpenSection(repProfile,'sales-returns'),true);
 assert.equal(navigation.canOpenSection(repProfile,'build-intake'),false);
 assert.equal(navigation.canOpenSection(hospitalProfile,'build-intake'),true);
 assert.equal(await salesView.salesVisible(hospitalProfile,row('scope-buyer-a')),true);assert.equal(await salesView.salesVisible(hospitalProfile,row('scope-buyer-b')),false);
+const salesApi=load('app/api/sales/route.ts');
+for(const profileId of ['home-sales','sales-representative']){
+ const selectId=crypto.randomUUID();
+ const selected=await ctx.run(admin,()=>profileApi.POST(request('/api/role-profiles',{id:selectId,mode:'select_profile',profileId,buyerId:'scope-buyer-a',confirmed:true})));
+ assert.equal(selected.status,200);
+ cookieValues[review.profileReviewCookie]=selected.headers.get('set-cookie').split(';',1)[0].split('=')[1];
+ const session=await ctx.run(admin,()=>auth.session());
+ assert.equal(session.profileReview.buyerId,'scope-buyer-a');
+ assert.equal(session.userId,admin.userId);
+ const directory=await ctx.run(admin,()=>salesApi.GET(new Request('https://test.local/api/sales')));
+ const data=await directory.json();
+ assert.equal(directory.status,200,JSON.stringify(data));
+ assert.deepEqual(data.agents.map(a=>a.id),['scope-buyer-a']);
+ assert.equal(sql.prepare('SELECT actor FROM access_audit WHERE id=?').get(selectId).actor,admin.userId);
+}
+cookieValues={};
 for(const buyerId of ['scope-inactive']){const r=await ctx.run(admin,()=>profileApi.POST(request('/api/role-profiles',{id:crypto.randomUUID(),mode:'select_profile',profileId:'sales-representative',buyerId,confirmed:true})));assert.equal(r.status,400);}
 const unscoped=await ctx.run(admin,()=>profileApi.POST(request('/api/role-profiles',{id:crypto.randomUUID(),mode:'select_profile',profileId:'sales-representative',buyerId:'',confirmed:true})));
 assert.equal(unscoped.status,200);assert.match(unscoped.headers.get('set-cookie'),/sales-representative;/);
@@ -59,12 +89,21 @@ const shellData=await shellCard.json();assert.equal(shellData.activeProfile,'sal
 const sampleId=review.representativeSampleId(admin.userId);
 assert.equal(sql.prepare("SELECT id FROM flow_entities WHERE id=?").get(sampleId),undefined);
 assert.equal(sql.prepare("SELECT id FROM training_flow_entities WHERE id=?").get(sampleId).id,sampleId);
-for(const path of ['sales','sales/returns','transport','tasks']){
+for(const path of ['sales','sales/returns','sales/rewards','transport','tasks']){
  const response=await ctx.run(admin,()=>load('app/api/'+path+'/route.ts').GET(new Request('https://test.local/api/'+path)));
  const body=await response.text();
  assert.equal(response.status,200,path+': '+body);
  assert.equal(response.headers.get('X-Training-Workspace'),'isolated');
  assert.ok(!body.includes('scope-buyer-a')&&!body.includes('scope-buyer-b'));
+ if(path==='sales/rewards'){
+  const preview=JSON.parse(body);
+  assert.equal(preview.sample,true);
+  assert.deepEqual(preview.rewards.map(row=>row.data.period).sort(),['quarter','year']);
+  assert.ok(preview.rewards.every(row=>row.data.agentId===sampleId));
+  assert.ok(preview.rewards.every(row=>row.data.basis==='units'&&row.data.productIds.length===1&&row.progress.daysLeft>0));
+  assert.ok(preview.rewards.some(row=>BigInt(row.progress.result.actual)>0n));
+  assert.equal(sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type='sales_reward'").get().n,0);
+ }
  if(path==='sales'){
   const preview=JSON.parse(body),account=preview.accounts.find(row=>row.agentId===sampleId);
   assert.deepEqual(account.invoices.map(row=>row.remaining),['0','10000000','30000000']);
@@ -74,8 +113,27 @@ for(const path of ['sales','sales/returns','transport','tasks']){
  }
 
 }
+const shipmentApi=load('app/api/transport/route.ts');
+const shipmentId=sampleId+':shipment-demo';
+const shipmentUrl='https://test.local/api/transport?id='+encodeURIComponent(shipmentId);
+const shipmentResponse=await ctx.run(admin,()=>shipmentApi.GET(new Request(shipmentUrl)));
+assert.equal(shipmentResponse.status,200);
+const {mission}=await shipmentResponse.json();
+assert.equal(mission.data.state,'offered');
+const serialIds=mission.data.items.map(item=>item.deviceId);
+assert.equal(serialIds.length,2);
+const receive=ids=>ctx.run(admin,()=>shipmentApi.POST(request('/api/transport',{
+ id:crypto.randomUUID(),mode:'receipt',missionId:shipmentId,revision:mission.revision,
+ day:mission.data.offeredDay,deviceIds:ids,packages:ids.length,result:'complete',
+})));
+assert.equal((await receive(serialIds.slice(0,1))).status,400);
+const received=await receive(serialIds);
+assert.equal(received.status,200,await received.text());
+const delivered=await ctx.run(admin,()=>shipmentApi.GET(new Request(shipmentUrl)));
+assert.equal((await delivered.json()).mission.data.state,'delivered');
+assert.equal(sql.prepare('SELECT id FROM flow_entities WHERE id=?').get(shipmentId),undefined);
 const samplePayment=sampleId+':finance-demo:payment:3';
-const bankDay='2026-11-06', bankAccount='test-claim-account';
+const bankDay=load('lib/duties.ts').addDay(load('lib/duties.ts').dayAt(),-2), bankAccount='test-claim-account';
 sql.prepare("UPDATE training_flow_entities SET created=?,data=json_set(data,'$.day',?,'$.receivingAccountId',?,'$.reference','MATCH-123') WHERE id=?").run(bankDay+'T00:00:00Z',bankDay,bankAccount,samplePayment);
 const addBankExample=(id,type,day,data)=>sql.prepare('INSERT INTO training_flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?)').run(id,type,JSON.stringify(data),day+'T10:00:00Z',day+'T10:00:00Z');
 const warning=async()=>{
@@ -87,9 +145,10 @@ addBankExample('claim-statement-1','sales_bank_statement',bankDay,{accountId:ban
 addBankExample('claim-statement-same-day','sales_bank_statement',bankDay,{accountId:bankAccount,to:bankDay});
 addBankExample('claim-statement-other-account','sales_bank_statement','2026-11-07',{accountId:'another-account',to:bankDay});
 assert.equal(await warning(),false);
-addBankExample('claim-statement-2','sales_bank_statement','2026-11-07',{accountId:bankAccount,to:bankDay});
+addBankExample('claim-statement-2','sales_bank_statement',bankDay,{accountId:bankAccount,coverageFrom:bankDay,coverageTo:bankDay});
 assert.equal(await warning(),true);
-addBankExample('claim-entry','sales_bank_row','2026-11-07',{accountId:bankAccount,direction:'in',day:bankDay,amount:'30000000',reference:'MATCH-123'});
+addBankExample(bankAccount,'sales_receiving_account',bankDay,{state:'active',kind:'bank',currency:'IRR'});
+addBankExample('claim-entry','sales_bank_row',bankDay,{accountId:bankAccount,direction:'in',kind:'transfer',status:'pending',day:bankDay,amount:'30000000',reference:'MATCH-123'});
 assert.equal(await warning(),false);
 const items=[{productId:'training-product-1',quantity:1}];
 const quoteResponse=await ctx.run(admin,()=>load('app/api/sales/quote/route.ts').POST(request('/api/sales/quote',{agentId:sampleId,items})));
@@ -113,8 +172,16 @@ assert.equal(await transport.transportCanSee(review.profileSession(admin,'driver
 const driverWork=await load('lib/profile-work.ts').profileWork(driverView);
 assert.ok(driverWork.work.some(x=>x.sourceId==='preview-mission'));assert.ok(!driverWork.work.some(x=>x.sourceId==='another-mission'));
 const transportApi=load('app/api/transport/route.ts');
-const forbiddenDriverWrite=await ctx.run(driverView,()=>transportApi.POST(request('/api/transport',{mode:'checklist',missionId:'preview-mission'})));
-assert.equal(forbiddenDriverWrite.status,403);
+const checklist={mode:'checklist',revision:1,packagesChecked:true,itemsChecked:true,documentsChecked:true,conditionChecked:true};
+const driverPost=(fields)=>ctx.run(driverView,()=>transportApi.POST(request('/api/transport',{id:crypto.randomUUID(),missionId:'preview-mission',...fields})));
+assert.equal((await driverPost({...checklist,missionId:'another-mission'})).status,404);
+assert.equal((await driverPost({mode:'expense',revision:1})).status,403);
+const driverChecklist=await driverPost(checklist);
+assert.equal(driverChecklist.status,200,await driverChecklist.clone().text());
+assert.equal(row('preview-mission').data.checklist.by,admin.userId);
+const treasuryRole=review.profileSession(admin,'treasurer',ws());
+assert.ok(navigation.canOpenSection(treasuryRole,'sales-bank'));
+assert.equal(navigation.canOpenSection(treasuryRole,'sales'),false);
 cookieValues[review.profileReviewCookie]='bad-profile';await assert.rejects(()=>ctx.run(admin,()=>auth.session()),e=>e.status===403);cookieValues={};
 const central=review.profileSession(admin,'central-store',ws()),quality=review.profileSession(admin,'quality',ws()),line=review.profileSession(admin,'line-store',ws());
 assert.ok(central.permissions.warehouseResponsibilities.some(r=>r.warehouseId===wh.id));assert.ok(!central.permissions.warehouseResponsibilities.some(r=>r.warehouseId==='line-wh'));assert.deepEqual(Array.from(line.permissions.warehouseResponsibilities,r=>r.warehouseId),['line-wh']);

@@ -11,6 +11,7 @@ export const salesFail=(m:string,status=400):never=>{throw new AccessError(m,sta
 export {salesRep,salesManager,salesStaff,salesFinance,salesRead,salesWarehouse,salesViewer,salesReportRead} from './sales-access';
 import {salesRep,salesRead,salesWarehouse,salesStaff,salesManager,salesFinance,salesViewer,salesReportRead} from './sales-access';
 import {memberId} from './duties';
+import {deferDispatchBalance} from './sales-dispatch-terms';
 import {termsPlan} from './sales-network-contract';
 import {salesPaymentDays,salesPaymentMaxDays,maxSalesPaymentDays} from './sales-payment-terms';
 import {resolveSalesOrderTemplates,selectSalesTemplatePrice} from './sales-template';
@@ -47,7 +48,7 @@ export async function salesEntity(id:string,type:string){const r:any=await stora
 export async function liveSalesUser(u:Session){if(u.isAdmin||u.profileReview||trainingContext.getStore())return u;const m:any=await storage().prepare("SELECT status,permissions FROM app_members WHERE subject=? OR id=?").bind(u.userId,u.userId.startsWith('local:')?u.userId.slice(6):u.userId).first();if(!m||m.status!=='active')salesFail('دسترسی فعال لازم است.',403);return {...u,permissions:storedAccessPermissions(m.permissions)};}
 export async function salesVisible(u:Session,a:any,operation:'read'|'write'='write'){
  if(salesRep(u))return a.id===u.permissions.salesAgentId;
- if(u.profileReview?.id==='hospital-sales'&&u.profileReview.buyerId)return a.id===u.profileReview.buyerId;
+ if(u.profileReview?.buyerId&&['hospital-sales','home-sales'].includes(u.profileReview.id))return a.id===u.profileReview.buyerId;
  if(salesManager(u)||salesFinance(u))return true;
  if(operation==='read'&&salesReportRead(u))return true;
  if(salesStaff(u)||operation==='read'&&salesViewer(u)){const id=await memberId(u);return !!id&&a.data.ownerId===id;}
@@ -98,7 +99,9 @@ export async function salesQuote(agent:any,items:any[],rows:any[],options:any={}
  let referral:any=null;if(options.referrerId){const ref=rows.find(r=>r.type==='sales_agent'&&r.id===options.referrerId&&r.data.active&&r.data.kind==='referrer'),contracts=rows.filter(r=>r.type==='sales_contract'&&r.data.agentId===ref?.id&&r.data.state==='approved'&&r.data.start<=today&&r.data.end>=today);if(!ref||contracts.length!==1)salesFail('عامل معرف با قرارداد مصوب معتبر انتخاب کنید.');const c=contracts[0];referral={agentId:ref.id,contractId:c.id,bps:c.data.bps,basis:'net-collected-v1'};}
  const deliveryMode=agent.data.kind==='branch'?'consignment':'sale',termDays=terms?salesPaymentDays(terms,today):agent.data.termDays;
  const baseDiscountBps=Math.max(...lines.map(l=>l.baseDiscountBps)),discountBps=Math.max(...lines.map(l=>l.discountBps));
- const quote={...(terms?{salesTerms:terms,installments:termsPlan(String(total(lines,l=>l.net)),terms,today)}:{}),...(referral?{referral}:{}),agentId:agent.id,agentRevision:agent.revision,deliveryMode,day:today,lines,amount:String(total(lines,l=>l.net)),discount:String(total(lines,l=>l.discount)),discountBps,baseDiscountBps,discountBlocked,targetId:target?.id||'',targetRevision:target?.revision||0,targetProgress:progress?.progress||'0',discountPolicy:'max-product-template-and-earned-tier-v1',termDays,due:addDay(today,termDays),recipient:{name:agent.data.name,phone:agent.data.phone,address:agent.data.address,province:agent.data.province,city:agent.data.city}};
+ const dispatchPaymentDays=agent.data.kind==='representative'&&termDays>0&&(terms?.cashBps??0)<10000?termDays:undefined;
+ const plan=terms?termsPlan(String(total(lines,l=>l.net)),terms,today):[];
+ const quote={...(dispatchPaymentDays===undefined?{}:{dispatchPaymentDays}),...(terms?{salesTerms:terms,installments:dispatchPaymentDays===undefined?plan:deferDispatchBalance(plan)}:{}),...(referral?{referral}:{}),agentId:agent.id,agentRevision:agent.revision,deliveryMode,day:today,lines,amount:String(total(lines,l=>l.net)),discount:String(total(lines,l=>l.discount)),discountBps,baseDiscountBps,discountBlocked,targetId:target?.id||'',targetRevision:target?.revision||0,targetProgress:progress?.progress||'0',discountPolicy:'max-product-template-and-earned-tier-v1',termDays,due:dispatchPaymentDays===undefined?addDay(today,termDays):'',recipient:{name:agent.data.name,phone:agent.data.phone,address:agent.data.address,province:agent.data.province,city:agent.data.city}};
  return {...quote,quoteHash:await sha256(new TextEncoder().encode(JSON.stringify(quote)).buffer)};
 }
 export function publicSalesFile(f:any){const {objectKey,uploadSignature,actor,...data}=f.data;return {...f,data};}

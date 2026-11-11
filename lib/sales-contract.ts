@@ -2,7 +2,7 @@ export const usesAssignedSalesAccounts=(kind='representative')=>kind==='represen
 // Shared UI / HTTP / MCP vocabulary. Money is integer IRR, never floating point.
 export const salesRoles:Record<string,string>={manager:'مدیر فروش',staff:'کارشناس فروش',finance:'مالی فروش',viewer:'گزارش خریداران تخصیص‌یافته',report_viewer:'مشاهده گزارش مدیریتی فروش',agent:'نماینده فروش'};
 export const salesStates:Record<string,string>={credit_review:'در انتظار بررسی بدهی معوق توسط مالی',submitted:'منتظر بررسی فروش',sales_approved:'منتظر تأیید مالی',approved:'تأیید و آماده ارسال',rejected:'رد شده',cancelled:'لغو شده',pending:'منتظر بررسی مالی',check_returned:'چک مسترد شد',check_collateral:'تبدیل‌شده به ضمانت',received:'چک دریافت‌شده، وصول نشده',cleared:'وصول و تأیید شده',bounced:'چک برگشتی',reversed:'برگشت ثبت مالی',requested:'درخواست برگشت',returned:'دریافت در قرنطینه',credited:'بستانکار شده',reserved:'رزرو انبار',in_transit:'ارسال شده',consignment_received:'دریافت‌شده در شعبه امانی',delivered_partner:'تحویل قطعی به نماینده / عامل',delivered:'تحویل مشتری نهایی',active:'فعال',retired:'جایگزین شده'};
-export const salesMilestones:Record<string,string>={waiting_stock:'انتظار تأمین موجودی',production:'در حال تولید',preparing:'آماده‌سازی ارسال'};
+export const salesMilestones:Record<string,string>={waiting_stock:'در انتظار آماده شدن کالا',production:'در حال تولید',preparing:'آماده‌سازی ارسال'};
 export const salesRequestChannels:Record<string,string>={phone:'تماس تلفنی',message:'پیام نماینده',email:'ایمیل',in_person:'مراجعه حضوری',letter:'نامه'};
 import {salesCustodyActions} from './sales-custody';
 export const salesProxyModes=['order','payment','order_cancel','return_request'];
@@ -32,14 +32,22 @@ export const salesHelp=[
 ];
 export const rial=(v:unknown)=>BigInt(String(v||'0'));
 export const total=(items:any[],value:(i:any)=>unknown)=>items.reduce((n,i)=>n+rial(value(i)),BigInt(0));
+export function checkRecovery(payment:any,rows:any[]){
+ const valid=rows.filter(r=>r.type==='sales_check_recovery'&&r.data.paymentId===payment.id&&rows.some(p=>p.type==='sales_payment'&&p.id===r.data.creditId&&p.data.agentId===payment.data.agentId&&p.data.state==='cleared'));
+ const recovered=total(valid,r=>r.data.amount),remaining=rial(payment.data.amount)-recovered;
+ return {recovered:String(recovered),remaining:String(remaining>BigInt(0)?remaining:BigInt(0))};
+}
 export function salesAccounts(rows:any[],agentId:string,today:string){
  const own=rows.filter(r=>r.data.agentId===agentId),payments=own.filter(r=>r.type==='sales_payment'),returns=own.filter(r=>r.type==='sales_return'),allocations=own.filter(r=>r.type==='sales_allocation');
- const credits=[...payments.filter(r=>r.data.state==='cleared'),...returns.filter(r=>r.data.state==='credited')];
+ const credits=[...payments.filter(r=>r.data.state==='cleared'),...returns.filter(r=>r.data.state==='credited'),
+  ...own.filter(r=>r.type==='sales_reward'&&r.data.kind==='cash'&&r.data.state==='approved')];
  const valid=new Set(credits.map(r=>r.id));
  const invoices=own.filter(r=>r.type==='sales_invoice').map(r=>{const installments=r.data.installments.map((i:any)=>{const paid=total(allocations.filter(a=>a.data.invoiceId===r.id&&a.data.installmentId===i.id&&valid.has(a.data.creditId)),a=>a.data.amount);const remaining=rial(i.amount)-paid;const days=Math.round((Date.parse(i.due)-Date.parse(today))/86400000);return {...i,paid:String(paid),remaining:String(remaining),days,overdue:remaining>BigInt(0)&&days<0};});return {...r,installments,remaining:String(total(installments,i=>i.remaining))};});
  const creditRows=credits.map(c=>({...c,available:String(rial(c.data.settlement?.offset??c.data.amount)-total(allocations.filter(a=>a.data.creditId===c.id),a=>a.data.amount))}));
  const debt=total(invoices,i=>i.remaining),available=total(creditRows,c=>c.available),overdue=total(invoices.flatMap(i=>i.installments).filter(i=>i.overdue),i=>i.remaining);
+ const awaiting=total(invoices.flatMap(i=>i.installments).filter(i=>!i.due),i=>i.remaining);
  const aging=[{label:'سررسید نشده',min:-Infinity,max:0},{label:'۱ تا ۳۰ روز',min:1,max:30},{label:'۳۱ تا ۶۰ روز',min:31,max:60},{label:'۶۱ تا ۹۰ روز',min:61,max:90},{label:'بیش از ۹۰ روز',min:91,max:Infinity}].map(b=>({label:b.label,amount:String(total(invoices.flatMap(i=>i.installments).filter(i=>-i.days>=b.min&&-i.days<=b.max),i=>i.remaining))}));
+ if(awaiting>BigInt(0))aging.unshift({label:'در انتظار خروج کالا',amount:String(awaiting)});
  return {invoices,credits:creditRows,payments,returns,allocations,debt:String(debt),credit:String(available),balance:String(debt-available),overdue:String(overdue),pending:String(total(payments.filter(p=>p.data.state==='pending'),p=>p.data.amount)),uncollectedChecks:String(total(payments.filter(p=>p.data.state==='received'),p=>p.data.amount)),aging};
 }
 export function salesSecuredCredit(rows:any[],agentId:string,today:string,excludeOrderId=''){
@@ -47,8 +55,9 @@ export function salesSecuredCredit(rows:any[],agentId:string,today:string,exclud
  const ceiling=total(account.payments.filter(row=>row.data.state==='check_collateral'),row=>row.data.disposition?.amount);
  const held=total(rows.filter(row=>row.type==='sales_order'&&row.id!==excludeOrderId&&row.data.agentId===agentId&&row.data.state==='sales_approved'),row=>row.data.securedHold);
  const used=rial(account.debt)+held;
- const funded=ceiling+rial(account.credit);
- return {ceiling:String(ceiling),held:String(held),debt:account.debt,available:String(funded>used?funded-used:BigInt(0)),cashCredit:account.credit};
+ const bouncedHold=total(account.payments.filter(p=>p.data.method==='check'&&p.data.state==='bounced'&&p.data.disposition?.state!=='approved'),p=>checkRecovery(p,rows).remaining);
+ const funded=ceiling+rial(account.credit),net=funded-used-bouncedHold;
+ return {ceiling:String(ceiling),held:String(held),debt:account.debt,available:String(net>BigInt(0)?net:BigInt(0)),netAvailable:String(net),bouncedHold:String(bouncedHold),cashCredit:account.credit};
 }
 
 export function salesCheckPosition(payment:any, account:ReturnType<typeof salesAccounts>, today:string){

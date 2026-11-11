@@ -1,3 +1,4 @@
+import {deferDispatchBalance} from '@/lib/sales-dispatch-terms';
 import {withRepresentativeSample} from '@/lib/representative-sample';
 import {returnTaskStatements} from '@/lib/sales-return-tasks';
 import {qmsDispatchGuard} from '@/lib/qms-release';
@@ -55,7 +56,7 @@ async function get(request:Request){try{
   const bankRow=bankRowsById.get(payment.data.bankRowId);
   const isTerminalPayment=bankRow?.kind==='pos'&&!!bankRow.terminalId&&bankRow.paymentId===payment.id;
   const claim=payment.data;
-  const bankMatchMissing=salesRep(u)&&claim.method==='bank'&&claim.state==='pending'&&!!claim.receivingAccountId&&bankPaymentReviewDue(payment,bankPeriods,today);
+  const bankMatchMissing=salesRep(u)&&claim.method==='bank'&&claim.state==='pending'&&!!claim.receivingAccountId&&bankPaymentReviewDue(payment,bankPeriods,today)&&!readyBankRowForPayment(payment,all);
   return {...payment,isTerminalPayment,bankMatchMissing};
  }),returns:account.returns.map(publicReturn),credits:account.credits.map(publicReturn),securedCredit:salesSecuredCredit(rows,a.id,today)};});
  const allMembers=!salesRep(u)?(await storage().prepare("SELECT id,name,permissions FROM app_members WHERE status='active'").all()).results.map((m:any)=>{const p=storedAccessPermissions(m.permissions),s={isAdmin:false,permissions:p} as any;return {id:m.id,name:m.name,sales:salesStaff(s),manager:salesManager(s),finance:salesFinance(s)};}).filter(m=>m.sales||m.finance):[];
@@ -90,7 +91,7 @@ async function post(request:Request){try{
  const installments=(items:any[],amount:string)=>{const result=arr(items,36).map((i,index)=>({id:String(index+1),due:sday(i.due),amount:money(i.amount,true)}));if(total(result,i=>i.amount)!==rial(amount))fail('جمع اقساط باید دقیقاً برابر مبلغ فاکتور باشد.');return result;};
  function canHold(order:any, orderId?:string){
   const credit=salesSecuredCredit(rows,own().id,today,orderId);
-  return rial(order.amount)+rial(credit.debt)+rial(credit.held)<=rial(credit.ceiling)+rial(account().credit);
+  return rial(order.amount)<=rial(credit.netAvailable);
  }
  async function reserveOrder(orderId:string,order:any){
   const reservations:{line:any;devices:any[];qualityChecks:D1PreparedStatement[]}[]=[];
@@ -189,7 +190,7 @@ async function post(request:Request){try{
    }else{
     if(!canHold(order.data,order.id))fail('اعتبار کافی نیست؛ پرداخت یا ضمانت تکمیلی را ثبت کنید.',409);
     const reserved=await reserveOrder(order.id,order.data);
-    if(!reserved)fail('موجودی آزاد برای رزرو کل سفارش کافی نیست.',409);
+    if(!reserved&&order.data.dispatchPaymentDays===undefined)fail('موجودی آزاد برای رزرو کل سفارش کافی نیست.',409);
     put(order.id,'sales_order',{...order.data,state:'sales_approved',securedHold:order.data.amount,salesBlock:'',salesReview:reason,...(financial?{overdueApprovedBy:u.userId,overdueApprovedAt:now}:{})},order);
    }
   }else if(mode==='order_review'){if(order.data.salesTerms&&!salesManager(u))fail('تأیید پیش‌فاکتور فقط با مدیر فروش است.',403);if(order.data.salesTerms&&order.data.createdBy===u.userId)fail('پیشنهاد خود را مدیر دیگری تأیید کند.',403);state(order,['submitted']);if(typeof b.approved!=='boolean')fail('نتیجه بررسی لازم است.');put(order.id,'sales_order',{...order.data,state:b.approved?'sales_approved':'rejected',salesReview:notes()},order);
@@ -215,12 +216,16 @@ async function post(request:Request){try{
   }else{
    if(order.data.deliveryMode==='consignment'||agent!.data.kind==='branch')fail('سفارش شعبه امانی فاکتور فروش قطعی ندارد؛ از تأیید ارسال امانی استفاده کنید.');
    state(order,['sales_approved']);if(!own().data.active)fail('نمایندگی غیرفعال است.');const a=account(),exposure=rial(a.balance)+rial(order.data.amount),limit=rial(order.data.securedPolicy?salesSecuredCredit(rows,own().id,today,order.id).ceiling:agent!.data.creditLimit);const exception=order.data.securedPolicy?rial(a.overdue)>BigInt(0):exposure>limit||rial(a.overdue)>BigInt(0);if(order.data.securedPolicy&&(!canHold(order.data,order.id)||exception&&!order.data.overdueApprovedBy))fail('شرایط مالی یا سقف ضمانت تغییر کرده است؛ سفارش نیاز به بررسی دارد.',409);if(!order.data.securedPolicy&&exception&&(b.creditException!==true||!txt(b.exceptionReason||'',2000)))fail('سقف اعتبار یا بدهی معوق مانع تأیید است؛ تصمیم استثنای مستند مالی لازم است.');
-   const reference=req(b.reference,300);if(rows.some(r=>r.type==='sales_invoice'&&r.data.reference===reference))fail('شماره فاکتور تکراری است.');const plan=order.data.salesTerms?termsPlan(order.data.amount,order.data.salesTerms,today):installments(b.installments,order.data.amount);if(order.data.salesTerms&&b.installments&&JSON.stringify(b.installments.map((p:any)=>({due:p.due,amount:p.amount})))!==JSON.stringify(plan.map(p=>({due:p.due,amount:p.amount}))))fail('اقساط باید عین شرایط مصوب مدیر باشد.');if(plan.some(i=>i.due<today))fail('سررسید فاکتور جدید در گذشته نباشد.');
-   put(id,'sales_invoice',{agentId:own().id,orderId:order.id,reference,day:today,salesTerms:order.data.salesTerms||null,referral:order.data.referral||null,lines:order.data.lines,amount:order.data.amount,discount:order.data.discount,installments:plan,openingId:'',creditReview:{exposure:String(exposure),limit:String(limit),overdue:a.overdue,exception,reason:exception?(order.data.securedPolicy?order.data.salesReview:req(b.exceptionReason,2000)):'',by:u.userId},province:own().data.province});
+   const reference=req(b.reference,300);if(rows.some(r=>r.type==='sales_invoice'&&r.data.reference===reference))fail('شماره فاکتور تکراری است.');const dispatchPaymentDays=order.data.dispatchPaymentDays;
+   const plan=order.data.salesTerms||dispatchPaymentDays!==undefined
+    ?termsPlan(order.data.amount,order.data.salesTerms||{cashBps:0,days:dispatchPaymentDays},today)
+    :installments(b.installments,order.data.amount);
+   if((order.data.salesTerms||dispatchPaymentDays!==undefined)&&b.installments&&JSON.stringify(b.installments.map((p:any)=>({due:p.due,amount:p.amount})))!==JSON.stringify(plan.map(p=>({due:p.due,amount:p.amount}))))fail('اقساط باید عین شرایط مصوب مدیر باشد.');if(plan.some(i=>i.due<today))fail('سررسید فاکتور جدید در گذشته نباشد.');
+   put(id,'sales_invoice',{agentId:own().id,orderId:order.id,reference,day:today,salesTerms:order.data.salesTerms||null,referral:order.data.referral||null,lines:order.data.lines,amount:order.data.amount,discount:order.data.discount,installments:dispatchPaymentDays===undefined?plan:deferDispatchBalance(plan),dispatchPaymentDays,openingId:'',creditReview:{exposure:String(exposure),limit:String(limit),overdue:a.overdue,exception,reason:exception?(order.data.securedPolicy?order.data.salesReview:req(b.exceptionReason,2000)):'',by:u.userId},province:own().data.province});
    if(order.data.securedPolicy){
     const held=(await db.prepare("SELECT id,revision,data FROM flow_entities WHERE type='sale' AND json_extract(data,'$.salesOrderId')=? AND json_extract(data,'$.state')='reserved'").bind(order.id).all()).results;
     for(const line of order.data.lines){
-     if(held.filter(row=>JSON.parse(String(row.data)).productId===line.productId).reduce((count,row)=>count+Number(JSON.parse(String(row.data)).count),0)!==line.quantity)fail('رزرو کامل سفارش لازم است.',409);
+     if(dispatchPaymentDays===undefined&&held.filter(row=>JSON.parse(String(row.data)).productId===line.productId).reduce((count,row)=>count+Number(JSON.parse(String(row.data)).count),0)!==line.quantity)fail('رزرو کامل سفارش لازم است.',409);
     }
     for(const row of held){
      guard("EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)",row.id,row.revision);
@@ -259,7 +264,7 @@ async function post(request:Request){try{
   if(b.method==='check'&&!file)fail('تصویر چک همین نماینده لازم است.');
   if(receivingAccountId&&reference&&rows.some(r=>r.type==='sales_payment'&&r.id!==old?.id&&r.data.receivingAccountId===receivingAccountId&&bankCode(r.data.reference||r.data.normalizedReference||'')===normalizedReference))fail('این تراکنش برای حساب مقصد قبلاً ثبت شده است.',409);
   if(b.method==='bank'&&reference&&rows.some(r=>r.type==='sales_payment'&&r.id!==old?.id&&r.data.bankRowId&&bankCode(r.data.reference||'')===bankCode(reference)&&(!receivingAccountId||r.data.receivingAccountId===receivingAccountId)))fail('این پیگیری قبلاً به وصول بانکی متصل شده است؛ سابقه بانک را بررسی کنید.',409);
-  const checkDue=b.method==='check'?sday(b.checkDue):'';const cashOrderId=txt(b.cashOrderId||'',200),checkInvoiceId=txt(b.checkInvoiceId||'',200);if(cashOrderId){if(b.method==='check')fail('وجه نقد خرید جدید نمی‌تواند چک باشد.');const o=await get(cashOrderId,'sales_order');state(o,['sales_approved','approved']);if(!o.data.salesTerms)fail('خرید فاقد شرایط مصوب است.');if(!rows.some(r=>r.type==='sales_invoice'&&r.data.orderId===o.id))fail('ابتدا فاکتور خرید جدید صادر شود تا وجه نقد به قسط مصوب متصل شود.');}if(b.method==='check'&&b.checkPurpose==='collateral'&&checkInvoiceId)fail('چک ضمانت به فاکتور پرداخت متصل نمی‌شود.');if(checkInvoiceId)await get(checkInvoiceId,'sales_invoice');target=old?.id||id;put(target,'sales_payment',{agentId:own().id,method:b.method,receivingAccountId,amount,day,bank,normalizedBank,reference,normalizedReference,fileId:file?.id||'',checkDue,cashOrderId,checkInvoiceId,state:'pending',checkPurpose:b.method==='check'&&b.checkPurpose==='collateral'?'collateral':'payment',submittedBy:u.userId,notes:txt(b.notes||'',4000)},old);
+  const checkDue=b.method==='check'?sday(b.checkDue):'';const cashOrderId=txt(b.cashOrderId||'',200),checkInvoiceId=txt(b.checkInvoiceId||'',200);if(cashOrderId){if(b.method==='check')fail('وجه نقد خرید جدید نمی‌تواند چک باشد.');const o=await get(cashOrderId,'sales_order');state(o,['sales_approved','approved']);if(!o.data.salesTerms)fail('خرید فاقد شرایط مصوب است.');if(!rows.some(r=>r.type==='sales_invoice'&&r.data.orderId===o.id))fail('ابتدا فاکتور خرید جدید صادر شود تا وجه نقد به قسط مصوب متصل شود.');}if(b.method==='check'&&b.checkPurpose==='collateral'&&checkInvoiceId)fail('چک ضمانت به فاکتور پرداخت متصل نمی‌شود.');if(checkInvoiceId)await get(checkInvoiceId,'sales_invoice');target=old?.id||id;put(target,'sales_payment',{agentId:own().id,method:b.method,receivingAccountId,amount,day,bank,normalizedBank,reference,normalizedReference,fileId:file?.id||'',checkDue,cashOrderId,checkInvoiceId,...(b.method==='check'?{checkVerification:{}}:{}),state:'pending',checkPurpose:b.method==='check'&&b.checkPurpose==='collateral'?'collateral':'payment',submittedBy:u.userId,notes:txt(b.notes||'',4000)},old);
   if(b.method==='bank'&&receivingAccountId){
    const all=await bankEntities(rows);
    const payment=all.find(row=>row.id===target);
@@ -306,15 +311,27 @@ async function post(request:Request){try{
   target=payment.id;
   put(payment.id,'sales_payment',{...payment.data,state:next,disposition,previousDispositions:mode==='check_disposition_request'&&previous?[...(payment.data.previousDispositions||[]),previous]:payment.data.previousDispositions},payment);
  }else if(['payment_review','check_status','payment_reverse'].includes(mode)){
-  const p=await get(req(b.paymentId),'sales_payment');revision(p);target=p.id;let next='';
+  const p=await get(req(b.paymentId),'sales_payment');revision(p);target=p.id;let next='',checkVerification=p.data.checkVerification;
   if(mode==='payment_review'&&b.approved===true&&p.data.method==='bank'&&(p.data.receivingAccountId||!bankCode(p.data.reference||'')))fail('این واریز را از بخش تطبیق بانکی با ردیف بانک تأیید کنید.',409);
   if(mode==='payment_review'&&b.approved===true&&p.data.method==='bank'&&rows.some(r=>r.type==='sales_payment'&&r.id!==p.id&&r.data.bankRowId&&bankCode(r.data.reference||'')===bankCode(p.data.reference||'')&&(!p.data.receivingAccountId||r.data.receivingAccountId===p.data.receivingAccountId)))fail('این پرداخت با وصول بانکی دیگری تعارض دارد؛ از بخش تطبیق بانک بررسی کنید.',409);
-  if(mode==='payment_review'){state(p,['pending']);if(typeof b.approved!=='boolean')fail('نتیجه بررسی لازم است.');next=b.approved?(p.data.method==='check'?(p.data.checkPurpose==='collateral'?'check_collateral':'received'):'cleared'):'rejected';}
-  if(mode==='check_status'){if(p.data.method!=='check')fail('این پرداخت چک نیست.');if(!['cleared','bounced'].includes(b.state))fail('وضعیت چک معتبر نیست.');state(p,b.state==='cleared'?['received']:['received','cleared']);if(b.state==='cleared'&&salesCheckPosition(p,account(),today).requiresReview)fail('مبلغ چک بیشتر از مانده فاکتور است؛ ابتدا چک را تعیین تکلیف کنید.',409);if(b.state==='cleared'&&p.data.checkDue>today)fail('تاریخ وصول چک هنوز نرسیده است.');next=b.state;}
+  if(mode==='payment_review'){
+   state(p,['pending']);
+   if(typeof b.approved!=='boolean')fail('نتیجه بررسی لازم است.');
+   if(!b.approved)next='rejected';
+   else if(p.data.method!=='check')next='cleared';
+   else {
+    const evidence=b.checkEvidence;
+    if(evidence!=='physical'&&evidence!=='registry')fail('دریافت اصل چک یا تأیید سامانه‌ای را جداگانه ثبت کنید.');
+    if(checkVerification?.[evidence])fail('این مرحله قبلاً ثبت شده است.',409);
+    checkVerification={...checkVerification,[evidence]:{by:u.userId,at:now}};
+    next=checkVerification.physical&&checkVerification.registry?(p.data.checkPurpose==='collateral'?'check_collateral':'received'):'pending';
+   }
+  }
+  if(mode==='check_status'){if(p.data.method!=='check')fail('این پرداخت چک نیست.');if(!['cleared','bounced'].includes(b.state))fail('وضعیت چک معتبر نیست.');state(p,b.state==='cleared'?['received']:['received','cleared','check_collateral']);if(b.state==='cleared'&&salesCheckPosition(p,account(),today).requiresReview)fail('مبلغ چک بیشتر از مانده فاکتور است؛ ابتدا چک را تعیین تکلیف کنید.',409);if(p.data.checkDue>today)fail('تاریخ وصول چک هنوز نرسیده است.');next=b.state;}
   if(p.data.bankRowId)fail('وصول متصل به بانک را از بخش پوز و تطبیق دریافت‌ها بررسی یا برگشت بزنید.');
   if(mode==='payment_reverse'){state(p,['cleared']);next='reversed';}
   const events=[...(p.data.financialEvents||[])];if(next==='cleared'||p.data.state==='cleared')events.push({id,day:today,at:now,delta:next==='cleared'?p.data.amount:String(-rial(p.data.amount)),state:next});
-  put(p.id,'sales_payment',{...p.data,financialEvents:events,state:next,...(next==='check_collateral'?{disposition:{kind:'collateral',state:'approved',amount:p.data.amount,reviewedBy:u.userId,reviewedAt:now}}:{}),reviewedBy:u.userId,reviewedAt:now,reviewNotes:notes()},p);
+  put(p.id,'sales_payment',{...p.data,financialEvents:events,state:next,...(checkVerification?{checkVerification}:{}),...(next==='check_collateral'?{disposition:{kind:'collateral',state:'approved',amount:p.data.amount,reviewedBy:u.userId,reviewedAt:now}}:{}),reviewedBy:u.userId,reviewedAt:now,reviewNotes:notes()},p);
  }else if(mode==='allocate'){
   const plan=allocationPlan(rows,own().id,req(b.creditId),today);if(!plan.allocations.length)fail('اعتبار آزاد قابل تخصیص وجود ندارد.');
   if(b.allocations&&JSON.stringify(b.allocations)!==JSON.stringify(plan.allocations))fail('تخصیص باید مطابق اولویت خودکار باشد؛ پیش‌نمایش را تازه کنید.',409);

@@ -275,7 +275,7 @@ html,button,input,textarea,select,option,svg text{font-family:"Vazirmatn",sans-s
 .sales-order-negotiation-limit{line-height:1.9;color:#334a79}.sales-order-terms .sales-order-negotiation-limit{margin-top:8px}
 
 /* One searchable buyer directory opens each combined dossier. */
-.sales-buyer-directory{display:grid;gap:20px;min-width:0}.sales-buyer-directory-heading{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap}.sales-buyer-directory-heading h3{margin:0}.sales-buyer-directory-filters{display:grid;grid-template-columns:minmax(0,2fr) repeat(2,minmax(0,1fr));gap:16px}.sales-buyer-directory-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:16px}.sales-buyer-directory-card{display:grid;gap:10px;min-width:0;padding:20px;border:1px solid #dce5f1;border-radius:16px;background:#fff}.sales-buyer-directory-card h4,.sales-buyer-directory-card p{margin:0;overflow-wrap:anywhere}.sales-buyer-directory-card h4{font-size:18px}.sales-buyer-directory-card>.btn{justify-self:start}.sales-buyer-directory-filters .field{min-width:0}@media(max-width:600px){.sales-buyer-directory-filters{grid-template-columns:minmax(0,1fr)}.sales-buyer-directory-card{padding:16px}}
+.sales-buyer-directory{display:grid;gap:20px;min-width:0}.sales-buyer-directory-heading{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap}.sales-buyer-directory-heading h3{margin:0}.sales-buyer-directory-filters{display:grid;grid-template-columns:minmax(0,2fr) repeat(2,minmax(0,1fr)) auto;gap:16px}.sales-buyer-directory-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:16px}.sales-buyer-directory-card{display:grid;gap:10px;min-width:0;padding:20px;border:1px solid #dce5f1;border-radius:16px;background:#fff}.sales-buyer-directory-card h4,.sales-buyer-directory-card p{margin:0;overflow-wrap:anywhere}.sales-buyer-directory-card h4{font-size:18px}.sales-buyer-directory-card>.btn{justify-self:start}.sales-buyer-directory-filters .field{min-width:0}@media(max-width:750px){.sales-buyer-directory-filters{grid-template-columns:minmax(0,1fr)}.sales-buyer-directory-card{padding:16px}}
 
 .inline-icon-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-block:12px;min-width:0}.inline-icon-actions>.btn{max-width:100%;min-width:0;white-space:normal}.inline-icon-actions>.btn>svg{flex-shrink:0}.inline-icon-actions>.btn>span{min-width:0;overflow-wrap:anywhere}.inline-icon-actions>h3{margin-inline-end:auto}
 .sales-order-toolbar{display:grid;gap:12px;margin-block:12px 18px;min-width:0}.sales-order-toolbar>.inline-icon-actions{margin:0}.sales-order-filters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:end;min-width:0}.sales-order-filters>.formgrid{display:contents}.sales-order-filters>.notice{grid-column:1/-1}.sales-order-filters .field{min-width:0}.sales-order-filters .field input,.sales-order-filters .field select{width:100%;min-width:0;box-sizing:border-box}@media(max-width:850px){.sales-order-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:600px){.sales-order-filters{grid-template-columns:minmax(0,1fr)}}
@@ -502,6 +502,17 @@ html,button,input,textarea,select,option,svg text{font-family:"Vazirmatn",sans-s
 .direct-chat-identity small{display:block;color:var(--muted-foreground);font-weight:normal}
 .direct-chat-identity img,.direct-chat-avatar{width:2rem;height:2rem;border-radius:50%;object-fit:cover;flex-shrink:0}
 .direct-chat-avatar{display:grid;place-items:center;background:#d9f1eb;color:#24685c}
+.material-issue-form{grid-column:1/-1;display:grid;gap:12px;min-width:0}
+.material-issue-form>.notice{display:block;margin:0}
+.material-issue-form>.btn{justify-self:start}
+.material-issue-form .material-issue-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,14rem),1fr));gap:12px;min-width:0;border:1px solid var(--border);border-radius:12px;padding:14px}
+.material-issue-row>.material-issue-batch{grid-column:1/-1;display:grid;gap:8px;min-width:0}
+.material-issue-batch [role=option]{overflow-wrap:anywhere}
+.material-issue-form .field{min-width:0}
+.material-issue-form .field input,.material-issue-form .field textarea{width:100%;min-width:0;box-sizing:border-box}
+.material-issue-row>.btn{grid-column:1/-1;justify-self:start}
+.material-issue-row>.field{align-self:start}
+.material-issue-scan-status{grid-column:1/-1;min-block-size:1.5em}
 .process-history{display:grid;gap:16px;min-width:0;margin-block:16px}
 .process-history>.formgrid{padding:0}
 .process-history .field{min-width:0}
@@ -557,7 +568,10 @@ button.hospital-network-option { cursor: pointer; }
 .representative-dashboard{--rep-line:#dbe2ee;--rep-tint:#f6f8fd;--rep-ink:#17254a;--rep-accent:#394ab4}
 .representative-dashboard .panelhead h2,.representative-orders-heading{color:var(--rep-ink)}
 .representative-account-strip{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;padding:16px;border:1px solid var(--rep-line);border-radius:12px;background:var(--rep-tint);margin-block:8px 22px}
-.representative-account-strip dl,.representative-dashboard-actions,.representative-order-links{display:flex;flex-wrap:wrap;gap:10px;margin:0;align-items:center}
+.representative-account-strip dl,.representative-order-links{display:flex;flex-wrap:wrap;gap:10px;margin:0;align-items:center}
+.representative-dashboard-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(6px,2vw,12px);max-width:570px;margin-block:0 16px}
+.representative-dashboard-actions .btn{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:8px;min-width:0;min-height:82px;padding:8px 4px;border-radius:12px;font-size:clamp(.75rem,2.8vw,.95rem);line-height:1.4;text-align:center;white-space:normal}
+.representative-dashboard-actions svg{width:26px;height:26px;flex-shrink:0}
 .representative-account-strip dl>div{min-width:145px;padding:6px 12px;border-inline-start:2px solid #c4cdef}
 .representative-account-strip dt{font-size:.85rem;color:#475578}
 .representative-account-strip dd{margin:0;font-size:1.15rem;font-weight:700;color:var(--rep-ink)}
@@ -582,3 +596,25 @@ button.hospital-network-option { cursor: pointer; }
 @media(max-width:780px){.representative-dashboard .representative-order-column-labels{display:none}.representative-dashboard .representative-order-row summary{grid-template-columns:1fr 1fr}.representative-dashboard .representative-order-chevron{display:none}}
 
 .representative-payment-status{display:inline-flex;align-items:center;gap:6px}.representative-payment-status[data-tone="confirmed"]{color:#146551}.representative-payment-status[data-tone="warning"]{color:#8a4708}
+
+.representative-rewards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:10px;margin-block:12px}
+.representative-rewards>div{padding:10px 12px;border:1px solid var(--rep-line);border-radius:10px}
+.representative-rewards h3{font-size:1rem;margin:0 0 4px}
+.representative-rewards .flow-card{border:0;background:none;margin:0;padding:0}
+.representative-rewards p{margin:3px 0}
+.sales-reward-progress{margin-block:6px}
+.sales-reward-progress-label{display:flex;justify-content:space-between;gap:8px}
+.sales-reward-progress progress{appearance:none;width:100%;height:8px;border:0;border-radius:999px;overflow:hidden;background:#e7edf6;accent-color:var(--rep-accent,#394ab4)}
+.sales-reward-progress progress::-webkit-progress-bar{background:#e7edf6}
+.sales-reward-progress progress::-webkit-progress-value{background:var(--rep-accent,#394ab4);border-radius:999px}
+.sales-reward-progress progress::-moz-progress-bar{background:var(--rep-accent,#394ab4);border-radius:999px}
+.representative-order-due{display:block}
+.representative-order-due[data-overdue="true"]{--rep-accent:#b42318;color:#b42318}
+.representative-order-due[data-overdue="true"] small{color:inherit}
+
+.sales-call-followup{margin-block:16px;padding:12px 16px;border:1px solid var(--input);border-radius:10px;min-inline-size:0}
+.sales-call-followup legend{padding-inline:6px;font-weight:600}
+.sales-call-followup-toggle{display:inline-flex;align-items:center;gap:8px;cursor:pointer}
+.sales-call-followup-toggle + .sales-call-followup-toggle{margin-inline-start:16px}
+.sales-call-followup-toggle input[type='checkbox']{inline-size:1.1em;block-size:1.1em;padding:0;margin:0;flex:none}
+.sales-call-followup>.formgrid,.sales-call-followup>.subtle{margin-block-start:8px}

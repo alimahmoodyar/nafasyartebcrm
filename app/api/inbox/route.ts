@@ -1,18 +1,18 @@
-import {requireAccess,checkOrigin,accessResponse,AccessError} from '@/lib/authorization';
+import {checkOrigin,accessResponse,AccessError} from '@/lib/authorization';
 import {storage} from '@/lib/storage';
 import {boundedBody} from '@/lib/firmware-storage';
 import {taskRequired as required,taskText as text,validDay} from '@/lib/duties';
-import {prepareInboxCreate,inboxCreateGuards,inboxAccess,inboxAssistantExecution,inboxClosed,inboxDecode,inboxDirectory,inboxContactAvatar,inboxMailbox,checkInboxMailbox,inboxLink,inboxList,inboxState,inboxView} from '@/lib/inbox';
+import {requireInboxAccess,prepareInboxCreate,inboxCreateGuards,inboxAccess,inboxAssistantExecution,inboxClosed,inboxDecode,inboxDirectory,inboxContactAvatar,inboxMailbox,checkInboxMailbox,inboxLink,inboxList,inboxState,inboxView} from '@/lib/inbox';
 import {inboxModes,inboxStates,inboxHelp} from '@/lib/inbox-contract';
 const json=(x:unknown)=>Response.json(x,{headers:{'Cache-Control':'private, no-store','Vary':'Cookie, Authorization'}});
 const fail=(s:string,status=400):never=>{throw new AccessError(s,status)};
 function due(v:any){const s=required(v,40);if(!/^\d{4}-\d\d-\d\dT([01]\d|2[0-3]):[0-5]\d:00\+03:30$/.test(s)||!validDay(s.slice(0,10))||Date.parse(s)<=Date.now())fail('مهلت آینده با ساعت تهران انتخاب کنید.');return new Date(s).toISOString();}
-export async function GET(request:Request){try{const u=await requireAccess(),q=new URL(request.url).searchParams,db=storage(),id=q.get('thread')||'';if(q.get('view')==='directory')return json(await inboxDirectory(u));
+export async function GET(request:Request){try{const u=await requireInboxAccess(),q=new URL(request.url).searchParams,db=storage(),id=q.get('thread')||'';if(q.get('view')==='directory')return json(await inboxDirectory(u));
  if(q.has('avatar'))return new Response(await inboxContactAvatar(u,q.get('avatar')||''),{headers:{'Content-Type':'image/jpeg','Cache-Control':'private, no-store','Vary':'Cookie, Authorization','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; sandbox"}});
  if(id){const t=await inboxAccess(id,u),offset=Math.max(0,Math.min(10000,Number(q.get('offset'))||0)),messages=(await db.prepare("SELECT * FROM flow_entities WHERE type='inbox_message' AND json_extract(data,'$.thread')=? ORDER BY created DESC,id DESC LIMIT 51 OFFSET ?").bind(id,offset).all()).results;let link=null;try{link=await inboxLink(u,t.data.link)}catch{}const files=(await db.prepare("SELECT * FROM flow_entities WHERE type='inbox_file' AND json_extract(data,'$.thread')=? ORDER BY created DESC").bind(id).all()).results.map((r:any)=>{const d=JSON.parse(r.data);delete d.objectKey;return {id:r.id,...d};});const peer=t.data.kind==='message'&&t.data.recipientType==='person'?(t.isSender?t.data.recipientId:t.data.sender):'';const peerReadRevision=peer?(await inboxState(id,peer)).readRevision||0:0;return json({accountId:u.userId,me:t.me,thread:await inboxView(t),peerReadRevision,messages:messages.slice(0,50).reverse().map((r:any)=>({id:r.id,created:r.created,...JSON.parse(r.data)})),nextOffset:messages.length>50?offset+50:null,link,files});}
  const d=await inboxList(u),attention=d.threads.filter((t:any)=>t.needsAttention);return json({accountId:u.userId,me:(await inboxMailbox(u)).id,...d,summary:{unread:d.threads.filter((t:any)=>t.unread).length,overdue:d.threads.filter((t:any)=>t.overdue&&t.needsAttention).length,review:d.threads.filter((t:any)=>t.needsReview).length,attention:attention.length,next:attention.sort((a:any,b:any)=>(Number(b.priority==='urgent')-Number(a.priority==='urgent'))||(a.due||'9999').localeCompare(b.due||'9999')).slice(0,5).map((t:any)=>({id:t.id,title:t.title,sender:t.senderName,due:t.due,state:t.state}))},modes:inboxModes,states:inboxStates,help:inboxHelp});
  }catch(e){return accessResponse(e)||Response.json({error:'دریافت صندوق ممکن نشد؛ دوباره تلاش کنید.'},{status:503})}}
-export async function POST(request:Request){try{checkOrigin(request);const u=await requireAccess(),db=storage(),mailbox=await inboxMailbox(u),me=mailbox.id,b=JSON.parse(new TextDecoder().decode(await boundedBody(request,80000))),id=required(b.id,100),mode=required(b.mode,40),now=new Date().toISOString();if(!/^[a-f0-9-]{36}$/i.test(id)||!inboxModes[mode])fail('عملیات معتبر نیست.');checkInboxMailbox(b.expectedMailbox,me);const viaAssistant=inboxAssistantExecution.getStore()===true;if(mailbox.profileTitle&&viaAssistant&&b.expectedMailbox!==me)fail('پیام را در صندوق همین پروفایل دوباره آماده کنید.',409);
+export async function POST(request:Request){try{checkOrigin(request);const u=await requireInboxAccess(),db=storage(),mailbox=await inboxMailbox(u),me=mailbox.id,b=JSON.parse(new TextDecoder().decode(await boundedBody(request,80000))),id=required(b.id,100),mode=required(b.mode,40),now=new Date().toISOString();if(!/^[a-f0-9-]{36}$/i.test(id)||!inboxModes[mode])fail('عملیات معتبر نیست.');checkInboxMailbox(b.expectedMailbox,me);const viaAssistant=inboxAssistantExecution.getStore()===true;if(mailbox.profileTitle&&viaAssistant&&b.expectedMailbox!==me)fail('پیام را در صندوق همین پروفایل دوباره آماده کنید.',409);
  const signature=JSON.stringify(mailbox.profileTitle?{mailbox:me,operation:b}:b);let t:any=null;if(mode!=='create')t=await inboxAccess(required(b.threadId,200),u);const previous:any=await db.prepare('SELECT payload,actor FROM inventory_operations WHERE id=?').bind(id).first();if(previous){if(previous.actor!==u.userId||previous.payload!==signature)fail('شناسه عملیات تکراری است.',409);return json({saved:true,repeated:true,threadId:t?.id||id});}
  const statements:D1PreparedStatement[]=[],target=t?.id||id;let d:any=t?{...t.data}:null;let body=typeof b.body==='string'?text(b.body,12000):'';
  const guard=(sql:string,...args:any[])=>statements.push(db.prepare('UPDATE inventory_operations SET guard=CASE WHEN '+sql+' THEN guard ELSE 0 END WHERE id=?').bind(...args,id));
@@ -38,7 +38,13 @@ export async function POST(request:Request){try{checkOrigin(request);const u=awa
    if(mode==='convert'){if(d.kind!=='message')fail('قبلاً درخواست کاری است.');d.kind='request';d.due=due(b.due);body=required(b.body,12000);}
    if(mode==='reschedule'){if(d.kind!=='request')fail('فقط درخواست کاری مهلت دارد.');d.due=due(b.due);body=required(b.body,12000);}
    if(mode==='close'){if(d.kind!=='message')fail('درخواست کاری باید اعلام انجام و تأیید شود.');d.state='closed';body=required(b.body,12000);}
-   if(mode==='reply')body=required(b.body,12000);
+   if(mode==='reply'){
+    if(d.kind==='message'&&d.recipientType==='person'&&(u.permissions.salesAgentId||u.profileReview?.id==='sales-representative')){
+     const peer=t.isSender?d.recipientId:d.sender;
+     if(!(await inboxDirectory(u)).people.some(contact=>contact.id===peer))fail('این مخاطب برای ارسال پیام در دسترس نیست.',403);
+    }
+    body=required(b.body,12000);
+   }
    if(d.recipientType==='position'&&t.isRecipient&&!t.isSender)guard("EXISTS(SELECT 1 FROM flow_entities p,json_each(p.data,'$.members') m WHERE p.id=? AND p.type='position' AND json_extract(p.data,'$.active')=1 AND m.value=?)",d.recipientId,me);
   }
   if(d.kind==='message'&&d.recipientType==='person')d.lastMessage=body.slice(0,160);

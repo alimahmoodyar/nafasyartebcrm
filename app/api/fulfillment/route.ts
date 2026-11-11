@@ -1,3 +1,4 @@
+import {dispatchInstallments} from '@/lib/sales-dispatch-terms';
 import {list} from '@/lib/after-sales';
 import {annualCountMovementStatements,assertWarehouseNotCounting,type CountMovement} from '@/lib/stocktake-lock';
 import {warehouseDirectory,warehouseMember} from '@/lib/material-warehouses';
@@ -148,6 +149,7 @@ export async function POST(request:Request){try{
  for(const did of chosen)if(!reserved.has(did)){const product=(await device(did)).product;const rows=swaps.get(product)||[];rows.push(did);swaps.set(product,rows);}
  const carrierId=needed(b.carrierId),carrier:any=await db.prepare("SELECT id,name,subject,permissions FROM app_members WHERE id=? AND status='active'").bind(carrierId).first();if(!carrier||!(storedAccessPermissions(carrier.permissions).flowRoles?.includes('logistics')||storedAccessPermissions(carrier.permissions).transportRoles?.includes('driver')))fail('تحویل‌گیرنده فعال از واحد تدارکات انتخاب کنید.');
  guard("EXISTS(SELECT 1 FROM app_members WHERE id=? AND status='active' AND permissions=?)",carrier.id,carrier.permissions);
+ const shipped:{productId:string;deviceIds:string[]}[]=[];
  for(const sale of sales){
  const selected=chosen.filter(did=>sale.data.deviceIds.includes(did));
  selected.push(...(swaps.get(sale.data.productId)||[]).splice(0,sale.data.count-selected.length));
@@ -159,7 +161,17 @@ export async function POST(request:Request){try{
  for(const did of selected){checks.push(await qmsDispatchGuard(did,id));const build=await get(did,'build'),d=await device(did);if(d.product!==sale.data.productId||!(build.data.state==='finished'||build.data.state==='reserved'&&build.data.saleId===sale.id))fail('سریال خروج موجود نیست یا برای حواله دیگری رزرو شده است.',409);
  if(build.data.warehouseId){const w=(await warehouseDirectory()).find(w=>w.id===build.data.warehouseId&&w.data.active);if(!w||!warehouseMember(u,w,'inventory'))fail('خروج این محصول در مسئولیت انبار شما نیست.',403);guard('EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)',w.id,w.revision);if(!sourceWarehouses.some(v=>v.id===w.id))sourceWarehouses.push({id:w.id,name:w.data.name});}
  entry(did,'finished',-1000);entry(did,'in_transit',1000);put(did,'build',{...build.data,state:'in_transit',saleId:sale.id,dispatchedAt:now,carrierId:carrier.id,recipient:sale.data.recipient},build);event(did,'خروج انبار ـ تحویل تدارکات',{notes:'مقصد: '+sale.data.recipient.name+' · تحویل‌گیرنده: '+carrier.name,recipient:sale.data.recipient.name,carrier:carrier.name});}
+ if(!sale.data.replacementReturnId)shipped.push({productId:sale.data.productId,deviceIds:selected});
  put(sale.id,'sale',{...sale.data,originalDeviceIds:sale.data.deviceIds,dispatchBatchId:id,sourceWarehouses,deviceIds:selected,state:'in_transit',carrierId:carrier.id,carrierSubject:carrier.subject||'',carrierName:carrier.name,dispatchedBy:u.name,dispatchedActor:u.userId,dispatchedAt:now,reason,receiptReference:text(b.receiptReference||'',300)},sale);
+ }
+ if(primary.data.salesOrderId&&shipped.length){
+  const order=await get(primary.data.salesOrderId,'sales_order');
+  if(order.data.dispatchPaymentDays!==undefined){
+   const invoice=await get(needed(order.data.invoiceId),'sales_invoice');
+   if(invoice.data.orderId!==order.id)fail('فاکتور به سفارش ارسال مرتبط نیست.',409);
+   const installments=dispatchInstallments(invoice.data,id,tehranDay(new Date(now)),shipped);
+   if(installments!==invoice.data.installments)put(invoice.id,'sales_invoice',{...invoice.data,installments},invoice);
+  }
  }
  }else if(mode==='handover'){
  const sale=await get(needed(b.saleId),'sale');const agent=await get(sale.data.salesAgentId||sale.data.partyId,'sales_agent');if(!agent.data.active)fail('نماینده یا شعبه غیرفعال است.');if(salesRep(u)&&agent.id!==u.permissions.salesAgentId)fail('این حواله متعلق به حساب شما نیست.',403);if(!['branch','representative','reseller','end_customer'].includes(agent.data.kind))fail('این حواله برای تحویل مشتری معتبر نیست.');const selected=ids(b.deviceIds);const handed=new Set<string>(sale.data.handedOverDeviceIds||[]);if(selected.some(d=>!sale.data.deviceIds.includes(d)||handed.has(d)))fail('سریال برای این تحویل معتبر نیست یا قبلاً ثبت شده است.',409);const customerName=needed(b.customerName,200),customerMobile=text(b.customerMobile||'',50),customerNationalId=text(b.customerNationalId||'',20),customerCity=text(b.customerCity||'',100),customerAddress=needed(b.customerAddress,2000),notes=text(b.notes||'',2000);if(customerNationalId&&!/^\d{10}$/.test(customerNationalId))fail('کد ملی مشتری باید ۱۰ رقم باشد.');if(customerMobile&&!/^(?:09\d{9}|\+989\d{9})$/.test(customerMobile))fail('موبایل مشتری معتبر نیست.');const order= sale.data.salesOrderId?await get(sale.data.salesOrderId,'sales_order'):null;const invoice=order?.data.invoiceId||sale.data.invoiceId||'';const day=tehranDay(),dealerName=agent.data.name,distributionId=(did:string)=>'distribution:'+did;

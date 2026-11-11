@@ -55,7 +55,7 @@ export function returnStatus(d:any,saleState?:string){
 }
 export function refundAllocation(invoices:any[],amount:bigint){
  let remaining=amount;
- const ordered=invoices.flatMap(i=>i.installments.map((p:any)=>({...p,invoiceId:i.id})))
+ const ordered=invoices.flatMap(i=>i.installments.filter((p:any)=>p.due).map((p:any)=>({...p,invoiceId:i.id})))
   .filter(p=>BigInt(p.remaining)>BigInt(0)).sort((a,b)=>a.due.localeCompare(b.due)||a.invoiceId.localeCompare(b.invoiceId)||a.id.localeCompare(b.id));
  const allocations=[];
  for(const p of ordered){

@@ -29,7 +29,7 @@ async function get(user,id='',status=200){const r=await context.run(user,()=>api
 async function upload(user,id,purpose='waybill',bytes=new Uint8Array([137,80,78,71,13,10,26,10,1]),status=201){const key=crypto.randomUUID(),form=new FormData();form.set('file',new Blob([bytes]),'evidence.png');const r=await context.run(user,()=>filesApi.POST(new Request(base+'/api/transport/files?mission='+id+'&purpose='+purpose+'&requestId='+key,{method:'POST',headers:{origin:base},body:form})));assert.equal(r.status,status,await r.clone().text());return key}
 async function create(kind,id,user=manager){return op(user,'create',{sourceKey:kind+':'+id,packages:1,route:'carrier',pickup:'مبدأ',destination:'مقصد',recipient:'گیرنده',phone:'09000000000',due:day,receiverId:['as_claim','as_case'].includes(kind)?'receiver':''})}
 async function assign(id){return op(manager,'assign',{missionId:id,driverId:'driver',vehicleId:'car',due:day})}
-async function collect(id){await op(driver,'checklist',{missionId:id,packagesChecked:true,itemsChecked:true,documentsChecked:true,conditionChecked:true});return op(driver,'collect',{missionId:id,packages:1,day,condition:'سالم'})}
+async function collect(id){await op(driver,'checklist',{missionId:id,packagesChecked:true,itemsChecked:true,documentsChecked:true,conditionChecked:true});const d=entity(id).data;return op(driver,'collect',{missionId:id,packages:1,day,condition:'سالم',...(d.kind==='sale'?{deviceIds:d.items.map(item=>item.deviceId)}:{})})}
 (async()=>{
  seed('A','as_agent',{name:'Agent A',active:true,domain:'home',phone:'090',address:'A address'});seed('B','as_agent',{name:'Agent B',active:true,domain:'home'});
  seed('car','transport_vehicle',{name:'Van',plate:'11 A 123',active:true});
@@ -82,11 +82,20 @@ async function collect(id){await op(driver,'checklist',{missionId:id,packagesChe
  seed('case','as_case',{domain:'home',agentId:'A',serial:'S1',state:'referred',customerName:'Customer',phone:'090',nationalCode:'VERY_PRIVATE',complaint:'PRIVATE MEDICAL'});
  r=await create('as_case','case',agent);await assign(r.id);await collect(r.id);assert.ok(!JSON.stringify(await get(driver,r.id)).includes('VERY_PRIVATE'));assert.ok(!JSON.stringify(await get(driver,r.id)).includes('PRIVATE MEDICAL'));await op(driver,'offer',{missionId:r.id,handoverTo:'پذیرش',day});await op(receiver,'receipt',{missionId:r.id,packages:1,day,result:'complete'});assert.equal(entity('case').data.state,'referred','physical arrival does not fabricate intake');assert.ok(entity('case').data.physicalArrival);
  seed('party','party',{name:'Agent A',active:true,phone:'090',address:'A address',serviceAgentId:'A'});seed('sales-profile','sales_agent',{name:'Sales A',active:true,phone:'090',address:'A address',serviceAgentId:'A'});seed('sale','sale',{salesAgentId:'sales-profile',partyId:'sales-profile',state:'in_transit',deviceIds:['D1'],recipient:{name:'Agent A',phone:'090',address:'A address'}});seed('D1','build',{state:'in_transit',saleId:'sale'});sql.prepare("INSERT INTO records(id,kind,payload,created) VALUES('D1','device',?,?)").run(JSON.stringify({code:'SERIAL-1',model:'NF5'}),now);balance('D1','in_transit',1000);
- r=await create('sale','sale');await assign(r.id);await collect(r.id);await op(driver,'carrier',{missionId:r.id,carrier:'Carrier',waybill:'W2',day});assert.equal(entity(r.id).data.missingDocuments,true);await op(agent,'receipt',{missionId:r.id,packages:1,day,result:'complete'});assert.equal(entity('D1').data.state,'delivered');assert.equal(sql.prepare("SELECT quantity FROM inventory_balances WHERE item_id='D1' AND warehouse='in_transit'").get().quantity,0);
+ const homePreview=load('lib/profile-review.ts').profileSession(admin,'home-sales',[],'sales-profile');
+ assert.equal(await transport.transportCanSee(homePreview,{data:{kind:'sale',salesAgentId:'sales-profile'}}),true);
+ assert.equal(await transport.transportCanSee(homePreview,{data:{kind:'sale',salesAgentId:'another-sales-profile'}}),false);
+ assert.equal(await transport.canRequest(homePreview,{type:'sale',data:{salesAgentId:'another-sales-profile'}}),false);
+ console.log('PASS home sales transport assignment scope');
+
+ r=await create('sale','sale');await assign(r.id);await collect(r.id);await op(driver,'carrier',{missionId:r.id,carrier:'Carrier',waybill:'W2',day});assert.equal(entity(r.id).data.missingDocuments,true);
+ const salesRecipient=actor('sales-recipient',{salesRoles:['agent'],salesAgentId:'sales-profile'});
+ await op(salesRecipient,'receipt',{missionId:r.id,deviceIds:['D1'],packages:1,day,result:'complete'},409);
  await upload(driver,r.id);assert.equal(entity(r.id).data.missingDocuments,false);
+ await op(salesRecipient,'receipt',{missionId:r.id,deviceIds:['D1'],packages:1,day,result:'complete'});assert.equal(entity('D1').data.state,'delivered');assert.equal(sql.prepare("SELECT quantity FROM inventory_balances WHERE item_id='D1' AND warehouse='in_transit'").get().quantity,0);
  seed('case2','as_case',{domain:'home',agentId:'B',serial:'S2',state:'referred'});await create('as_case','case2');await op(agent,'create',{sourceKey:'as_case:case2',packages:1,route:'direct',pickup:'x',destination:'y',recipient:'z',phone:'1',due:day},403);
  seed('hospital-service-case','as_case',{domain:'hospital',agentId:'',serial:'HS1',state:'referred',customer:'Hospital customer',phone:'090',model:'NF5'});
- const hospitalSource=entity('hospital-service-case');assert.equal(load('lib/service-access.ts').domainAccess(homeServiceManager,'hospital'),true,'service manager has supervisory read of the other domain');assert.equal(transport.canRequest(homeServiceManager,hospitalSource),false,'supervisory read never grants transport request');assert.equal(transport.canRequest(hospitalServiceManager,hospitalSource),true,'assigned-domain service manager retains transport request');
+ const hospitalSource=entity('hospital-service-case');assert.equal(load('lib/service-access.ts').domainAccess(homeServiceManager,'hospital'),true,'service manager has supervisory read of the other domain');assert.equal(await transport.canRequest(homeServiceManager,hospitalSource),false,'supervisory read never grants transport request');assert.equal(await transport.canRequest(hospitalServiceManager,hospitalSource),true,'assigned-domain service manager retains transport request');
  const beforeDenied=sql.prepare('SELECT COUNT(*) n FROM inventory_operations').get().n;
  await op(homeServiceManager,'create',{sourceKey:'as_case:hospital-service-case',packages:1,route:'direct',pickup:'مبدأ',destination:'مقصد',recipient:'پذیرش',phone:'090',due:day,receiverId:'hospital-service-manager'},403);
  assert.equal(sql.prepare('SELECT COUNT(*) n FROM inventory_operations').get().n,beforeDenied,'cross-domain request denial is before writes');assert.equal(entity('hospital-service-case').data.transportId,undefined);
@@ -125,7 +134,7 @@ async function collect(id){await op(driver,'checklist',{missionId:id,packagesChe
  assert.equal(entity(multi).data.state,'assigned');
  await op(driver,'collect',{missionId:multi,day,condition:'سالم',deviceIds:['carton-b']});
  await op(driver,'offer',{missionId:multi,handoverTo:'Receiver',day});
- await op(rep,'receipt',{missionId:multi,day,result:'shortage',deviceIds:['carton-a'],notes:''},400);
+ await op(rep,'receipt',{missionId:multi,day,result:'shortage',deviceIds:['unknown-carton']},400);
  await op(rep,'receipt',{missionId:multi,day,result:'shortage',deviceIds:['carton-a']});
  assert.equal(entity('carton-a').data.state,'delivered');
  assert.equal(entity('carton-b').data.state,'in_transit');

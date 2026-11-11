@@ -1,6 +1,7 @@
 import {storedAccessPermissions} from './permissions';
 import {financialAccess} from './financial-access';
-import {salesRep,salesStaff} from './sales';
+import {salesManager,salesRep,salesStaff,salesVisible} from './sales';
+import {homeSalesStaff} from './sales-access';
 import {storage} from './storage';
 import type {Session} from './permissions';
 import {memberId} from './duties';
@@ -12,12 +13,25 @@ import {transportStates,transportRoles,transportBlockerReasons} from './transpor
 export const transportManager=(u:Session)=>u.isAdmin||!!u.permissions.transportRoles?.includes('manager');
 export const transportDriver=(u:Session)=>!!u.permissions.transportRoles?.includes('driver')||!!u.permissions.flowRoles?.includes('logistics');
 export const transportDriverPreview=(u:Session)=>u.profileReview?.id==='driver';
+export function transportDriverCanAct(u:Session,mission:{id:string;data:{driverId?:string}},member:string){
+ if(!transportDriver(u)||!mission.data.driverId)return false;
+ if(transportDriverPreview(u))return u.profileReview?.missionId===mission.id;
+ return member===mission.data.driverId;
+}
 export const transportFinancialRead=(u:Session)=>financialAccess(u,'transport');
 export const transportFinance=(u:Session)=>u.isAdmin||!isAgent(u)&&financialAccess(u,'transport',true);
 export const purchaseTransportRequester=(u:Session,s?:any)=>!isAgent(u)&&(!!u.permissions.supplyRoles?.includes('inventory')||!!u.permissions.supplyRoles?.includes(s?.data.route)||!s&&!!u.permissions.supplyRoles?.some(r=>['domestic','foreign'].includes(r)));
 export const purchaseReceiver=(p:any)=>!p.serviceAgentId&&(p.supplyRoles?.includes('inventory')||p.flowRoles?.includes('inventory')&&(!p.warehouses||p.warehouses.includes('quarantine')));
 export function transportUnit(d:any){return d.kind==='sale'?'فروش':d.kind==='purchase_order'?(d.purchaseRoute==='foreign'?'بازرگانی خارجی':'بازرگانی داخلی'):d.domain==='hospital'?'خدمات بیمارستانی':'خدمات خانگی';}
 export const transportEntry=(u:Session)=>u.isAdmin||salesRep(u)||salesStaff(u)||!!u.permissions.transportRoles?.length||!!u.permissions.flowRoles?.some(r=>['inventory','sales','logistics'].includes(r))||!!u.permissions.serviceRoles?.length||transportFinancialRead(u)||purchaseTransportRequester(u);
+async function salesTransportAccess(user:Session,data:any){
+ if(warehouseAccess(user,'finished')||salesManager(user))return true;
+ if(!salesStaff(user))return false;
+ if(!homeSalesStaff(user))return true;
+ if(!data.salesAgentId)return !!data.dispatchActor&&data.dispatchActor===user.userId;
+ const row=await storage().prepare("SELECT id,data FROM flow_entities WHERE type='sales_agent' AND id=?").bind(data.salesAgentId).first<{id:string;data:string}>();
+ return !!row&&await salesVisible(user,{id:row.id,data:JSON.parse(row.data)},'read');
+}
 export async function transportCanSee(u:Session,m:any,mid?:string){
  if(transportDriverPreview(u))return u.profileReview?.missionId===m.id;
  if(u.isAdmin||transportManager(u))return true;const d=m.data;mid=mid??await memberId(u);
@@ -26,7 +40,7 @@ export async function transportCanSee(u:Session,m:any,mid?:string){
  if(transportFinancialRead(u))return true;
  if(transportDriver(u)&&mid===d.driverId)return true;
  if(d.kind==='purchase_order')return purchaseReceiver(u.permissions)||purchaseTransportRequester(u,{data:{route:d.purchaseRoute}});
- if(d.kind==='sale')return warehouseAccess(u,'finished')||salesStaff(u);
+ if(d.kind==='sale')return salesTransportAccess(u,d);
  return domainAccess(u,d.domain)&&(['manager','coordinator'].some(r=>role(u,r))||d.kind==='as_shipment'&&role(u,'inventory')||mid===d.receiverId&&(d.kind==='as_case'?role(u,'intake'):role(u,'inventory')));
 }
 export async function transportAccess(u:Session,id:string){const m=await entity(id,'transport');if(!await transportCanSee(u,m))fail('مأموریت پیدا نشد یا دسترسی ندارید.',404);return m;}
@@ -37,7 +51,7 @@ export async function sourceSummary(s:any){const d=s.data;let agentId=d.agentId|
  else {if(agentId){const a=await entity(agentId,'as_agent');name=a.data.name;phone=a.data.phone;address=a.data.address;}if(s.type==='as_shipment')items=d.lines.map((l:any)=>({batchId:l.batchId,partCode:l.partCode,quantity:l.quantity/1000}));else if(s.type==='as_claim')items=[{serial:d.serial,partCode:d.partCode,batchId:d.oldBatchId||'',quantity:d.quantity/1000}];else {name=d.customerName||d.customer||name;phone=d.phone||phone;items=[{serial:d.serial,model:d.model||'',quantity:1}];}}
  return {salesAgentId:s.type==='sale'?d.salesAgentId||'':'',key:s.type+':'+s.id,id:s.id,kind:s.type,purchaseRoute:s.type==='purchase_order'?d.route:'',agentId,domain,name,phone,address,items,state:d.state,revision:s.revision};
 }
-export function canRequest(u:Session,s:any){if(transportManager(u))return true;if(s.type==='purchase_order')return purchaseTransportRequester(u,s)||purchaseReceiver(u.permissions);if(s.type==='sale')return warehouseAccess(u,'finished')||salesStaff(u);if(!domainWriteAccess(u,s.data.domain))return false;if(isAgent(u))return ['as_claim','as_case'].includes(s.type)&&s.data.agentId===u.permissions.serviceAgentId;return ['coordinator','manager',...(s.type==='as_shipment'?['inventory']:['intake'])].some(r=>role(u,r));}
+export async function canRequest(u:Session,s:any){if(transportManager(u))return true;if(s.type==='purchase_order')return purchaseTransportRequester(u,s)||purchaseReceiver(u.permissions);if(s.type==='sale')return salesTransportAccess(u,{...s.data,dispatchActor:s.data.dispatchedActor});if(!domainWriteAccess(u,s.data.domain))return false;if(isAgent(u))return ['as_claim','as_case'].includes(s.type)&&s.data.agentId===u.permissions.serviceAgentId;return ['coordinator','manager',...(s.type==='as_shipment'?['inventory']:['intake'])].some(r=>role(u,r));}
 export function sourceReady(s:any){return s.type==='purchase_order'?['issued','paid','preparing','shipped'].includes(s.data.state):s.type==='sale'?s.data.state==='in_transit':s.type==='as_shipment'?s.data.state==='prepared':s.type==='as_claim'?['sent','awaiting_return'].includes(s.data.state):!['closed','returned','delivered'].includes(s.data.state);}
 export async function transportFiles(u:Session,m:any){const files=(await list('transport_file')).filter(f=>f.data.missionId===m.id);return files.filter(f=>f.data.purpose!=='expense'||!isAgent(u)&&!salesRep(u)&&(transportManager(u)||transportFinancialRead(u)||f.data.actor===u.userId)).map(f=>{const {objectKey,...data}=f.data;return {...f,data};});}
 export async function installTransportPositions(u:Session){if(!u.isAdmin)return;const now=new Date().toISOString(),db=storage();for(const [key,name] of Object.entries(transportRoles)){const id='transport-position:'+key,data={name,unit:'تدارکات و حمل‌ونقل',active:true,members:[],supervisor:'',mission:key==='manager'?'تخصیص و پیگیری حمل‌های رفت و برگشت':'تحویل‌گیری و تحویل مستند محموله‌های مأموریت',responsibilities:key==='manager'?'تخصیص راننده و خودرو؛ پیگیری موعد و مدارک؛ رفع مغایرت؛ هماهنگی انبار، فروش و خدمات.':'دریافت بسته؛ ثبت وضعیت ظاهری؛ تحویل باربری و بارنامه؛ دریافت برگشتی؛ تحویل به مسئول مقصد.',authorityBoundaries:'تأیید حمل جای تأیید گارانتی، داغی، موجودی یا پرداخت نیست؛ دسترسی مستقل حساب لازم است.',reportingTo:key==='manager'?'مدیرعامل':'مسئول تدارکات و حمل‌ونقل',handoffs:'انبار، فروش، خدمات، نماینده، باربری و مالی',metrics:'تأخیر مأموریت، مدارک ناقص، مغایرت دریافت و زمان تحویل'};await db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) SELECT ?,'position',?,1,?,? WHERE NOT EXISTS(SELECT 1 FROM flow_entities WHERE type='position' AND (id=? OR (?='manager' AND json_extract(data,'$.name')=?)))").bind(id,JSON.stringify(data),now,now,id,key,name).run();}await unifyTransportPositions(u);}
