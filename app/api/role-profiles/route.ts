@@ -19,7 +19,7 @@ export async function GET(request:Request){try{
  const json=(value:unknown)=>Response.json(value,{headers:{'Cache-Control':'private, no-store','Vary':'Cookie, Authorization'}});
  const active=(await session()).profileReview;
  if(!profile)return json({profiles:roleProfiles.map(visibleProfile),activeProfile:active?.id||''});
- if(!profile.operational)return json({profile:visibleProfile(profile),work:[],activeProfile:active?.id||'',unverified:[],personalPreview:true});
+ if(!profile.operational)return json({profile:visibleProfile(profile),work:[],activeProfile:active?.id||'',unverified:[],personalPreview:!profile.pendingWorkflow});
  const buyerId=params.get('buyer')||(active?.id===profile.id?active.buyerId||active.missionId:'')||'';
  if(!await validProfileScope(profile.id,buyerId)&&buyerId)throw new AccessError('پرونده خریدار یا مأموریت معتبر برای این پروفایل لازم است.',400);
  if(profile.id==='sales-representative'&&!buyerId){

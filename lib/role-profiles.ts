@@ -1,7 +1,7 @@
 import {warehouseTarget} from './warehouse-workspace';
 
 export type RoleLink={title:string;section:string;target?:string;taskOnly?:boolean};
-export type RoleProfile={id:string;title:string;group:string;operational:boolean;links:RoleLink[];gaps:string[];workflowRoles:string[];buyerScope?:'optional'|'required';missionScope?:true;serviceScope?:true};
+export type RoleProfile={id:string;title:string;group:string;operational:boolean;links:RoleLink[];gaps:string[];workflowRoles:string[];buyerScope?:'optional'|'required';missionScope?:true;serviceScope?:true;pendingWorkflow?:true};
 const link=(title:string,section:string,target=''):RoleLink=>({title,section,target});
 const salesLink=(title:string,view:string)=>link(title,'sales','sales-view:'+view);
 const salesRewardLinks=[salesLink('هدف و پاداش فصلی','reward-quarter'),salesLink('هدف و پاداش سالانه','reward-year')];
@@ -46,7 +46,8 @@ export const roleProfiles:RoleProfile[]=[
  {id:'sales-finance',title:'مالی فروش',group:'فروش',operational:true,workflowRoles:[],links:[...salesRewardLinks,link('حساب‌ها، فاکتورها و پرداخت‌های فروش','sales'),link('تطبیق بانکی فروش','sales-bank'),salesLink('امانت‌های نمایندگان','custody'),link('مرجوعی دستگاه','sales-returns'),link('تخصیص حساب مقصد آزمایشی','sales-bank',salesBankTestTarget)],gaps:[]},
  {id:'treasurer',title:'خزانه‌دار',group:'مالی',operational:true,workflowRoles:[],links:[link('ثبت و تطبیق اکسل بانک','sales-bank'),link('خزانه‌داری','treasury'),link('ثبت حساب مقصد آزمایشی','treasury',treasuryTestTarget),link('تطبیق اکسل آزمایشی','sales-bank',salesBankTestTarget)],gaps:[]},
  {id:'home-service-manager',title:'مدیر خدمات پس از فروش خانگی',group:'خدمات پس از فروش',operational:true,workflowRoles:[],links:[link('قرارداد نمایندگان خدمات','after-sales','service-contract:'),link('اعتبار، قیمت قطعه و زمان‌سنجی','after-sales','service-commercial:'),link('مدیریت خدمات خانگی','after-sales')],gaps:[]},
- {id:'home-service-representative',title:'نماینده خدمات پس از فروش خانگی',group:'خدمات پس از فروش',operational:true,workflowRoles:[],buyerScope:'required',serviceScope:true,links:[link('قرارداد نمایندگی و تمدید','after-sales','service-contract:'),link('پرونده، قطعات و حساب نماینده خدمات','after-sales'),link('اعتبار و تعرفه خدمات','after-sales','service-commercial:')],gaps:[]},
+ {id:'home-service-representative',title:'مسئول نمایندگی خدمات پس از فروش خانگی',group:'خدمات پس از فروش',operational:true,workflowRoles:[],buyerScope:'required',serviceScope:true,links:[link('قرارداد نمایندگی و تمدید','after-sales','service-contract:'),link('پرونده، قطعات و حساب نماینده خدمات','after-sales'),link('اعتبار و تعرفه خدمات','after-sales','service-commercial:')],gaps:[]},
+ {id:'home-service-customer-support',title:'پاسخ‌گوی مشتری نمایندگی خدمات پس از فروش خانگی',group:'خدمات پس از فروش',operational:false,pendingWorkflow:true,workflowRoles:[],links:[],gaps:['فرایندها و دسترسی‌های این نقش هنوز تعریف نشده‌اند.']},
  {id:'home-service',title:'کارشناس خدمات پس از فروش خانگی',group:'نقش‌های مرتبط',operational:true,workflowRoles:[],links:[link('قرارداد نمایندگان و پیگیری تمدید','after-sales','service-contract:'),link('پرونده و درخواست قطعه خدمات خانگی','after-sales'),link('حد اعتبار و تعرفه خدمات','after-sales','service-commercial:')],gaps:[]},
  {id:'hospital-service',title:'خدمات پس از فروش بیمارستانی',group:'نقش‌های مرتبط',operational:true,workflowRoles:[],links:[link('پرونده و درخواست قطعه خدمات بیمارستانی','after-sales')],gaps:[]},
  {id:'driver',title:'راننده تدارکات',group:'تدارکات',operational:true,workflowRoles:[],missionScope:true,links:[link('مأموریت‌های حمل و ثبت گزارش راننده','transport')],gaps:[]},

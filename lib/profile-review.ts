@@ -11,7 +11,7 @@ export const profileJobRoles:Record<string,string[]>={
  quality:['qc'],technical:['engineering','product_manager'],'finance-director':['finance_director','purchase_finance'],
  ceo:['ceo'],domestic:['domestic'],foreign:['foreign'],sales:['sales'],
  'home-sales':['home_sales'],'hospital-sales':['hospital_sales'],'sales-representative':['sales_agent'],'sales-manager':['sales_manager'],'sales-finance':['sales_finance'],treasurer:['treasurer'],
- 'home-service-manager':['service_manager'],'home-service-representative':['service_agent'],'home-service':['service_support','service_intake','service_technician','service_coordinator'],'hospital-service':['service_support','service_intake','service_technician'],logistics:['transport_manager'],driver:['driver']
+ 'home-service-customer-support':[],'home-service-manager':['service_manager'],'home-service-representative':['service_agent'],'home-service':['service_support','service_intake','service_technician','service_coordinator'],'hospital-service':['service_support','service_intake','service_technician'],logistics:['transport_manager'],driver:['driver']
 };
 /** An authenticated admin tests a position's grants; the actor never becomes a person. */
 export function profileSession(admin:Session,id:string,warehouses:any[],buyerId=''):Session{
