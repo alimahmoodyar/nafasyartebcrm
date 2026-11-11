@@ -45,7 +45,7 @@ export function ServicePartImport({domain,onSaved}:{domain:string;onSaved:()=>vo
    if(!response.ok){definiteFailure=response.status<500;throw Error(result.error||'بررسی یا ثبت قطعات انجام نشد.');}
    if(commit){
     commitBody.current=null;setPendingCommit(false);setPreview(null);
-    setMessage(`ثبت کامل شد: ${count(result.newMaterialCount)} قطعه جدید، ${count(result.newTariffCount)} قیمت مصرف‌کننده و ${count(result.unchangedCount)} ردیف بدون تغییر.`);
+    setMessage(`ثبت کامل شد: ${count(result.newMaterialCount)} قطعه جدید، ${count(result.newTariffCount)} ${result.pendingFinance?'پیشنهاد قیمت در انتظار تأیید مدیر مالی':'قیمت مصرف‌کننده'} و ${count(result.unchangedCount)} ردیف بدون تغییر.`);
     onSaved();
    }else setPreview(result);
   }catch(e){if(current===generation.current){

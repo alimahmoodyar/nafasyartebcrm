@@ -48,7 +48,11 @@ async function evidence(cid,user,id=crypto.randomUUID(),contents=new Uint8Array(
  // Old API clients omit geography: updates must retain it, not erase it.
  await op('agent',{agentId:a,name:'Agent A',code:'A',phone:'0912',address:'A',active:true});
  assert.equal(entity(a).data.coverage.length,2);
- const part=(await op('tariff',{kind:'part',name:'Compressor',partCode:'01',priceRial:'100',costRial:'70',validFrom:today,active:true})).id,labor=(await op('tariff',{kind:'labor',name:'Replacement',priceRial:'50',costRial:'0',validFrom:today,active:true})).id;
+ const commercial=load('app/api/after-sales/commercial/route.ts');
+ async function commercialAction(mode,data){const r=await commercial.POST(request('/api/after-sales/commercial','POST',{mode,id:crypto.randomUUID(),domain:'home',confirmed:true,...data})),d=await r.json();assert.equal(r.status,200,JSON.stringify(d));return d;}
+ for(const agentId of [a,b]){const proposed=await commercialAction('credit_propose',{agentId,limitRial:'1000000',notes:'Approved test credit'});await commercialAction('credit_decide',{requestId:proposed.id,revision:1,approved:true,notes:'Approved'});}
+ const proposedPart=await commercialAction('part_price_propose',{partCode:'01',priceRial:'100',validFrom:today,notes:'Part price'});await commercialAction('part_price_decide',{requestId:proposedPart.id,revision:1,approved:true,notes:'Finance approved'});
+ const part=entity(proposedPart.id).data.tariffId;await commercialAction('work_define',{name:'Replacement',minutes:'10',active:true,notes:'Time study'});await commercialAction('labor_publish',{ratePerMinuteRial:'5',customerMultiplier:'1',policyRevision:0,notes:'CEO approved'});const labor=entities('as_tariff').find(t=>t.data.kind==='labor').id;
  await op('order',{agentId:b,lines:[{tariffId:part,quantity:'1'}]},403,agent);
  const order=(await op('order',{agentId:a,lines:[{tariffId:part,quantity:'3'}],notes:'stock'},200,agent)).id;assert.equal((await service.ledger(a))[0].debit,'300');assert.equal(entity(order).data.due,service.monthsAfter(today,1));
  await op('approve_order',{orderId:order,approved:true,notes:'ok'},403,agent);await op('approve_order',{orderId:order,approved:true,notes:'ok'},200,actor('coordinator'));

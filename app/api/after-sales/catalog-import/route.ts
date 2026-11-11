@@ -1,3 +1,4 @@
+import {syncServiceCommercialTasks} from '@/lib/service-commercial-tasks';
 import {storage} from '@/lib/storage';
 import {requireAccess,checkOrigin,accessResponse} from '@/lib/authorization';
 import {boundedBody} from '@/lib/firmware-storage';
@@ -23,12 +24,14 @@ export async function POST(request:Request){try{
  }
  const materialRows:any[]=[];for(let start=0;start<rows.length;start+=90){const ids=rows.slice(start,start+90).map(row=>'material:'+row.code);const part=(await db.prepare('SELECT * FROM flow_entities WHERE id IN ('+ids.map(()=>'?').join(',')+')').bind(...ids).all()).results;materialRows.push(...part);}
  const materialMap=new Map(materialRows.map(row=>[row.id,row])),codes=new Set(rows.map(row=>row.code)),allTariffs=(await db.prepare("SELECT * FROM flow_entities WHERE type='as_tariff' AND json_extract(data,'$.domain')=? AND json_extract(data,'$.kind')='part'").bind(domain).all()).results as any[],tariffs=allTariffs.filter(row=>codes.has(JSON.parse(row.data).partCode));
+ const pending=domain==='home'?(await db.prepare("SELECT * FROM flow_entities WHERE type='as_commercial_request' AND json_extract(data,'$.domain')='home' AND json_extract(data,'$.kind')='part_price' AND json_extract(data,'$.state')='pending'").all()).results.filter((r:any)=>codes.has(JSON.parse(String(r.data)).partCode)) as any[]:[];
  const decodedTariffs=tariffs.map(row=>({...row,data:JSON.parse(row.data)})),errors=[...normalized.errors],warnings:string[]=[],newCodes:string[]=[],reuse=new Map<string,any>();
  for(const row of rows){
   const existing:any=materialMap.get('material:'+row.code);if(existing){const data=JSON.parse(existing.data);if(existing.type!=='material'||data.unit!==row.unit)errors.push(row.code+': واحد با شناسنامهٔ موجود یکسان نیست ('+String(data.unit||'—')+').');if(data.name!==row.name)warnings.push(row.code+': نام موجود «'+data.name+'» حفظ می‌شود؛ نام فایل «'+row.name+'» است.');}else newCodes.push(row.code);
   const effective=selectConsumerPartTariff(decodedTariffs,row.code,validFrom,domain);if(effective&&effective.data.validFrom===validFrom&&consumerTariffValue(effective)===row.consumerPriceRial)reuse.set(row.code,effective);
+  if(!reuse.has(row.code)){const proposed=pending.find(p=>{const d=JSON.parse(p.data);return d.partCode===row.code&&d.validFrom===validFrom&&d.consumerPriceRial===row.consumerPriceRial&&d.priceRial===null;});if(proposed)reuse.set(row.code,proposed);}
  }
- const snapshotData={domain,source,validFrom,rows,materials:rows.map(row=>{const material:any=materialMap.get('material:'+row.code);return material?{id:material.id,type:material.type,revision:material.revision,data:material.data}:null;}),tariffs:tariffSnapshot(tariffs)};
+ const snapshotData={domain,source,validFrom,rows,materials:rows.map(row=>{const material:any=materialMap.get('material:'+row.code);return material?{id:material.id,type:material.type,revision:material.revision,data:material.data}:null;}),tariffs:tariffSnapshot(tariffs),pending:tariffSnapshot(pending)};
  const catalogSnapshot=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(snapshotData))))).map(value=>value.toString(16).padStart(2,'0')).join('');
  const counts={totalCount:rows.length,newMaterialCount:newCodes.length,newTariffCount:rows.length-reuse.size,unchangedCount:reuse.size};
  const preview={domain,source,validFrom,rows,newCodes,errors,warnings,catalogSnapshot,...counts};if(b.mode==='preview')return json(preview);
@@ -39,12 +42,14 @@ export async function POST(request:Request){try{
   const mid='material:'+row.code,existing:any=materialMap.get(mid),catalog=tariffs.filter(tariff=>JSON.parse(tariff.data).partCode===row.code),materialCheck=existing?"EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND type='material' AND revision=? AND data=?)":'NOT EXISTS(SELECT 1 FROM flow_entities WHERE id=?)';
   // Ordered JSON guards the complete relevant tariff set, including new versions inserted after preview.
   const tariffCheck="COALESCE((SELECT json_group_array(json_object('id',id,'revision',revision,'data',data,'created',created)) FROM (SELECT id,revision,data,created FROM flow_entities WHERE type='as_tariff' AND json_extract(data,'$.domain')=? AND json_extract(data,'$.kind')='part' AND json_extract(data,'$.partCode')=? ORDER BY id)), '[]')=?";
+  if(domain==='home'){const pendingCheck="COALESCE((SELECT json_group_array(json_object('id',id,'revision',revision,'data',data,'created',created)) FROM (SELECT id,revision,data,created FROM flow_entities WHERE type='as_commercial_request' AND json_extract(data,'$.domain')='home' AND json_extract(data,'$.kind')='part_price' AND json_extract(data,'$.state')='pending' AND json_extract(data,'$.partCode')=? ORDER BY id)), '[]')=?";checks.push(db.prepare('UPDATE inventory_operations SET guard=CASE WHEN '+pendingCheck+' THEN guard ELSE 0 END WHERE id=?').bind(row.code,tariffSnapshot(pending.filter(p=>JSON.parse(p.data).partCode===row.code)),importId));}
   checks.push(db.prepare('UPDATE inventory_operations SET guard=CASE WHEN '+materialCheck+' AND '+tariffCheck+' THEN guard ELSE 0 END WHERE id=?').bind(...(existing?[mid,existing.revision,existing.data]:[mid]),domain,row.code,tariffSnapshot(catalog),importId));
   if(!existing)writes.push(db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'material',?,1,?,?)").bind(mid,JSON.stringify({code:row.code,name:row.name,unit:row.unit,specs:'',fields:[],importSource:source,importKind:'service_part_import',qcSetupRequired:true}),now,now));
-  if(!reuse.has(row.code)){const name=existing?JSON.parse(existing.data).name:row.name;writes.push(db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'as_tariff',?,1,?,?)").bind(crypto.randomUUID(),JSON.stringify({domain,kind:'part',name,partCode:row.code,consumerPriceRial:row.consumerPriceRial,priceRial:null,costRial:null,validFrom,active:true,importSource:source,importKind:'service_part_import',...(row.sourceRow!==undefined?{sourceRow:row.sourceRow}:{})}),now,now));}
+  if(!reuse.has(row.code)){const name=existing?JSON.parse(existing.data).name:row.name;writes.push(db.prepare('INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?)').bind(crypto.randomUUID(),domain==='home'?'as_commercial_request':'as_tariff',JSON.stringify({domain,kind:domain==='home'?'part_price':'part',...(domain==='home'?{state:'pending',submitted:{by:u.userId,byName:u.name,at:now},notes:'واردسازی قیمت قطعات: '+source}:{}),name,partCode:row.code,consumerPriceRial:row.consumerPriceRial,priceRial:null,costRial:null,validFrom,active:domain!=='home',importSource:source,importKind:'service_part_import',...(row.sourceRow!==undefined?{sourceRow:row.sourceRow}:{})}),now,now));}
  }
- const result={saved:true,importId,domain,source,validFrom,newCodes,...counts};
+ const result={saved:true,importId,domain,source,validFrom,newCodes,...counts,pendingFinance:domain==='home'};
  await db.batch([db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(importId,'service_part_import',signature,u.userId,now),...checks,...writes,db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,importId,'service_part_import',JSON.stringify(result),now)]);
+ try{await syncServiceCommercialTasks()}catch{console.error('Service import approval task projection deferred');}
  return json(result);
  }catch(e){
   const denied=accessResponse(e);if(denied)return denied;

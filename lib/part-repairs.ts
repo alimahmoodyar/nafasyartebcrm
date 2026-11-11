@@ -3,7 +3,8 @@ import {storage} from './storage';
 import type {Session} from './permissions';
 import {dayAt,memberId as activeMemberId} from './duties';
 import {normalizeSerial} from './distribution';
-import {fail,req,txt,isAgent,role,domainAccess,need,visible,entity,list,past,amount,warehouse,monthsAfter} from './after-sales';
+import {serviceCreditExposure} from './service-commercial-contract';
+import {fail,req,txt,isAgent,role,domainAccess,need,visible,entity,list,past,amount,warehouse,monthsAfter,ledger} from './after-sales';
 import {supplyLock} from './sourcing';
 import {partRepairActions} from './part-repair-contract';
 import {selectRepresentativePartTariff,representativeTariffValue,servicePartTariffGuard} from './after-sales-pricing';
@@ -104,6 +105,7 @@ export async function applyPartRepair(u:Session,b:any){
   const p=lot?JSON.parse(lot.payload):null;
   if(!lot||lot.owner!=='office'||lot.domain!==domain||lot.quantity-lot.reserved<1000||p.partCode!==d.review.partCode||p.status!=='تأیید'||p.expiry&&p.expiry<dayAt())fail('یک قطعهٔ آزاد و تأییدشده از انبار خدمات دفتر لازم است.');
   if(d.review.coverage==='paid'&&d.consent?.approved!==true)fail('پاسخ نماینده به هزینه ثبت نشده است.');
+  if(domain==='home'&&d.review.coverage==='paid'){const account=await ledger(a.id);if(a.data.creditLimitRial===undefined||a.data.creditLimitRial===null||serviceCreditExposure(account)+BigInt(d.review.priceRial)>BigInt(a.data.creditLimitRial))fail('اعتبار مصوب نماینده برای قطعه جایگزین کافی نیست.',409);guard('EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)',a.id,a.revision);guard('(SELECT COUNT(*) FROM service_ledger WHERE agent_id=?)=?',a.id,account.length);}
   guard("EXISTS(SELECT 1 FROM service_lots WHERE id=? AND owner='office' AND domain=? AND quantity-COALESCE((SELECT SUM(quantity) FROM service_reservations WHERE lot_id=?),0)>=1000)",lot.id,domain,lot.id);
   guard("EXISTS(SELECT 1 FROM records WHERE id=? AND payload=?)",lot.batch_id,lot.payload);
   guard('EXISTS(SELECT 1 FROM inventory_balances WHERE item_id=? AND warehouse=? AND quantity>=1000)',lot.batch_id,warehouse('office',domain));

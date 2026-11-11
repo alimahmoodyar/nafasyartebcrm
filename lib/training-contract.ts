@@ -1,11 +1,11 @@
-import {presets,allPermissions,type Session,type Permissions} from './permissions';
+import {resolveRoleAssignment,presets,allPermissions,type Session,type Permissions} from './permissions';
 const extra:Record<string,Permissions>={
  'مدیر سامانه':allPermissions,
  'مدیر خدمات پس از فروش':{read:[],write:[],eventStages:[],serviceRoles:['manager'],serviceDomains:['home','hospital']},
  ...Object.fromEntries([['sales','برنامه‌ریز فروش'],['ceo','مدیرعامل تأمین'],['engineering','مهندس محصول'],['inventory','کنترل موجودی تأمین'],['finance','کنترل مالی تأمین'],['domestic','کارشناس خرید داخلی'],['foreign','کارشناس خرید خارجی']].map(([role,name])=>[name,{read:[],write:[],eventStages:[],supplyRoles:[role]}])),
  ...Object.fromEntries([['intake','پذیرش خدمات'],['technician','تکنسین خدمات'],['coordinator','هماهنگ‌کننده خدمات'],['inventory','انبار خدمات'],['logistics','ارسال خدمات'],['finance','مالی خدمات']].map(([role,name])=>[name,{read:[],write:[],eventStages:[],serviceRoles:[role],serviceDomains:['home','hospital']}]))
 };
-export const trainingRoles=Object.entries({...Object.fromEntries(Object.entries(presets).filter(([n])=>!['تکنسین فنی بیمارستانی','تکنسین فنی خانگی'].includes(n))),...extra,'مسئول مرکز بیمارستانی ۱':{read:[],write:[],eventStages:[],hospitalCenterId:'training-hospital-1'},'مسئول مرکز بیمارستانی ۲':{read:[],write:[],eventStages:[],hospitalCenterId:'training-hospital-2'},'تکنسین فنی بیمارستانی':presets['تکنسین فنی بیمارستانی'],'تکنسین فنی خانگی':presets['تکنسین فنی خانگی']}).filter(([name])=>name!=='سفارشی').map(([name,permissions],i)=>{
+export const trainingRoles=Object.entries({...Object.fromEntries(Object.entries(presets).filter(([n])=>!['تکنسین فنی بیمارستانی','تکنسین فنی خانگی'].includes(n))),...extra,'مسئول مرکز بیمارستانی ۱':{read:[],write:[],eventStages:[],hospitalCenterId:'training-hospital-1'},'مسئول مرکز بیمارستانی ۲':{read:[],write:[],eventStages:[],hospitalCenterId:'training-hospital-2'},'تکنسین فنی بیمارستانی':presets['تکنسین فنی بیمارستانی'],'تکنسین فنی خانگی':presets['تکنسین فنی خانگی'],'مدیر مالی خدمات':resolveRoleAssignment({roles:['finance_director']})}).filter(([name])=>name!=='سفارشی').map(([name,permissions],i)=>{
  const id='role-'+i,p=JSON.parse(JSON.stringify(permissions)) as Permissions;
  if(name==='انبار خدمات')p.warehouses=['raw'];
  if(name==='انبار')p.warehouses=['raw','line','quarantine','nonconforming','finished'];

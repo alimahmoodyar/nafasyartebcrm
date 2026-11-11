@@ -27,7 +27,7 @@ export const roleWorkflowPrograms:Record<string,string[]>={
  custodian:['assets'],firmware:['firmware','device'],
  viewer:['overview','analytics','product','batch','device','event','service','action','distribution','firmware'],
  product_manager:['product'],
- treasurer:['treasury','guarantees','sales-bank'],finance_director:['build-projects','treasury','guarantees','costing','pricing','finance-control','transport'],
+ treasurer:['treasury','guarantees','sales-bank'],finance_director:['after-sales','build-projects','treasury','guarantees','costing','pricing','finance-control','transport'],
  accounting_head:['build-projects','treasury','costing','pricing','finance-control'],ceo_payment:['treasury'],warehouse_finance:['build-projects','costing','pricing','inventory'],
  sales_agent:['sales','fulfillment','transport'],service_agent:['after-sales','hospital'],
  service_manager:['after-sales','hospital','transport'],service_support:['after-sales','activation-code','hospital','transport'],

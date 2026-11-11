@@ -1,3 +1,4 @@
+import {currentServiceLabor} from './service-commercial-contract';
 import {consumerTariffValue,selectConsumerPartTariff} from './after-sales-pricing';
 
 // Display the same approved price the server will snapshot at confirmation.
@@ -16,4 +17,10 @@ export function consumerRowTotal(row:any):string|null {
  const [whole,fraction='']=String(row.quantity).split('.'),quantity=BigInt(whole)*BigInt(1000)+BigInt(fraction.padEnd(3,'0'));
  if(quantity<=BigInt(0))return null;
  return ((BigInt(row.customerUnitRial)*quantity+BigInt(999))/BigInt(1000)).toString();
+}
+
+export function consumerLaborDraft(row:any,tariffs:any[],day:string,domain:string){
+ if(domain!=='home')return row;
+ const t=currentServiceLabor(tariffs,day,domain).find(t=>t.id===row.tariffId);
+ return {...row,customerRial:row.covered===true?'0':t?.data.consumerPriceRial??'',automaticLabor:true};
 }

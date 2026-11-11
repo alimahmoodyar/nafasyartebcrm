@@ -12,7 +12,7 @@ const importer=load('app/api/after-sales/catalog-import/route.ts');
 const manager={userId:'manager',email:'manager@test.local',name:'Manager',isAdmin:false,permissions:{read:[],write:[],eventStages:[],serviceDomains:['home'],serviceRoles:['manager'],flowRoles:['inventory'],warehouses:[]}};
 const rows=[{code:'98000001',name:'Set fixture',unit:'ست',consumerPriceRial:'999999999999999999'},{code:'98000002',name:'Pair fixture',unit:'جفت',consumerPriceRial:'123456789012345678'}];
 const data={domain:'home',source:'failure-fixture.xlsx',validFrom:today,rows};
-const counts=()=>({materials:sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type='material'").get().n,tariffs:sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type='as_tariff'").get().n,operations:sql.prepare('SELECT COUNT(*) n FROM inventory_operations').get().n,audits:sql.prepare("SELECT COUNT(*) n FROM access_audit WHERE action='service_part_import'").get().n});
+const counts=()=>({materials:sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type='material'").get().n,tariffs:sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type='as_commercial_request'").get().n,operations:sql.prepare('SELECT COUNT(*) n FROM inventory_operations').get().n,audits:sql.prepare("SELECT COUNT(*) n FROM access_audit WHERE action='service_part_import'").get().n});
 async function invoke(payload,status=200,actor=manager){const request=new Request(base+'/api/after-sales/catalog-import',{method:'POST',headers:{origin:base,'Content-Type':'application/json'},body:typeof payload==='string'?payload:JSON.stringify(payload)}),response=await context.run(actor,()=>importer.POST(request)),result=await response.json();assert.equal(response.status,status,JSON.stringify(result));return result;}
 (async()=>{
  const initial=counts(),preview=await invoke({mode:'preview',...data});assert.deepEqual(counts(),initial);
@@ -21,7 +21,7 @@ async function invoke(payload,status=200,actor=manager){const request=new Reques
  assert.ok(!failed.error.includes('D1_TIMEOUT')&&!failed.error.includes('PRIVATE-INFRA-DETAIL'),'infrastructure exceptions remain private');
  const committed=counts();assert.deepEqual(committed,{materials:2,tariffs:2,operations:1,audits:1});assert.equal(batchCalls,1,'transaction committed before response was lost');
  const repeated=await invoke(body);assert.equal(repeated.saved,true);assert.equal(repeated.repeated,true);assert.equal(repeated.importId,body.id);assert.equal(repeated.newMaterialCount,2);assert.equal(repeated.newTariffCount,2);assert.deepEqual(counts(),committed);assert.equal(batchCalls,1,'same UUID replay does not execute another batch');
- const prices=sql.prepare("SELECT data FROM flow_entities WHERE type='as_tariff'").all().map(t=>JSON.parse(t.data).consumerPriceRial).sort();assert.deepEqual(prices,rows.map(r=>r.consumerPriceRial).sort(),'retry preserves exact 18-digit money');
+ const prices=sql.prepare("SELECT data FROM flow_entities WHERE type='as_commercial_request'").all().map(t=>JSON.parse(t.data).consumerPriceRial).sort();assert.deepEqual(prices,rows.map(r=>r.consumerPriceRial).sort(),'retry preserves exact 18-digit money');
  await invoke({...body,source:'changed-request.xlsx'},409);assert.deepEqual(counts(),committed);
  await invoke('{',400);assert.deepEqual(counts(),committed);
  await invoke({mode:'preview',...data},403, {...manager,permissions:{...manager.permissions,flowRoles:[]}});

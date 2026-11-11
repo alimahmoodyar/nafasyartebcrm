@@ -16,6 +16,7 @@ export function serviceSupervisor(u:Session){
 }
 export function serviceReadDomains(u:Session):string[]{
  if(serviceSupervisor(u))return Object.keys(serviceDomains);
+ if(!u.permissions.salesAgentId&&!u.permissions.serviceAgentId&&!u.permissions.hospitalCenterId&&u.permissions.treasuryWorkflowRoles?.includes('manager'))return ['home'];
  if(u.permissions.hospitalCenterId||u.permissions.salesAgentId||u.permissions.salesRoles?.includes('agent')||!u.permissions.serviceRoles?.length)return [];
  return Object.keys(serviceDomains).filter(d=>u.permissions.serviceDomains?.includes(d));
 }
