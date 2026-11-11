@@ -94,10 +94,11 @@ export function SubprogramNavigation({items,value,onChange,showLabel=true,inline
  const title=items.find(([key])=>key===value)?.[1];return showLabel&&title?<p className="subtle" aria-label="مسیر زیر‌برنامه">{title}</p>:null;
 }
 
-export function IconSections({scope,title='برنامه‌های این بخش',items}:{scope:string;title?:string;items:{key:string;title:string;content:ReactNode}[]}){
+export function IconSections({scope,title='برنامه‌های این بخش',items,inline=false}:{scope:string;title?:string;inline?:boolean;items:{key:string;title:string;content:ReactNode}[]}){
  const [selected,setSelected]=useState(items[0]?.key||'');
  const active=items.some(item=>item.key===selected)?selected:items[0]?.key||'';
  if(!items.length)return null;
+ if(inline)return <div>{items.map(item=><section key={item.key}><h3>{item.title}</h3>{item.content}</section>)}</div>;
  return <ProgramWorkspace programId={scope} title={title}><SubprogramNavigation items={items.map(item=>[item.key,item.title])} value={active} onChange={setSelected}/>{items.map(item=><div className="program-workspace-content" key={item.key} hidden={active!==item.key}>{item.content}</div>)}</ProgramWorkspace>;
 }
 

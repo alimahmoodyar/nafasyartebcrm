@@ -32,7 +32,7 @@ function BatchLookup(){
   </form>}
  </div>;
 }
-export function RoleTestingPanel({targetId='',onNavigate,onProfile,onAccessChanged,representativeDashboard}:{targetId?:string;onNavigate:(section:string,target?:string)=>void;onProfile:(profile:{id:string;title:string}|null)=>void;onAccessChanged?:()=>Promise<void>;representativeDashboard?:React.ReactNode}){
+export function RoleTestingPanel({targetId='',onNavigate,onProfile,onAccessChanged,representativeDashboard,serviceRepresentativeDashboard}:{targetId?:string;onNavigate:(section:string,target?:string)=>void;onProfile:(profile:{id:string;title:string}|null)=>void;onAccessChanged?:()=>Promise<void>;representativeDashboard?:React.ReactNode;serviceRepresentativeDashboard?:React.ReactNode}){
  const [profiles,setProfiles]=useState<RoleProfile[]>([]),[snapshot,setSnapshot]=useState<Snapshot|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(false);
  const [query,setQuery]=useState('');
  const [choosing,setChoosing]=useState<RoleProfile|null>(null),[choices,setChoices]=useState<{id:string;name:string}[]>([]),[buyer,setBuyer]=useState('');
@@ -73,7 +73,7 @@ export function RoleTestingPanel({targetId='',onNavigate,onProfile,onAccessChang
  {snapshot&&!choosing&&<>
   {salesScope&&<div className="tools">{scopedBuyer&&<span>پروندهٔ آزمون: {scopedBuyer}</span>}<button type="button" className="btn" disabled={loading} onClick={()=>void open(snapshot.profile,true)}>{scopedBuyer?'تغییر پروندهٔ آزمون':'انتخاب پرونده برای آزمون'}</button></div>}
   {snapshot.sample&&<p className="subtle">داده‌های نمونهٔ نقش نماینده فروش</p>}
-  {snapshot.profile.id==='sales-representative'&&representativeDashboard?<>
+  {snapshot.profile.id==='home-service-representative'&&serviceRepresentativeDashboard?<>{serviceRepresentativeDashboard}</>:snapshot.profile.id==='sales-representative'&&representativeDashboard?<>
    {representativeDashboard}
   </>:<>
   {snapshot.profile.id==='home-service-representative'&&<p className="notice">آزمون مستقل نقش؛ بدون انتساب به شخص. فرم‌ها و گردش‌ها با نقش‌های خدمات، مدیرعامل و مالی روی داده‌های آزمایشی مشترک اجرا می‌شوند.</p>}
