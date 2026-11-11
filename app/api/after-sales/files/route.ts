@@ -1,16 +1,17 @@
+import {withServiceRolePreview} from '@/lib/service-role-preview';
 import {requireAccess,checkOrigin,accessResponse} from '@/lib/authorization';
 import {storage} from '@/lib/storage';
 import {firmwareBucket,boundedBody} from '@/lib/firmware-storage';
 import {sha256} from '@/lib/firmware';
 import {caseAccess,need,fail} from '@/lib/after-sales';
 const safe=(r:any)=>{const {object_key,...v}=r;return v};
-export async function GET(request:Request){try{const u=await requireAccess(),q=new URL(request.url).searchParams,c=await caseAccess(q.get('case')||'',u),db=storage(),id=q.get('id');
+async function get(request:Request){try{const u=await requireAccess(),q=new URL(request.url).searchParams,c=await caseAccess(q.get('case')||'',u),db=storage(),id=q.get('id');
  if(!id)return Response.json({files:(await db.prepare('SELECT * FROM service_files WHERE case_id=? ORDER BY created').bind(c.id).all()).results.map(safe)},{headers:{'Cache-Control':'private, no-store'}});
  const f:any=await db.prepare('SELECT * FROM service_files WHERE id=? AND case_id=?').bind(id,c.id).first();if(!f)fail('مدرک پیدا نشد.',404);const object=await firmwareBucket().get(f.object_key);if(!object)throw Error('missing');const bytes=await object.arrayBuffer();if(await sha256(bytes)!==f.sha256)throw Error('integrity');
  return new Response(bytes,{headers:{'Content-Type':'application/octet-stream','Content-Disposition':"attachment; filename=service-evidence; filename*=UTF-8''"+encodeURIComponent(f.filename).replace(/['()*]/g,s=>'%'+s.charCodeAt(0).toString(16)),'X-Content-Type-Options':'nosniff','Content-Security-Policy':"sandbox; default-src 'none'",'Cache-Control':'private, no-store'}});
  }catch(e){return accessResponse(e)||Response.json({error:'دریافت مدرک انجام نشد.'},{status:503})}}
 function media(bytes:ArrayBuffer,name:string){const b=new Uint8Array(bytes),head=new TextDecoder().decode(b.slice(0,16)),ext=name.split('.').pop()?.toLowerCase();if(['jpg','jpeg'].includes(ext||'')&&b[0]===255&&b[1]===216&&b[2]===255)return 'image/jpeg';if(ext==='png'&&[137,80,78,71,13,10,26,10].every((n,i)=>b[i]===n))return 'image/png';if(ext==='webp'&&head.startsWith('RIFF')&&head.slice(8,12)==='WEBP')return 'image/webp';if(ext==='pdf'&&head.startsWith('%PDF-'))return 'application/pdf';if(['mp4','mov'].includes(ext||'')&&head.slice(4,8)==='ftyp')return ext==='mov'?'video/quicktime':'video/mp4';if(ext==='webm'&&[26,69,223,163].every((n,i)=>b[i]===n))return 'video/webm';return fail('فایل معتبر JPG، PNG، WEBP، PDF، MP4، MOV یا WEBM انتخاب کنید.');}
-export async function POST(request:Request){let key='',id='';try{
+async function post(request:Request){let key='',id='';try{
  checkOrigin(request);const u=await requireAccess(),q=new URL(request.url).searchParams,c=await caseAccess(q.get('case')||'',u);need(u,c.data.domain,'support','intake','technician','coordinator','agent');id=q.get('requestId')||'';const purpose=q.get('purpose')||'';
  if(!/^[a-f0-9-]{36}$/i.test(id)||!['before','intake','diagnosis','after','delivery','other'].includes(purpose))fail('شناسه یا نوع مدرک معتبر نیست.');
  const ct=request.headers.get('content-type')||'',raw=await boundedBody(request,25*1024*1024+128000),form=await new Response(raw,{headers:{'Content-Type':ct}}).formData(),f=form.get('file');if(!f||typeof f==='string'||!f.size||f.size>25*1024*1024||f.name.length>180||form.getAll('file').length!==1)fail('یک فایل تا ۲۵ مگابایت با نام حداکثر ۱۸۰ حرف انتخاب کنید.');
@@ -21,3 +22,6 @@ export async function POST(request:Request){let key='',id='';try{
  await db.batch([db.prepare("INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,'service_file','{}',?,?,CASE WHEN EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?) THEN 1 ELSE 0 END)").bind(crypto.randomUUID(),u.userId,now,c.id,c.revision),db.prepare('INSERT INTO service_files(id,case_id,purpose,object_key,filename,mime,byte_size,sha256,created,actor) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(id,c.id,purpose,key,f.name,mime,f.size,hash,now,u.userId),db.prepare('UPDATE flow_entities SET revision=revision+1,updated=? WHERE id=?').bind(now,c.id),db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,c.id,'service_file',JSON.stringify(safe(row)),now)]);
  return Response.json({file:safe(row)},{status:201});
  }catch(e){if(key&&id)try{const linked:any=await storage().prepare('SELECT object_key FROM service_files WHERE id=?').bind(id).first();if(linked?.object_key!==key)await firmwareBucket().delete(key)}catch{}return accessResponse(e)||Response.json({error:'مدرک ثبت نشد؛ فهرست پرونده را تازه کنید.'},{status:409})}}
+
+export const GET=withServiceRolePreview(get);
+export const POST=withServiceRolePreview(post);

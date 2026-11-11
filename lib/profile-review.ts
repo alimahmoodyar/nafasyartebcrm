@@ -1,3 +1,4 @@
+import {servicePreviewAgent} from './service-role-preview';
 import {storage} from './storage';
 import {resolveRoleAssignment,type Session} from './permissions';
 import {roleProfiles} from './role-profiles';
@@ -5,7 +6,7 @@ import {roleProfiles} from './role-profiles';
 // Stable per administrator and only materialized in isolated preview storage.
 export const representativeSampleId=(userId:string)=>'role-sample-representative:'+userId;
 // Compatibility is limited to old admin preview cookies; API scopes stay strict.
-export function profileReviewSelection(raw:string){const [storedProfileId,buyerId='',extra]=raw.split('~');if(extra!==undefined)throw Error('invalid preview scope');return {profileId:storedProfileId==='home-service'&&buyerId?'home-service-representative':storedProfileId,buyerId};}
+export function profileReviewSelection(raw:string){const [storedProfileId,buyerId='',extra]=raw.split('~');if(extra!==undefined)throw Error('invalid preview scope');return {profileId:storedProfileId==='home-service'&&buyerId?'home-service-representative':storedProfileId,buyerId:storedProfileId==='home-service-representative'||storedProfileId==='home-service'&&buyerId?'':buyerId};}
 export const profileReviewCookie='__Host-nafasyar-profile-review';
 export const profileJobRoles:Record<string,string[]>={
  'central-store':['inventory'],'line-store':['production_store_assistant'],'line-manager':['production'],
@@ -18,10 +19,11 @@ export const profileJobRoles:Record<string,string[]>={
 /** An authenticated admin tests a position's grants; the actor never becomes a person. */
 export function profileSession(admin:Session,id:string,warehouses:any[],buyerId=''):Session{
  const profile=roleProfiles.find(p=>p.id===id);if(!admin.isAdmin||!profile)throw Error('پروفایل معتبر مدیر لازم است.');
- if((!profile.buyerScope&&!profile.missionScope&&buyerId))throw Error('پرونده خریدار برای این پروفایل معتبر نیست.');
+ if((!profile.buyerScope&&!profile.missionScope&&buyerId)&&!(id==='home-service-representative'&&buyerId===servicePreviewAgent))throw Error('پرونده خریدار برای این پروفایل معتبر نیست.');
 
  if(profile.buyerScope==='required'&&!buyerId)return {...admin,isAdmin:false,permissions:{read:[],write:[],eventStages:[],manualPrograms:[]},profileReview:{id,title:profile.title,warehouseIds:[]},productionParticipant:false};
  const serviceRepresentative=id==='home-service-representative';
+ if(serviceRepresentative&&!buyerId)buyerId=servicePreviewAgent;
  const roles=profileJobRoles[id];if(!roles)throw Error('مجوزهای این پروفایل تعریف نشده است.');
  const selected=warehouses.filter(w=>w.data.active&&!w.data.deletedAt&&(id==='quality'||id==='line-store'?id==='quality'||w.data.warehouseType==='production_line':!w.data.serviceDomain&&!['production_line','quarantine'].includes(w.data.warehouseType)));
  const responsibilities=['central-store','line-store','quality'].includes(id)?selected.map(w=>({warehouseId:w.id,role:(id==='quality'?'qc':'inventory') as 'inventory'|'qc'})):[];
@@ -42,6 +44,7 @@ export async function profileScopeChoices(profileId:string){
 }
 export async function validProfileScope(profileId:string,buyerId:string,allowUnscoped=false){
  const profile=roleProfiles.find(p=>p.id===profileId);
+ if(profileId==='home-service-representative'&&buyerId===servicePreviewAgent)return true;
  if(!buyerId)return !!profile&&(allowUnscoped||profile.buyerScope!=='required');
  if((!profile?.buyerScope&&!profile?.missionScope)||!/^[A-Za-z0-9:_-]{1,160}$/.test(buyerId))return false;
  if(profile.serviceScope)return !!await storage().prepare("SELECT 1 FROM flow_entities WHERE id=? AND type='as_agent' AND json_extract(data,'$.domain')='home' AND json_extract(data,'$.active')=1").bind(buyerId).first();

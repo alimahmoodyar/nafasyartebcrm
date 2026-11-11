@@ -1,3 +1,4 @@
+import {serviceRolePreview,runServiceRolePreview} from './service-role-preview';
 import {accessResponse,session} from './authorization';
 import {mcpActor} from './mcp/context';
 import {isUnscopedRepresentative,type Session} from './permissions';
@@ -91,6 +92,7 @@ export function withRepresentativeSample<T extends Request|undefined>(handler:(r
   if(trainingContext.getStore())return handler(request);
   try{
    const position=await session();
+   if(serviceRolePreview(position))return runServiceRolePreview(position,()=>handler(request));
    if(position.profileReview?.id!=='sales-representative'||!isUnscopedRepresentative(position))return handler(request);
    const response=await runRepresentativeSample(position,()=>handler(request));
    response.headers.set('Cache-Control','private, no-store');

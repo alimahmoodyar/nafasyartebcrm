@@ -254,3 +254,5 @@ resetHelp.push('راهنماهای عیب‌یابی محصول، تاریخچه
 // Sales calls use existing sales_contact and sales_call_policy records and duty_runs.
 
 // Passkey credentials/challenges are authentication infrastructure preserved with app_members/password_accounts by both business reset scopes. No business-reset freeze applies, like password sessions; account deletion cascades credentials and expired challenges are purged on issuance. Account-version changes invalidate old keys.
+
+// Service role preview uses existing training_* tables and training R2 prefix, preserved by both company reset scopes. No new account/person binding, schema or company-data fixture is created.

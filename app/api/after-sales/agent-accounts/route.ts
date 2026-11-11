@@ -1,3 +1,4 @@
+import {withServiceRolePreview} from '@/lib/service-role-preview';
 import {storage} from '@/lib/storage';
 import {requireAccess,checkOrigin,accessResponse,AccessError} from '@/lib/authorization';
 import {username,password,hashPassword} from '@/lib/password-auth';
@@ -10,12 +11,12 @@ async function scope(domain:string) {
   return actor;
 }
 function failure(e:unknown){return accessResponse(e)||Response.json({error:/UNIQUE/.test(String(e))?'این نام کاربری قبلاً استفاده شده است.':'ثبت حساب انجام نشد؛ ورودی‌ها را بررسی و دوباره تلاش کنید.'},{status:/UNIQUE/.test(String(e))?409:400});}
-export async function GET(request:Request){try{
+async function get(request:Request){try{
   const domain=new URL(request.url).searchParams.get('domain')||'';await scope(domain);
   const rows=await storage().prepare("SELECT m.id,m.name,m.status,a.username,a.must_change AS mustChangePassword,EXISTS(SELECT 1 FROM access_audit x WHERE x.target=m.id AND x.action='automatic_representative_account') AS automaticAccount,json_extract(m.permissions,'$.serviceAgentId') AS agentId FROM app_members m JOIN password_accounts a ON a.member_id=m.id JOIN flow_entities f ON f.id=json_extract(m.permissions,'$.serviceAgentId') AND f.type='as_agent' WHERE m.status!='deleted' AND json_extract(f.data,'$.domain')=? AND json_extract(m.permissions,'$.serviceRoles')='[\"agent\"]' AND json_extract(m.permissions,'$.serviceDomains')=? ORDER BY m.created DESC").bind(domain,JSON.stringify([domain])).all();
   return Response.json({accounts:rows.results},{headers:{'Cache-Control':'no-store'}});
 }catch(e){return failure(e)}}
-export async function POST(request:Request){try{
+async function post(request:Request){try{
   checkOrigin(request);
   const raw=await request.text();if(raw.length>4096)throw new AccessError('درخواست بیش از حد بزرگ است.',413);
   const b=JSON.parse(raw);const actor=await scope(b.domain);
@@ -41,3 +42,6 @@ export async function POST(request:Request){try{
   ]);
   return Response.json({id:b.id,username:login},{status:201,headers:{'Cache-Control':'no-store'}});
 }catch(e){return failure(e)}}
+
+export const GET=withServiceRolePreview(get);
+export const POST=withServiceRolePreview(post);

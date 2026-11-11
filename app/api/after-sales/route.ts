@@ -1,3 +1,4 @@
+import {withServiceRolePreview} from '@/lib/service-role-preview';
 import {currentServiceLabor,serviceCreditExposure,serviceCommercialPermissions} from '@/lib/service-commercial-contract';
 import {servicePartEntitlement,requireServiceProduct,orderableCodes} from '@/lib/service-parts';
 import {collectionPolicy,collectionPolicyId,serviceCollection} from '@/lib/service-collection';
@@ -24,7 +25,7 @@ import {supplyLock,holdChecks} from '@/lib/sourcing';
 import {serviceRoles,serviceDomains} from '@/lib/after-sales-labels';
 import {fail,req,txt,decode,isAgent,role,domainAccess,need,visible,entity,list,date,past,monthsAfter,amount,qty,total,array,unique,warehouse,warranty,lineage,automaticRemovedPart,ledger,serviceSteps,syncServiceTasks} from '@/lib/after-sales';
 const json=(v:unknown,status=200)=>Response.json(v,{status,headers:{'Cache-Control':'private, no-store','Vary':'Cookie, Authorization'}});
-export async function GET(request:Request){try{
+async function get(request:Request){try{
  const u=await requireAccess(),db=storage(),q=new URL(request.url).searchParams,domain=q.get('domain')||'home',operational=domainWriteAccess(u,domain);if(!domainAccess(u,domain))fail('دسترسی این حوزه خدمات را ندارید.',403);if(q.get('locations')==='1'){need(u,domain,'manager');return json({provinces:iranProvinces,localities:q.has('province')?iranLocalities(q.get('province')):[]});}
  const own=isAgent(u)?u.permissions.serviceAgentId:'',filter=(r:any)=>r.data.domain===domain&&(!own||r.data.agentId===own||r.type==='as_agent'&&r.id===own);if(own)await visible(u,{data:{domain,agentId:own}});
  const cases=(await list('as_case')).filter(filter).filter(c=>!q.get('serial')||c.data.serial===normalizeSerial(q.get('serial')!)).map(c=>operational?c:{...c,data:{...c.data,internalPartsCost:undefined,repairs:c.data.repairs?.map((r:any)=>({...r,costRial:undefined}))}}),agents=(await list('as_agent')).filter(filter),tariffs=(await list('as_tariff')).filter(r=>r.data.domain===domain).map(r=>own||!operational?{...r,data:{...r.data,costRial:undefined}}:r);
@@ -41,7 +42,7 @@ export async function GET(request:Request){try{
  return json({canLinkSales:links.canLinkSales,salesAgentChoices:links.salesAgentChoices,domain,roles:domainWriteAccess(u,domain)?u.isAdmin?Object.keys(serviceRoles):u.permissions.serviceRoles:[],readOnly:!domainWriteAccess(u,domain),ownAgent:own||'',cases,agents:links.agents.map(a=>representativePublic(a,operational&&role(u,'manager'))),tariffs:own&&domain==='home'?tariffs.filter(t=>t.data.kind!=='part'||orderableCodes(agents.find(a=>a.id===own),partCatalogs).has(t.data.partCode)):tariffs,orders,shipments,claims,lots,raw,members,materials:(operational?await list('material'):[]).filter(m=>!own||domain!=='home'||orderableCodes(agents.find(a=>a.id===own),partCatalogs).has(m.data.code)).map(r=>({id:r.id,code:r.data.code,name:r.data.name,unit:r.data.unit})),account:accountRows,collection:domain==='home'&&account?await serviceCollection(account):null,collectionPolicy:domain==='home'?await collectionPolicy():null,orderableByAgent:domain==='home'?Object.fromEntries(agents.map(a=>[a.id,[...orderableCodes(a,partCatalogs)]])):null,products:(await db.prepare("SELECT id,payload FROM records WHERE kind='product'").all()).results.map((r:any)=>({id:r.id,code:JSON.parse(r.payload).code,name:JSON.parse(r.payload).name,model:JSON.parse(r.payload).model}))});
  }catch(e){return accessResponse(e)||json({error:'اطلاعات خدمات در دسترس نیست؛ مهاجرت 0015 را بررسی کنید.'},503)}}
 
-export async function POST(request:Request){try{
+async function post(request:Request){try{
  checkOrigin(request);const u=await requireAccess(),db=storage(),b=JSON.parse(new TextDecoder().decode(await boundedBody(request,250000))),mode=req(b.mode),id=req(b.id),domain=req(b.domain),now=new Date().toISOString(),today=dayAt();if(!/^[a-f0-9-]{36}$/i.test(id))fail('شناسه عملیات معتبر نیست.');if(!domainAccess(u,domain))fail('مجوز این حوزه را ندارید.',403);if(isAgent(u)&&b.agentId&&b.agentId!==u.permissions.serviceAgentId)fail('نماینده دیگری قابل انتخاب نیست.',403);
  if(['consent','authorize','approve_order','return_review'].includes(mode)&&typeof b.approved!=='boolean')fail('نتیجه تأیید یا رد باید مشخص باشد.');
  if(['report_submit','collection_policy'].includes(mode)&&b.confirmed!==true)fail('تأیید ثبت لازم است.');
@@ -151,3 +152,6 @@ export async function POST(request:Request){try{
  try{await syncServiceTasks()}catch{console.error('Service task projection deferred');}
  return json({saved:true,id:target,automaticAccount});
  }catch(e){return accessResponse(e)||json({error:/constraint|SQLITE|D1/i.test(String(e))?'موجودی یا پرونده هم‌زمان تغییر کرده؛ هیچ عملیات ناقصی ثبت نشد.':e instanceof Error?e.message:'ثبت خدمات انجام نشد.'},409)}}
+
+export const GET=withServiceRolePreview(get);
+export const POST=withServiceRolePreview(post);

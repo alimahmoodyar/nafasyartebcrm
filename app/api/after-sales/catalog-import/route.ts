@@ -1,3 +1,4 @@
+import {withServiceRolePreview} from '@/lib/service-role-preview';
 import {syncServiceCommercialTasks} from '@/lib/service-commercial-tasks';
 import {storage} from '@/lib/storage';
 import {requireAccess,checkOrigin,accessResponse} from '@/lib/authorization';
@@ -9,7 +10,7 @@ import {consumerTariffValue,selectConsumerPartTariff} from '@/lib/after-sales-pr
 const json=(value:unknown,status=200)=>Response.json(value,{status,headers:{'Cache-Control':'private, no-store',Vary:'Cookie, Authorization'}});
 const ordered=(rows:any[])=>rows.sort((a,b)=>a.id>b.id?1:a.id<b.id?-1:0);
 const tariffSnapshot=(rows:any[])=>JSON.stringify(ordered([...rows]).map(row=>({id:row.id,revision:row.revision,data:row.data,created:row.created})));
-export async function POST(request:Request){try{
+async function post(request:Request){try{
  checkOrigin(request);const u=await requireAccess(),b=JSON.parse(new TextDecoder().decode(await boundedBody(request,250000))),domain=req(b.domain),source=req(b.source,500),validFrom=date(b.validFrom);
  need(u,domain,'manager');if(!(u.isAdmin||u.permissions.flowRoles?.includes('inventory')))fail('ورود قطعات و تعرفه به مجوز مدیر خدمات و تعریف کالا در انبار نیاز دارد.',403);
  if(!['preview','commit'].includes(b.mode))fail('عملیات واردسازی معتبر نیست.');
@@ -61,3 +62,5 @@ export async function POST(request:Request){try{
   return json({error:'پاسخ قطعی عملیات دریافت نشد؛ برای بررسی نتیجه، همین درخواست را دوباره ارسال کنید.'},503);
  }
 }
+
+export const POST=withServiceRolePreview(post);

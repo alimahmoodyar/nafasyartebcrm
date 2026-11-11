@@ -1,3 +1,4 @@
+import {runServiceRolePreview,serviceRolePreview} from '@/lib/service-role-preview';
 import {runRepresentativeSample} from '@/lib/representative-sample';
 import {profileWork} from '@/lib/profile-work';
 import {profileSession} from '@/lib/profile-review';
@@ -22,15 +23,16 @@ export async function GET(request:Request){try{
  if(!profile.operational)return json({profile:visibleProfile(profile),work:[],activeProfile:active?.id||'',unverified:[],personalPreview:!profile.pendingWorkflow});
  const buyerId=params.get('buyer')||(active?.id===profile.id?active.buyerId||active.missionId:'')||'';
  if(!await validProfileScope(profile.id,buyerId)&&buyerId)throw new AccessError('پرونده خریدار یا مأموریت معتبر برای این پروفایل لازم است.',400);
- if(profile.id==='home-service-representative'&&!buyerId)return json({profile:visibleProfile(profile),work:[],activeProfile:active?.id||'',buyerId:'',buyerChoices:await profileScopeChoices(profile.id),unverified:[],personalPreview:false});
  if(profile.id==='sales-representative'&&!buyerId){
   const work=active?.id===profile.id?await runRepresentativeSample(profileSession(admin,profile.id,[]),async position=>(await profileWork(position)).work):[];
   return json({profile:visibleProfile(profile),work,activeProfile:active?.id||'',buyerChoices:await profileScopeChoices(profile.id),sample:true,unverified:[],personalPreview:false});
  }
+ const previewPosition=profileSession(admin,profile.id,[],buyerId);
+ if(serviceRolePreview(previewPosition))return runServiceRolePreview(previewPosition,async()=>json({profile:visibleProfile(profile),work:(await profileWork(previewPosition)).work,activeProfile:active?.id||'',buyerId:previewPosition.profileReview?.buyerId||'',buyerChoices:[],unverified:[],personalPreview:false,serviceRoleSample:true}));
  const templateSync=await syncReceiptTemplates(admin);if(templateSync.needsTaskSync)await syncMaterialTasks();await syncInventoryCounts();
  const buyerChoices=await profileScopeChoices(profile.id);
  const position=profileSession(admin,profile.id,(await storage().prepare("SELECT id,data FROM flow_entities WHERE type='material_warehouse'").all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)})),buyerId);
- const {work}=await profileWork(position);
+ const {work}=await runServiceRolePreview(position,()=>profileWork(position));
  return json({profile:visibleProfile(profile),work,activeProfile:active?.id||'',buyerId,buyerChoices,unverified:[],personalPreview:false});
  }catch(e){return accessResponse(e)||Response.json({error:'دریافت پروفایل نقش انجام نشد.'},{status:500,headers:{'Cache-Control':'no-store'}})}}
 
