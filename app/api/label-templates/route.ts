@@ -50,7 +50,7 @@ export async function POST(request:Request){
  try{
   checkOrigin(request);
   const user=await labelTemplateAccess();
-  const body=await request.json().catch(()=>null);
+  const body:any=await request.json().catch(()=>null);
   if(!user.isAdmin&&(body?.id||body?.revision!==0))throw new AccessError('ویرایش قالب‌های موجود فقط برای مدیر سامانه مجاز است؛ قالب تازه را با نام جدید ذخیره کنید.',403);
   return json(await saveLabelTemplate(user.userId,body));
  }catch(e){return failed(e);}
