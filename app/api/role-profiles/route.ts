@@ -22,6 +22,7 @@ export async function GET(request:Request){try{
  if(!profile.operational)return json({profile:visibleProfile(profile),work:[],activeProfile:active?.id||'',unverified:[],personalPreview:!profile.pendingWorkflow});
  const buyerId=params.get('buyer')||(active?.id===profile.id?active.buyerId||active.missionId:'')||'';
  if(!await validProfileScope(profile.id,buyerId)&&buyerId)throw new AccessError('پرونده خریدار یا مأموریت معتبر برای این پروفایل لازم است.',400);
+ if(profile.id==='home-service-representative'&&!buyerId)return json({profile:visibleProfile(profile),work:[],activeProfile:active?.id||'',buyerId:'',buyerChoices:await profileScopeChoices(profile.id),unverified:[],personalPreview:false});
  if(profile.id==='sales-representative'&&!buyerId){
   const work=active?.id===profile.id?await runRepresentativeSample(profileSession(admin,profile.id,[]),async position=>(await profileWork(position)).work):[];
   return json({profile:visibleProfile(profile),work,activeProfile:active?.id||'',buyerChoices:await profileScopeChoices(profile.id),sample:true,unverified:[],personalPreview:false});

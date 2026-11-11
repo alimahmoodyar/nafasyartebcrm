@@ -24,6 +24,7 @@ const can=(u:Session,kind:Kind,operation:'read'|'write'='read')=>u.isAdmin||u.pe
 
 /** One navigation policy shared by the browser shell and the assistant. */
 export function canOpenSection(user:Session,s:string):boolean{
+ if(user.profileReview?.id==='home-service-representative'&&isUnscopedRepresentative(user))return s==='tasks';
  if(isUnscopedRepresentative(user))return ['tasks','sales','sales-returns','transport'].includes(s);
  const p=accessPermissions(user.permissions),u={...user,permissions:p};
  const internal=!p.hospitalCenterId&&!p.salesAgentId&&!p.serviceAgentId;

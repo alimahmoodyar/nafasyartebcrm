@@ -7,7 +7,7 @@ import {storage} from './storage';
 import {trainingContext} from './training-context';
 
 export async function runRepresentativeSample<T>(position:Session,work:(actor:Session)=>Promise<T>):Promise<T>{
- if(!isUnscopedRepresentative(position))throw Error('Representative sample scope required');
+ if(position.profileReview?.id!=='sales-representative'||!isUnscopedRepresentative(position))throw Error('Representative sample scope required');
  const buyerId=representativeSampleId(position.userId);
  const actor=profileSession({...position,isAdmin:true},'sales-representative',[],buyerId);
  return trainingContext.run({actor:position.userId,role:'sales-representative'},async()=>{
@@ -91,7 +91,7 @@ export function withRepresentativeSample<T extends Request|undefined>(handler:(r
   if(trainingContext.getStore())return handler(request);
   try{
    const position=await session();
-   if(!isUnscopedRepresentative(position))return handler(request);
+   if(position.profileReview?.id!=='sales-representative'||!isUnscopedRepresentative(position))return handler(request);
    const response=await runRepresentativeSample(position,()=>handler(request));
    response.headers.set('Cache-Control','private, no-store');
    response.headers.set('X-Training-Workspace','isolated');

@@ -8,20 +8,36 @@ const navigate=(...args)=>navigation.push(args),{RoleTestingPanel}=load('compone
 (async()=>{
 for(const operational of [true,false]){response={activeProfile:'central-store',profile:{id:'central-store',title:'مسئول انبار مرکزی',operational,links:[],gaps:[]},work:[{id:'shelf',title:'جانمایی'}],unverified:[]};const render=()=>{cursor=0;return RoleTestingPanel({targetId:'central-store',onNavigate:navigate,onProfile(){}})};await mount(render);const button=nodes(render()).find(n=>n.type==='button'&&text(n).startsWith('کارتابل'));assert.ok(button);button.props.onClick();assert.deepEqual(navigation.pop(),['tasks']);const mailbox=nodes(render()).find(n=>n.type==='button'&&text(n)==='صندوق پیام آزمایشی');assert.equal(mailbox,undefined,'Direct messages are accessed from the shared cartable');assert.equal(nodes(render()).filter(n=>n.type==='h3'&&text(n).includes('کارتابل فرایندی')).length,0,'One shared cartable, no parallel task list');}
 
-response={activeProfile:'home-service-customer-support',profile:{id:'home-service-customer-support',title:'پاسخ‌گوی مشتری نمایندگی خدمات خانگی',operational:false,pendingWorkflow:true,links:[],gaps:[]},work:[],unverified:[],personalPreview:false};const pendingRender=()=>{cursor=0;return RoleTestingPanel({targetId:'home-service-customer-support',onNavigate:navigate,onProfile(){}})};await mount(pendingRender);assert.ok(text(pendingRender()).includes('پس از تعریف فرایندها'));assert.ok(!text(pendingRender()).includes('فیش حقوقی'));assert.ok(!nodes(pendingRender()).some(n=>n.type==='button'&&text(n).startsWith('کارتابل')),'undefined customer-support workflow must not expose a cartable button');
+response={activeProfile:'home-service-customer-support',profile:{id:'home-service-customer-support',title:'پاسخ‌گوی مشتری نمایندگی خدمات خانگی',operational:false,pendingWorkflow:false,links:[],gaps:[]},work:[],unverified:[],personalPreview:false};const pendingRender=()=>{cursor=0;return RoleTestingPanel({targetId:'home-service-customer-support',onNavigate:navigate,onProfile(){}})};await mount(pendingRender);assert.ok(text(pendingRender()).includes('کارتابل و پیام‌های مستقیم این نقش فعال است'));assert.ok(!text(pendingRender()).includes('فیش حقوقی'));assert.ok(nodes(pendingRender()).some(n=>n.type==='button'&&text(n).startsWith('کارتابل')),'Customer support exposes cartable without service grants');
 
 const internalService={id:'home-service',title:'کارشناس خدمات پس از فروش خانگی (مسئول نمایندگی‌ها)',operational:true,links:[],gaps:[]};
 response={activeProfile:internalService.id,profile:internalService,work:[],unverified:[]};
 const renderInternalService=()=>{cursor=0;return RoleTestingPanel({targetId:internalService.id,onNavigate:navigate,onProfile(){}})};await mount(renderInternalService);assert.ok(!text(renderInternalService()).includes('انتخاب / تغییر نمایندگی آزمایشی'));
-const serviceRep={id:'home-service-representative',title:'نماینده خدمات پس از فروش خانگی',operational:true,buyerScope:'required',serviceScope:true,links:[],gaps:[]};
+const serviceRep={id:'home-service-representative',title:'نماینده خدمات پس از فروش خانگی',operational:true,buyerScope:'required',serviceScope:true,links:[{title:'سفارش قطعه',section:'after-sales',target:'service-parts:'}],gaps:[]};
 response={activeProfile:serviceRep.id,profile:serviceRep,work:[],unverified:[],buyerChoices:[{id:'agency',name:'سپهر'}]};
 const renderServiceRep=()=>{cursor=0;return RoleTestingPanel({targetId:serviceRep.id,onNavigate:navigate,onProfile(){}})};await mount(renderServiceRep);
-nodes(renderServiceRep()).find(n=>n.type==='button'&&text(n)==='انتخاب / تغییر نمایندگی آزمایشی').props.onClick();await new Promise(r=>setImmediate(r));
-assert.ok(!text(renderServiceRep()).includes('کارشناس مسئول نمایندگی‌ها (اطلاعات شرکت)'));
-nodes(renderServiceRep()).find(n=>n.type==='select').props.onChange({target:{value:'agency'}});profileRequests=[];
-nodes(renderServiceRep()).find(n=>n.type==='button'&&text(n)==='ورود به پروفایل').props.onClick();await new Promise(r=>setImmediate(r));
+assert.ok(nodes(renderServiceRep()).some(n=>n.type==='button'&&text(n).startsWith('کارتابل')));
+assert.ok(!nodes(renderServiceRep()).some(n=>n.type==='button'&&text(n)==='ورود به پروفایل'));
+assert.ok(!text(renderServiceRep()).includes('کارشناس مسئول نمایندگی‌ها'));
+assert.equal(nodes(renderServiceRep()).find(n=>n.type==='button'&&text(n).startsWith('سفارش قطعه')).props.disabled,true);
+profileRequests=[];
+nodes(renderServiceRep()).find(n=>n.type==='select').props.onChange({target:{value:'agency'}});await new Promise(r=>setImmediate(r));
 const repSelection=JSON.parse(profileRequests.find(r=>r.options?.method==='POST').options.body);assert.equal(repSelection.profileId,'home-service-representative');assert.equal(repSelection.buyerId,'agency');
+response={profiles:[serviceRep]};const renderServiceCatalog=()=>{cursor=0;return RoleTestingPanel({onNavigate:navigate,onProfile(){}})};await mount(renderServiceCatalog);profileRequests=[];
+nodes(renderServiceCatalog()).find(n=>n.type==='button'&&text(n).includes(serviceRep.title)).props.onClick();await new Promise(r=>setImmediate(r));
+assert.equal(profileRequests[0].options.method,'POST','Service representative enters directly without pre-entry chooser');
+assert.equal(JSON.parse(profileRequests[0].options.body).buyerId,'');assert.deepEqual(navigation.pop(),['role-testing',serviceRep.id]);
+response={profile:serviceRep,activeProfile:'other',work:[],unverified:[],buyerChoices:[]};profileRequests=[];await mount(renderServiceRep);
+assert.ok(profileRequests.some(r=>r.options?.method==='POST'),'Direct link enters without a chooser');
+assert.ok(text(renderServiceRep()).includes('نمایندگی فعال خدمات خانگی ثبت نشده'));
+assert.ok(!text(renderServiceRep()).includes('ورود به پروفایل'));
 
+response={activeProfile:serviceRep.id,profile:serviceRep,buyerId:'agency',work:[],unverified:[],buyerChoices:[{id:'agency',name:'سپهر'}]};await mount(renderServiceRep);
+const orderButton=nodes(renderServiceRep()).find(n=>n.type==='button'&&text(n).startsWith('سفارش قطعه'));assert.equal(orderButton.props.disabled,false);orderButton.props.onClick();assert.deepEqual(navigation.pop(),['after-sales','service-parts:']);
+response={profileReview:{id:serviceRep.id,title:serviceRep.title},requiresServiceScope:true,isAdmin:false,positionWork:[],tasks:[],definitions:[],members:[]};
+const renderServiceTasks=()=>{cursor=0;return TasksPanel({demo:false,onNavigate:navigate})};await mount(renderServiceTasks);
+assert.ok(nodes(renderServiceTasks()).some(n=>n.type===leaves.SubprogramNavigation&&n.props.items.some(i=>i[0]==='inbox')));
+assert.ok(!nodes(renderServiceTasks()).some(n=>n.type===leaves.SalesCallsPanel||n.type===leaves.InboxWorkflowPanel));
 const hospital={id:'hospital-sales',title:'کارشناس فروش بیمارستانی',operational:true,buyerScope:'optional',links:[],gaps:[]};
 response={profiles:[hospital]};const renderCatalog=()=>{cursor=0;return RoleTestingPanel({onNavigate:navigate,onProfile(){}})};await mount(renderCatalog);
 profileRequests=[];nodes(renderCatalog()).find(n=>n.type==='button'&&text(n).includes(hospital.title)).props.onClick();await new Promise(r=>setImmediate(r));

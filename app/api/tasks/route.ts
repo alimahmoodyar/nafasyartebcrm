@@ -11,7 +11,7 @@ import {syncInventoryCounts} from '@/lib/inventory-counts';
 import {guidanceOutline} from '@/lib/workflow-guidance';
 import {syncForeignTasks} from '@/lib/foreign-purchase-tasks';
 import {installForeignPosition} from '@/lib/foreign-purchase';
-import {requireAccess,checkOrigin,accessResponse,AccessError} from '@/lib/authorization';
+import {session,requireAccess,checkOrigin,accessResponse,AccessError} from '@/lib/authorization';
 import {storage} from '@/lib/storage';
 import {installDutyStarter,positionProfileFields} from '@/lib/duty-starter-install';
 import {DUTY_STARTER_VERSION} from '@/lib/duty-starter';
@@ -116,5 +116,10 @@ async function post(request:Request){try{checkOrigin(request);const u=await requ
  await db.batch([db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(id,'duty_'+mode,signature,u.userId,now),...checks,...statements,db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,target,'duty_'+mode,signature,now)]);return json({saved:true});
  }catch(e){return accessResponse(e)||Response.json({error:'ثبت انجام نشد؛ احتمال تغییر هم‌زمان وجود دارد. تازه‌سازی کنید.'},{status:409})}}
 
-export const GET=withRepresentativeSample(get);
+const getWithSample=withRepresentativeSample(get);
+export async function GET(request?:Request){try{
+ const u=await session();
+ if(u.profileReview?.id==='home-service-representative'&&!u.profileReview.buyerId)return json({profileReview:u.profileReview,positionWork:[],pendingQuality:0,accountId:u.userId,memberId:null,isAdmin:false,receiptNotesAvailable:false,canPurchaseServices:false,tasks:[],limited:false,notifications:[],managementNotifications:[],definitions:[],ownPositions:[],starterInstalled:true,members:[],scheduler:null,requiresServiceScope:true});
+ return getWithSample(request);
+}catch(e){return accessResponse(e)||Response.json({error:'دریافت کارتابل انجام نشد.'},{status:500});}}
 export const POST=withRepresentativeSample(post);
