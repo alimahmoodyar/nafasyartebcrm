@@ -4,6 +4,7 @@ import {ArrowLeftRight,Boxes,ClipboardList,Search,UserRound} from 'lucide-react'
 import {batchScanCode} from '@/lib/batch-qr';
 import type {RoleProfile,ProfileWork} from '@/lib/role-profiles';
 
+const roleSearchText=(s:string)=>s.normalize('NFKC').replace(/[يى]/g,'ی').replace(/ك/g,'ک').replace(/[\u064B-\u065F\u0670\u0640\u200c\u200d\s]/g,'').toLocaleLowerCase();
 type Snapshot={activeProfile?:string;profile:RoleProfile;work:ProfileWork[];unverified:string[];personalPreview:boolean;buyerId?:string;buyerChoices?:{id:string;name:string}[];sample?:boolean};
 function BatchLookup(){
  const [open,setOpen]=useState(false),[value,setValue]=useState(''),[error,setError]=useState('');
@@ -33,6 +34,7 @@ function BatchLookup(){
 }
 export function RoleTestingPanel({targetId='',onNavigate,onProfile,onAccessChanged,representativeDashboard}:{targetId?:string;onNavigate:(section:string,target?:string)=>void;onProfile:(profile:{id:string;title:string}|null)=>void;onAccessChanged?:()=>Promise<void>;representativeDashboard?:React.ReactNode}){
  const [profiles,setProfiles]=useState<RoleProfile[]>([]),[snapshot,setSnapshot]=useState<Snapshot|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(false);
+ const [query,setQuery]=useState('');
  const [choosing,setChoosing]=useState<RoleProfile|null>(null),[choices,setChoices]=useState<{id:string;name:string}[]>([]),[buyer,setBuyer]=useState('');
  const selection=useRef(false);const id=targetId;
  useEffect(()=>{let live=true;setLoading(true);setError('');setSnapshot(null);
@@ -60,13 +62,14 @@ export function RoleTestingPanel({targetId='',onNavigate,onProfile,onAccessChang
   try{const r=await fetch('/api/role-profiles?profile='+encodeURIComponent(p.id),{cache:'no-store'}),d=await r.json() as Snapshot&{error?:string};if(!r.ok)throw Error(d.error);setChoices(d.buyerChoices||[]);}
   catch(error){setError((error as Error).message);}finally{setLoading(false);}
  }
+ const searchWords=query.trim().split(/\s+/).map(roleSearchText).filter(Boolean),filteredProfiles=profiles.filter(p=>{const text=roleSearchText(p.title+' '+p.group);return searchWords.every(word=>text.includes(word));});
  const salesScope=snapshot?.profile.id==='home-sales'||snapshot?.profile.id==='sales-representative';
  const scopedBuyer=snapshot?.buyerChoices?.find(choice=>choice.id===snapshot.buyerId)?.name;
  return <section className="panel" dir="rtl"><div className="panelhead"><div><h2>{snapshot?'پروفایل نقش '+snapshot.profile.title:'پروفایل نقش‌ها'}</h2><p className="subtle">جایگاه مستقل از شخص؛ بررسی مرحله‌به‌مرحله فرایندهای فروش، انبار و تولید</p></div>{id&&<button className="btn" onClick={()=>void select(null)}>همه نقش‌ها</button>}</div>
  <p className="notice">انتخاب پروفایل، مجوزهای سمت سرور و فرم‌ها را به همین جایگاه محدود می‌کند؛ هویت ثبت‌کننده همچنان مدیر است و حساب شخصی ساخته نمی‌شود. آزمون انتساب به فرد و مسئولیت‌های شخصی جداگانه انجام می‌شود.</p>
  {error&&<p className="notice error" role="alert">{error}<button className="btn" onClick={()=>id?onNavigate('role-testing'):void select(null)}>بازگشت به نقش‌ها</button></p>}{loading&&<p role="status">دریافت پروفایل…</p>}
  {choosing&&!loading&&<section className="inside"><h3>{choosing.title}</h3><p>این انتخاب فقط محدودهٔ پروندهٔ آزمایشی را تعیین می‌کند و کسی را به نقش منتسب نمی‌کند.</p><label className="field">{choosing.missionScope?'مأموریت حمل':'پرونده خریدار'}<select value={buyer} onChange={e=>setBuyer(e.target.value)}><option value="">{choosing.missionScope?'ورود بدون مأموریت':'ورود بدون انتخاب پرونده'}</option>{choices.map(row=><option key={row.id} value={row.id}>{row.name}</option>)}</select></label><div className="tools"><button className="btn primary" onClick={()=>void select(choosing,buyer)}>ورود به پروفایل</button><button className="btn" onClick={()=>{setChoosing(null);if(id&&!snapshot)onNavigate('role-testing');}}>بازگشت</button></div></section>}
- {!id&&!choosing&&!loading&&<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:16}}>{profiles.map(p=><button key={p.id} disabled={loading} className="panel inside" style={{textAlign:'right',cursor:'pointer'}} onClick={()=>open(p)}><UserRound size={26}/><h3>پروفایل نقش {p.title}</h3><p className="subtle">{p.group} · {p.pendingWorkflow?'در انتظار تعریف فرایند':p.operational?'کارتابل و عملیات':'پروفایل شخصی'}</p><span>باز کردن پروفایل</span></button>)}</div>}
+ {!id&&!choosing&&!loading&&<><div className="tools" role="search" aria-label="جست‌وجوی نقش‌های آزمایشی"><label className="field"><span><Search size={16} style={{display:'inline',marginLeft:6}}/>جست‌وجوی نقش</span><input type="search" value={query} placeholder="نام نقش یا گروه؛ مثلاً خدمات خانگی، مالی، انبار…" onChange={e=>setQuery(e.target.value)}/></label>{query&&<button type="button" className="btn" onClick={()=>setQuery('')}>پاک‌کردن جست‌وجو</button>}<p className="subtle" role="status" aria-live="polite">{filteredProfiles.length.toLocaleString('fa-IR')} نقش از {profiles.length.toLocaleString('fa-IR')} نقش</p></div>{!filteredProfiles.length&&<p className="notice">نقشی با این نام یا گروه پیدا نشد؛ عبارت دیگری جست‌وجو کنید.</p>}<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:16}}>{filteredProfiles.map(p=><button key={p.id} disabled={loading} className="panel inside" style={{textAlign:'right',cursor:'pointer'}} onClick={()=>open(p)}><UserRound size={26}/><h3>پروفایل نقش {p.title}</h3><p className="subtle">{p.group} · {p.pendingWorkflow?'در انتظار تعریف فرایند':p.operational?'کارتابل و عملیات':'پروفایل شخصی'}</p><span>باز کردن پروفایل</span></button>)}</div></>}
  {snapshot&&!choosing&&<>
   {salesScope&&<div className="tools">{scopedBuyer&&<span>پروندهٔ آزمون: {scopedBuyer}</span>}<button type="button" className="btn" disabled={loading} onClick={()=>void open(snapshot.profile,true)}>{scopedBuyer?'تغییر پروندهٔ آزمون':'انتخاب پرونده برای آزمون'}</button></div>}
   {snapshot.sample&&<p className="subtle">داده‌های نمونهٔ نقش نماینده فروش</p>}
