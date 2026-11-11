@@ -1,3 +1,4 @@
+import {serviceCollection} from './service-collection';
 import {storage} from './storage';
 import {trainingContext} from './training-context';
 import {AccessError} from './authorization';
@@ -16,7 +17,7 @@ export async function serviceCommercialWorkspace(u:Session){
  const works=(await list('as_service_work')).filter(r=>r.data.domain==='home');
  const policies=(await list('as_service_labor_policy')).filter(r=>r.data.domain==='home');
  const tariffs=(await list('as_tariff')).filter(r=>r.data.domain==='home');
- const accounts=await Promise.all(agents.map(async a=>{const rows=await ledger(a.id);const exposure=rows.reduce((n:bigint,r:any)=>n+BigInt(r.debit||0)-BigInt(r.credit||0),BigInt(0));return {agentId:a.id,outstandingRial:(exposure>BigInt(0)?exposure:BigInt(0)).toString(),limitRial:a.data.creditLimitRial??null};}));
+ const accounts=await Promise.all(agents.map(async a=>{const rows=await ledger(a.id);const exposure=rows.reduce((n:bigint,r:any)=>n+BigInt(r.debit||0)-BigInt(r.credit||0),BigInt(0));return {agentId:a.id,outstandingRial:(exposure>BigInt(0)?exposure:BigInt(0)).toString(),limitRial:a.data.creditLimitRial??null,...await serviceCollection(a.id)};}));
  return {rights,agents:agents.map(a=>({id:a.id,revision:a.revision,data:{name:a.data.name,active:a.data.active,creditLimitRial:a.data.creditLimitRial??null}})),requests,works,policy:policies[0]||null,tariffs:own?tariffs.map(t=>({...t,data:{...t.data,costRial:undefined}})):tariffs,accounts,materials:own?[]:(await list('material')).map(m=>({code:m.data.code,name:m.data.name}))};
 }
 

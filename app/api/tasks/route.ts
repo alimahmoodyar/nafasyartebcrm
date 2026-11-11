@@ -1,3 +1,5 @@
+import {syncServiceTasks} from '@/lib/after-sales';
+import {serviceRead} from '@/lib/service-access';
 import {syncServiceContractTasks} from '@/lib/service-contract-tasks';
 import {serviceContractRights} from '@/lib/service-contracts-contract';
 import {withRepresentativeSample} from '@/lib/representative-sample';
@@ -28,7 +30,7 @@ async function get(request?:Request){try{const u=await requireAccess(),db=storag
   return json({position,templates:plans});
  }
  if(u.isAdmin||u.permissions.flowRoles?.includes('inventory')||u.permissions.supplyRoles?.some((r:string)=>['finance','ceo'].includes(r)))await syncInventoryCounts();
- if(serviceContractRights(u).read)await syncServiceContractTasks();
+ if(serviceRead(u))await syncServiceTasks();else if(serviceContractRights(u).read)await syncServiceContractTasks();
  const purchaseServices=await import('@/lib/purchase-services');await purchaseServices.syncServiceFinanceTasks();
  const canPurchaseServices=await purchaseServices.purchaseServicesAvailable(u);
  const processView=request&&new URL(request.url).searchParams.get('view')==='process-history';

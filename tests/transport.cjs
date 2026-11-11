@@ -65,7 +65,7 @@ async function collect(id){await op(driver,'checklist',{missionId:id,packagesChe
 
  await op(other,'collect',{missionId:id,packages:1,day,condition:'good'},404);
  await op(driver,'receipt',{missionId:id,packages:1,day,result:'complete'},400);
- await collect(id);await upload(driver,id,'waybill',new Uint8Array([1,2,3]),400);const file=await upload(driver,id);
+ await collect(id);assert.equal(entity('shipment').data.exitDay,day,'maturity begins at actual central-warehouse pickup');await upload(driver,id,'waybill',new Uint8Array([1,2,3]),400);const file=await upload(driver,id);
  await op(driver,'carrier',{missionId:id,carrier:'باربری',waybill:'WB123',tracking:'TRACK',day});
  assert.equal(entity(id).data.state,'carrier');assert.equal(entity('shipment').data.state,'shipped');assert.equal(sql.prepare('SELECT COUNT(*) n FROM service_lots').get().n,0,'carrier is not final receipt');
  const fileDenied=await context.run(agent2,()=>filesApi.GET(request('/api/transport/files?mission='+id+'&id='+file)));assert.equal(fileDenied.status,404);

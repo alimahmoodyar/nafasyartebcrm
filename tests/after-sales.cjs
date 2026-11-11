@@ -4,7 +4,7 @@ const db={prepare(q){let args=[];return{bind(...a){args=a;return this},async fir
 const objects=new Map();const bucket={async put(k,b){objects.set(k,b.slice(0));return {key:k}},async get(k){const b=objects.get(k);return b?{arrayBuffer:async()=>b.slice(0)}:null},async delete(k){objects.delete(k)}};
 let identity=null;const env={TRACE_OWNER_EMAIL:'owner@example.com',LLM_CONFIG_ENCRYPTION_KEY:require('node:crypto').randomBytes(32).toString('base64'),DB:db,BUCKET:bucket};
 const cache={};function load(file){file=path.resolve(root,file);if(cache[file])return cache[file];const exports={};cache[file]=exports;const source=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
-vm.runInNewContext(source,{exports,require:n=>{if(n==='cloudflare:workers')return {env};if(n==='@/app/chatgpt-auth')return {getChatGPTUser:async()=>identity};if(n.startsWith('@/')||n.startsWith('.')){const p=n.startsWith('@/')?path.join(root,n.slice(2)):path.resolve(path.dirname(file),n);return load(p+(path.extname(p)?'':'.ts'));}return require(n)},Response,Request,URL,URLSearchParams,Error,crypto:globalThis.crypto,Date,Intl,Set,Map,FormData,Blob,File,TextEncoder,TextDecoder,Uint8Array,ArrayBuffer,AbortController,ReadableStream,btoa,atob,setTimeout:(f,n)=>setTimeout(f,Math.min(n,10)),clearTimeout,console},{filename:file});return exports;}
+vm.runInNewContext(source,{exports,require:n=>{if(n==='cloudflare:workers')return {env};if(n==='@/app/chatgpt-auth')return {getChatGPTUser:async()=>identity};if(n.startsWith('@/')||n.startsWith('.')){const p=n.startsWith('@/')?path.join(root,n.slice(2)):path.resolve(path.dirname(file),n);return load(p+(path.extname(p)?'':'.ts'));}return require(n)},Response,Request,Headers,URL,URLSearchParams,Error,crypto:globalThis.crypto,Date,Intl,Set,Map,FormData,Blob,File,TextEncoder,TextDecoder,Uint8Array,ArrayBuffer,AbortController,ReadableStream,btoa,atob,setTimeout:(f,n)=>setTimeout(f,Math.min(n,10)),clearTimeout,console},{filename:file});return exports;}
 const auth=load('lib/authorization.ts'),http=load('app/mcp/route.ts'),sse=load('lib/mcp/sse.ts'),tokens=load('app/api/mcp-tokens/route.ts'),configs=load('app/api/llm-config/route.ts'),secrets=load('lib/llm-secrets.ts'),catalog=load('lib/mcp/tools.ts');
 const base='https://test.local';const owner={userId:'owner',email:'owner@example.com',displayName:'Owner',fullName:null};
 const request=(path,method='GET',body,headers={})=>new Request(base+path,{method,headers:{origin:base,...(body?{'Content-Type':'application/json'}:{}),...headers},...(body?{body:JSON.stringify(body)}:{})});
@@ -20,10 +20,11 @@ const entities=type=>sql.prepare('SELECT * FROM flow_entities WHERE type=?').all
 const entity=id=>{const r=sql.prepare('SELECT * FROM flow_entities WHERE id=?').get(id);return {...r,data:JSON.parse(r.data)}};
 const actor=(role,agent='')=>({userId:role+(agent||'User'),email:role+'@test.local',name:role+(agent||''),isAdmin:false,permissions:{read:[],write:[],eventStages:[],serviceDomains:['home'],serviceRoles:[role],serviceAgentId:agent,warehouses:['raw']}});
 let representativeSequence=1234500000;
-async function op(mode,b={},status=200,user){const key=['caseId','orderId','shipmentId','claimId','tariffId'].find(k=>b[k])||(mode==='agent'&&b.agentId?'agentId':'');const body={id:crypto.randomUUID(),mode,...(mode==='agent'&&!b.agentId?{nationalId:String(++representativeSequence),mobile:'09123456789',confirmed:true}:{}),domain:'home',...(key?{revision:entity(b[key]).revision}:{}),...b};const go=()=>api.POST(request('/api/after-sales','POST',body)),r=user?await context.run(user,go):await go(),d=await r.json();assert.equal(r.status,status,mode+': '+JSON.stringify(d));return {...d,body};}
+async function op(mode,b={},status=200,user){const key=['caseId','orderId','shipmentId','claimId','tariffId'].find(k=>b[k])||(mode==='agent'&&b.agentId?'agentId':'');const body={id:crypto.randomUUID(),mode,...(mode==='create'?{productId:'product:NF5'}:{}),...(mode==='agent'&&!b.agentId?{nationalId:String(++representativeSequence),mobile:'09123456789',confirmed:true}:{}),domain:'home',...(key?{revision:entity(b[key]).revision}:{}),...b};const go=()=>api.POST(request('/api/after-sales','POST',body)),r=user?await context.run(user,go):await go(),d=await r.json();assert.equal(r.status,status,mode+': '+JSON.stringify(d));return {...d,body};}
 async function get(query='',user,status=200){const go=()=>api.GET(request('/api/after-sales?domain=home'+query)),r=user?await context.run(user,go):await go(),d=await r.json();assert.equal(r.status,status,JSON.stringify(d));return d;}
 function seedEntity(id,type,data){const now=new Date().toISOString();sql.prepare('INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?)').run(id,type,JSON.stringify(data),now,now);}
-async function evidence(cid,user,id=crypto.randomUUID(),contents=new Uint8Array([137,80,78,71,13,10,26,10,1]),status=201){const form=new FormData();form.set('file',new Blob([contents]),'serial.png');const r=await context.run(user,()=>fileApi.POST(new Request(base+'/api/after-sales/files?case='+cid+'&purpose=before&requestId='+id,{method:'POST',headers:{origin:base},body:form})));const d=await r.json();assert.equal(r.status,status,JSON.stringify(d));return {id,d};}
+let evidencePurpose='before';
+async function evidence(cid,user,id=crypto.randomUUID(),contents=new Uint8Array([137,80,78,71,13,10,26,10,1]),status=201){const form=new FormData();form.set('file',new Blob([contents]),'serial.png');const r=await context.run(user,()=>fileApi.POST(new Request(base+'/api/after-sales/files?case='+cid+'&purpose='+evidencePurpose+'&requestId='+id,{method:'POST',headers:{origin:base},body:form})));const d=await r.json();assert.equal(r.status,status,JSON.stringify(d));return {id,d};}
 (async()=>{
  identity=owner;await auth.session();const today=load('lib/duties.ts').dayAt(),now=new Date().toISOString();
  for(const role of ['support','intake','technician','coordinator','inventory','logistics','finance']){const a=actor(role);sql.prepare("INSERT INTO app_members(id,email,name,unit,status,subject,permissions,revision,created,updated) VALUES(?,?,?,'خدمات','active',?,?,1,?,?)").run(a.userId,a.email,a.name,a.userId,JSON.stringify(a.permissions),now,now);}
@@ -52,25 +53,31 @@ async function evidence(cid,user,id=crypto.randomUUID(),contents=new Uint8Array(
  async function commercialAction(mode,data){const r=await commercial.POST(request('/api/after-sales/commercial','POST',{mode,id:crypto.randomUUID(),domain:'home',confirmed:true,...data})),d=await r.json();assert.equal(r.status,200,JSON.stringify(d));return d;}
  for(const agentId of [a,b]){const proposed=await commercialAction('credit_propose',{agentId,limitRial:'1000000',notes:'Approved test credit'});await commercialAction('credit_decide',{requestId:proposed.id,revision:1,approved:true,notes:'Approved'});}
  const proposedPart=await commercialAction('part_price_propose',{partCode:'01',priceRial:'100',validFrom:today,notes:'Part price'});await commercialAction('part_price_decide',{requestId:proposedPart.id,revision:1,approved:true,notes:'Finance approved'});
+ const partsApi=load('app/api/after-sales/parts/route.ts');
+ async function partsAction(mode,data,user){const run=()=>partsApi.POST(request('/api/after-sales/parts','POST',{mode,id:crypto.randomUUID(),domain:'home',confirmed:true,...data}));const r=user?await context.run(user,run):await run(),result=await r.json();assert.equal(r.status,200,JSON.stringify(result));return result;}
+ sql.prepare("INSERT INTO records(id,kind,payload,created) VALUES(?,'product',?,?)").run('product:NF5',JSON.stringify({name:'NF5',model:'NF5'}),now);
+ const proposedCatalog=await partsAction('catalog_propose',{productId:'product:NF5',parts:[{partCode:'01'}],catalogRevision:0,notes:'Central catalog'});
+ await partsAction('catalog_decide',{requestId:proposedCatalog.id,revision:1,approved:true,notes:'CEO reviewed'});
+ for(const agentId of [a,b])await partsAction('eligibility',{agentId,revision:entity(agentId).revision,products:[{productId:'product:NF5'}],notes:'Training verified'});
  const part=entity(proposedPart.id).data.tariffId;await commercialAction('work_define',{name:'Replacement',minutes:'10',active:true,notes:'Time study'});await commercialAction('labor_publish',{ratePerMinuteRial:'5',customerMultiplier:'1',policyRevision:0,notes:'CEO approved'});const labor=entities('as_tariff').find(t=>t.data.kind==='labor').id;
  await op('order',{agentId:b,lines:[{tariffId:part,quantity:'1'}]},403,agent);
- const order=(await op('order',{agentId:a,lines:[{tariffId:part,quantity:'3'}],notes:'stock'},200,agent)).id;assert.equal((await service.ledger(a))[0].debit,'300');assert.equal(entity(order).data.due,service.monthsAfter(today,1));
+ const order=(await op('order',{agentId:a,lines:[{tariffId:part,quantity:'3'}],notes:'stock'},200,agent)).id;assert.equal((await service.ledger(a))[0].debit,'300');assert.equal(entity(order).data.due,null);assert.equal(entity(order).data.deadlineBasis,'warehouse_exit');
  await op('approve_order',{orderId:order,approved:true,notes:'ok'},403,agent);await op('approve_order',{orderId:order,approved:true,notes:'ok'},200,actor('coordinator'));
  const line=entity(order).data.lines[0].id;const prepared=await op('prepare',{orderId:order,allocations:[{lineId:line,batchId:raw,quantity:'2',location:''}],notes:'partial'},200,actor('inventory'));const shipment=prepared.body.id;
  assert.equal(entities('as_shipment').length,1);await op('receive',{shipmentId:shipment,confirmedReceived:true,notes:'not shipped'},400,agent);
- await op('ship',{shipmentId:shipment,carrier:'Carrier',tracking:'REF',eta:today,notes:'sent'},200,actor('logistics'));
+ await op('ship',{shipmentId:shipment,day:today,carrier:'Carrier',tracking:'REF',eta:today,notes:'sent'},200,actor('logistics'));
  await op('receive',{shipmentId:shipment,confirmedReceived:true,notes:'received'},404,other);await op('receive',{shipmentId:shipment,confirmedReceived:true,notes:'received'},200,agent);
  assert.equal(entity(order).data.state,'approved');const lot=sql.prepare('SELECT * FROM service_lots WHERE owner=?').get(a);assert.equal(lot.quantity,2000);
  const own=await get('',agent);assert.equal(own.agents.length,1);assert.equal(own.lots[0].batch.supplier,undefined);assert.equal(own.raw.length,0);await get('&agent='+b,agent,403);assert.equal((await get('',other)).orders.length,0);
  await op('activation_import',{source:'legacy',rows:[{serial:'S1',day:today,months:12}]});assert.equal(sql.prepare('SELECT COUNT(*) n FROM service_activations').get().n,1);
  const prev=await op('activation_preview',{source:'legacy',rows:[{serial:'S1',day:'2025-01-01',months:12}]});assert.equal(prev.preview[0].status,'conflict');await op('activation_import',{source:'legacy',rows:[{serial:'S1',day:'2025-01-01',months:12}]},400);
- const cid=(await op('create',{serial:'S1',customer:'Customer',phone:'0912',day:today,model:'NF5',complaint:'stopped'},200,agent)).id;
+ const cid=(await op('create',{serial:'S1',customer:'Customer',phone:'09123456789',day:today,model:'NF5',complaint:'stopped'},200,agent)).id;
  await get('&case='+cid,other,404);
  await op('intake',{caseId:cid,day:today,deliverer:'Courier',accessories:'Cable',appearance:'Good'},400,agent);
  await op('intake',{caseId:cid,day:today,deliverer:'Courier',delivererPhone:'bad',accessories:'Cable',appearance:'Good'},400,agent);
  assert.equal(entity(cid).data.state,'contact');
 await op('intake',{caseId:cid,day:today,hours:'100',deliverer:'Customer',delivererPhone:'۰۹۱۲۳۴۵۶۷۸۹',accessories:'Cable',appearance:'Good'},200,agent);
- assert.equal(entity(cid).data.intake.delivererPhone,'09123456789');assert.equal(entity(cid).data.intake.delivererNationalId,'');assert.equal(entity(cid).data.phone,'0912');
+ assert.equal(entity(cid).data.intake.delivererPhone,'09123456789');assert.equal(entity(cid).data.intake.delivererNationalId,'');assert.equal(entity(cid).data.phone,'09123456789');
  const intakeFields=load('lib/after-sales-contract.ts').serviceForms.intake;assert.equal(intakeFields.find(f=>f.key==='delivererNationalId').optional,true);assert.ok(!intakeFields.find(f=>f.key==='delivererPhone').optional);
  const contact=load('lib/service-intake-contact.ts').intakeContact;assert.equal(contact({delivererPhone:'+۹۸ ۹۱۲ ۳۴۵ ۶۷۸۹',delivererNationalId:'۰۰۱۲۳۴۵۶۷۸'}).delivererNationalId,'0012345678');assert.throws(()=>contact({delivererPhone:'09123456789',delivererNationalId:'123'}));
  const receipt=await context.run(agent,()=>printApi.GET(request('/api/after-sales/print?case='+cid+'&kind=receipt')));assert.equal(receipt.status,200);const receiptText=await receipt.text();assert.ok(receiptText.includes('شماره تماس تحویل‌دهنده'));assert.ok(receiptText.includes('09123456789'));
@@ -98,13 +105,23 @@ await op('intake',{caseId:cid,day:today,hours:'100',deliverer:'Customer',deliver
  await op('deliver',{caseId:cid,day:today,person:'Customer',reference:'signed'},200,agent);assert.equal(entity(cid).data.partWarrantyEnd,service.monthsAfter(today,6));assert.equal(entity(cid).data.repairs[0].batchId,raw);assert.equal((await service.lineage('S1'))[0].partCode,'01');
  await op('labor',{caseId:cid,notes:'not confirmed'},400,actor('coordinator'));await op('confirm',{caseId:cid,result:'confirmed',person:'Customer',rating:5,paidRial:'0',notes:'works'},403,agent);
  await op('confirm',{caseId:cid,result:'confirmed',person:'Customer',rating:5,paidRial:'0',notes:'works'},200,actor('support'));
- await op('labor',{caseId:cid,notes:'approved'},200,actor('coordinator'));assert.equal((await service.ledger(a)).find(r=>r.kind==='labor_credit').credit,'50');assert.equal(entities('as_claim')[0].data.state,'awaiting_return');
+ await op('labor',{caseId:cid,notes:'not without returns'},400,actor('coordinator'));assert.ok(!(await service.ledger(a)).some(r=>r.kind==='labor_credit'));
+ await op('report_submit',{caseId:cid,confirmed:true,notes:'Complete report'},400,agent);
+ evidencePurpose='after';await evidence(cid,agent);evidencePurpose='before';await op('report_submit',{caseId:cid,confirmed:true,notes:'Complete report'},200,agent);
+ assert.equal(entity(cid).data.returnDispatchDays,7);assert.equal(entities('as_claim')[0].data.state,'awaiting_return');
+ const collection=load('lib/service-collection.ts'),addDay=load('lib/duties.ts').addDay;
+ assert.equal((await collection.serviceCollection(a,today)).heldWarrantyRial,'100');
+ assert.equal((await collection.serviceCollection(a,addDay(today,8))).heldWarrantyRial,'0');
+ const send=await op('return_send',{claimId:entities('as_claim')[0].id,day:today,tracking:'RETURN-1',notes:'Dispatched'},200,agent);
+ assert.equal((await collection.serviceCollection(a,service.monthsAfter(today,1))).heldWarrantyRial,'100');
+ assert.equal((await collection.serviceCollection(a,service.monthsAfter(today,1))).collectibleRial,'100');
+ await op('return_send',send.body,200,agent);
  await op('labor',{caseId:cid,notes:'repeat'},400,actor('coordinator'));
  // Receive/pay in full before faulty part is credited: the later credit remains available.
  const payment=await op('payment',{agentId:a,direction:'received',amountRial:'300',day:today,reference:'bank ref',notes:'received'},200,actor('finance'));let led=await service.ledger(a);const inv=led.find(r=>r.kind==='invoice'),pay=led.find(r=>r.source_id===payment.body.id);
  await op('offset',{agentId:a,debitId:inv.id,creditId:pay.id,amountRial:'300',notes:'allocated'},200,actor('finance'));
- const claim=entities('as_claim')[0].id;await op('return_receive',{claimId:claim,day:today,location:'RETURN-A',notes:'received'},200,actor('inventory'));await op('return_review',{claimId:claim,approved:true,notes:'matches evidence'},200,actor('coordinator'));await op('credit',{claimId:claim,notes:'credit'},200,actor('finance'));
- led=await service.ledger(a);assert.equal(led.find(r=>r.kind==='return_credit').remaining,'100');assert.equal(led.find(r=>r.kind==='invoice').remaining,'0');await op('credit',{claimId:claim,notes:'again'},400,actor('finance'));
+ const claim=entities('as_claim')[0].id;await op('return_receive',{claimId:claim,day:today,location:'RETURN-A',notes:'received'},200,actor('inventory'));const reviewed=await op('return_review',{claimId:claim,approved:true,notes:'matches evidence'},200,actor('coordinator'));await op('return_review',reviewed.body,200,actor('coordinator'));assert.equal((await service.ledger(a)).filter(r=>r.kind==='labor_credit').length,1);assert.equal((await service.ledger(a)).filter(r=>r.kind==='return_credit').length,1);assert.equal((await service.ledger(a)).find(r=>r.kind==='labor_credit').credit,'50');assert.equal(entity(claim).data.state,'credited');
+ led=await service.ledger(a);assert.equal(led.find(r=>r.kind==='return_credit').remaining,'100');assert.equal(led.find(r=>r.kind==='invoice').remaining,'0');await op('credit',{claimId:claim,notes:'again'},400,actor('finance'));await op('labor',{caseId:cid,notes:'again'},400,actor('coordinator'));
  // Prior replacement warranty is traceable and date based, not inferred from main warranty.
  const next=(await op('create',{serial:'S1',customer:'Customer',phone:'0912',day:today,complaint:'again'},200,agent)).id;await op('intake',{caseId:next,day:today,hours:'101',deliverer:'Customer',delivererPhone:'۰۹۱۲۳۴۵۶۷۸۹',accessories:'Cable',appearance:'Good'},200,agent);
  await op('diagnose',{...quote,caseId:next,lines:[{...quote.lines[0],coverage:'part_warranty',oldBatchId:'forged-client-batch',unknownReason:'ignored'}]},200,agent);
@@ -128,6 +145,14 @@ await op('intake',{caseId:cid,day:today,hours:'100',deliverer:'Customer',deliver
  const cancelPayment=await op('payment',{agentId:a,direction:'received',amountRial:'75',day:today,reference:'payment',notes:'partial'});
  let cancelLedger=await service.ledger(a),cancelInvoice=cancelLedger.find(r=>r.source_id===cancelOrder),cancelPay=cancelLedger.find(r=>r.source_id===cancelPayment.body.id);await op('offset',{agentId:a,debitId:cancelInvoice.id,creditId:cancelPay.id,amountRial:'75',notes:'partial payment'});
  await op('approve_order',{orderId:cancelOrder,approved:false,notes:'rejected'});cancelLedger=await service.ledger(a);assert.equal(cancelLedger.find(r=>r.id===cancelInvoice.id).remaining,'0');assert.equal(cancelLedger.find(r=>r.kind==='order_cancel').remaining,'75');
+ // Paying out an available credit cannot also reuse it to clear an invoice.
+ const payoutOrder=(await op('order',{agentId:b,lines:[{tariffId:part,quantity:'1'}]},200,actor('coordinator'))).id;
+ await op('approve_order',{orderId:payoutOrder,approved:true,notes:'Approved'},200,actor('coordinator'));
+ const packed=await op('prepare',{orderId:payoutOrder,allocations:[{lineId:entity(payoutOrder).data.lines[0].id,batchId:raw,quantity:'1'}],notes:'Packed'},200,actor('inventory'));
+ await op('ship',{shipmentId:packed.body.id,day:today,carrier:'Carrier',tracking:'OUT-2',eta:today,notes:'Exit'},200,actor('logistics'));
+ await op('payment',{agentId:b,direction:'received',amountRial:'100',day:today,reference:'IN',notes:'Received'},200,actor('finance'));
+ await op('payment',{agentId:b,direction:'paid',amountRial:'100',day:today,reference:'OUT',notes:'Paid back'},200,actor('finance'));
+ assert.equal((await collection.serviceCollection(b,service.monthsAfter(today,1))).collectibleRial,'100');
  const repReport=await get('&report=1&from='+today+'&to='+today,agent);assert.equal(repReport.cases,3);assert.equal(repReport.people.length,1);assert.equal(repReport.agents.length,1);
  // A workflow task cannot be marked completed instead of doing the business action.
  const task=sql.prepare("SELECT * FROM duty_runs WHERE template_id LIKE 'after-sales:%' AND state='open' LIMIT 1").get();const tr=await load('app/api/tasks/route.ts').POST(request('/api/tasks','POST',{id:crypto.randomUUID(),mode:'cancel',taskId:task.id,revision:task.revision,note:'bypass'}));assert.equal(tr.status,400);
@@ -138,5 +163,5 @@ await op('intake',{caseId:cid,day:today,hours:'100',deliverer:'Customer',deliver
  token=(await mint('read')).token;assert.ok(!(await call('get_after_sales',{domain:'home',case:cid})).error);const args={id:crypto.randomUUID(),domain:'home',mode:'followup',revision:entity(paid).revision,data:{caseId:paid,nextDue:today,notes:'MCP'},confirmed:true};assert.ok((await call('after_sales_apply',args)).error);
  token=(await mint('read_write')).token;assert.ok((await call('after_sales_apply',{...args,confirmed:false})).error);assert.ok(!(await call('after_sales_apply',args)).error);
  assert.ok(sql.prepare("SELECT 1 FROM duty_runs WHERE template_id LIKE 'after-sales:%'").get());
- console.log('After-sales passed: isolated agents/domains, partial supply, invoice deadline, proof gate, consent invalidation, inventory/repair idempotency, QA/delivery, six-month part warranty, labor independent of returns, payment allocation, credit after payment, scoped files/print and MCP confirmation.');
+ console.log('After-sales passed: isolated agents/domains, partial supply, invoice deadline, proof gate, consent invalidation, inventory/repair idempotency, QA/delivery, six-month part warranty, labor gated by physical return and complete evidence, payment allocation, credit after payment, scoped files/print and MCP confirmation.');
 })().catch(e=>{console.error(e);process.exit(1)});

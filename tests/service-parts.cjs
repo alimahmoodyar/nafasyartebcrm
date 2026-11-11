@@ -1,0 +1,64 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),ts=require('typescript');
+const {DatabaseSync}=require('node:sqlite'),{randomUUID}=require('node:crypto');
+const root=path.resolve(__dirname,'..'),sql=new DatabaseSync(':memory:');
+sql.exec('PRAGMA foreign_keys=ON');for(const f of fs.readdirSync(path.join(root,'drizzle')).filter(f=>f.endsWith('.sql')).sort())sql.exec(fs.readFileSync(path.join(root,'drizzle',f),'utf8'));
+let beforeBatch=null;
+const db={prepare(q){let args=[];return{bind(...a){args=a;return this},async first(){return sql.prepare(q).get(...args)||null},async all(){return{results:sql.prepare(q).all(...args)}},async run(){return{meta:{changes:sql.prepare(q).run(...args).changes}}}}},async batch(stmts){if(beforeBatch){const f=beforeBatch;beforeBatch=null;f();}sql.exec('BEGIN');try{const r=[];for(const s of stmts)r.push(await s.run());sql.exec('COMMIT');return r;}catch(e){sql.exec('ROLLBACK');throw e;}}};
+const env={TRACE_OWNER_EMAIL:'owner@example.com',LLM_CONFIG_ENCRYPTION_KEY:require('node:crypto').randomBytes(32).toString('base64'),DB:db},cache={};
+function load(file){file=path.resolve(root,file);if(cache[file])return cache[file];const exports={};cache[file]=exports;const source=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+ vm.runInNewContext(source,{exports,require:n=>{if(n==='cloudflare:workers')return{env};if(n==='@/app/chatgpt-auth')return{getChatGPTUser:async()=>null};if(n.startsWith('@/')||n.startsWith('.')){const p=n.startsWith('@/')?path.join(root,n.slice(2)):path.resolve(path.dirname(file),n);return load(p+(path.extname(p)?'':'.ts'));}return require(n)},Response,Request,Headers,URL,URLSearchParams,Error,crypto:globalThis.crypto,Date,Intl,Set,Map,FormData,Blob,File,TextEncoder,TextDecoder,Uint8Array,ArrayBuffer,AbortController,ReadableStream,btoa,atob,setTimeout,clearTimeout,console},{filename:file});return exports;}
+const api=load('app/api/after-sales/route.ts'),context=load('lib/mcp/context.ts').mcpActor,pricing=load('lib/after-sales-pricing.ts'),base='https://test.local',today=load('lib/duties.ts').dayAt();
+const addDay=(day,n)=>new Date(Date.parse(day+'T00:00:00Z')+n*86400000).toISOString().slice(0,10),yesterday=addDay(today,-1),tomorrow=addDay(today,1);
+const actor=(role,domain='home')=>({userId:role+'-'+domain,email:role+'@test.local',name:role,isAdmin:false,permissions:{read:[],write:[],eventStages:[],serviceDomains:[domain],serviceRoles:[role],warehouses:[]}}),manager=actor('manager'),technician=actor('technician');
+function seed(id,type,data,created=new Date().toISOString()){sql.prepare('INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?)').run(id,type,JSON.stringify(data),created,created);return id;}
+function entity(id){const r=sql.prepare('SELECT * FROM flow_entities WHERE id=?').get(id);assert.ok(r,id);return{...r,data:JSON.parse(r.data)};}
+const rows=type=>sql.prepare('SELECT * FROM flow_entities WHERE type=?').all(type).map(r=>({...r,data:JSON.parse(r.data)}));
+function caseSeed(code='P',domain='home'){return seed(randomUUID(),'as_case',{domain,agentId:'',serial:randomUUID(),customer:'Customer',phone:'09123456789',complaint:'fault',contactDay:today,intake:{day:today},warranty:{state:'unknown'},state:'received',lines:[],laborLines:[],customerTotal:'0',history:[]});}
+async function op(mode,body={},status=200,user=manager){const key=['caseId','tariffId'].find(k=>body[k]),payload={id:randomUUID(),mode,domain:'home',...(key?{revision:entity(body[key]).revision}:{}),...body},request=new Request(base+'/api/after-sales',{method:'POST',headers:{origin:base,'Content-Type':'application/json'},body:JSON.stringify(payload)}),response=await context.run(user,()=>api.POST(request)),data=await response.json();assert.equal(response.status,status,mode+': '+JSON.stringify(data));return{...data,payload};}
+async function tariff(code,price,extra={},user=manager){return(await op('tariff',{kind:'part',name:'Part '+code,partCode:code,consumerPriceRial:price,validFrom:yesterday,active:true,...extra},200,user)).id;}
+const diagnosis=(caseId,partCode='P',extra={})=>({caseId,lines:[{partCode,quantity:'1',coverage:'paid',fault:'broken',cause:'wear',coverageReason:'chargeable',...extra}],laborLines:[],notes:'diagnosis'});
+
+
+const parts=load('lib/service-parts.ts'),httpParts=load('app/api/after-sales/parts/route.ts'),collection=load('lib/service-collection.ts'),perms=load('lib/permissions.ts'),reset=load('lib/reset-contract.ts');
+const expert=actor('coordinator'),ceo={...actor('CEO'),permissions:perms.resolveRoleAssignment({roles:['ceo']})},finance={...actor('FIN'),permissions:perms.resolveRoleAssignment({roles:['finance_director']})};
+async function part(mode,b={},status=200,user=expert){const body={mode,id:randomUUID(),domain:'home',confirmed:true,...b},r=await context.run(user,()=>httpParts.POST(new Request(base+'/api/after-sales/parts',{method:'POST',headers:{origin:base,'content-type':'application/json'},body:JSON.stringify(body)}))),d=await r.json();assert.equal(r.status,status,mode+JSON.stringify(d));return {...d,body};}
+async function read(user,q=''){const r=await context.run(user,()=>httpParts.GET(new Request(base+'/api/after-sales/parts?'+q)));return {status:r.status,data:await r.json()};}
+(async()=>{
+const now=new Date().toISOString();for(const a of [manager,expert,ceo,finance,actor('technician')])sql.prepare("INSERT INTO app_members(id,email,name,unit,status,subject,permissions,revision,created,updated) VALUES(?,?,?,'service','active',?,?,1,?,?)").run(a.userId,a.email,a.name,a.userId,JSON.stringify(a.permissions),now,now);for(const model of ['A','B'])sql.prepare("INSERT INTO records(id,kind,payload,created) VALUES(?,'product',?,?)").run('product:'+model,JSON.stringify({code:model,name:'Model '+model}),now);
+for(const code of ['01','02'])seed('material:'+code,'material',{code,name:'شیربرقی '+code,unit:'عدد',description:'Identification only',supplier:'SECRET',costRial:'PRIVATE',bom:['PRIVATE']});
+const agent=(await op('agent',{confirmed:true,nationalId:'1234500001',mobile:'09123456789',name:'Sepehr',code:'SEPEHR',phone:'02112345678',address:'Test',province:'تهران',city:'تهران',active:true})).id;
+const other=(await op('agent',{confirmed:true,nationalId:'1234500002',mobile:'09123456789',name:'Other',code:'OTHER',phone:'02112345678',address:'Test',province:'تهران',city:'تهران',active:true})).id;
+const rep=load('lib/profile-review.ts').profileSession({userId:'actual-admin',name:'Tester',email:'owner@example.com',isAdmin:true,permissions:perms.allPermissions},'home-service-representative',[],agent);
+sql.prepare("INSERT INTO app_members(id,email,name,unit,status,subject,permissions,revision,created,updated) VALUES(?,?,?,'service','active',?,?,1,?,?)").run(rep.userId,rep.email,rep.name,rep.userId,JSON.stringify(perms.allPermissions),now,now);
+await part('eligibility',{agentId:agent,revision:entity(agent).revision,products:[{productId:'product:A'}],notes:'Training'},403,rep);
+await part('catalog_propose',{productId:'product:A',parts:[{partCode:'missing'}],notes:'Bad'},400);
+const request=await part('catalog_propose',{productId:'product:A',parts:[{partCode:'01'}],catalogRevision:0,notes:'Initial'});assert.equal((await read(rep)).data.items.length,0);assert.ok(sql.prepare("SELECT id FROM duty_runs WHERE assignee=? AND json_extract(data,'$.sourceId')=? AND state='open'").get(ceo.userId,'service-parts:'+request.id),'CEO receives a direct linked approval task');
+await part('catalog_decide',{requestId:request.id,revision:1,approved:true,notes:'Not CEO'},403,finance);
+await part('catalog_decide',{requestId:request.id,revision:1,approved:true,notes:'Not CEO'},403,expert);
+const approve=await part('catalog_decide',{requestId:request.id,revision:1,approved:true,notes:'CEO accepted'},200,ceo);assert.equal((await part('catalog_decide',approve.body,200,ceo)).repeated,true);
+await part('eligibility',{agentId:agent,revision:entity(agent).revision,products:[{productId:'product:A'}],notes:'Trained'});
+const found=(await read(rep,'q='+encodeURIComponent('شیربرقی'))).data;assert.equal(found.items.length,1);assert.equal(found.items[0].code,'01');assert.equal(found.items[0].priceRial,null);assert.equal(found.materials.length,0);assert.equal(found.catalogs.length,0);assert.ok(!JSON.stringify(found).includes('SECRET'));assert.ok(!JSON.stringify(found).includes('PRIVATE'));
+const details=await read(rep,'part=01');assert.equal(details.status,200);assert.equal(details.data.item.description,'Identification only');assert.equal((await read(rep,'part=02')).status,404);assert.equal((await read(actor('technician'))).status,403);
+assert.equal((await read(rep,'agent='+other)).data.agentId,agent,'caller cannot change own agent scope');
+await part('eligibility',{agentId:agent,revision:1,products:[],notes:'Stale'},409);
+const proposedChange=await part('catalog_propose',{productId:'product:A',parts:[],catalogRevision:1,notes:'Remove'});
+assert.equal((await read(rep)).data.items.length,1,'pending removal does not revoke existing catalog');
+let injected=false;beforeBatch=()=>{sql.prepare("UPDATE flow_entities SET revision=revision+1 WHERE id=?").run(entity(agent).id);injected=true;};
+await part('eligibility',{agentId:agent,revision:entity(agent).revision,products:[],notes:'Concurrent'},409);assert.ok(injected);assert.equal(entity(agent).data.allowedServiceProducts.length,1);
+await part('catalog_decide',{requestId:proposedChange.id,revision:1,approved:true,notes:'Approved removal'},200,ceo);assert.equal((await read(rep)).data.items.length,0);
+await op('collection_policy',{confirmed:true,revision:0,dispatchDays:'9',reviewDays:'4',notes:'Policy'},200,manager);assert.equal((await collection.collectionPolicy()).dispatchDays,9);await op('collection_policy',{confirmed:true,revision:1,dispatchDays:'0',reviewDays:'4',notes:'Invalid'},400,manager);
+// Fractional partial shipments distribute the exact original invoice without duplication.
+const order={id:'o',data:{deadlineBasis:'warehouse_exit',totalRial:'1',lines:[{id:'l',quantity:3000,totalRial:'1'}]}};
+const shipped=[0,1,2].map(i=>({id:'s'+i,data:{orderId:'o',exitDay:addDay(today,i),lines:[{lineId:'l',quantity:1000}]}}));
+const matured=collection.serviceMaturities([order],shipped);assert.equal(matured.reduce((n,m)=>n+BigInt(m.amountRial),0n),1n);assert.equal(matured[0].due,load('lib/after-sales.ts').monthsAfter(today,1));assert.equal(collection.serviceMaturities([order],[]).length,0);
+const claim={data:{state:'awaiting_return',due:addDay(today,30)}},report={data:{reportSubmittedAt:now,returnDispatchDays:7}};
+assert.ok(collection.claimCollectionHold(claim,report,{dispatchDays:7},addDay(today,7)));assert.ok(!collection.claimCollectionHold(claim,report,{dispatchDays:7},addDay(today,8)));
+claim.data.state='sent';claim.data.sentAt=now;assert.ok(collection.claimCollectionHold(claim,report,{dispatchDays:7},addDay(today,100)));
+claim.data.rejectedAt=now;assert.ok(!collection.claimCollectionHold(claim,report,{dispatchDays:7},today));delete claim.data.rejectedAt;claim.data.sentAt=addDay(today,8)+'T12:00:00Z';assert.ok(!collection.claimCollectionHold(claim,report,{dispatchDays:7},today),'late entry cannot restart an expired hold');
+for(const type of ['as_service_part_catalog','as_service_catalog_request','as_service_collection_policy'])assert.ok(reset.resetFlowCatalog.includes(type));
+// Freeze enforcement remains transactional for all new entity kinds.
+const config=fs.readFileSync(path.join(root,'drizzle/0016_reset_controls.sql'),'utf8');assert.ok(config.includes('flow_entities'));
+ const count=sql.prepare('SELECT COUNT(*) n FROM inventory_operations').get().n;sql.prepare("UPDATE reset_control SET phase='maintenance' WHERE id=1").run();await part('catalog_propose',{productId:'product:B',parts:[{partCode:'02'}],catalogRevision:0,notes:'Frozen'},423);assert.equal(sql.prepare('SELECT COUNT(*) n FROM inventory_operations').get().n,count);sql.prepare("UPDATE reset_control SET phase='testing' WHERE id=1").run();
+const ui=fs.readFileSync(path.join(root,'components/trace/service-parts-panel.tsx'),'utf8');assert.ok(ui.includes('جزئیات'));assert.ok(!ui.includes('label>مدل'));
+console.log('Service parts passed: expert/CEO separation, central catalog revision guards, trained-model own-only search/details, no private material disclosure, idempotence, removal, concurrency rollback, partial maturity rounding and seven-day hold expiry/proof/rejection.');
+})().catch(e=>{console.error(e);process.exit(1)});
