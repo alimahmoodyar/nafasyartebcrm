@@ -1,3 +1,5 @@
+import {syncServiceContractTasks} from '@/lib/service-contract-tasks';
+import {serviceContractRights} from '@/lib/service-contracts-contract';
 import {withRepresentativeSample} from '@/lib/representative-sample';
 import {profileWork,handoffShortageWork} from '@/lib/profile-work';
 import {materialHistory} from '@/lib/process-history';
@@ -26,6 +28,7 @@ async function get(request?:Request){try{const u=await requireAccess(),db=storag
   return json({position,templates:plans});
  }
  if(u.isAdmin||u.permissions.flowRoles?.includes('inventory')||u.permissions.supplyRoles?.some((r:string)=>['finance','ceo'].includes(r)))await syncInventoryCounts();
+ if(serviceContractRights(u).read)await syncServiceContractTasks();
  const purchaseServices=await import('@/lib/purchase-services');await purchaseServices.syncServiceFinanceTasks();
  const canPurchaseServices=await purchaseServices.purchaseServicesAvailable(u);
  const processView=request&&new URL(request.url).searchParams.get('view')==='process-history';
@@ -88,7 +91,7 @@ async function post(request:Request){try{checkOrigin(request);const u=await requ
  }else if(mode==='read_notice'){
  target=required(b.noticeId);const mid=await memberId(u);const n:any=await db.prepare('SELECT * FROM duty_notices WHERE id=?').bind(target).first();if(!n||n.recipient!==mid&&!(u.isAdmin&&n.recipient==='@admin'))fail('اعلان پیدا نشد.',404);statements.push(db.prepare('UPDATE duty_notices SET read_at=? WHERE id=?').bind(now,target));
  }else{
- target=required(b.taskId);const t=await taskAccess(target,u),mid=await memberId(u);if(t.data.qmsWorkflow)fail('اطلاعات کیفیت فقط در پرونده اصلی ثبت می‌شود.',403);if(b.revision!==t.revision)fail('وظیفه تغییر کرده است؛ تازه‌سازی کنید.',409);guard('EXISTS(SELECT 1 FROM duty_runs WHERE id=? AND revision=?)',t.id,t.revision);if((t.data.purchaseInvoiceWorkflow||t.data.assetWorkflow||t.data.qmsWorkflow||t.data.foreignPurchaseWorkflow||t.data.personnelWorkflow||t.data.salesLeadWorkflow||t.data.treasuryWorkflow||t.data.guaranteeWorkflow||t.data.hospitalWorkflow||t.data.materialWorkflow||t.data.salesWorkflow||t.data.salesReturnWorkflow||t.data.supplierQualityWorkflow||t.data.sourcingWorkflow||t.data.serviceWorkflow||t.data.transportWorkflow||t.data.replenishmentWorkflow||t.data.buildIntakeWorkflow)&&(t.data.replenishmentWorkflow?['approve','cancel','reassign','submit']:['approve','cancel','reassign','extend','submit']).includes(mode))fail('این وظیفه با انجام مرحله واقعی گردش کار بسته می‌شود. پاسخ، مانع یا درخواست تمدید را ثبت و عملیات را در بخش مربوط انجام دهید.');let state=t.state,due=t.due,data={...t.data};const note=required(b.note,12000);if(['completed','cancelled'].includes(state))fail('وظیفه بسته شده است.');
+ target=required(b.taskId);const t=await taskAccess(target,u),mid=await memberId(u);if(t.data.qmsWorkflow)fail('اطلاعات کیفیت فقط در پرونده اصلی ثبت می‌شود.',403);if(b.revision!==t.revision)fail('وظیفه تغییر کرده است؛ تازه‌سازی کنید.',409);guard('EXISTS(SELECT 1 FROM duty_runs WHERE id=? AND revision=?)',t.id,t.revision);if((t.data.purchaseInvoiceWorkflow||t.data.assetWorkflow||t.data.qmsWorkflow||t.data.foreignPurchaseWorkflow||t.data.personnelWorkflow||t.data.salesLeadWorkflow||t.data.treasuryWorkflow||t.data.guaranteeWorkflow||t.data.hospitalWorkflow||t.data.materialWorkflow||t.data.salesWorkflow||t.data.salesReturnWorkflow||t.data.supplierQualityWorkflow||t.data.sourcingWorkflow||t.data.serviceCommercial||t.data.serviceWorkflow||t.data.transportWorkflow||t.data.replenishmentWorkflow||t.data.buildIntakeWorkflow)&&(t.data.replenishmentWorkflow?['approve','cancel','reassign','submit']:['approve','cancel','reassign','extend','submit']).includes(mode))fail('این وظیفه با انجام مرحله واقعی گردش کار بسته می‌شود. پاسخ، مانع یا درخواست تمدید را ثبت و عملیات را در بخش مربوط انجام دهید.');let state=t.state,due=t.due,data={...t.data};const note=required(b.note,12000);if(['completed','cancelled'].includes(state))fail('وظیفه بسته شده است.');
  if(['answer','submit','blocked','request_extension'].includes(mode)){
  if(!u.isAdmin&&mid!==t.assignee)fail('فقط مسئول وظیفه می‌تواند پاسخ بدهد.',403);if(state==='submitted')fail('پاسخ در حال بررسی است.');
  if(mode==='answer')data.answer=note;

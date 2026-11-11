@@ -1,3 +1,4 @@
+import {serviceContractForms} from './service-contracts-contract';
 import {serviceCommercialForms} from './service-commercial-contract';
 import {controlledForms} from './form-control-contract';
 import {partRepairForms,partRepairActions,visiblePartRepairFields} from './part-repair-contract';
@@ -41,10 +42,10 @@ export function generalPresentation(tool:string,args:any,input:any,title:string)
  const dataSchema=operationDataSchema(tool,args.mode);
  if(dataSchema){schema.properties??={};schema.properties.data={...schema.properties.data,...dataSchema};}
  if(tool==='apply_qms_record'&&schema.properties?.data?.properties?.kind){schema.properties.data.properties.kind={type:'string',enum:Object.keys(qmsKinds),enumLabels:Object.fromEntries(Object.entries(qmsKinds).map(([k,v])=>[k,v.title]))};}
- const forms=tool==='service_commercial_apply'?serviceCommercialForms:tool==='part_repair_apply'?partRepairForms:tool==='after_sales_apply'?serviceForms:tool==='transport_apply'?transportForms:null;
+ const forms=tool==='service_contract_apply'?serviceContractForms:tool==='service_commercial_apply'?serviceCommercialForms:tool==='part_repair_apply'?partRepairForms:tool==='after_sales_apply'?serviceForms:tool==='transport_apply'?transportForms:null;
  if(forms?.[args.mode]){
   const target=contractSchema(tool==='part_repair_apply'?visiblePartRepairFields(args.mode,args.data||{}):tool==='after_sales_apply'?visibleServiceFields(args.mode,args.data||{}):forms[args.mode]);
-  if(tool==='service_commercial_apply'||tool==='part_repair_apply'){for(const key of Object.keys(args.data||{}))if(!target.properties[key])target.properties[key]={uiHidden:true};if(target.properties.repairId&&args.data?.repairId)target.properties.repairId.uiHidden=true;}
+  if(tool==='service_contract_apply'||tool==='service_commercial_apply'||tool==='part_repair_apply'){for(const key of Object.keys(args.data||{}))if(!target.properties[key])target.properties[key]={uiHidden:true};if(target.properties.repairId&&args.data?.repairId)target.properties.repairId.uiHidden=true;}
   if(tool==='after_sales_apply'&&args.mode==='tariff'&&args.data?.kind==='labor')for(const key of ['partCode','consumerPriceRial'])target.properties[key]={uiHidden:true};
   schema.properties??={};schema.properties.data={...schema.properties.data,...target};
  }

@@ -1,3 +1,4 @@
+import * as serviceContracts from '@/app/api/after-sales/contracts/route';
 import * as serviceCommercial from '@/app/api/after-sales/commercial/route';
 import * as oxygenCapacity from '@/app/api/build-intake/oxygen-capacity/route';
 import * as salesReturns from '@/app/api/sales/returns/route';
@@ -56,6 +57,7 @@ import * as route37 from '@/app/api/sales/files/route';
 import * as route38 from '@/app/api/sales/quote/route';
 import * as route39 from '@/app/api/sales/monitor/route';
 export const trainingRoutes:Record<string,Record<string,any>>={
+ "after-sales/contracts":serviceContracts,
  "after-sales/commercial":serviceCommercial,
  hospital,
  "purchase-settlement":purchaseSettlement,
