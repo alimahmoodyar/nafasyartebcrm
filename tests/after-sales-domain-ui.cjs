@@ -12,6 +12,12 @@ function mount(actor,options={}){slots=[];current=actor;hubOptions=options;retur
 function nav(element=tree()){return nodes(element).find(n=>n.type===leaves.SubprogramNavigation)}
 function select(domain){nav().props.onChange(domain);return tree()}
 const domains=()=>Array.from(nav().props.items,([key,label])=>[key,label]);
+for(const [target,component]of [['service-parts:','ServicePartsPanel'],['service-contract:','ServiceContractsPanel'],['service-commercial:','ServiceCommercialPanel']]){
+ const deep=mount(user('agent',{serviceAgentId:'ROLE-SAMPLE',serviceRoles:['agent'],serviceDomains:['home']}),{target});
+ assert.equal(deep.props.direct,true,'Direct role link bypasses outer service home');
+ const nested=nodes(deep).find(n=>n.type===leaves.ProgramWorkspace&&n.props.programId==='home-services');assert.ok(nested);assert.equal(nested.props.direct,true,'Direct role link bypasses inner home-service launcher');assert.ok(nodes(nested).some(n=>n.type===leaves[component]),target+' renders its actual form panel');
+}
+const roleOnly=user('agent',{serviceAgentId:'ROLE-SAMPLE',serviceRoles:['agent'],serviceDomains:['home']});roleOnly.profileReview={id:'home-service-representative'};const roleEntry=mount(roleOnly);assert.equal(roleEntry.props.direct,true);const casePanel=nodes(roleEntry).find(n=>n.type===leaves.AfterSalesPanel);assert.ok(casePanel);assert.equal(casePanel.props.embedded,true,'Profile case/account link exposes the case panel rather than a third launcher');
 mount(user('admin'));assert.deepEqual(domains(),[['home','خدمات پس از فروش خانگی'],['hospital','خدمات پس از فروش بیمارستانی']]);assert.equal(nodes(tree()).filter(n=>n.type===leaves.AfterSalesPanel).length,0,'a domain chooser must not mount any service API consumer before selection');
 const home=select('home'),homePanel=nodes(home).find(n=>n.type===leaves.AfterSalesPanel);assert.equal(homePanel.props.domain,'home');assert.equal(homePanel.key,'admin:::::home');assert.equal(homePanel.props.user,current);
 const hospital=select('hospital');assert.ok(!nodes(hospital).some(n=>n.type===leaves.AfterSalesPanel),'switching domains unmounts the home panel with its private drafts/files');const hospitalElement=nodes(hospital).find(n=>typeof n.type==='function'&&n.type.name==='HospitalServicesWorkspace');assert.ok(hospitalElement);assert.equal(hospitalElement.key,'admin:hospital');
