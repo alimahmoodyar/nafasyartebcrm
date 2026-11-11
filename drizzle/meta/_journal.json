@@ -169,6 +169,13 @@
       "when": 1793930733991,
       "tag": "0023_inventory_count_locks",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1794420000000,
+      "tag": "0024_passkeys",
+      "breakpoints": true
     }
   ]
 }

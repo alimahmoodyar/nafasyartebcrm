@@ -252,3 +252,5 @@ resetHelp.push('راهنماهای عیب‌یابی محصول، تاریخچه
 // hospital_gas_survey uses operational flow_entities. Both scopes back up/delete questionnaires; 0016 freezes all create, revoke and answer writes. No new tables, files or foreign keys.
 
 // Sales calls use existing sales_contact and sales_call_policy records and duty_runs.
+
+// Passkey credentials/challenges are authentication infrastructure preserved with app_members/password_accounts by both business reset scopes. No business-reset freeze applies, like password sessions; account deletion cascades credentials and expired challenges are purged on issuance. Account-version changes invalidate old keys.
