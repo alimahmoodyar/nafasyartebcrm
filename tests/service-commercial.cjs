@@ -71,6 +71,9 @@ const realMembers=[manager,expert,finance,ceo,technician];
  await decide('credit_decide',previewCredit,true,managerPreview);assert.equal(entity(agent).data.creditApproval.by,admin.userId);
  assert.ok((await workspace(rep)).agents.every(a=>a.id===agent));assert.equal((await workspace(rep)).requests.some(r=>r.data.kind==='part_price'),false);
  const outsider={...rep,permissions:{...rep.permissions,serviceDomains:['hospital']}};const denied=await context.run(outsider,()=>commercial.GET());assert.equal(denied.status,403);
+ // A real recorded service prepayment also supplies purchasing power; credit is checked on the resulting net debt.
+ await op('payment',{agentId:agent,direction:'received',amountRial:'160000',day:today,reference:'PREPAYMENT-TEST',notes:'Documented prepayment'},200,actor('finance'));
+ await op('order',{agentId:agent,lines:[{tariffId:part,quantity:'6'}]},200,actor('coordinator'));
  // Concurrent order debt insertion must invalidate a prechecked credit balance atomically.
  const orderCount=rows('as_order').length,ops=sql.prepare('SELECT COUNT(*) n FROM inventory_operations').get().n;
  beforeBatch=()=>sql.prepare("INSERT INTO service_ledger(id,agent_id,domain,kind,source_id,debit,credit,due,data,created,actor) VALUES(?,?,'home','invoice',?,'50000','0',NULL,'{}',?,'test')").run(randomUUID(),agent,randomUUID(),now);
