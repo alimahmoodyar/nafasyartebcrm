@@ -30,7 +30,7 @@ export function AfterSalesHub({demo,user,onNavigate,transportAvailable,target=''
  const scope=[user.userId,user.profileReview?.id||'',user.profileReview?.buyerId||'',user.permissions.serviceAgentId||'',(user.permissions.serviceRoles||[]).join(',')].join(':');
  const [homeView,setHomeView]=useState(targetView);
  useEffect(()=>{setDomain(entryDomain);setHomeView(targetView);},[scope]);
- useEffect(()=>{if(targetView!=='cases'){setDomain('home');setHomeView(targetView);}},[target]);
+ useEffect(()=>{setDomain(entryDomain);setHomeView(targetView);},[target]);
  return <ProgramWorkspace direct={!!target||roleEntry} programId="after-sales-hub" title="خدمات پس از فروش">
   <SubprogramNavigation items={domains.map(d=>[d,serviceBranchTitles[d]] as [string,string])} value={domain} onChange={setDomain}/>
   {!domains.length&&<p className="notice">دسترسی خدمات پس از فروش برای این حساب تعریف نشده است.</p>}
