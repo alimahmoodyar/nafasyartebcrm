@@ -1,0 +1,4 @@
+/** Completed means terminal workflow state, not merely repaired or delivered. */
+export const completedServiceCase=(state:string)=>['closed','resolved','returned'].includes(state);
+export const serviceCaseSearch=(s:string)=>s.normalize('NFKC').replace(/[يى]/g,'ی').replace(/ك/g,'ک').replace(/[۰-۹]/g,c=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(c))).replace(/[٠-٩]/g,c=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(c))).replace(/[\s\u200c]+/g,'').toLowerCase();
+export function serviceCaseList(cases:any[],bucket:'open'|'history',query=''){const q=serviceCaseSearch(query);return cases.filter(r=>(bucket==='history')===completedServiceCase(r.data.state)&&serviceCaseSearch([r.data.serial,r.data.customer,r.data.phone,r.data.model].filter(Boolean).join(' ')).includes(q)).sort((a,b)=>String(b.updated||b.created||'').localeCompare(String(a.updated||a.created||'')));}
