@@ -43,12 +43,27 @@ async function print(u,id,query=''){return context.run(u,()=>labels.GET(request(
  const before=sql.prepare('SELECT COUNT(*) n FROM inventory_operations').get().n;
  const result=await print(admin,bid,'&copies=3');assert.equal(result.status,200,JSON.stringify(admin)+': '+(result.ok?'':await result.text()));assert.equal(result.headers.get('cache-control'),'private, no-store');let html=await result.text();assert.equal((html.match(/<article class="label">/g)||[]).length,3);assert.equal((html.match(/<svg /g)||[]).length,6);assert.ok(html.includes('100mm 80mm'));assert.ok(html.includes(code));assert.ok(html.includes('&lt;script&gt;'));assert.ok(!html.includes('<script>alert'));assert.ok(!html.includes('https://'));
  for(const actor of [qc,viewer]){const check=await print(actor,bid);assert.equal(check.status,200,actor.name+': '+(check.ok?'':await check.text()));}for(const actor of [other,sales,external])assert.equal((await print(actor,bid)).status,403);
- assert.equal((await print(admin,'missing')).status,404);assert.equal((await print(admin,bid,'&copies=101')).status,400);assert.equal((await print(admin,bid,'&width=0')).status,400);assert.equal((await print(admin,bid,'&layout=wrong')).status,400);assert.equal((await print(admin,bid,'&width=50&symbol=both')).status,400,'Do not shrink a dense barcode to an unreadable label');
+ assert.equal((await print(admin,'missing')).status,404);assert.equal((await print(admin,bid,'&copies=101')).status,400);assert.equal((await print(admin,bid,'&width=0')).status,400);assert.equal((await print(admin,bid,'&layout=wrong')).status,400);assert.equal((await print(admin,bid,'&width=50&symbol=both')).status,200,'Operator-selected dimensions are accepted without a barcode size gate');
  for(const symbol of ['barcode','qr']){const response=await print(admin,bid,'&symbol='+symbol+'&width=60&layout=a4');assert.equal(response.status,200);const content=await response.text();assert.equal((content.match(/<svg /g)||[]).length,1);assert.ok(content.includes('size:A4'));}
  for(const [symbol,width,height] of [['barcode',70,40],['qr',60,75],['both',100,80]]){const page=await (await print(admin,bid,'&symbol='+symbol)).text();assert.ok(page.includes('عرض '+width+' × ارتفاع '+height+' میلی‌متر'));assert.ok(page.includes('size:'+width+'mm '+height+'mm'));}
+ // Small dimensions keep the entire design and real symbol, with no negative CSS sizes.
+ for(const symbol of ['barcode','qr','both']){
+  for(const layout of ['thermal','a4','roll']){
+   const small=await print(admin,bid,'&symbol='+symbol+'&layout='+layout+'&width=12.5&height=6.25&rollWidth=27&columns=2&gapX=2&copies=3');
+   assert.equal(small.status,200,await small.clone().text());const page=await small.text();
+   assert.ok(page.includes('width:12.5mm;height:6.25mm'));
+   assert.ok(page.includes('class="label-content"')&&page.includes('scale('));
+   assert.ok(!/height:-|width:-|NaN|Infinity/.test(page));
+   const widthInput=page.match(/<input name="width"[^>]+>/)[0];assert.ok(!widthInput.includes('max='));
+  }
+ }
+ assert.equal((await print(admin,bid,'&symbol=qr&layout=a4&width=500&height=200')).status,200);
+ for(const value of ['0','-1','NaN','Infinity'])assert.equal((await print(admin,bid,'&width='+value)).status,400);
+ const narrow=await print(admin,bid,'&layout=roll&symbol=qr&width=5&height=5&columns=2&gapX=1');
+ assert.equal(narrow.status,200);assert.ok((await narrow.text()).includes('size:11mm 7mm'),'Automatic roll width does not impose the old 35mm minimum');
  const requested=await (await print(admin,bid,'&symbol=barcode&copies=7&print=1')).text();assert.equal((requested.match(/<article class="label">/g)||[]).length,7,'Print submission applies the newly requested count');assert.ok(requested.includes('name="print" value="1"'));
- let change,onloadfn,printed=0,submitted,replaced;const inputs={layout:{value:'thermal',addEventListener(){}},symbol:{value:'barcode',addEventListener(type,fn){change=fn}},width:{value:'70'},height:{value:'30'},copies:{value:'7'}},preview={id:'label-preview'},hint={textContent:''},form={elements:{namedItem:k=>inputs[k]},requestSubmit:button=>submitted=button,addEventListener(){}};const script=requested.match(/<script>([\s\S]*?)<\/script>/)[1];
- vm.runInNewContext(script,{URL,document:{getElementById:id=>id==='label-options'?form:id==='label-preview'?preview:hint,fonts:{ready:Promise.resolve()}},window:{location:{href:base+'/api/batch-labels?id='+encodeURIComponent(bid)+'&copies=7&print=1'},history:{replaceState:(_s,_t,url)=>replaced=String(url)},addEventListener:(_event,fn)=>onloadfn=fn,print:()=>printed++}});assert.equal(printed,0);inputs.symbol.value='qr';change();assert.equal(inputs.width.value,'60');assert.equal(inputs.height.value,'75');assert.equal(inputs.copies.value,'7');assert.equal(submitted,preview);assert.ok(hint.textContent.includes('عرض 60 × ارتفاع 75'));onloadfn();await new Promise(r=>setImmediate(r));assert.equal(printed,1);assert.ok(!new URL(replaced).searchParams.has('print'),'Reload must not reopen the print dialog');assert.equal(new URL(replaced).searchParams.get('copies'),'7');
+ let change,onloadfn,printed=0,submitted,replaced;const inputs={layout:{value:'thermal',addEventListener(){}},symbol:{value:'barcode',addEventListener(type,fn){change=fn}},width:{value:'70'},height:{value:'40'},copies:{value:'7'}},preview={id:'label-preview'},hint={textContent:''},form={elements:{namedItem:k=>inputs[k]},requestSubmit:button=>submitted=button,addEventListener(){}};const script=requested.match(/<script>([\s\S]*?)<\/script>/)[1];
+ vm.runInNewContext(script,{URL,document:{getElementById:id=>id==='label-options'?form:id==='label-preview'?preview:hint,fonts:{ready:Promise.resolve()}},window:{location:{href:base+'/api/batch-labels?id='+encodeURIComponent(bid)+'&copies=7&print=1'},history:{replaceState:(_s,_t,url)=>replaced=String(url)},addEventListener:(_event,fn)=>onloadfn=fn,print:()=>printed++}});assert.equal(printed,0);inputs.symbol.value='qr';change();assert.equal(inputs.width.value,'60');assert.equal(inputs.height.value,'75');assert.equal(inputs.copies.value,'7');assert.equal(submitted,preview);assert.ok(hint.textContent.includes('عرض 60 × ارتفاع 75'));onloadfn();await new Promise(r=>setImmediate(r));assert.equal(printed,1);assert.ok(!new URL(replaced).searchParams.has('print'),'Reload must not reopen the print dialog');assert.equal(new URL(replaced).searchParams.get('copies'),'7'); inputs.width.value='20';inputs.height.value='10';inputs.symbol.value='both';change();assert.equal(inputs.width.value,'20');assert.equal(inputs.height.value,'10','Changing symbol preserves operator-selected small dimensions');
  const rollQuery='&layout=roll&symbol=barcode&copies=10&width=65.5&height=40&rollWidth=205&columns=3&gapX=2.25&gapY=2.5&left=1&top=1';
  const roll=await print(admin,bid,rollQuery);assert.equal(roll.status,200);
  const rollHtml=await roll.text();assert.deepEqual([...rollHtml.matchAll(/<div class="roll-row">([\s\S]*?)<\/article><\/div>/g)].map(row=>(row[0].match(/<article class="label">/g)||[]).length),[3,3,3,1]);
@@ -101,6 +116,19 @@ async function print(u,id,query=''){return context.run(u,()=>labels.GET(request(
  assert.equal((await serialPage(admin,'&serial=not-in-run')).status,404);
  assert.equal((await serialPage(viewer,'')).status,403);
  assert.equal((await (await serialPage(admin,'&label=small')).text()).match(/<article class="label">/g).length,4);
+ for(const layout of ['thermal','a4','roll']){
+  const tinySerial=await serialPage(admin,'&layout='+layout+'&label=small&serial=DEVICE-0001&width=10&height=5');
+  assert.equal(tinySerial.status,200);const content=await tinySerial.text();assert.ok(content.includes('width:10mm;height:5mm'));assert.ok(content.includes('DEVICE-0001'));
+  assert.ok(!/height:-|width:-|NaN|Infinity/.test(content));
+ }
+ const tinyConfig={width:5,height:5,rollWidth:11,columns:2,gapX:1,gapY:0,left:0,top:0};
+ assert.equal((await createTemplate(admin,{...first,name:'رول کوچک پنج میلی‌متری',roll:tinyConfig})).status,200);
+ assert.equal((await createTemplate(admin,{...first,name:'رول عریض',roll:{...tinyConfig,width:400,height:200,rollWidth:850,gapX:50}})).status,200);
+ const tinyMcp=await call('print_batch_labels',{id:bid,layout:'roll',symbol:'qr',width:5,height:5,rollWidth:11,columns:2,gapX:1,gapY:0,left:0,top:0});
+ assert.ok(tinyMcp.html?.includes('size:11mm 5mm'),JSON.stringify(tinyMcp));
+ const tinySerialMcp=await call('print_serials',{id:'test-run',layout:'thermal',width:10,height:5});
+ assert.ok(tinySerialMcp.html?.includes('size:10mm 5mm'),JSON.stringify(tinySerialMcp));
+ console.log('PASS unrestricted label dimensions: small QR/barcode/combined labels, large pages, automatic narrow rolls, saved templates, serial printing, uniform content scaling, valid geometry and HTTP/MCP parity.');
  console.log('PASS shared label layouts: multiple presets, authorization, training isolation, geometry, per-serial copies and test row.');
- console.log('PASS batch labels: existing identity only, real SVG encoders, copies/sizing/layout, dense barcode guard, escaped business text, own/foreign/inactive warehouse and external access, MCP read parity, zero stock/identity writes.');
+ console.log('PASS batch labels: existing identity only, real SVG encoders, copies/sizing/layout, operator-selected geometry, escaped business text, own/foreign/inactive warehouse and external access, MCP read parity, zero stock/identity writes.');
 })().catch(e=>{console.error(e);process.exitCode=1});

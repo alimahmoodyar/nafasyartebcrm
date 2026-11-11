@@ -1,14 +1,14 @@
 import {AccessError} from './authorization';
 
 export const rollFields=[
- ['width','عرض لیبل',18,150,60],
- ['height','ارتفاع لیبل',12,160,30],
- ['rollWidth','عرض کل رول',35,330,60],
+ ['width','عرض لیبل',0.01,Infinity,60],
+ ['height','ارتفاع لیبل',0.01,Infinity,30],
+ ['rollWidth','عرض کل رول',0.01,Infinity,60],
  ['columns','تعداد لیبل در هر ردیف',1,12,1],
- ['gapX','فاصلهٔ افقی',0,30,2],
- ['gapY','فاصلهٔ عمودی',0,30,2],
- ['left','حاشیهٔ چپ رول',0,30,0],
- ['top','جابه‌جایی چاپ از بالای ردیف',0,30,0],
+ ['gapX','فاصلهٔ افقی',0,Infinity,2],
+ ['gapY','فاصلهٔ عمودی',0,Infinity,2],
+ ['left','حاشیهٔ چپ رول',0,Infinity,0],
+ ['top','جابه‌جایی چاپ از بالای ردیف',0,Infinity,0],
 ] as const;
 export type RollField=typeof rollFields[number][0];
 export type RollLayout=Record<RollField,number>;
@@ -21,18 +21,18 @@ export function readRoll(q:URLSearchParams,size={width:60,height:30}):RollLayout
  for(const [key,,min,max,fallback] of rollFields){
   const defaultValue=key==='width'||key==='height'?size[key]:fallback;
   const raw=q.get(key)??String(defaultValue),value=Number(raw);
-  if(!(key==='columns'?/^\d+$/:/^\d+(?:\.\d{1,2})?$/).test(raw)||value<min||value>max)
+  if(!(key==='columns'?/^\d+$/:/^\d+(?:\.\d{1,2})?$/).test(raw)||!Number.isFinite(value)||value<min||value>max)
    throw new AccessError('اندازهٔ رول، فاصله یا حاشیه معتبر نیست.',400);
   values[key]=value;
  }
  const used=values.left+values.columns*values.width+(values.columns-1)*values.gapX;
- if(!q.has('rollWidth'))values.rollWidth=Math.max(35,Math.ceil(used*100-0.00001)/100);
- if(values.rollWidth>330||used-values.rollWidth>0.00001||values.top>values.gapY)
+ if(!q.has('rollWidth'))values.rollWidth=Number(used.toFixed(2));
+ if(!Number.isFinite(used)||!Number.isFinite(values.height+values.gapY)||used-values.rollWidth>0.00001||values.top>values.gapY)
   throw new AccessError('لیبل‌ها باید در عرض رول جا شوند و جابه‌جایی بالا نباید از فاصلهٔ عمودی بیشتر باشد.',400);
  return values;
 }
 
-export function rollPitch(roll:RollLayout){return Math.round((roll.height+roll.gapY)*100)/100;}
+export function rollPitch(roll:RollLayout){return Number((roll.height+roll.gapY).toFixed(2));}
 export function rollRows(labels:string[],roll:RollLayout){
  const rows=[];
  for(let i=0;i<labels.length;i+=roll.columns)rows.push('<div class="roll-row">'+labels.slice(i,i+roll.columns).join('')+'</div>');
@@ -43,7 +43,20 @@ export function rollCss(roll:RollLayout){
 }
 
 export function rollInputs(roll:RollLayout,omit:RollField[]=[]){
- return rollFields.filter(([key])=>!omit.includes(key)).map(([key,title,min,max])=>'<label>'+title+(key==='columns'?'':'، میلی‌متر')+'<input name="'+key+'" type="number" step="'+(key==='columns'?1:0.01)+'" min="'+min+'" max="'+max+'" value="'+roll[key]+'" required></label>').join('');
+ return rollFields.filter(([key])=>!omit.includes(key)).map(([key,title,min,max])=>'<label>'+title+(key==='columns'?'':'، میلی‌متر')+'<input name="'+key+'" type="number" step="'+(key==='columns'?1:0.01)+'" min="'+min+'"'+(Number.isFinite(max)?' max="'+max+'"':'')+' value="'+roll[key]+'" required></label>').join('');
+}
+
+export function readLabelSize(q:URLSearchParams,size:{width:number;height:number}){
+ const dimensions=new URLSearchParams();
+ for(const key of ['width','height'])if(q.has(key))dimensions.set(key,q.get(key)!);
+ const {width,height}=readRoll(dimensions,size);
+ return {width,height};
+}
+
+// Scale the complete design uniformly; small labels must not clip their code.
+export function labelContentCss(size:{width:number;height:number},design:{width:number;height:number}){
+ const scale=Math.min(1,size.width/design.width,size.height/design.height);
+ return '.label{position:relative}.label-content{position:absolute;left:50%;top:50%;width:'+design.width+'mm;height:'+design.height+'mm;transform:translate(-50%,-50%) scale('+scale+');transform-origin:center}';
 }
 
 export function templatePicker(templates:LabelTemplate[],manageUrl:string,admin:boolean,selected=''){
