@@ -1,7 +1,7 @@
 import {warehouseTarget} from './warehouse-workspace';
 
 export type RoleLink={title:string;section:string;target?:string;taskOnly?:boolean};
-export type RoleProfile={id:string;title:string;group:string;operational:boolean;links:RoleLink[];gaps:string[];workflowRoles:string[];buyerScope?:'optional'|'required';missionScope?:true;serviceScope?:true;pendingWorkflow?:true};
+export type RoleProfile={id:string;title:string;group:string;operational:boolean;links:RoleLink[];gaps:string[];workflowRoles:string[];buyerScope?:'optional'|'required';missionScope?:true;serviceScope?:true;pendingWorkflow?:boolean};
 const link=(title:string,section:string,target=''):RoleLink=>({title,section,target});
 const salesLink=(title:string,view:string)=>link(title,'sales','sales-view:'+view);
 const salesRewardLinks=[salesLink('هدف و پاداش فصلی','reward-quarter'),salesLink('هدف و پاداش سالانه','reward-year')];
