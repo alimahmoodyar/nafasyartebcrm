@@ -37,7 +37,7 @@ export async function GET(request:Request){
   <form id="label-options" method="get"><input type="hidden" name="id" value="${esc(id)}"><input type="hidden" name="label" value="${small?'small':'large'}">
   <label>سریال<select name="serial">${serialOptions}</select></label><label>تعداد نسخه از هر سریال<input name="copies" type="number" min="1" max="100" value="${copies}" required></label>
   <label>نوع کاغذ<select name="layout">${[['a4','برگه A4'],['thermal','لیبل تکی'],['roll','رول قابل تنظیم']].map(([key,title])=>`<option value="${key}"${key===layout?' selected':''}>${title}</option>`).join('')}</select></label>
-  ${templatePicker(templates,labelTemplateManager,user.isAdmin&&!trainingContext.getStore(),q.get('template')??'')}
+  ${templatePicker(templates,labelTemplateManager,user.isAdmin&&!trainingContext.getStore(),q.get('template')??'',!trainingContext.getStore())}
   <div>${rollInputs(geometry,['rollWidth','columns','gapX','gapY','left','top'])}</div>
   <fieldset id="roll-settings" ${roll?'':'hidden disabled'}><legend>تنظیمات رول</legend><div>${rollInputs(geometry,['width','height'])}</div></fieldset>
   <button type="submit" id="label-preview">پیش‌نمایش</button><button type="submit" name="print" value="test" id="test-roll" ${roll?'':'hidden'}>چاپ یک ردیف آزمایشی</button><button class="print" type="submit" name="print" value="1">چاپ / ذخیره PDF</button></form>
@@ -51,6 +51,6 @@ export async function GET(request:Request){
   layout.addEventListener('change',updateRoll);
   ${selectRollScript}
   ${printOnLoad(test||q.get('print')==='1')}
-  </script></body></html>`,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'none'; img-src 'self'; font-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'self'"}});
+  </script></body></html>`,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'none'; img-src 'self'; font-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'self'"}});
  }catch(e){return accessResponse(e)||Response.json({error:'آماده‌سازی چاپ انجام نشد؛ دوباره تلاش کنید.'},{status:503});}
 }

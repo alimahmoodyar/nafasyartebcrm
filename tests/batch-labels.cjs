@@ -83,7 +83,7 @@ async function print(u,id,query=''){return context.run(u,()=>labels.GET(request(
  const createTemplate=(u,body,headers)=>context.run(u,()=>templateRoute.POST(request(templatePath,'POST',body,headers)));
  const config={width:32,height:15,rollWidth:103,columns:3,gapX:2,gapY:3,left:1,top:1};
  const first={name:'رول سه‌ستونه',revision:0,roll:config,confirmed:true};
- assert.equal((await createTemplate(viewer,first)).status,403);
+ assert.equal((await createTemplate(viewer,{...first,confirmed:false})).status,400);assert.equal((await createTemplate(external,first)).status,403);
  assert.equal((await createTemplate(admin,first,{origin:'https://foreign.test'})).status,403);
  assert.equal((await createTemplate(admin,{...first,roll:{...config,rollWidth:90}})).status,400);
  const created=await createTemplate(admin,first);assert.equal(created.status,200,created.ok?'':await created.clone().text());
@@ -99,6 +99,23 @@ async function print(u,id,query=''){return context.run(u,()=>labels.GET(request(
  assert.equal((await context.run(viewer,()=>templateRoute.GET(request(templatePath+'?view=manage')))).status,403);
  const managed=await (await context.run(admin,()=>templateRoute.GET(request(templatePath+'?view=manage')))).text();
  assert.ok(managed.includes('مدیریت قالب‌های چاپ')&&managed.includes('رول سه‌ستونه'));
+ // Save the operator's current calibration directly from the shared print widget.
+ const rollLib=load('lib/label-roll.ts'),events={},values=Object.fromEntries(Object.entries(config).map(([k,v])=>[k,{value:String(v),addEventListener(){}}]));
+ values.copies={value:'7'};const paper={value:'roll',addEventListener(){}};values.layout=paper;
+ const blankOption={value:'',dataset:{}},picker={value:'',options:[blankOption],get selectedOptions(){return [this.options.find(o=>o.value===this.value)]},add(option){this.options.push(option)},addEventListener(type,fn){events.select=fn}},saveButton={disabled:false,addEventListener(type,fn){events.save=fn}},nameInput={value:'پرینتر انبار ـ ۳۲ در ۱۵',focus(){}},notice={textContent:''},previewButton={id:'label-preview'};
+ let presetSubmissions=0,sentPayload,settingsUpdated=0;const printForm={elements:{namedItem:key=>values[key]},reportValidity:()=>true,requestSubmit(button){assert.equal(button,previewButton);presetSubmissions++}};
+ vm.runInNewContext(rollLib.selectRollScript,{document:{getElementById:id=>({'roll-template':picker,'save-roll-preset':saveButton,'roll-preset-name':nameInput,'roll-preset-feedback':notice,'label-preview':previewButton}[id])},form:printForm,layout:paper,updateRoll:()=>settingsUpdated++,fetch:async(path,options)=>{assert.equal(path,templatePath);sentPayload=JSON.parse(options.body);return createTemplate(viewer,sentPayload)},Option:function(name,id){return {textContent:name,value:id,dataset:{}}},crypto:globalThis.crypto,Array,Object,JSON,Number,Error});
+ assert.ok(!rollLib.templatePicker([],templatePath,false,'',false).includes('id="save-roll-preset"'),'Isolated training pages must not post a shared company preset');
+ await events.save();assert.ok(notice.textContent.includes('ذخیره شد'),notice.textContent);assert.equal(presetSubmissions,0,'Saving must neither print nor change the page');assert.deepEqual(sentPayload.roll,config);assert.equal(sentPayload.layout,'roll');assert.equal(saveButton.disabled,false);assert.equal(values.copies.value,'7');
+ const operatorPreset=(await (await loadTemplates(other)).json()).templates.find(t=>t.name===sentPayload.name);assert.ok(operatorPreset,'A different authorized workstation sees the saved calibration');
+ assert.equal((await createTemplate(viewer,{...operatorPreset,confirmed:true})).status,403,'Operators cannot overwrite shared presets');
+ const retriesBefore=entities('label_template').length,repeatSave=await createTemplate(viewer,sentPayload);assert.equal(repeatSave.status,200);assert.equal((await repeatSave.json()).id,operatorPreset.id);assert.equal(entities('label_template').length,retriesBefore);assert.equal((await createTemplate(other,sentPayload)).status,409);assert.equal((await createTemplate(viewer,{...sentPayload,name:'Different request'})).status,409);const withoutRetry={...sentPayload};delete withoutRetry.requestId;assert.equal((await createTemplate(viewer,withoutRetry)).status,409,'A new operation must not duplicate a name');
+ for(const field of Object.values(values))field.value='0';paper.value='thermal';picker.value=operatorPreset.id;events.select();assert.equal(paper.value,'roll');for(const [key,value] of Object.entries(config))assert.equal(Number(values[key].value),value);assert.equal(settingsUpdated,1);assert.equal(presetSubmissions,1);assert.equal(values.copies.value,'0','Applying geometry does not change the requested copy count');
+ const single=await createTemplate(viewer,{...first,name:'چاپگر دیگر ـ تکی',layout:'thermal',roll:{width:10,height:5,rollWidth:10,columns:1,gapX:0,gapY:0,left:0,top:0}});assert.equal(single.status,200);assert.equal((await single.json()).layout,'thermal');
+ assert.ok((await (await print(viewer,bid)).text()).includes('id="save-roll-preset"'));assert.ok((await print(viewer,bid)).headers.get('content-security-policy').includes("connect-src 'self'"));
+
+ const presetTool=catalog.tools.find(t=>t.name==='save_label_template'),mcpPreset={...first,name:'قالب اپراتور از ابزار',layout:'roll',requestId:crypto.randomUUID()};const viaTool=await context.run(viewer,()=>presetTool.run(mcpPreset,base,{}));assert.ok(viaTool.id);const viaToolRepeat=await context.run(viewer,()=>presetTool.run(mcpPreset,base,{}));assert.equal(viaToolRepeat.id,viaTool.id);assert.equal(viaToolRepeat.repeated,true);
+ await assert.rejects(()=>context.run(external,()=>presetTool.run({...mcpPreset,requestId:crypto.randomUUID()},base,{})),/دسترسی/);
  const training=load('lib/training-context.ts').trainingContext;
  assert.deepEqual((await (await training.run({actor:'test',role:'test'},()=>loadTemplates(admin))).json()).templates,[]);
  sql.prepare("INSERT INTO serial_runs(id,product_id,actor,day,payload,created) VALUES('test-run',?,?,?,?,?)").run(bid,'owner','2026-10-17',JSON.stringify({name:'دستگاه تست',model:'A',smallLabels:2}),now);
@@ -108,7 +125,7 @@ async function print(u,id,query=''){return context.run(u,()=>labels.GET(request(
  const serialResponse=await serialPage(admin,params);
  assert.equal(serialResponse.status,200,serialResponse.ok?'':await serialResponse.clone().text());
  const serialHtml=await serialResponse.text();
- assert.ok(serialHtml.includes('size:103mm 18mm')&&serialHtml.includes('رول سه‌ستونه'));
+ assert.ok(serialHtml.includes('size:103mm 18mm')&&serialHtml.includes('رول سه‌ستونه'));assert.ok(serialHtml.includes('id="save-roll-preset"'));assert.ok(serialResponse.headers.get('content-security-policy').includes("connect-src 'self'"));
  assert.deepEqual([...serialHtml.matchAll(/<div class="roll-row">([\s\S]*?)<\/article><\/div>/g)].map(row=>(row[0].match(/class="serial" dir="ltr">DEVICE-0001/g)||[]).length),[3,3,3,1]);
  const trial=await (await serialPage(admin,params+'&print=test')).text();
  assert.equal((trial.match(/class="serial" dir="ltr">DEVICE-0001/g)||[]).length,3);
@@ -129,6 +146,7 @@ async function print(u,id,query=''){return context.run(u,()=>labels.GET(request(
  const tinySerialMcp=await call('print_serials',{id:'test-run',layout:'thermal',width:10,height:5});
  assert.ok(tinySerialMcp.html?.includes('size:10mm 5mm'),JSON.stringify(tinySerialMcp));
  console.log('PASS unrestricted label dimensions: small QR/barcode/combined labels, large pages, automatic narrow rolls, saved templates, serial printing, uniform content scaling, valid geometry and HTTP/MCP parity.');
+ console.log('PASS inline preset save/apply: current geometry, shared workstations, thermal/roll layout, no automatic printing, operator creation with admin-only updates.');
  console.log('PASS shared label layouts: multiple presets, authorization, training isolation, geometry, per-serial copies and test row.');
  console.log('PASS batch labels: existing identity only, real SVG encoders, copies/sizing/layout, operator-selected geometry, escaped business text, own/foreign/inactive warehouse and external access, MCP read parity, zero stock/identity writes.');
 })().catch(e=>{console.error(e);process.exitCode=1});

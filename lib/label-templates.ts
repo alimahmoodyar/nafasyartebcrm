@@ -25,20 +25,25 @@ export async function saveLabelTemplate(actor:string,body:any){
   if(typeof body.roll?.[key]!=='number')throw new AccessError('تمام اندازه‌های رول را وارد کنید.',400);
   params.set(key,String(body.roll[key]));
  }
- const roll=readRoll(params),data=JSON.stringify({name,roll}),db=storage();
+ const roll=readRoll(params),db=storage();
+ if(body.requestId!==undefined&&(typeof body.requestId!=='string'||!/^[a-f\d-]{36}$/i.test(body.requestId)))throw new AccessError('شناسهٔ ذخیرهٔ قالب معتبر نیست.',400);
+ const signature=JSON.stringify({id:body.id||null,revision:body.revision,name,roll,layout:body.layout??null});
+ if(body.requestId){const prior=await db.prepare('SELECT kind,payload,actor FROM inventory_operations WHERE id=?').bind(body.requestId).first<{kind:string;payload:string;actor:string}>();if(prior){if(prior.kind!=='label_template_save'||prior.actor!==actor||prior.payload!==signature)throw new AccessError('شناسهٔ ذخیره برای درخواست دیگری استفاده شده است.',409);const result=await db.prepare("SELECT target,after FROM access_audit WHERE id=? AND actor=? AND action='label_template_save'").bind(body.requestId,actor).first<{target:string;after:string}>();if(!result)throw new AccessError('نتیجهٔ ذخیرهٔ قبلی در دسترس نیست.',409);return {id:result.target,...JSON.parse(result.after),revision:body.revision+1,repeated:true};}}
+
  const previous=body.id?await db.prepare("SELECT data,revision FROM flow_entities WHERE id=? AND type='label_template'").bind(body.id).first<{data:string;revision:number}>():null;
+ const layout=body.layout??(previous?JSON.parse(previous.data).layout:undefined)??'roll';if(!['roll','thermal','a4'].includes(layout))throw new AccessError('نوع کاغذ قالب معتبر نیست.',400);const data=JSON.stringify({name,roll,layout});
  if(body.revision>0&&previous?.revision!==body.revision)throw new AccessError('قالب تغییر کرده است. فهرست را تازه کنید.',409);
- if(previous?.data===data)return {id:body.id,name,roll,revision:previous.revision};
- const id=body.id||'label-template:'+crypto.randomUUID(),now=new Date().toISOString(),op=crypto.randomUUID();
+ if(previous?.data===data&&!body.requestId)return {id:body.id,name,roll,layout,revision:previous.revision};
+ const id=body.id||'label-template:'+crypto.randomUUID(),now=new Date().toISOString(),op=body.requestId||crypto.randomUUID();
  try{
   await db.batch([
-   db.prepare("INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,'label_template_save','{}',?,?,CASE WHEN COALESCE((SELECT revision FROM flow_entities WHERE id=? AND type='label_template'),0)=? AND NOT EXISTS(SELECT 1 FROM flow_entities WHERE type='label_template' AND id<>? AND json_extract(data,'$.name')=? COLLATE NOCASE) AND (? > 0 OR (SELECT COUNT(*) FROM flow_entities WHERE type='label_template')<100) THEN 1 ELSE 0 END)").bind(op,actor,now,id,body.revision,id,name,body.revision),
+   db.prepare("INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,'label_template_save',?,?,?,CASE WHEN COALESCE((SELECT revision FROM flow_entities WHERE id=? AND type='label_template'),0)=? AND NOT EXISTS(SELECT 1 FROM flow_entities WHERE type='label_template' AND id<>? AND json_extract(data,'$.name')=? COLLATE NOCASE) AND (? > 0 OR (SELECT COUNT(*) FROM flow_entities WHERE type='label_template')<100) THEN 1 ELSE 0 END)").bind(op,signature,actor,now,id,body.revision,id,name,body.revision),
    db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'label_template',?,1,?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data,revision=flow_entities.revision+1,updated=excluded.updated").bind(id,data,now,now),
    db.prepare("INSERT INTO access_audit(id,actor,target,action,before,after,at) VALUES(?,?,?,'label_template_save',?,?,?)").bind(op,actor,id,previous?.data??null,data,now)
   ]);
  }catch(error){
-  if(/guard|CHECK constraint/i.test(String(error)))throw new AccessError('نام قالب تکراری است، فهرست تغییر کرده یا ظرفیت قالب‌ها پر شده است.',409);
+  if(/guard|constraint/i.test(String(error)))throw new AccessError('نام قالب تکراری است، فهرست تغییر کرده یا ظرفیت قالب‌ها پر شده است.',409);
   throw error;
  }
- return {id,name,roll,revision:body.revision+1};
+ return {id,name,roll,layout,revision:body.revision+1};
 }

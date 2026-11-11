@@ -13,7 +13,7 @@ export const rollFields=[
 export type RollField=typeof rollFields[number][0];
 export type RollLayout=Record<RollField,number>;
 export const labelTemplateManager='/api/label-templates?view=manage';
-export type LabelTemplate={id:string;name:string;revision:number;roll:RollLayout};
+export type LabelTemplate={id:string;name:string;revision:number;roll:RollLayout;layout?:'roll'|'thermal'|'a4'};
 export const printEsc=(v:unknown)=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
 
 export function readRoll(q:URLSearchParams,size={width:60,height:30}):RollLayout{
@@ -59,8 +59,8 @@ export function labelContentCss(size:{width:number;height:number},design:{width:
  return '.label{position:relative}.label-content{position:absolute;left:50%;top:50%;width:'+design.width+'mm;height:'+design.height+'mm;transform:translate(-50%,-50%) scale('+scale+');transform-origin:center}';
 }
 
-export function templatePicker(templates:LabelTemplate[],manageUrl:string,admin:boolean,selected=''){
- return '<label>قالب ذخیره‌شدهٔ رول<select id="roll-template" name="template"><option value="">تنظیم دستی</option>'+templates.map(t=>'<option value="'+printEsc(t.id)+'" data-roll="'+printEsc(JSON.stringify(t.roll))+'"'+(selected===t.id?' selected':'')+'>'+printEsc(t.name)+'</option>').join('')+'</select></label>'+(admin?'<a href="'+printEsc(manageUrl)+'" target="_blank" rel="noopener">مدیریت قالب‌های چاپ</a>':'');
+export function templatePicker(templates:LabelTemplate[],manageUrl:string,admin:boolean,selected='',canSave=true){
+ return '<label>قالب ذخیره‌شدهٔ چاپ<select id="roll-template" name="template"><option value="">تنظیم دستی</option>'+templates.map(t=>'<option value="'+printEsc(t.id)+'" data-layout="'+printEsc(t.layout||'roll')+'" data-roll="'+printEsc(JSON.stringify(t.roll))+'"'+(selected===t.id?' selected':'')+'>'+printEsc(t.name)+'</option>').join('')+'</select></label>'+(canSave?'<label>نام قالب جدید<input id="roll-preset-name" type="text" maxlength="80" style="width:240px;max-width:100%" placeholder="مثلاً پرینتر انبار ـ لیبل ۳۲ در ۱۵"></label><button type="button" id="save-roll-preset">ذخیرهٔ تنظیمات فعلی با نام</button><small>قالب برای کاربران دارای دسترسی چاپ قابل انتخاب است. تنظیمات داخل همین صفحه ذخیره می‌شوند؛ انتخاب پرینتر و تنظیمات پنجرهٔ چاپ مرورگر جداست.</small><p id="roll-preset-feedback" role="status" aria-live="polite"></p>':'<small>ذخیرهٔ قالب مشترک را از بخش اطلاعات شرکت انجام دهید.</small>')+(admin?'<a href="'+printEsc(manageUrl)+'" target="_blank" rel="noopener">مدیریت قالب‌های چاپ</a>':'');
 }
 
 export const selectRollScript=String.raw`
@@ -68,15 +68,32 @@ const preset=document.getElementById('roll-template');
 preset.addEventListener('change',()=>{
  const data=preset.selectedOptions[0]?.dataset.roll;
  if(!data)return;
- layout.value='roll';
+ layout.value=preset.selectedOptions[0].dataset.layout||'roll';
  updateRoll();
  for(const [key,value] of Object.entries(JSON.parse(data)))form.elements.namedItem(key).value=value;
  form.requestSubmit(document.getElementById('label-preview'));
 });
-layout.addEventListener('change',()=>{if(layout.value!=='roll')preset.value='';});
+layout.addEventListener('change',()=>{preset.value='';});
 for(const key of ['width','height','rollWidth','columns','gapX','gapY','left','top']){
  form.elements.namedItem(key)?.addEventListener('input',()=>{preset.value='';});
 }
+const savePreset=document.getElementById('save-roll-preset');let pendingPreset=null;
+savePreset?.addEventListener('click',async()=>{
+ const nameInput=document.getElementById('roll-preset-name'),message=document.getElementById('roll-preset-feedback'),name=nameInput.value.trim();
+ if(!name){message.textContent='برای تنظیمات فعلی یک نام وارد کنید.';nameInput.focus();return;}
+ if(!form.reportValidity())return;
+ const read=key=>Number(form.elements.namedItem(key).value),kind=layout.value;
+ const roll=kind==='roll'?Object.fromEntries(['width','height','rollWidth','columns','gapX','gapY','left','top'].map(key=>[key,read(key)])):{width:read('width'),height:read('height'),rollWidth:read('width'),columns:1,gapX:0,gapY:0,left:0,top:0};
+ const payload={name,revision:0,roll,layout:kind,confirmed:true},key=JSON.stringify(payload);if(pendingPreset?.key!==key)pendingPreset={key,requestId:crypto.randomUUID()};
+ savePreset.disabled=true;message.textContent='در حال ذخیرهٔ قالب…';
+ try{
+  const response=await fetch('/api/label-templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...payload,requestId:pendingPreset.requestId})});
+  const data=await response.json();if(!response.ok)throw Error(data.error||'ذخیرهٔ قالب انجام نشد.');
+  let option=Array.from(preset.options).find(o=>o.value===data.id);if(!option){option=new Option(data.name,data.id);preset.add(option);}
+  option.textContent=data.name;option.dataset.roll=JSON.stringify(data.roll);option.dataset.layout=data.layout||'roll';preset.value=data.id;
+  pendingPreset=null;nameInput.value='';message.textContent='قالب «'+data.name+'» ذخیره شد و از فهرست قالب‌های چاپ قابل انتخاب است.';
+ }catch(error){message.textContent=error.message;}finally{savePreset.disabled=false;}
+});
 `;
 
 export function printOnLoad(requested:boolean){
