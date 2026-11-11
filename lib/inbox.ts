@@ -22,8 +22,7 @@ export async function inboxMailbox(u:Session){
  if(!preview)return {id:await inboxIdentity(u),name:u.name,profileTitle:null};
  const profile=roleProfiles.find(p=>p.id===preview.id);
  if(!profile)throw new AccessError('پروفایل آزمایشی صندوق پیام پیدا نشد.',403);
- const mailboxProfile=profile.id==='home-service'&&u.permissions.serviceAgentId?'home-service-representative':profile.id;
- return {id:profileAddress(mailboxProfile),name:profile.title+' (آزمایشی)',profileTitle:profile.title};
+ return {id:profileAddress(profile.id),name:profile.title+' (آزمایشی)',profileTitle:profile.title};
 }
 export function checkInboxMailbox(expected:unknown,actual:string){
  if(expected!=null&&expected!==actual)throw new AccessError('صندوق پیام عوض شده است. صفحه را دوباره باز کنید.',409);

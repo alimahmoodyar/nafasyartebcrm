@@ -4,6 +4,8 @@ import {roleProfiles} from './role-profiles';
 
 // Stable per administrator and only materialized in isolated preview storage.
 export const representativeSampleId=(userId:string)=>'role-sample-representative:'+userId;
+// Compatibility is limited to old admin preview cookies; API scopes stay strict.
+export function profileReviewSelection(raw:string){const [storedProfileId,buyerId='',extra]=raw.split('~');if(extra!==undefined)throw Error('invalid preview scope');return {profileId:storedProfileId==='home-service'&&buyerId?'home-service-representative':storedProfileId,buyerId};}
 export const profileReviewCookie='__Host-nafasyar-profile-review';
 export const profileJobRoles:Record<string,string[]>={
  'central-store':['inventory'],'line-store':['production_store_assistant'],'line-manager':['production'],
@@ -19,8 +21,8 @@ export function profileSession(admin:Session,id:string,warehouses:any[],buyerId=
  if((!profile.buyerScope&&!profile.missionScope&&buyerId))throw Error('پرونده خریدار برای این پروفایل معتبر نیست.');
 
  if(profile.buyerScope==='required'&&!buyerId)return {...admin,isAdmin:false,permissions:{read:[],write:[],eventStages:[],manualPrograms:[]},profileReview:{id,title:profile.title,warehouseIds:[]},productionParticipant:false};
- const serviceRepresentative=id==='home-service-representative'||id==='home-service'&&!!buyerId;
- const roles=serviceRepresentative?['service_agent']:profileJobRoles[id];if(!roles)throw Error('مجوزهای این پروفایل تعریف نشده است.');
+ const serviceRepresentative=id==='home-service-representative';
+ const roles=profileJobRoles[id];if(!roles)throw Error('مجوزهای این پروفایل تعریف نشده است.');
  const selected=warehouses.filter(w=>w.data.active&&!w.data.deletedAt&&(id==='quality'||id==='line-store'?id==='quality'||w.data.warehouseType==='production_line':!w.data.serviceDomain&&!['production_line','quarantine'].includes(w.data.warehouseType)));
  const responsibilities=['central-store','line-store','quality'].includes(id)?selected.map(w=>({warehouseId:w.id,role:(id==='quality'?'qc':'inventory') as 'inventory'|'qc'})):[];
  let permissions=roles.length?resolveRoleAssignment({roles,...(id==='sales-representative'?{salesAgentId:buyerId}:{}),...(serviceRepresentative?{serviceAgentId:buyerId}:{}),...(['central-store','line-store','quality'].includes(id)?{...(responsibilities.length?{warehouseResponsibilities:responsibilities}:{}),warehouses:id==='line-store'?['line']:['raw','quarantine','nonconforming','finished']}:{}),...(['home-service','home-service-manager','home-service-representative','hospital-service'].includes(id)?{serviceDomains:[id==='hospital-service'?'hospital':'home']}: {})}):{read:[],write:[],eventStages:[]};
