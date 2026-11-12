@@ -34,7 +34,7 @@ export function bankMatch(row:any,all:any[]){
  if(d.direction!=='in')return answer('ignored','برداشت بانک، وصول خریدار نیست.');
  if(!['pos','transfer'].includes(d.kind))return answer('unmatched','نوع واریز مشخص نیست؛ مالی باید بررسی کند.');
  if(!all.some(a=>a.id===d.accountId&&isApprovedReceivingAccount(a)))return answer('unmatched','حساب مقصد بانکی ریالی تأییدشده نیست.');
- const code=bankCode(d.reference||''),payments=all.filter(r=>r.type==='sales_payment'&&r.data.method==='bank'&&!r.data.openingId),agents=all.filter(r=>r.type==='sales_agent'&&r.data.active&&r.data.kind!=='referrer');
+ const code=bankCode(d.reference||''),payments=all.filter(r=>r.type==='sales_payment'&&r.data.method==='bank'&&!r.data.openingId),agents=all.filter(r=>(r.type==='sales_agent'||r.type==='as_agent'&&r.data.domain==='home')&&r.data.active&&r.data.kind!=='referrer');
  const exact=payments.filter(p=>code&&bankCode(p.data.reference||'')===code&&p.data.amount===d.amount&&p.data.day===d.day&&p.data.receivingAccountId===d.accountId);
  const possible=d.kind==='transfer'?payments.filter(p=>p.data.state!=='rejected'&&transferPaymentFits(row,p)):exact;
  candidates.push(...possible.map(p=>({id:p.id,agentId:p.data.agentId,amount:p.data.amount,day:p.data.day,reference:p.data.reference,state:p.data.state,revision:p.revision})));

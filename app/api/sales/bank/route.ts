@@ -1,3 +1,6 @@
+import {bankEntities} from '@/lib/sales-bank';
+import {bankMatch} from '@/lib/sales-bank-contract';
+import {syncServicePaymentTasks} from '@/lib/service-payment-tasks';
 import {requireAccess,checkOrigin,accessResponse} from '@/lib/authorization';
 import {boundedBody} from '@/lib/firmware-storage';
 import {applySalesBank,readSalesBank,previewSalesBank,downloadSalesBankStatement} from '@/lib/sales-bank';
@@ -47,6 +50,8 @@ export async function POST(request:Request){try{
  }
  if(body?.mode==='preview')return json(await previewSalesBank(actor,body));
  const result=await applySalesBank(actor,body);let followupPending=false;
+ if(body.mode==='import')try{let autoMatched=0;for(let n=0;n<20;n++){const all=await bankEntities(),ids=all.filter(r=>r.type==='sales_bank_row'&&r.data.status==='pending').filter(r=>{const m=bankMatch(r,all);return m.status==='ready'&&all.some(p=>p.id===m.paymentId&&p.data.serviceDomain==='home')}).slice(0,25).map(r=>r.id);if(!ids.length)break;const more=await applySalesBank(actor,{id:crypto.randomUUID(),mode:'reconcile',confirmed:true,rowIds:ids});autoMatched+=more.matched||0;}if(autoMatched){const latest=await bankEntities();Object.assign(result,{matched:(result.matched||0)+autoMatched,reconciled:(result.reconciled||0)+autoMatched,pendingReady:latest.filter(r=>r.type==='sales_bank_row'&&r.data.status==='pending'&&bankMatch(r,latest).status==='ready').length});}}catch{followupPending=true;}
+ try{await syncServicePaymentTasks()}catch{followupPending=true;}
  try{await syncSalesTasks();}catch{followupPending=true;}
  if(['import','archive_pos'].includes(body?.mode))try{await syncTreasuryTasks();}catch{followupPending=true;}
  return json({...result,followupPending});

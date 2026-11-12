@@ -1,4 +1,5 @@
 'use client';
+import {ServicePaymentsPanel} from './service-payments-panel';
 import {ServicePartsPanel} from './service-parts-panel';
 import {useEffect,useState} from 'react';
 import {ServiceContractsPanel} from './service-contracts-panel';
@@ -31,6 +32,7 @@ export function AfterSalesHub({demo,user,onNavigate,transportAvailable,target=''
  const [homeView,setHomeView]=useState(targetView);
  useEffect(()=>{setDomain(entryDomain);setHomeView(targetView);},[scope]);
  useEffect(()=>{setDomain(entryDomain);setHomeView(targetView);},[target]);
+ if(target.startsWith('service-payments:'))return <ServicePaymentsPanel key={scope+':'+target} agentId={user.permissions.serviceAgentId||target.slice('service-payments:'.length)}/>;
  return <ProgramWorkspace direct={!!target||roleEntry} programId="after-sales-hub" title="خدمات پس از فروش">
   <SubprogramNavigation items={domains.map(d=>[d,serviceBranchTitles[d]] as [string,string])} value={domain} onChange={setDomain}/>
   {!domains.length&&<p className="notice">دسترسی خدمات پس از فروش برای این حساب تعریف نشده است.</p>}

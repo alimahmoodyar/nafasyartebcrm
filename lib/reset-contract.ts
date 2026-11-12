@@ -1,3 +1,4 @@
+// Service bank claims reuse sales_payment with serviceDomain/serviceAgentId; receipts reuse sales_file. Journal entries use existing service_ledger. Existing operational reset/backup, private sales-files cleanup, FK-safe offsets-first deletion and generic freeze cover all of them; no new table or exemption.
 // Payment requests, supplier credits/offsets, shipment manifests, receipt links, return movements and delivery decisions are JSON on existing purchase_payable, purchase_order and receipt entities. Existing operational backup/reset and freeze also cover linked files and inventory movements.
 // Contractual delivery extension decisions and deadlines stay inside existing purchase_order JSON; backup, reset and 0016 freeze already cover them.
 // CEO quote returns and order terms amendments use existing operational quote/order JSON; 0016 freeze and both backup/reset scopes cover them and their history.

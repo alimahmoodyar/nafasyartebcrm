@@ -1,3 +1,4 @@
+import {serviceBankLedgerStatements} from './service-bank-ledger';
 import {storedAccessPermissions} from './permissions';
 import type {Session} from './permissions';
 import {storage} from './storage';
@@ -32,15 +33,15 @@ export async function salesBankRoles(actor:Session){
 export async function bankEntities(salesRowsSnapshot?:any[]){
  const sales=salesRowsSnapshot||await salesRows();
  if(trainingContext.getStore()?.salesBankTest)return sales;
- return [...sales,...(await storage().prepare("SELECT * FROM flow_entities WHERE type='treasury_account' ORDER BY id").all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}))];
+ return [...sales,...(await storage().prepare("SELECT * FROM flow_entities WHERE type='treasury_account' OR (type='as_agent' AND json_extract(data,'$.domain')='home') ORDER BY id").all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}))];
 }
 const accountPublic=(a:any,bank:boolean)=>({id:a.id,revision:a.revision,data:{title:a.data.title,...(bank?{number:a.data.number,iban:a.data.iban,cardNumber:a.data.cardNumber}:{}),currency:a.data.currency,kind:a.data.kind,state:a.data.state}});
-const minimalAgent=(a:any)=>({id:a.id,revision:a.revision,data:{name:a.data.name,active:a.data.active,kind:a.data.kind||'representative',receivingAccountIds:a.data.receivingAccountIds||[]}});
+const minimalAgent=(a:any)=>({id:a.id,revision:a.revision,data:{name:(a.type==='as_agent'?'خدمات: ':'')+a.data.name,active:a.data.active,kind:a.data.kind||'representative',receivingAccountIds:a.data.receivingAccountIds||[]}});
 const statementPublic=(s:any)=>{const {objectKey,...data}=s.data;return {...s,data};};
 export async function readSalesBank(actor:Session){
  const roles=await salesBankRoles(actor),all=await bankEntities();
  const today=dayAt();
- return {today,roles:{manage:roles.manage,bank:roles.bank},canImport:roles.canImport,canAssign:roles.salesFinance,canResolve:roles.salesFinance,agents:all.filter(a=>a.type==='sales_agent'&&a.data.kind!=='referrer').map(minimalAgent),accounts:all.filter(approvedAccount).map(a=>accountPublic(a,roles.bank)),terminals:all.filter(r=>r.type==='sales_bank_terminal'),...(roles.bank?{coverage:bankCoverage(all,today),statements:all.filter(r=>r.type==='sales_bank_statement').map(statementPublic),rows:all.filter(r=>r.type==='sales_bank_row').map(r=>({...r,assessment:bankMatch(r,all)})),payments:all.filter(r=>r.type==='sales_payment'&&r.data.method==='bank'&&r.data.state==='pending').map(r=>({id:r.id,revision:r.revision,data:{agentId:r.data.agentId,day:r.data.day,amount:r.data.amount,reference:r.data.reference,receivingAccountId:r.data.receivingAccountId||'',state:r.data.state}}))}: {})};
+ return {today,roles:{manage:roles.manage,bank:roles.bank},canImport:roles.canImport,canAssign:roles.salesFinance,canResolve:roles.salesFinance,agents:all.filter(a=>(a.type==='sales_agent'||a.type==='as_agent'&&a.data.domain==='home')&&a.data.kind!=='referrer').map(minimalAgent),accounts:all.filter(approvedAccount).map(a=>accountPublic(a,roles.bank)),terminals:all.filter(r=>r.type==='sales_bank_terminal'),...(roles.bank?{coverage:bankCoverage(all,today),statements:all.filter(r=>r.type==='sales_bank_statement').map(statementPublic),rows:all.filter(r=>r.type==='sales_bank_row').map(r=>({...r,assessment:bankMatch(r,all)})),payments:all.filter(r=>r.type==='sales_payment'&&r.data.method==='bank'&&r.data.state==='pending').map(r=>({id:r.id,revision:r.revision,data:{agentId:r.data.agentId,day:r.data.day,amount:r.data.amount,reference:r.data.reference,receivingAccountId:r.data.receivingAccountId||'',state:r.data.state}}))}: {})};
 }
 export async function downloadSalesBankStatement(actor:Session,id:string){
  if(!(await salesBankRoles(actor)).bank)fail('دسترسی به بایگانی بانک لازم است.',403);
@@ -101,8 +102,10 @@ export function recordSalesBankMatch({row,match,all,put,actorId,operationId,now,
 }){
  const d=row.data,existing=match.paymentId?all.find(r=>r.id===match.paymentId&&r.type==='sales_payment'):null,paymentId=existing?.id||row.id+':payment';
  if(existing&&existing.data.state!=='pending')fail('اعلام پرداخت هم‌زمان تغییر کرد؛ دوباره تطبیق کنید.',409);
- const data={...(existing?.data||{}),agentId:match.agentId,method:'bank',amount:d.amount,day:existing?.data.day||d.day,bank:existing?.data.bank||all.find(r=>r.id===d.accountId)!.data.title,normalizedBank:bankCode(existing?.data.bank||all.find(r=>r.id===d.accountId)!.data.title),reference:existing?.data.reference||d.reference||'BANK:'+d.bankId,normalizedReference:bankCode(existing?.data.reference||d.reference||'BANK:'+d.bankId),receivingAccountId:d.accountId,fileId:existing?.data.fileId||'',checkDue:'',state:'cleared',bankRowId:row.id,bankStatementId:d.statementId,bankSettlementDay:d.day,bankEvidence:{bankId:d.bankId,accountId:d.accountId,statementId:d.statementId,terminalCode:d.terminalCode,provider:d.provider,day:d.day},automaticBank:!manual,reviewedBy:actorId,reviewedAt:now,reviewNotes:match.reason,submittedBy:existing?.data.submittedBy||actorId,financialEvents:[...(existing?.data.financialEvents||[]),{id:operationId+':'+row.id,day:d.day,at:now,delta:d.amount,state:'cleared',bankRowId:row.id}]};
+ const serviceAgent=all.find(a=>a.id===match.agentId&&a.type==='as_agent'&&a.data.domain==='home');
+ const data={...(existing?.data||{}),...(serviceAgent?{serviceDomain:'home',serviceAgentId:serviceAgent.id}:{}),agentId:match.agentId,method:'bank',amount:d.amount,day:existing?.data.day||d.day,bank:existing?.data.bank||all.find(r=>r.id===d.accountId)!.data.title,normalizedBank:bankCode(existing?.data.bank||all.find(r=>r.id===d.accountId)!.data.title),reference:existing?.data.reference||d.reference||'BANK:'+d.bankId,normalizedReference:bankCode(existing?.data.reference||d.reference||'BANK:'+d.bankId),receivingAccountId:d.accountId,fileId:existing?.data.fileId||'',checkDue:'',state:'cleared',bankRowId:row.id,bankStatementId:d.statementId,bankSettlementDay:d.day,bankEvidence:{bankId:d.bankId,accountId:d.accountId,statementId:d.statementId,terminalCode:d.terminalCode,provider:d.provider,day:d.day},automaticBank:!manual,reviewedBy:actorId,reviewedAt:now,reviewNotes:match.reason,submittedBy:existing?.data.submittedBy||actorId,financialEvents:[...(existing?.data.financialEvents||[]),{id:operationId+':'+row.id,day:d.day,at:now,delta:d.amount,state:'cleared',bankRowId:row.id}]};
  put(paymentId,'sales_payment',data,existing);put(row.id,row.type,{...d,status:'matched',agentId:match.agentId,paymentId,terminalId:match.terminalId||'',matchedAt:now,matchedBy:actorId,...(manual?{resolutionReason:match.reason}:{})},row);
+ if(serviceAgent||data.serviceDomain==='home')return;
  const payment=all.find(entry=>entry.id===paymentId);
  const allocationRows=payment?.data.state==='cleared'?all:[...all.filter(entry=>entry.id!==paymentId),{id:paymentId,type:'sales_payment',data,created:existing?.created||now}];
  const plan=allocationPlan(allocationRows,match.agentId,paymentId,today);
@@ -128,13 +131,13 @@ export async function applySalesBank(actor:Session,b:any){
  const account=(id:string)=>{const a=all.find(r=>r.id===id&&approvedAccount(r));if(!a)fail('حساب بانکی ریالی تأییدشده لازم است.');guard('EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)',a.id,a.revision);return a;};
  let target=b.id,objectKey='',imported=0,skipped=0,matched=0,ignored=0,unresolved=0,archived=false;
  if(b.mode==='receiving_accounts'){
-  const agent=all.find(r=>r.type==='sales_agent'&&r.id===b.agentId&&r.data.active&&usesAssignedSalesAccounts(r.data.kind));
+  const agent=all.find(r=>(r.type==='sales_agent'&&usesAssignedSalesAccounts(r.data.kind)||r.type==='as_agent'&&r.data.domain==='home')&&r.id===b.agentId&&r.data.active);
   if(!agent)fail('نماینده یا عامل فروش فعال را انتخاب کنید.');
   if(agent.revision!==b.revision)fail('پرونده خریدار تغییر کرده است. فهرست را تازه کنید.',409);
   if(!Array.isArray(b.receivingAccountIds)||b.receivingAccountIds.length>2||new Set(b.receivingAccountIds).size!==b.receivingAccountIds.length)fail('حداکثر دو حساب متفاوت انتخاب کنید.');
   const receivingAccountIds=b.receivingAccountIds.map((id:unknown)=>account(sreq(id)).id);
   target=agent.id;
-  put(target,'sales_agent',{...agent.data,receivingAccountIds},agent);
+  put(target,agent.type,{...agent.data,receivingAccountIds},agent);
  }else if(b.mode==='terminal'){
   const old=b.terminalId?all.find(r=>r.id===b.terminalId&&r.type==='sales_bank_terminal'):null;if(b.terminalId&&!old)fail('اتصال ترمینال پیدا نشد.',404);
   if(b.revision!==(old?.revision||0))fail('نسخه اتصال پوز تغییر کرده؛ تازه‌سازی کنید.',409);
@@ -205,7 +208,7 @@ export async function applySalesBank(actor:Session,b:any){
    const row=selected.find(r=>r.id===b.rowId&&r.data.direction==='in'&&r.data.kind==='transfer');
    const payment=all.find(p=>p.type==='sales_payment'&&p.id===b.paymentId&&p.data.state==='pending'&&!p.data.bankRowId);
    if(!row||!payment||row.revision!==b.revision||payment.revision!==b.paymentRevision)fail('ردیف بانک یا اعلام پرداخت تغییر کرده است؛ فهرست را تازه کنید.',409);
-   if(bankMatch(row,all).status!=='ambiguous'||!transferPaymentFits(row,payment)||!all.some(a=>a.type==='sales_agent'&&a.id===payment.data.agentId&&a.data.active&&a.data.kind!=='referrer'))fail('اعلام انتخاب‌شده با ردیف بانکی قابل تطبیق نیست.',409);
+   if(bankMatch(row,all).status!=='ambiguous'||!transferPaymentFits(row,payment)||!all.some(a=>(a.type==='sales_agent'||a.type==='as_agent'&&a.data.domain==='home')&&a.id===payment.data.agentId&&a.data.active&&a.data.kind!=='referrer'))fail('اعلام انتخاب‌شده با ردیف بانکی قابل تطبیق نیست.',409);
    const code=bankCode(row.data.reference||'');
    if(code&&all.some(r=>r.id!==row.id&&r.data.receivingAccountId===row.data.accountId&&r.type==='sales_payment'&&r.data.state==='cleared'&&bankCode(r.data.reference||'')===code))fail('این شماره پیگیری قبلاً به وصول قطعی رسیده است.',409);
    resolution={rowId:row.id,agentId:payment.data.agentId,paymentId:payment.id,reason:sreq(b.reason,4000)};
@@ -223,7 +226,7 @@ export async function applySalesBank(actor:Session,b:any){
  const updates=[...writes.values()].filter(w=>w.old).map(w=>({id:w.id,revision:w.old.revision,data:JSON.stringify(w.data)})),inserts=[...writes.values()].filter(w=>!w.old).map(w=>({id:w.id,type:w.type,data:JSON.stringify(w.data)})),stmts:D1PreparedStatement[]=[];
  if(updates.length){const payload=JSON.stringify(updates);guard('NOT EXISTS (SELECT 1 FROM json_each(?) j WHERE NOT EXISTS (SELECT 1 FROM flow_entities f WHERE f.id=json_extract(j.value,\'$.id\') AND f.revision=json_extract(j.value,\'$.revision\')))',payload);stmts.push(db.prepare("UPDATE flow_entities SET data=(SELECT json_extract(j.value,'$.data') FROM json_each(?) j WHERE json_extract(j.value,'$.id')=flow_entities.id),revision=revision+1,updated=? WHERE id IN (SELECT json_extract(value,'$.id') FROM json_each(?))").bind(payload,now,payload));}
  if(inserts.length)stmts.push(db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) SELECT json_extract(value,'$.id'),json_extract(value,'$.type'),json_extract(value,'$.data'),1,?,? FROM json_each(?)").bind(now,now,JSON.stringify(inserts)));
- try{await db.batch([db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(b.id,'sales_bank_'+b.mode,signature,u.userId,now),...checks,...stmts,db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,target,'sales_bank_'+b.mode,JSON.stringify({mode:b.mode,signature,imported,skipped,matched,unresolved,ignored,reason:b.mode==='reverse'?b.reason:undefined}),now)]);}catch(e){if(objectKey)try{await firmwareBucket().delete(objectKey);}catch{/* Original remains private if cleanup is unavailable. */}throw e;}
+ try{await db.batch([db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(b.id,'sales_bank_'+b.mode,signature,u.userId,now),...checks,...stmts,...serviceBankLedgerStatements([...writes.values()],u.userId,now),db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,target,'sales_bank_'+b.mode,JSON.stringify({mode:b.mode,signature,imported,skipped,matched,unresolved,ignored,reason:b.mode==='reverse'?b.reason:undefined}),now)]);}catch(e){if(objectKey)try{await firmwareBucket().delete(objectKey);}catch{/* Original remains private if cleanup is unavailable. */}throw e;}
  if(b.mode==='import')pendingReady=all.filter(r=>r.type==='sales_bank_row'&&r.data.status==='pending'&&bankMatch(r,all).status==='ready').length;
  return {saved:true,id:target,...(['import','archive_pos'].includes(b.mode)?{archived}:{}),...(['import','archive_pos','reconcile','resolve_transfer'].includes(b.mode)?{imported,skipped,matched,reconciled:matched,pendingReady,unresolved,ignored}: {})};
 }

@@ -1,4 +1,5 @@
 'use client';
+import {ServicePaymentsPanel} from './service-payments-panel';
 import {RefreshButton} from './refresh-button';
 import {useEffect,useState} from 'react';
 import {Dialog,DialogContent,DialogTitle,DialogDescription} from '@/components/ui/dialog';
@@ -23,6 +24,7 @@ export function SalesBankPanel({onChange,roleTest=false,targetId=''}:{onChange?:
  const [data,setData]=useState<any>(null),[error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[mode,setMode]=useState(''),[form,setForm]=useState<any>({}),[workbook,setWorkbook]=useState<{sheet:string;data:any[][]}[]>([]),[sheetIndex,setSheetIndex]=useState(0),[mapping,setMapping]=useState<BankImportMapping>(emptyMapping),[preview,setPreview]=useState<any>(null),[checked,setChecked]=useState(false),[fileContent,setFileContent]=useState(''),[profile,setProfile]=useState<'auto'|'manual'>('auto'),[unitChoice,setUnitChoice]=useState<''|'IRR'|'IRT'>('');
  async function load(){const response=await fetch(api,{cache:'no-store'}),result:any=await response.json();if(!response.ok)throw Error(result.error||'دریافت اطلاعات انجام نشد.');setData(result);}
  useEffect(()=>{void load().catch(e=>setError(e.message));},[api]);
+ const [serviceBankView,setServiceBankView]=useState(false);
  const grid=workbook[sheetIndex]?.data||[],roles=data?.roles||{},detection=detectBankReport(grid);
  const gap=targetId.match(/^(.+):(\d{4}-\d{2}-\d{2}):(bank|pos)$/);
  const change=(key:string,value:any)=>{if(['accountId','coverageFrom','coverageTo','emptyStatement','source'].includes(key)){setChecked(false);setPreview(null);}setForm((f:any)=>({...f,[key]:value}));};
@@ -41,12 +43,13 @@ export function SalesBankPanel({onChange,roleTest=false,targetId=''}:{onChange?:
  function updateMapping(patch:Partial<BankImportMapping>){setMapping(m=>({...m,...patch}));setPreview(null);setChecked(false);}
  const input=(key:string,label:string,required=false)=><label className="field" key={key}>{label}<NumberInput fieldKey={key} required={required} maxLength={key==='terminalCode'?100:200} value={form[key]??''} onChange={e=>change(key,latinDigits(e.target.value))}/></label>;
  const assignableAgents=data?.assignableAgents||data?.agents||[];
- const accountRows=(data?.rows||[]).filter((row:any)=>!targetId||gap||row.id===targetId);
+ const accountRows=(data?.rows||[]).filter((row:any)=>!targetId||targetId.startsWith('service-payments:')||gap||row.id===targetId);
  const resolutionRow=accountRows.find((row:any)=>row.id===form.rowId);
  const candidates=(resolutionRow?.assessment?.candidates||[]).filter((candidate:any)=>candidate.state==='pending');
  const accounts=Object.fromEntries((data?.accounts||[]).map((r:any)=>[r.id,r.data.title+(r.data.number?' — '+r.data.number:'')])),agents=Object.fromEntries((data?.agents||[]).map((r:any)=>[r.id,r.data.name]));
  const pick=(key:string,label:string,values:Record<string,string>)=><label className="field" key={key}>{label}<select required value={form[key]||''} onChange={e=>change(key,e.target.value)}><option value="">انتخاب کنید</option>{Object.entries(values).map(([value,text])=><option key={value} value={value}>{text}</option>)}</select></label>;
  const column=(key:keyof BankImportMapping['columns'],label:string,required=false)=><label className="field" key={key}>{label}{!required?' (اختیاری)':''}<select required={required} value={mapping.columns[key]} onChange={e=>updateMapping({columns:{...mapping.columns,[key]:e.target.value===''?'':Number(e.target.value)}})}><option value="">{required?'انتخاب ستون':'بدون ستون'}</option>{Array.from({length:grid.reduce((count,row)=>Math.max(count,row.length),0)},(_,index)=><option key={index} value={index}>{columnName(index)} — {cellText(grid[Math.max(0,mapping.firstRow-2)]?.[index])||'بدون عنوان'}</option>)}</select></label>;
+ if(targetId.startsWith('service-payments:')&&!serviceBankView)return <section><button className="btn" onClick={()=>setServiceBankView(true)}>باز کردن تطبیق بانکی</button><ServicePaymentsPanel agentId={targetId.slice('service-payments:'.length)}/></section>;
  if(!data)return <section dir="rtl"><h3>پوز و تطبیق دریافت‌ها</h3>{error?<p className="error" role="alert">{error}</p>:<p role="status">در حال دریافت اطلاعات…</p>}</section>;
  if(!roles.manage&&!roles.bank)return <p role="alert">دسترسی به تنظیمات پوز و تطبیق بانکی برای نقش شما فعال نیست.</p>;
  return <section dir="rtl"><div className="panelhead"><h3>پوز و تطبیق دریافت‌ها</h3><RefreshButton retry={!!error} type="button" className="btn" disabled={busy} onRefresh={()=>load().catch(e=>setError(e.message))} /></div><p>وصول پوز با ترمینال و تاریخ ارتباط آن به خریدار متصل می‌شود. سایر واریزها با حساب مقصد، مبلغ، تاریخ و شماره پیگیریِ ثبت‌شده کنترل می‌شوند؛ موارد مبهم برای بررسی مالی باقی می‌مانند.</p>{roleTest&&<p className="notice">آزمون تطبیق بانکی با دادهٔ جداگانه. از فایل بانکی فرضی استفاده کنید.</p>}{error&&<p className="error" role="alert">{error}</p>}{message&&<p role="status">{message}</p>}
