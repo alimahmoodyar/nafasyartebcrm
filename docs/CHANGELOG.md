@@ -1,3 +1,10 @@
+## 2026-11-12 — Faulty-part carton shipping labels and scan handover
+
+- Home-service representatives pack up to 100 whole claim rows from multiple repair cases into up to 20 cartons. Each carton has an immutable QR and printable A5 label with frozen sender identity, company destination and per-carton contents. Printing/reprinting is read-only; actual dispatch requires tracking and date.
+- Driver scans and explicitly confirms independent carrier pickup without a preassigned mission. Scoped custody prevents a second driver claiming the carton. Company receipt records only observed rows, keeps missing items open, and never creates credit.
+- Coordinator reviews each received claim through the existing after-sales approval/credit handler. Package snapshots retain the decision; rejected claims can be repacked without erasing prior history. Existing duplicate-credit and revision guards apply.
+- Manager-only destination configuration, private role-scoped QR resolution, bounded/searchable lists, atomic packing/custody, reset coverage and MCP parity. No new migration or persistent print image. No company test data seeded or physical printer claim.
+
 ## 2026-11-12 — Shared representative identity
 
 - One reviewed identity dossier for explicitly linked sales/service agencies, available to the representative, scoped sales expert, same-domain service coordinator/support and defining manager. Searchable, paginated agency selection; natural/legal identity, responsible contact, agency address and private PDF/image evidence.

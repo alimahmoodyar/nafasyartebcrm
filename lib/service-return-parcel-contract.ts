@@ -1,0 +1,3 @@
+export const returnParcelStates:Record<string,string>={prepared:'آمادهٔ ارسال',sent:'ارسال‌شده',with_driver:'نزد راننده',office_partial:'دریافت شرکت با کسری',received:'تحویل شرکت',cancelled:'لغوشده'};
+export const returnCartonQr=(parcelId:string,cartonId:string)=>`NAFASYAR-RETURN/1:${parcelId}:${cartonId}`;
+export function parseReturnCarton(raw:string){const match=/^NAFASYAR-RETURN\/1:([a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}):([a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12})$/i.exec(raw.trim());return match?{parcelId:match[1],cartonId:match[2]}:null;}

@@ -1,4 +1,5 @@
 'use client';
+import {ServiceReturnParcelsPanel} from './service-return-parcels-panel';
 import {driverPreviewActions,needsSalesWaybill} from '@/lib/transport-contract';
 import {isUnscopedRepresentative} from '@/lib/permissions';
 import {DriverReceiptsPanel} from './driver-receipts-panel';
@@ -85,7 +86,7 @@ export function TransportPanel({user,demo,targetId=''}:{targetId?:string;user:Se
  const scopeMissions=(data?.missions||[]).filter((m:any)=>{const d=m.data,active=!['delivered','cancelled'].includes(d.state);if(tab==='today')return active&&(d.due<=today()||['collected','carrier','offered'].includes(d.state));if(tab==='collect')return d.state==='assigned';if(tab==='deliver')return ['collected','carrier','offered'].includes(d.state);if(tab==='documents')return d.state!=='cancelled';if(tab==='expenses')return d.state!=='cancelled';if(tab==='followups')return d.blocker?.state==='open'||d.state==='disputed'||d.missingDocuments||active&&d.due<today();return true;});
  const missions=scopeMissions.filter((m:any)=>(!filter||m.data.state===filter)&&(!unitFilter||m.data.requestingUnit===unitFilter)&&(!query||JSON.stringify(m.data).toLowerCase().includes(query.toLowerCase())));
  return <ProgramWorkspace programId="transport" direct={!!targetId} title="کارهای تدارکات و راننده"><section ref={backRef}><div className="panelhead"><div><h2><Truck size={24}/> تدارکات و حمل‌ونقل</h2><p className="subtle">یک کارتابل مشترک برای فروش، خدمات خانگی، بیمارستانی و دریافت خرید</p></div><IconActions scope="transport-panel-actions-79748fa74d"><RefreshButton retry={!!error} className="btn" disabled={busy} onRefresh={()=>refresh()} />{!!data?.sources.length&&<button className="btn primary" onClick={()=>start('create')}><Plus size={16}/>درخواست حمل</button>}</IconActions></div>
- {driverWorkspace&&<DriverReceiptsPanel key={user.userId+':'+(user.profileReview?.id||'')} missions={data?.missions||[]}/>}
+ {driverWorkspace&&<><ServiceReturnParcelsPanel driver accountKey={user.userId+':'+(user.profileReview?.id||'')}/><DriverReceiptsPanel key={user.userId+':'+(user.profileReview?.id||'')} missions={data?.missions||[]}/></>}
  {error&&<p className="notice error" role="alert">{error}</p>}{message&&<p className="notice" role="status">{message}</p>}
  {!representativeShipments&&<div className="tools"><SubprogramNavigation items={(driverWorkspace?["today","collect","deliver","documents","expenses","followups","missions","vehicle-reports","drafts"]:["missions",...(manager?["vehicles","followups","vehicle-reports"]:[]),"drafts"]).map(key=>[key,tabTitles[key]] as [string,string])} value={tab} onChange={key=>{setTab(key);setSelected('');setDetail(null);setFilter('')}}/></div>}
  {!online&&<p className="notice" role="status">اتصال قطع است؛ متن و عکس را در پیش‌نویس‌ها نگه دارید و بعداً ارسال کنید.</p>}
