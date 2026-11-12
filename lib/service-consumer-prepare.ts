@@ -37,6 +37,7 @@ export async function prepareServiceDiagnosisArgs(user:Session,args:any){
   if(!row||typeof row!=='object'||Array.isArray(row))fail('ردیف قطعه معتبر نیست.');
   const material=await entity('material:'+req(row.partCode,12),'material');
   const tariff=row.coverage==='paid'?selectConsumerPartTariff(tariffs,material.data.code,today,domain):null;
+  if(domain==='home'&&!serviceCase.data.agentId&&row.coverage==='paid'&&!tariff)fail('قیمت معتبر مصرف‌کننده تعریف نشده؛ برآورد ناقص است.',409);
   lines.push({...row,...consumerPriceSnapshot(row,tariff)});
  }
  return {...args,data:{...data,lines}};

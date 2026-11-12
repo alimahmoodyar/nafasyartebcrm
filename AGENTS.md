@@ -39,3 +39,10 @@
 - Initial receipt is physical custody only: sender/carrier/waybill/condition, optional readable serial, immutable receipt identity and reprintable QR. Do not invent warranty, stock, a repair case, or successful physical printing.
 - Device stays with its driver until authorized company service intake explicitly confirms physical receipt. Intake then links a compatible active case or completes the existing service case form; case creation and receipt linkage must be atomic and idempotent. Keep the agency coordinator out of this intake workflow.
 - Printer and phone models are not chosen yet. Provide a printable label/PDF first; direct portable-printer integration is deferred until hardware is known. All data remains in the shared application dataset.
+
+## Office device service (owner agreement 2026-11-13)
+
+- Customer-response staff receive devices at the company office. Home technician means «سرویسکار خدمات پس از فروش خانگی»; keep its profile separate from customer response and agency coordinator.
+- Permanent device QR identifies the serial across visits; each repair visit is a separate existing as_case. Reuse the same protocol in manufacturing back labels and legacy-service labels; no customer data inside QR. Scan only resolves authorized records, never consents, receives, consumes or delivers by itself.
+- Derive office estimates from published consumer part prices and formula labor rates. Missing prices remain incomplete; no manual-price fallback. Keep historical estimates and invalidate consent/authorization on revision.
+- Append actual performer and recorder separately for each office technical action. Self defaults to authenticated staff; manager/admin may record another active home technician only with a reason and CAS-protected membership. Never fabricate another person’s work/approval in role preview.

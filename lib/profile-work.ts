@@ -39,13 +39,13 @@ export async function profileWork(user:Session){
  const serviceRows=(await db.prepare("SELECT * FROM flow_entities WHERE type IN ('as_commercial_request','as_service_work','as_service_catalog_request','as_case','as_order','as_agent','as_service_contract','as_claim','as_shipment')").all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}));
  work.push(...commercialProfileWork(user,serviceRows),...serviceContractProfileWork(user,serviceRows));
  if(profile.id==='central-store'&&user.permissions.serviceRoles?.includes('inventory'))for(const order of serviceRows.filter(r=>r.type==='as_order'&&r.data.domain==='home'&&r.data.state==='approved'&&r.data.lines.some((l:any)=>l.prepared<l.quantity)))work.push({id:order.id+':prepare',title:'آماده‌سازی قطعات نماینده خدمات',section:'after-sales',target:'service-orders:'+order.id,sourceId:order.id,state:order.data.state});
- if(['home-service','home-service-manager','home-service-representative'].includes(profile.id)){
+ if(['home-service-customer-support','home-service-technician','home-service-intake','home-service','home-service-manager','home-service-representative'].includes(profile.id)){
   const own=user.permissions.serviceAgentId,roles=user.permissions.serviceRoles||[];
-  for(const c of serviceRows.filter(r=>r.data.domain==='home'&&(!own||r.data.agentId===own))){
-   if(c.type==='as_case')for(const step of await serviceSteps(c))if(roles.includes('manager')||roles.includes(step.role))work.push({id:c.id+':'+step.key,title:step.title,section:'after-sales',target:c.id,sourceId:c.id,state:c.data.state});
-   if(c.type==='as_claim'&&c.data.state==='received'&&(roles.includes('manager')||roles.includes('coordinator')))work.push({id:c.id+':review',title:'بررسی فیزیکی داغی و مستندات تعمیر',section:'after-sales',target:c.id,sourceId:c.id,state:c.data.state});
-   if(c.type==='as_claim'&&['awaiting_return','sent','rejected'].includes(c.data.state)&&roles.includes('agent'))work.push({id:c.id+':return',title:'ارسال و پیگیری داغی قطعه',section:'after-sales',target:c.id,sourceId:c.id,state:c.data.state});
-   if(c.type==='as_order'&&c.data.state==='requested'&&(roles.includes('manager')||roles.includes('coordinator')))work.push({id:c.id+':approve',title:'بررسی درخواست قطعه نماینده',section:'after-sales',target:c.id,sourceId:c.id,state:c.data.state});
+  for(const c of serviceRows.filter(r=>r.data.domain==='home'&&(!own||r.data.agentId===own)&&(!['home-service-customer-support','home-service-technician','home-service-intake'].includes(profile.id)||r.type==='as_case'&&!r.data.agentId))){
+   if(c.type==='as_case')for(const step of await serviceSteps(c))if(roles.includes('manager')||roles.includes(step.role))work.push({id:c.id+':'+step.key,title:step.title,section:'after-sales',target:c.type==='as_case'&&!c.data.agentId?'service-office:case:'+c.id:c.id,sourceId:c.id,state:c.data.state});
+   if(c.type==='as_claim'&&c.data.state==='received'&&(roles.includes('manager')||roles.includes('coordinator')))work.push({id:c.id+':review',title:'بررسی فیزیکی داغی و مستندات تعمیر',section:'after-sales',target:c.type==='as_case'&&!c.data.agentId?'service-office:case:'+c.id:c.id,sourceId:c.id,state:c.data.state});
+   if(c.type==='as_claim'&&['awaiting_return','sent','rejected'].includes(c.data.state)&&roles.includes('agent'))work.push({id:c.id+':return',title:'ارسال و پیگیری داغی قطعه',section:'after-sales',target:c.type==='as_case'&&!c.data.agentId?'service-office:case:'+c.id:c.id,sourceId:c.id,state:c.data.state});
+   if(c.type==='as_order'&&c.data.state==='requested'&&(roles.includes('manager')||roles.includes('coordinator')))work.push({id:c.id+':approve',title:'بررسی درخواست قطعه نماینده',section:'after-sales',target:c.type==='as_case'&&!c.data.agentId?'service-office:case:'+c.id:c.id,sourceId:c.id,state:c.data.state});
   }
  }
  const competing=new Set<string>(),liveBankReviews=new Set<string>();

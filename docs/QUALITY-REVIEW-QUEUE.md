@@ -1,3 +1,11 @@
+## Company-office device service — 2026-11-13
+
+Scope: independent home technician role + response/intake role, office-intake atomic as_case extension, bounded office serial/QR/open/history read API and MCP, permanent manufacturing/service QR printing, existing per-stage service UI/HTTP, performer vs recorder history/report projection, private photo camera and same-file upload retry. Shared application data only; no new entity type/table/FK/migration/reset exemption.
+
+Focused evidence: service-office SQLite scenario covers denied rep/hospital/technician-intake, required physical reception, active-serial duplicate CAS, stable private serial QR across closed/new visits, read-only lookup/print, missing-price/manual fallback denial, snapshot/re-consent, multiple performers and manager-on-behalf reason/member-revision race, actual lot reservation and replay-safe consumption, tests and explicit physical/accessory delivery, performance identities, 20-row search pages, MCP parity and maintenance freeze. UI hook coverage checks scanner/user gesture, exact active-case routing, no implicit reception/writes and separate existing forms. Existing after-sales, commercial/consumer assistant/forms, role/cartable, service-domain/navigation, serial/batch-label and camera regressions; TypeScript/build required.
+
+Limitations/debt: broad legacy AfterSalesPanel domain snapshot and aggregate report still use pre-existing full-domain loading; new office lists are bounded SQL. Historical technician rates/counts are operational evidence, not causal productivity rankings; calendar waiting time includes parts/customer waits. Large-volume plans/load/recovery and real phone/printer trial deferred. The paused cross-role faulty-part transport walkthrough is not resumed; release/browser navigation does not create live business fixtures.
+
 ## Home service agency coordinator scanner — 2026-11-13
 
 Scope: scan-first coordinator home in role profile and ordinary service entry; existing carton receive/review forms; SQL carton-level waiting/progress/history counts and search/page; MCP read parity. Shared existing dataset only, no new records/tables/migrations.

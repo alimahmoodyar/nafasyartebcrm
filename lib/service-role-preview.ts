@@ -7,7 +7,7 @@ import type {Session} from './permissions';
 import {storage} from './storage';
 // An unbound profile has no matching record; entering it never seeds data.
 export const servicePreviewAgent=unassignedServiceProfileId;
-const profiles=new Set(['home-service-representative','home-service','home-service-manager','ceo','finance-director','central-store','technical','quality','logistics']);
+const profiles=new Set(['home-service-customer-support','home-service-technician','home-service-intake','home-service-representative','home-service','home-service-manager','ceo','finance-director','central-store','technical','quality','logistics']);
 export const serviceRolePreview=(u:Session)=>!!u.profileReview&&profiles.has(u.profileReview.id);
 /** Preview changes position grants, never the application's data source.
  * The authenticated administrator remains the audit actor.

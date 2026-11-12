@@ -34,7 +34,7 @@ function BatchLookup(){
   </form>}
  </div>;
 }
-export function RoleTestingPanel({targetId='',onNavigate,onProfile,onAccessChanged,representativeDashboard,serviceRepresentativeDashboard}:{targetId?:string;onNavigate:(section:string,target?:string)=>void;onProfile:(profile:{id:string;title:string}|null)=>void;onAccessChanged?:()=>Promise<void>;representativeDashboard?:React.ReactNode;serviceRepresentativeDashboard?:React.ReactNode}){
+export function RoleTestingPanel({targetId='',onNavigate,onProfile,onAccessChanged,representativeDashboard,serviceRepresentativeDashboard,officeServiceDashboard}:{targetId?:string;onNavigate:(section:string,target?:string)=>void;onProfile:(profile:{id:string;title:string}|null)=>void;onAccessChanged?:()=>Promise<void>;representativeDashboard?:React.ReactNode;serviceRepresentativeDashboard?:React.ReactNode;officeServiceDashboard?:React.ReactNode}){
  const [profiles,setProfiles]=useState<RoleProfile[]>([]),[snapshot,setSnapshot]=useState<Snapshot|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(false);
  const [query,setQuery]=useState('');
  const [choosing,setChoosing]=useState<RoleProfile|null>(null),[choices,setChoices]=useState<{id:string;name:string}[]>([]),[buyer,setBuyer]=useState('');
@@ -66,6 +66,7 @@ export function RoleTestingPanel({targetId='',onNavigate,onProfile,onAccessChang
  const searchWords=query.trim().split(/\s+/).map(roleSearchText).filter(Boolean),filteredProfiles=profiles.filter(p=>{const text=roleSearchText(p.title+' '+p.group);return searchWords.every(word=>text.includes(word));});
  const salesScope=snapshot?.profile.id==='home-sales'||snapshot?.profile.id==='sales-representative';
  const scopedBuyer=snapshot?.buyerChoices?.find(choice=>choice.id===snapshot.buyerId)?.name;
+ if(snapshot&&['home-service-customer-support','home-service-technician'].includes(snapshot.profile.id)&&officeServiceDashboard&&!choosing)return <>{officeServiceDashboard}</>;
  if(snapshot?.profile.id==='home-service'&&!choosing)return <ServiceExpertDashboard accountKey={snapshot.profile.id} onNavigate={onNavigate}/>;
  if(id==='home-service'&&!snapshot&&!error&&!choosing)return <section className="panel inside" role="status">در حال دریافت پنل کارشناس…</section>;
  if(snapshot?.profile.id==='driver'&&!choosing)return <DriverDashboard accountKey={snapshot.profile.id} onNavigate={onNavigate}/>;
@@ -85,7 +86,7 @@ export function RoleTestingPanel({targetId='',onNavigate,onProfile,onAccessChang
   {!salesScope&&snapshot.profile.id!=='home-service-representative'&&(snapshot.profile.buyerScope==='optional'||snapshot.profile.missionScope)&&<div className="tools"><p>{scopedBuyer||(snapshot.profile.missionScope?'کارتابل راننده':'پیش‌نمایش بدون پرونده خریدار')}</p><button className="btn" onClick={()=>void open(snapshot.profile,true)}>{snapshot.profile.missionScope?'انتخاب مأموریت برای بررسی':snapshot.buyerId?'تغییر پرونده خریدار':'انتخاب پرونده خریدار'}</button></div>}
   {snapshot.profile.id==='central-store'&&<BatchLookup/>}
   {!snapshot.profile.pendingWorkflow&&<button className="panel inside" disabled={loading} style={{cursor:"pointer",textAlign:"right",width:"100%"}} onClick={()=>onNavigate("tasks")}><ClipboardList size={28}/><h3>کارتابل ({snapshot.work.length.toLocaleString("fa-IR")})</h3><p>{snapshot.sample?'کارهای فرایندی این جایگاه':'پیام‌های مستقیم و کارهای فرایندی این جایگاه'}</p></button>}
-  {snapshot.profile.id==='home-service-customer-support'?<p className="notice">کارتابل و پیام‌های مستقیم این نقش فعال است. فرایندهای تخصصی پاسخ‌گویی مشتری پس از تعریف اضافه می‌شوند.</p>:snapshot.profile.pendingWorkflow?<p className="notice">پروفایل این نقش ایجاد شده است. پس از تعریف فرایندها، فرم‌ها، کارتابل و دسترسی‌های مربوط به همین نقش اضافه می‌شوند.</p>:!snapshot.profile.operational?<div className="inside"><h3>پروفایل شخصی</h3><p>کارکرد، فیش حقوقی، مرخصی، مساعده، شرح وظایف و اموال امانی در این پروفایل قرار می‌گیرند. نمایش اطلاعات شخصی پس از اتصال فرد انجام می‌شود؛ برای این جایگاه فعلاً کارتابل عملیاتی تعریف نشده است.</p></div>:<>
+  {snapshot.profile.pendingWorkflow?<p className="notice">پروفایل این نقش ایجاد شده است. پس از تعریف فرایندها، فرم‌ها، کارتابل و دسترسی‌های مربوط به همین نقش اضافه می‌شوند.</p>:!snapshot.profile.operational?<div className="inside"><h3>پروفایل شخصی</h3><p>کارکرد، فیش حقوقی، مرخصی، مساعده، شرح وظایف و اموال امانی در این پروفایل قرار می‌گیرند. نمایش اطلاعات شخصی پس از اتصال فرد انجام می‌شود؛ برای این جایگاه فعلاً کارتابل عملیاتی تعریف نشده است.</p></div>:<>
   <h3><Boxes size={20} style={{display:'inline',marginLeft:8}}/>شروع کار و گزارش‌ها</h3><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:12}}>{snapshot.profile.links.map((a,i)=><button className="btn" key={i} disabled={loading} onClick={()=>onNavigate(a.section,a.target||(snapshot.profile.missionScope&&a.section==='transport'?snapshot.buyerId:undefined))}>{a.title}<ArrowLeftRight size={16}/></button>)}</div>
   </>}
   </>}

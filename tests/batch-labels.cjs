@@ -124,7 +124,7 @@ async function print(u,id,query=''){return context.run(u,()=>labels.GET(request(
  const params='&layout=roll&label=small&serial=DEVICE-0001&copies=10&'+new URLSearchParams(config);
  const serialResponse=await serialPage(admin,params);
  assert.equal(serialResponse.status,200,serialResponse.ok?'':await serialResponse.clone().text());
- const serialHtml=await serialResponse.text();
+ const serialHtml=await serialResponse.text();assert.ok(serialHtml.includes('<svg'),'Device serial label contains permanent service QR');
  assert.ok(serialHtml.includes('size:103mm 18mm')&&serialHtml.includes('رول سه‌ستونه'));assert.ok(serialHtml.includes('id="save-roll-preset"'));assert.ok(serialResponse.headers.get('content-security-policy').includes("connect-src 'self'"));
  assert.deepEqual([...serialHtml.matchAll(/<div class="roll-row">([\s\S]*?)<\/article><\/div>/g)].map(row=>(row[0].match(/class="serial" dir="ltr">DEVICE-0001/g)||[]).length),[3,3,3,1]);
  const trial=await (await serialPage(admin,params+'&print=test')).text();

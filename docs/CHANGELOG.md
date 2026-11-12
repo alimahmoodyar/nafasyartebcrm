@@ -1,3 +1,11 @@
+## 2026-11-13 — Company-office device reception and service technician
+
+- Added an independent «سرویسکار خدمات پس از فروش خانگی» role profile; customer-response staff now have support/intake grants and direct office reception. Existing agency-coordinator and agent workflows remain separate. Office home provides a device scanner, explicit reception, bounded open/history search and exact serial history.
+- New office_intake atomically stores physical receipt, deliverer/contact, accessories, appearance and existing warranty snapshot on an as_case. Each visit is separate; an active serial cannot be admitted twice. Existing private media/camera attachment flow is available after reception; uploads retry the same file operation ID.
+- Permanent NAFASYAR-DEVICE/1 serial QR is shared by production serial labels and read-only service device labels. It contains no customer/contact/repair data. Scan opens an existing current case; no active case offers history and explicit new reception, never automatic writes.
+- Office estimates require valid published part consumer tariffs and existing formula-derived home labor rates; manual missing-price fallback is blocked. Existing estimate snapshots, re-consent, actual lot reservation/consumption, tests and callback remain in use. New office departures require physical delivery/accessories confirmation.
+- Office diagnosis/repair/test/work logs record actual performer, authenticated recorder and timestamps. Only manager/admin may attribute an action to another active home technician, with a reason and membership revision guard. Reports use stable performer identities and per-case contributions. Existing as_case/records/service_files reset, backup and freeze coverage applies; no new table or migration.
+
 ## 2026-11-13 — Scan-first home service agency coordinator
 
 - Added one carton scanner to the agency coordinator home, with waiting, unfinished review and history sections, bounded server search/pagination and preserved links to existing agency workflows. The same home is available to ordinary home coordinators.
