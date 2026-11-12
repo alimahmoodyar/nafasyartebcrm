@@ -1,3 +1,7 @@
+## 2026-11-13 — Remove driver camera test block
+
+- Removed the redundant camera/code-reader test block from the driver role home; operational package, faulty-part carton and device-receipt scanners remain available. No business workflow or permissions changed.
+
 ## 2026-11-13 — Driver package scan pickup
 
 - Assigned logistics driver scans an opaque package QR, reviews default checked remaining serials and explicitly confirms pickup. No preassigned mission is required; an existing assigned/requested mission is synchronized in the same transaction. Missing serials require explanation; replay and wrong-driver access are rejected. Warehouse custody remains separate from destination receipt, stock and money.

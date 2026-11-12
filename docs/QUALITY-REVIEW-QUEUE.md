@@ -1,3 +1,7 @@
+## Driver camera test block removal — 2026-11-13
+
+Removed only the role-home test scanner, its local result state and import. Maintained the existing role-cartable UI test; operational scanners, HTTP/MCP and persistence unchanged. No new test suite or broad capacity check needed for this UI cleanup.
+
 ## Driver package pickup — 2026-11-13
 
 Focused extension of existing finished-package QR/receipt UI and fulfillment custody handler. Exact assigned carrier identity gates reads and writes, even without a mission. Existing mission assignment cannot be bypassed. Package-level missing rows do not mark other packages missing; same-operation replay and CAS protect custody history. No new entity/table/FK/blob or vehicle-checklist attestation. Automated driver/shared receipt tests and TypeScript/build required; no real camera/physical shipping claimed.

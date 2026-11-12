@@ -1,7 +1,6 @@
 'use client';
 import {ServiceReturnParcelsPanel} from './service-return-parcels-panel';
 import {DriverReceiptsPanel} from './driver-receipts-panel';
-import {CameraCodeScanner} from './camera-code-scanner';
 import {useEffect,useRef,useState} from 'react';
 import {ArrowLeftRight,Boxes,ClipboardList,Search,UserRound} from 'lucide-react';
 import {batchScanCode} from '@/lib/batch-qr';
@@ -37,11 +36,10 @@ function BatchLookup(){
 }
 export function RoleTestingPanel({targetId='',onNavigate,onProfile,onAccessChanged,representativeDashboard,serviceRepresentativeDashboard}:{targetId?:string;onNavigate:(section:string,target?:string)=>void;onProfile:(profile:{id:string;title:string}|null)=>void;onAccessChanged?:()=>Promise<void>;representativeDashboard?:React.ReactNode;serviceRepresentativeDashboard?:React.ReactNode}){
  const [profiles,setProfiles]=useState<RoleProfile[]>([]),[snapshot,setSnapshot]=useState<Snapshot|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(false);
- const [scanText,setScanText]=useState('');
  const [query,setQuery]=useState('');
  const [choosing,setChoosing]=useState<RoleProfile|null>(null),[choices,setChoices]=useState<{id:string;name:string}[]>([]),[buyer,setBuyer]=useState('');
  const selection=useRef(false);const id=targetId;
- useEffect(()=>{let live=true;setScanText('');setLoading(true);setError('');setSnapshot(null);
+ useEffect(()=>{let live=true;setLoading(true);setError('');setSnapshot(null);
   fetch('/api/role-profiles'+(id?'?profile='+encodeURIComponent(id):''),{cache:'no-store'}).then(async r=>{
    const d=await r.json() as Snapshot&{profiles?:RoleProfile[];error?:string};
    if(!r.ok)throw Error(d.error||'دریافت پروفایل انجام نشد.');
@@ -75,7 +73,6 @@ export function RoleTestingPanel({targetId='',onNavigate,onProfile,onAccessChang
  {!id&&!choosing&&!loading&&<><div className="tools" role="search" aria-label="جست‌وجوی نقش‌های آزمایشی"><label className="field"><span><Search size={16} style={{display:'inline',marginLeft:6}}/>جست‌وجوی نقش</span><input type="search" value={query} placeholder="نام نقش یا گروه؛ مثلاً خدمات خانگی، مالی، انبار…" onChange={e=>setQuery(e.target.value)}/></label>{query&&<button type="button" className="btn" onClick={()=>setQuery('')}>پاک‌کردن جست‌وجو</button>}<p className="subtle" role="status" aria-live="polite">{filteredProfiles.length.toLocaleString('fa-IR')} نقش از {profiles.length.toLocaleString('fa-IR')} نقش</p></div>{!filteredProfiles.length&&<p className="notice">نقشی با این نام یا گروه پیدا نشد؛ عبارت دیگری جست‌وجو کنید.</p>}<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:16}}>{filteredProfiles.map(p=><button key={p.id} disabled={loading} className="panel inside" style={{textAlign:'right',cursor:'pointer'}} onClick={()=>open(p)}><UserRound size={26}/><h3>پروفایل نقش {p.title}</h3><p className="subtle">{p.group} · {p.pendingWorkflow?'در انتظار تعریف فرایند':p.operational?'کارتابل و عملیات':'پروفایل شخصی'}</p><span>باز کردن پروفایل</span></button>)}</div></>}
  {snapshot&&!choosing&&<>
   {snapshot.profile.id==='driver'&&<><ServiceReturnParcelsPanel driver accountKey={snapshot.profile.id}/><DriverReceiptsPanel key={'receipts:'+snapshot.profile.id}/></>}
-  {snapshot.profile.id==='driver'&&<section className="inside"><h3>تست دوربین و کدخوان</h3><p>برای امتحان QR یا بارکد، نیازی به مأموریت نیست. این آزمایش کالا یا تحویل ثبت نمی‌کند.</p><CameraCodeScanner key={snapshot.profile.id} onScan={setScanText}/>{scanText&&<p role="status">کد خوانده شد: <bdi style={{overflowWrap:'anywhere'}}>{scanText.slice(0,3000)}</bdi></p>}</section>}
   {salesScope&&<div className="tools">{scopedBuyer&&<span>پروندهٔ آزمون: {scopedBuyer}</span>}<button type="button" className="btn" disabled={loading} onClick={()=>void open(snapshot.profile,true)}>{scopedBuyer?'تغییر پروندهٔ آزمون':'انتخاب پرونده برای آزمون'}</button></div>}
   {snapshot.sample&&<p className="subtle">داده‌های نمونهٔ نقش نماینده فروش</p>}
   {snapshot.profile.id==='home-service-representative'&&serviceRepresentativeDashboard?<>{serviceRepresentativeDashboard}</>:snapshot.profile.id==='sales-representative'&&representativeDashboard?<>
