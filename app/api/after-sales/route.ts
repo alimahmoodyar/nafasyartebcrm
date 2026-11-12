@@ -1,5 +1,6 @@
 import {isUnassignedServiceProfile} from '@/lib/service-profile-scope';
 import {trainingContext} from '@/lib/training-context';
+import {driverReceiptAccess,canReceiveDriverReceipt} from '@/lib/driver-receipts';
 import {withServiceRolePreview} from '@/lib/service-role-preview';
 import {currentServiceLabor,serviceCreditExposure,serviceCommercialPermissions} from '@/lib/service-commercial-contract';
 import {servicePartEntitlement,requireServiceProduct,orderableCodes} from '@/lib/service-parts';
@@ -88,7 +89,9 @@ async function post(request:Request){try{
  }else if(mode==='create'){
  if(domain==='home'&&u.profileReview?.id==='home-service')fail('نقش مسئول نمایندگی‌ها گزارش نماینده را بررسی می‌کند؛ ثبت گزارش با خود نماینده است.',403);
  need(u,domain,'support','intake','agent');const agentId=isAgent(u)?u.permissions.serviceAgentId||'':txt(b.agentId,200);const assigned=agentId?await agentCheck(agentId):null;const productId=txt(b.productId,200);if(domain==='home'&&assigned)await requireServiceProduct(assigned,productId);const serial=normalizeSerial(req(b.serial,160)),contactDay=past(b.day);const w=await warranty(serial,contactDay);if(domain==='home'&&assigned&&w.productId&&w.productId!==productId)fail('مدل انتخابی با سریال ثبت‌شده دستگاه متفاوت است.',409);guard("NOT EXISTS(SELECT 1 FROM flow_entities WHERE type='as_case' AND json_extract(data,'$.serial')=? AND json_extract(data,'$.state') NOT IN ('closed','resolved','returned'))",serial);
- put(id,'as_case',{domain,agentId,serial,productId,model:txt(b.model)||w.model,customer:req(b.customer),phone:req(b.phone,30),city:txt(b.city),province:serviceProvince(b.province),complaint:req(b.complaint),contactDay,warranty:w,state:'contact',lines:[],laborLines:[],customerTotal:'0',history:[{mode,by:u.name,actor:u.userId,at:now,notes:txt(b.complaint)}]});
+ let driverArrival:any=null;
+ if(b.transportReceiptId){const receipt=await driverReceiptAccess(u,req(b.transportReceiptId)),r=receipt.data;if(!canReceiveDriverReceipt(u,domain)||r.domain!==domain||r.state!=='received_office'||r.caseId||r.serial&&r.serial!==serial)fail('رسید باید توسط پذیرش همین حوزه دریافت شده و با سریال پرونده سازگار باشد.',409);guard('EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)',receipt.id,receipt.revision);driverArrival={day:r.receivedDay||dayAt(),by:r.receivedBy,driverReceiptId:receipt.id};put(receipt.id,'transport_receipt',{...r,caseId:id,state:'linked',history:[...r.history,{mode:'create_case',caseId:id,actor:u.userId,at:now}]},receipt);}
+ put(id,'as_case',{...(driverArrival?{physicalArrival:driverArrival,transportReceiptId:txt(b.transportReceiptId,200)}:{}),domain,agentId,serial,productId,model:txt(b.model)||w.model,customer:req(b.customer),phone:req(b.phone,30),city:txt(b.city),province:serviceProvince(b.province),complaint:req(b.complaint),contactDay,warranty:w,state:'contact',lines:[],laborLines:[],customerTotal:'0',history:[{mode,by:u.name,actor:u.userId,at:now,notes:txt(b.complaint)}]});
  }else if(mode==='office_stock'){
  need(u,domain,'inventory');const q=qty(b.quantity),batch=req(b.batchId),data=await takeRaw(batch,q,txt(b.location,100));entry(batch,warehouse('office',domain),q);stmts.push(db.prepare('INSERT INTO service_lots(id,owner,domain,batch_id,quantity,unit_rial,created) VALUES(?,?,?,?,?,?,?)').bind(id,'office',domain,batch,q,amount(b.costRial),now));
  }else if(mode==='order'){

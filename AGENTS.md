@@ -32,3 +32,10 @@
 - Configure ordinary users later with explicit, least-privilege access per role and operation. Navigation visibility is not authorization: enforce record and action permissions in the server handler, and keep HTTP, UI and MCP behavior aligned.
 - Preserve segregation of duties for sensitive approvals. When the administrator personally performs an approval during a test, record it as the administrator's approval; do not treat it as proof that the intended role's permissions work.
 - Before release, walk each workflow as administrator to validate transitions, then verify each role with its own account and confirm it sees and performs only its assigned work. Keep test evidence separate from real financial, inventory and supplier records.
+
+## Driver independent device pickup (owner agreement 2026-11-12)
+
+- Driver login and independent work do not require a preassigned mission. Keep assigned missions available, but allow one-device initial carrier pickup receipts separately, optionally referencing an authorized inbound device mission.
+- Initial receipt is physical custody only: sender/carrier/waybill/condition, optional readable serial, immutable receipt identity and reprintable QR. Do not invent warranty, stock, a repair case, or successful physical printing.
+- Device stays with its driver until authorized company service intake explicitly confirms physical receipt. Intake then links a compatible active case or completes the existing service case form; case creation and receipt linkage must be atomic and idempotent. Keep the agency coordinator out of this intake workflow.
+- Printer and phone models are not chosen yet. Provide a printable label/PDF first; direct portable-printer integration is deferred until hardware is known. All data remains in the shared application dataset.

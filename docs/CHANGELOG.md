@@ -1,3 +1,11 @@
+## 2026-11-12 — Independent driver device receipt and company intake
+
+- Driver profile/transport workspace can register one-device initial pickup from a carrier without any preassigned mission. Optional mission references are validated against assigned inbound device work; they do not automatically complete that mission.
+- Initial receipt records custody with the driver. Serial can remain unreadable/blank; no fake serial, warranty activation, stock or financial posting, or repair case is created. A stable receipt QR produces a private 60×40 mm printable label/PDF; reprints reuse the same identity and never claim physical print success.
+- Home/hospital service intake profiles can scan the QR and explicitly confirm physical handover. Custody then leaves the driver's SQL-paginated active list and enters history. Intake links a compatible active case or completes the existing case form; new case creation, receipt linkage and physical-arrival provenance are atomic.
+- Added dedicated intake preview entries using existing service_intake job grants, with domain isolation. Agency coordinator stays out of the new intake path. Actual administrator identity is preserved when testing roles.
+- New transport_receipt JSON is operational, covered by both reset/backup scopes and generic reset freeze. HTTP and MCP use the same handlers; no new table, migration or blob storage. Direct portable printer integration remains pending hardware choice.
+
 ## 2026-11-12 — Direct driver profile entry
 
 - Removed the initial mission-selection gate and the "enter without mission" option from driver role entry. The driver profile opens directly like other optional-scope roles.
