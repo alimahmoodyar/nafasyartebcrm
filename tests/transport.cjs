@@ -130,7 +130,8 @@ async function collect(id){await op(driver,'checklist',{missionId:id,packagesChe
  await assign(multi);
  await op(driver,'checklist',{missionId:multi,packagesChecked:true,itemsChecked:true,documentsChecked:true,conditionChecked:true,notes:''});
  await op(other,'collect',{missionId:multi,day,condition:'سالم',deviceIds:['carton-a']},404);
- await op(driver,'collect',{missionId:multi,day,condition:'سالم',deviceIds:['carton-a']});
+ const scanRevision=entity(multi).revision;await op(driver,'collect',{missionId:multi,day,condition:'سالم',deviceIds:['carton-a'],scannedCodes:['FOREIGN']},400);assert.equal(entity(multi).revision,scanRevision,'Foreign scan changes no mission/stock');await op(driver,'collect',{missionId:multi,day,condition:'سالم',deviceIds:['carton-a'],scannedCodes:['carton-a','carton-a']},400);await op(driver,'collect',{missionId:multi,day,condition:'سالم',deviceIds:['carton-a'],scannedCodes:['carton-b']},400);
+ await op(driver,'collect',{missionId:multi,day,condition:'سالم',deviceIds:['carton-a'],scannedCodes:['carton-a']});assert.equal(entity(multi).data.history.at(-1).scannedItems[0].serial,'carton-a');
  assert.equal(entity(multi).data.state,'assigned');
  await op(driver,'collect',{missionId:multi,day,condition:'سالم',deviceIds:['carton-b']});
  await op(driver,'offer',{missionId:multi,handoverTo:'Receiver',day});
@@ -162,5 +163,6 @@ async function collect(id){await op(driver,'checklist',{missionId:id,packagesChe
  const result=await catalog.executeTool('record_transport_vehicle_report',{id:crypto.randomUUID(),missionId:id,revision:entity(id).revision,reportKind:'reading',day,notes:'MCP mileage evidence',data:{odometer:'1001'},confirmed:true},base,{user:driverPrincipal,scope:'read_write',tokenId:null});assert.ok(result);assert.equal(entity(id).data.vehicleReports.at(-1).odometer,1001);
  let deniedMCP=false;try{await catalog.executeTool('report_transport_blocker',{id:crypto.randomUUID(),missionId:id,revision:entity(id).revision,reason:'other',retryDay:day,notes:'No write scope',confirmed:true},base,{user:driverPrincipal,scope:'read',tokenId:null})}catch{deniedMCP=true}assert.ok(deniedMCP);
  const p=load('lib/permissions.ts');assert.throws(()=>p.validatePermissions({...empty,serviceRoles:['agent'],serviceDomains:['home'],serviceAgentId:'A',transportRoles:['manager']}));
+ const scanDomain=load('lib/transport-scan.ts');seed('SCAN-BATCH','receipt',{code:'99011-14050821-001',part:'Service part'});const scanned=await scanDomain.checkTransportScans([{batchId:'SCAN-BATCH',partCode:'99011',quantity:7}],['https://test.local/b/99011-14050821-001']);assert.equal(scanned[0].quantity,7);await assert.rejects(()=>scanDomain.checkTransportScans([{batchId:'SCAN-BATCH',partCode:'99011',quantity:7}],['99011','99011-14050821-001']));
  console.log('Transport passed: driver/agent isolation, private documents/prices, partial-damage hold, atomic final inventory receipt, idempotency, actual return custody without warranty credit, source links, costs, positions, tasks and MCP scopes.');
 })().catch(e=>{console.error(e);process.exit(1)});

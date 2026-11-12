@@ -1,3 +1,11 @@
+## 2026-11-12 — Transport phone scanner
+
+- Scope: shared camera code scanner, transport-only camera action on existing carton selection, other mission-item matching, authorized batch alias reads and confirmed-operation scan history. New dependency @zxing/browser 0.2.1 is exact-pinned with the pnpm lockfile; decoder import is deferred until a user click. No new table, inventory formula, automatic confirmation or parallel workflow.
+- PASS: transport-scanner.cjs decodes an actual generated Persian QR snapshot and Code 128 image, and checks code matching/ambiguity, duplicate frames, click-only camera access, permission refusal, hidden-page/late-permission cleanup. mission-scan-ui.cjs checks manual/camera selection, deduplication, ambiguity/foreign rejection, no automatic submit, and original serial selection.
+- PASS: transport.cjs adds invalid/duplicate/stage-inconsistent scan rollback, authorized batch alias verification and recorded scan history to existing driver/agent isolation, inventory, idempotency and MCP tests; transport-unified.cjs remains passing. TypeScript/build and full source/native publication verification recorded with release.
+- Batch alias reads are restricted to IDs already in the authorized mission and batched in two bounded queries. Scan quantities come from the mission; repeated product/batch scans are never treated as counted units. No application records were changed by these isolated SQLite and component tests.
+- Limits: no physical phone camera/touch/browser validation claimed. Initial decoder download needs connectivity; the existing manual input and explicit local draft workflow remain. Non-serialized scan evidence is optional and is not proof of physical inspection. Pre-existing unbounded transport mission/source lists are unchanged and remain scaling debt.
+
 ## 2026-11-12 — Receipt photo crop and confirmation
 
 - Scope: shared camera/editor UI for both sales and service payment forms. No new business API/MCP capability; the existing upload and payment handlers retain all authorization and financial rules.

@@ -1,3 +1,10 @@
+## 2026-11-12 — Driver phone QR/barcode scanning
+
+- Driver collection and delivery forms now open an in-page phone camera on explicit click, with rear-camera preference, local QR/1D barcode decoding and separate manual entry. The decoder is dynamically loaded only when scanning starts.
+- Serialized carton scans feed the existing selected-device workflow. Other mission goods match serial, product or batch codes (including printed NAFASYAR batch QR snapshots) against that authorized mission. Ambiguous/foreign items and repeated frames/items cannot increase quantities; batch scanning does not count physical units.
+- Scanning edits the current form only. Explicit operation confirmation uses the existing driver/state/revision/idempotency checks; optional scanned item evidence is validated again on the server and retained in mission history. HTTP and transport_apply share this behavior.
+- Camera/decoder stop on close, page hiding, disabled form, role/mission/form exit, and cancellation of a pending permission request. Physical device/browser camera verification remains separate from software tests.
+
 ## 2026-11-12 — Confirmable receipt photo framing for sales and services
 
 - Newly captured receipt photos now open a shared free-crop editor before attachment: drag/keyboard corner handles, frame movement, preview magnification, 90-degree rotation, full-frame reset, retake and explicit photo confirmation.
