@@ -1,3 +1,4 @@
+import {unassignedServiceProfileId} from './service-profile-scope';
 import {profileExecutionContext} from './profile-execution-context';
 import {profileSession} from './profile-review';
 import {mcpActor} from './mcp/context';
@@ -5,7 +6,7 @@ import {session,accessResponse} from './authorization';
 import type {Session} from './permissions';
 import {storage} from './storage';
 // An unbound profile has no matching record; entering it never seeds data.
-export const servicePreviewAgent='role-unassigned-service-agent';
+export const servicePreviewAgent=unassignedServiceProfileId;
 const profiles=new Set(['home-service-representative','home-service','home-service-manager','ceo','finance-director','central-store','technical','quality','logistics']);
 export const serviceRolePreview=(u:Session)=>!!u.profileReview&&profiles.has(u.profileReview.id);
 /** Preview changes position grants, never the application's data source.

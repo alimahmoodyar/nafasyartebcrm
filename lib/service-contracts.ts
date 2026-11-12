@@ -1,3 +1,4 @@
+import {isUnassignedServiceProfile} from './service-profile-scope';
 import {storage} from './storage';
 import {AccessError} from './authorization';
 import type {Session} from './permissions';
@@ -15,7 +16,7 @@ export function contractWarning(c:any,agents:any[],today=dayAt()){
 export async function serviceContractWorkspace(u:Session){
  const rights=serviceContractRights(u);if(!rights.read)throw new AccessError('دسترسی قرارداد خدمات خانگی ندارید.',403);
  const rows=await serviceContractRows(),agents=rows.filter(r=>r.type==='as_agent'&&r.data.domain==='home'&&(!rights.ownAgent||r.id===rights.ownAgent));
- if(rights.ownAgent&&!agents.length)throw new AccessError('نماینده خدمات خانگی پیدا نشد.',404);
+ if(rights.ownAgent&&!agents.length&&!isUnassignedServiceProfile(u))throw new AccessError('نماینده خدمات خانگی پیدا نشد.',404);
  const ids=new Set(agents.map(a=>a.id)),today=dayAt(),contracts=rows.filter(r=>r.type==='as_service_contract'&&r.data.domain==='home'&&ids.has(r.data.agentId)).map(c=>({...c,status:serviceContractStatus(c,today,monthsAfter(c.data.endsOn,-1))}));
  return {rights,today,agents:agents.map(a=>({id:a.id,revision:a.revision,name:a.data.name,active:a.data.active,currentContractId:a.data.currentServiceContractId||''})),contracts};
 }

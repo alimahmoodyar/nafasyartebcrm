@@ -1,3 +1,4 @@
+import {isUnassignedServiceProfile} from './service-profile-scope';
 import {storage} from './storage';
 import {AccessError} from './authorization';
 import type {Session} from './permissions';
@@ -21,7 +22,7 @@ export function servicePartsAccess(u:Session){const r=serviceCommercialPermissio
 export async function servicePartsWorkspace(u:Session,q:URLSearchParams){
  const rights=servicePartsAccess(u);if(!rights.read)throw new AccessError('دسترسی فهرست قطعات خدمات خانگی ندارید.',403);
  const db=storage(),agents=(await list('as_agent')).filter(a=>a.data.domain==='home'&&(!rights.ownAgent||a.id===rights.ownAgent)),catalogs=(await list('as_service_part_catalog')).filter(c=>c.data.domain==='home');
- const selected=rights.ownAgent||q.get('agent')||'',a=selected?agents.find(a=>a.id===selected):null;if(selected&&(!a||!a.data.active))throw new AccessError('نماینده فعال و مجاز انتخاب کنید.',404);
+ const selected=rights.ownAgent||q.get('agent')||'',a=selected?agents.find(a=>a.id===selected):null;if(selected&&(!a||!a.data.active)&&!isUnassignedServiceProfile(u))throw new AccessError('نماینده فعال و مجاز انتخاب کنید.',404);
  const codes=a?orderableCodes(a,catalogs):new Set<string>(),tariffs=await list('as_tariff'),materials=await list('material'),query=servicePartText(q.get('q')||''),products=await servicePartProducts();
  const items=materials.filter(m=>codes.has(m.data.code)).map(m=>{const t=selectRepresentativePartTariff(tariffs,m.data.code,dayAt(),'home');return {code:m.data.code,name:m.data.name,unit:m.data.unit,description:typeof m.data.description==='string'?m.data.description:typeof m.data.specs==='string'?m.data.specs:typeof m.data.specifications==='string'?m.data.specifications:'',tariffId:t?.id||'',tariffRevision:t?.revision||0,priceRial:t?.data.priceRial??null,models:catalogs.filter(c=>(a?.data.allowedServiceProducts||[]).includes(c.data.productId)&&c.data.partCodes.includes(m.data.code)).map(c=>products.find(p=>p.id===c.data.productId)?.model||products.find(p=>p.id===c.data.productId)?.name||'')};}).filter(m=>!query||servicePartText([m.code,m.name,m.description,...m.models].join(' ')).includes(query));
  const photosByMaterial=new Map<string,string>();

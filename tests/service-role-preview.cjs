@@ -25,6 +25,18 @@ const entity=id=>{const r=sql.prepare('SELECT * FROM flow_entities WHERE id=?').
  assert.equal(sql.prepare('SELECT COUNT(*) n FROM flow_entities').get().n,0);
  assert.equal(sql.prepare('SELECT COUNT(*) n FROM training_flow_entities').get().n,0);
  assert.equal(sql.prepare('SELECT COUNT(*) n FROM app_members').get().n,0);
+ // Regression: a freshly entered role with no shared agency must open every
+ // read-only home/form workspace without claiming the agency is inactive.
+ for(const route of ['app/api/after-sales/route.ts','app/api/after-sales/parts/route.ts','app/api/after-sales/commercial/route.ts','app/api/after-sales/contracts/route.ts','app/api/after-sales/payments/route.ts','app/api/after-sales/part-repairs/route.ts']){
+  const result=await read(rep,load(route),'/api/form?domain=home');assert.ok(!result.data.error,route);
+ }
+ const ordinary={...rep,profileReview:undefined};
+ for(const route of ['app/api/after-sales/route.ts','app/api/after-sales/commercial/route.ts','app/api/after-sales/contracts/route.ts','app/api/after-sales/payments/route.ts']){
+  const denied=await context.run(ordinary,()=>load(route).GET(new Request(base+'/api/form?domain=home')));assert.ok([403,404].includes(denied.status),'Ordinary missing-agency account stays denied: '+route);
+ }
+ assert.equal(sql.prepare('SELECT COUNT(*) n FROM flow_entities').get().n,0,'Opening an empty role creates no agency or financial data');
+ assert.equal(sql.prepare('SELECT COUNT(*) n FROM training_flow_entities').get().n,0);
+
  // Existing application warehouse, created using its ordinary owning handler.
  const warehouseOperation=randomUUID(),warehouseId='warehouse:'+warehouseOperation;
  await form(admin,flow,{id:warehouseOperation,mode:'warehouse',confirmed:true,name:'انبار مرکزی پرند',warehouseType:'storage',directReceiptEnabled:true,quarantineWarehouseId:'',parentId:'',serviceDomain:'',serviceOwner:'',locations:['P-1-1-1'],active:true,revision:0});

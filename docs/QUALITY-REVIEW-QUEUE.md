@@ -1,3 +1,11 @@
+## 2026-11-12 — Representative profile without a shared agency
+
+- Confirmed online alerts from account, commercial, contract and payment reads against the unassigned administrator role marker. This was a regression from the preceding shared-data release; the previous full chain test began with an actual agency and missed the empty starting state.
+- Added six empty-workspace GET regression cases and ordinary missing-agency denials. No fake agency, ledger, bank account or stock is created, and write checks remain unchanged.
+- PASS: shared-role workflow test including empty reads/no implicit data writes and regular-account denials; service dashboard test; service bank/payment matching and reversal test. TypeScript --noEmit PASS.
+- Remaining online proof: the same administrator role opens without those alerts, parts/report/contract/payment pages open in their normal empty state, and a subsequent agency entered through its owning form binds to the same shared records. Earlier pending receipt outcome remains unknown and must be read before any retry.
+- Terminology correction: the owner meant the existing central/reference warehouse («انبار مرجع»), not a warehouse named after Parand. Reuse the existing warehouse shown in the application.
+
 ## 2026-11-12 — Shared service walkthrough correction
 
 - Replaces the earlier assumption that service-role walkthroughs must use isolated training storage. The owner confirmed all current application records are pre-production test data and specifically requested existing central Parand stock/workflows.

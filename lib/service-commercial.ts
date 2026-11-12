@@ -1,3 +1,4 @@
+import {isUnassignedServiceProfile} from './service-profile-scope';
 import {serviceCollection} from './service-collection';
 import {storage} from './storage';
 import {trainingContext} from './training-context';
@@ -12,7 +13,7 @@ export async function serviceCommercialWorkspace(u:Session){
  if(own&&(!u.permissions.serviceDomains?.includes('home')||!u.permissions.serviceRoles?.includes('agent')))throw new AccessError('دسترسی نماینده خدمات خانگی لازم است.',403);
  if(!Object.values(rights).some(Boolean)&&!own&&!(u.permissions.serviceDomains?.includes('home')&&u.permissions.serviceRoles?.length))throw new AccessError('دسترسی اعتبار و تعرفه خدمات ندارید.',403);
  const agents=(await list('as_agent')).filter(a=>a.data.domain==='home'&&(!own||a.id===own));
- if(own&&!agents.some(a=>a.id===own&&a.data.active))throw new AccessError('نماینده فعال خدمات خانگی لازم است.',403);
+ if(own&&!agents.some(a=>a.id===own&&a.data.active)&&!isUnassignedServiceProfile(u))throw new AccessError('نماینده فعال خدمات خانگی لازم است.',403);
  const requests=(await list('as_commercial_request')).filter(r=>r.data.domain==='home'&&(!own||r.data.agentId===own));
  const works=(await list('as_service_work')).filter(r=>r.data.domain==='home');
  const policies=(await list('as_service_labor_policy')).filter(r=>r.data.domain==='home');

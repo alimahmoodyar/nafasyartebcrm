@@ -1,3 +1,4 @@
+import {isUnassignedServiceProfile} from './service-profile-scope';
 import type {Session} from './permissions';
 import {storage} from './storage';
 import {AccessError} from './authorization';
@@ -16,6 +17,7 @@ export async function servicePaymentAgent(u:Session,id:string){
  const agent=await entity(id,'as_agent');if(agent.data.domain!=='home')fail('نماینده خدمات خانگی پیدا نشد.',404);return agent;
 }
 export async function readServicePayments(u:Session,id:string,page=1){
+ if(isUnassignedServiceProfile(u)&&id===u.permissions.serviceAgentId)return {unassignedProfile:true,agentId:id,agentName:'',canSubmit:false,canReview:false,today:dayAt(),page:1,pages:1,total:0,receivingAccounts:[],payments:[]};
  const agent=await servicePaymentAgent(u,id),db=storage(),all=await bankEntities(),periods=coveredBankPeriods(all),today=dayAt(),size=10;
  const count:any=await db.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type='sales_payment' AND json_extract(data,'$.serviceDomain')='home' AND json_extract(data,'$.agentId')=?").bind(id).first(),pages=Math.max(1,Math.ceil(count.n/size)),current=Math.min(page,pages);
  const rows=(await db.prepare("SELECT * FROM flow_entities WHERE type='sales_payment' AND json_extract(data,'$.serviceDomain')='home' AND json_extract(data,'$.agentId')=? ORDER BY created DESC,id LIMIT ? OFFSET ?").bind(id,size,(current-1)*size).all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}));

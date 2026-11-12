@@ -1,3 +1,9 @@
+## 2026-11-12 — Empty service-role profile regression
+
+- Reproduced the online representative dashboard showing inactive/missing-agency errors after the shared-data switch. The administrator's unassigned role identity is not an actual agency and must not be validated as an inactive one on read.
+- Empty administrator service-role workspaces now open account, contracts, commercial terms, payments, parts and part-repair views without creating or seeding records. The dashboard displays absence of history without repeated failure alerts. Explicit agency scopes and ordinary representative accounts retain validation; financial/inventory writes still require actual authorized business records.
+- Regression checks cover all six empty workspaces, no implicit data writes, ordinary-account denial, and the existing shared approval/order/receipt/QC chain. Dashboard and bank/payment tests remain passing. Online verification will be recorded separately after deployment.
+
 ## 2026-11-12 — Shared service-role business data
 
 - Owner correction: the service/warehouse/technical/QC/approval walkthrough uses the existing application dataset and central Parand warehouse. Role entry no longer seeds or redirects these profiles into training tables. Existing isolated records are retained, not migrated or deleted.

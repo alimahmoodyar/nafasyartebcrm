@@ -1,3 +1,4 @@
+import {isUnassignedServiceProfile} from './service-profile-scope';
 import {storedAccessPermissions} from './permissions';
 import {storage} from './storage';
 import type {Session} from './permissions';
@@ -30,7 +31,7 @@ function publicRow(u:Session,r:any,assignedId:string){const d={...r.data};if(!do
 }
 export async function readPartRepairs(u:Session,domain:string,id=''){
  if(!partRepairRead(u,domain))fail('مجوز قطعات تعمیری این حوزه را ندارید.',403);
- if(isAgent(u))await visible(u,{data:{domain,agentId:u.permissions.serviceAgentId}});
+ if(isAgent(u)&&!isUnassignedServiceProfile(u))await visible(u,{data:{domain,agentId:u.permissions.serviceAgentId}});
  const assignedId=await activeMemberId(u);
  const all=(await list(type)).filter(r=>r.data.domain===domain&&allowed(u,r,assignedId)),rows=id?all.filter(r=>r.id===id):all;
  if(id&&!rows.length)fail('پروندهٔ قطعه پیدا نشد یا دسترسی ندارید.',404);
