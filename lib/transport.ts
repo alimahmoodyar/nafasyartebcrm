@@ -15,7 +15,7 @@ export const transportDriver=(u:Session)=>!!u.permissions.transportRoles?.includ
 export const transportDriverPreview=(u:Session)=>u.profileReview?.id==='driver';
 export function transportDriverCanAct(u:Session,mission:{id:string;data:{driverId?:string}},member:string){
  if(!transportDriver(u)||!mission.data.driverId)return false;
- if(transportDriverPreview(u))return u.profileReview?.missionId===mission.id;
+ if(transportDriverPreview(u)&&u.profileReview?.missionId)return u.profileReview.missionId===mission.id;
  return member===mission.data.driverId;
 }
 export const transportFinancialRead=(u:Session)=>financialAccess(u,'transport');
@@ -33,7 +33,7 @@ async function salesTransportAccess(user:Session,data:any){
  return !!row&&await salesVisible(user,{id:row.id,data:JSON.parse(row.data)},'read');
 }
 export async function transportCanSee(u:Session,m:any,mid?:string){
- if(transportDriverPreview(u))return u.profileReview?.missionId===m.id;
+ if(transportDriverPreview(u)){if(u.profileReview?.missionId)return u.profileReview.missionId===m.id;return m.data.driverId===(mid??await memberId(u));}
  if(u.isAdmin||transportManager(u))return true;const d=m.data;mid=mid??await memberId(u);
  if(salesRep(u)){const a:any=await storage().prepare("SELECT data FROM flow_entities WHERE type='sales_agent' AND id=?").bind(u.permissions.salesAgentId).first();return !!a&&JSON.parse(a.data).active&&d.kind==='sale'&&d.salesAgentId===u.permissions.salesAgentId;}
  if(isAgent(u)){const a:any=await storage().prepare("SELECT data FROM flow_entities WHERE type='as_agent' AND id=?").bind(u.permissions.serviceAgentId).first();return !!a&&JSON.parse(a.data).active&&d.agentId===u.permissions.serviceAgentId&&domainAccess(u,d.domain);}

@@ -1,3 +1,11 @@
+## Scan-first driver dashboard — 2026-11-13
+
+Scope: shared role/real-driver dashboard, typed QR routing + unique authorized barcode lookup, separate operational form launch, own custody/work/history DTO with bounded SQL pagination/search, existing component initial-code props and scoped assigned-mission continuation. New read API has MCP parity; no new records/tables/blobs or reset changes.
+
+Focused checks: SQLite own-driver/other-driver/staff isolation across product packages, faulty-part cartons and initial device receipts, actual-collected serial filtering, assigned work/history, stable pages, unknown and foreign barcode rejection, read-only lookup, own preview next action with foreign denial; dashboard hook routing, camera not mounted on home, default checks and explicit existing confirmations; role/cartable and domain receipt UI/HTTP regression, scanner lifecycle, TypeScript/build. Live cross-profile faulty-part walkthrough remains paused.
+
+Deferred: high-volume query plans for multi-valued carton custody (existing JSON membership design); broad load/soak and physical phone/printer trial. Queries/counts stay in SQL; no new all-history JS list. No guessed shipping data, receiver approval or financial postings added.
+
 ## Driver camera test block removal — 2026-11-13
 
 Removed only the role-home test scanner, its local result state and import. Maintained the existing role-cartable UI test; operational scanners, HTTP/MCP and persistence unchanged. No new test suite or broad capacity check needed for this UI cleanup.

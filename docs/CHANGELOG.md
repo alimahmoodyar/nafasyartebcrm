@@ -1,3 +1,10 @@
+## 2026-11-13 — Scan-first driver home
+
+- Driver home now has one scan entry, own custody, assigned work, searchable/paginated history and a separate unlabeled-device receipt page. Operational forms open separately; admin profile explanations and mission-selection tools are removed from the driver home.
+- Existing product-package, faulty-part carton and initial-device QR handlers receive the scanned code automatically. A raw product serial resolves only a unique authorized active package; unknown/ambiguous codes never create records or confirm receipt. The camera starts after choosing scan and closes on leaving the scan page.
+- Own-driver mixed custody list reads shared existing data, showing only actually picked product serials. Explicit confirmations and original approval/stock/financial boundaries remain unchanged. Scoped read-only MCP parity; no new business persistence or migration.
+- A driver's own assigned mission can be followed from the profile without manually selecting a preview mission. Explicitly selected admin preview scope remains exact. Existing next-action forms open directly from the resolved mission; unknown real shipping details still require actual entry.
+
 ## 2026-11-13 — Remove driver camera test block
 
 - Removed the redundant camera/code-reader test block from the driver role home; operational package, faulty-part carton and device-receipt scanners remain available. No business workflow or permissions changed.

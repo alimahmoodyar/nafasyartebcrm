@@ -45,7 +45,7 @@ async function get(request:Request){try{const u=await requireAccess();if(request
 async function post(request:Request){try{checkOrigin(request);const u=await requireAccess();if(request.headers.get('X-Transport-Account')&&request.headers.get('X-Transport-Account')!==u.userId)fail('حساب ورود تغییر کرده است؛ پیش‌نویس برای این حساب نیست.',403);if(!transportEntry(u))fail('دسترسی تدارکات ندارید.',403);const b=JSON.parse(new TextDecoder().decode(await boundedBody(request,100000))),mode=req(b.mode),op=req(b.id),db=storage(),now=new Date().toISOString(),mid=await memberId(u);if(!/^[a-f0-9-]{36}$/i.test(op)||!transportActions[mode])fail('شناسه یا عملیات معتبر نیست.');
  if(transportDriverPreview(u)){
   if(!driverPreviewActions.has(mode))fail('این عملیات در پیش‌نمایش راننده مجاز نیست.',403);
-  if(!u.profileReview?.missionId||b.missionId!==u.profileReview.missionId)fail('مأموریت در محدودهٔ پیش‌نمایش نیست.',404);
+  if(u.profileReview?.missionId&&b.missionId!==u.profileReview.missionId)fail('مأموریت در محدودهٔ پیش‌نمایش نیست.',404);
  }
  const signature=JSON.stringify(b),prior:any=await db.prepare('SELECT * FROM inventory_operations WHERE id=?').bind(op).first();if(prior){if(prior.actor!==u.userId||prior.payload!==signature)fail('شناسه تکراری متفاوت.',409);return json({saved:true,repeated:true,id:b.missionId||b.vehicleId||b.partyId||op});}
  const stmts:D1PreparedStatement[]=[],checks=await supplyLock(db,op);let target=op;

@@ -1,9 +1,9 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
 import {Camera} from 'lucide-react';
-export function CameraCodeScanner({onScan,disabled=false}:{onScan:(code:string)=>void;disabled?:boolean}){
+export function CameraCodeScanner({onScan,disabled=false,autoStart=false}:{onScan:(code:string)=>void;disabled?:boolean;autoStart?:boolean}){
  const video=useRef<HTMLVideoElement|null>(null),stream=useRef<MediaStream|null>(null),controls=useRef<{stop:()=>void}|null>(null),epoch=useRef(0),callback=useRef(onScan),last=useRef({code:'',at:0});callback.current=onScan;
- const [open,setOpen]=useState(false),[starting,setStarting]=useState(false),[error,setError]=useState('');
+ const [open,setOpen]=useState(autoStart),[starting,setStarting]=useState(autoStart),[error,setError]=useState('');
  function release(){epoch.current++;controls.current?.stop();controls.current=null;stream.current?.getTracks().forEach(track=>track.stop());stream.current=null;if(video.current)video.current.srcObject=null}
  function close(){release();setOpen(false);setStarting(false)}
  useEffect(()=>release,[]);
@@ -17,5 +17,5 @@ export function CameraCodeScanner({onScan,disabled=false}:{onScan:(code:string)=
   if(token!==epoch.current){scanner.stop();return}controls.current=scanner;setStarting(false);
  }catch(e){if(token!==epoch.current)return;close();setError((e as Error).name==='NotAllowedError'?'اجازهٔ دوربین داده نشد؛ دسترسی دوربین این سایت را در مرورگر فعال کنید.':'اسکنر دوربین باز نشد؛ دوربین را بررسی کنید یا کد را دستی وارد کنید.')}})();return()=>release()},[open]);
  function start(){if(disabled)return;close();setError('');if(!navigator.mediaDevices?.getUserMedia){setError('این مرورگر به دوربین دسترسی ندارد؛ کد را دستی وارد کنید.');return}last.current={code:'',at:0};setStarting(true);setOpen(true)}
- return <div className="wide"><button type="button" className="btn" disabled={disabled||open} onClick={start}><Camera size={18}/>اسکن با دوربین</button>{error&&<p className="notice error" role="alert">{error}</p>}{open&&<section className="notice" aria-label="اسکن QR و بارکد"><p>{starting?'در حال بازکردن دوربین…':'کد را مقابل دوربین نگه دارید؛ اسکن فقط به فهرست اضافه می‌کند.'}</p><video ref={video} autoPlay playsInline muted style={{width:'100%',maxHeight:320,objectFit:'contain'}}/><button type="button" className="btn" onClick={close}>بستن اسکنر</button></section>}</div>;
+ return <div className="wide"><button type="button" className="btn" disabled={disabled||open} onClick={start}><Camera size={18}/>اسکن با دوربین</button>{error&&<p className="notice error" role="alert">{error}</p>}{open&&<section className="notice" aria-label="اسکن QR و بارکد"><p>{starting?'در حال بازکردن دوربین…':'کد را مقابل دوربین نگه دارید.'}</p><video ref={video} autoPlay playsInline muted style={{width:'100%',maxHeight:320,objectFit:'contain'}}/><button type="button" className="btn" onClick={close}>بستن اسکنر</button></section>}</div>;
 }
