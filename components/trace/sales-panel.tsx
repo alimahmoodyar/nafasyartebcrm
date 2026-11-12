@@ -1,4 +1,5 @@
 'use client';
+import {ShippingPackageReceipt} from './shipping-package-receipt';
 import {RepresentativeIdentityPanel} from './representative-identity-panel';
 import {ReceiptAttachment} from './receipt-attachment';
 import {CircleCheck,ClipboardList,Clock,History,Search,ShoppingCart,TriangleAlert,Wallet} from 'lucide-react';
@@ -50,6 +51,7 @@ const representativeEntries={
 } as const;
 
 export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:boolean;onNavigate:(s:string,target?:string)=>void}){
+ const [packageReceiptOpen,setPackageReceiptOpen]=useState(false);
  const [receiptEditing,setReceiptEditing]=useState(false);
  const [credentials,setCredentials]=useState<{username:string;mobile:string;name:string}|null>(null);
  const [baseData,setData]=useState<any>(null),[selected,setSelected]=useState(''),[view,setView]=useState('home'),[error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[draft,setDraft]=useState<any>(null),[quote,setQuote]=useState<any>(null),[file,setFile]=useState<File|null>(null),[accounts,setAccounts]=useState<any[]>([]),[search,setSearch]=useState(''),[province,setProvince]=useState(''),[from,setFrom]=useState(''),[to,setTo]=useState(''),[stage,setStage]=useState('');
@@ -388,12 +390,14 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
   const entry=targetId.slice('sales-view:calls'.length+1);
   return <SalesCallsPanel buyer={entry.startsWith('referral:')?'':entry} referralId={entry.startsWith('referral:')?entry.slice('referral:'.length):''} onNavigate={onNavigate}/>;
  }
+ if(representativeDashboard&&rep&&packageReceiptOpen)return <section className="panel" dir="rtl"><button className="btn" onClick={()=>setPackageReceiptOpen(false)}>بازگشت به پنل فروش</button><ShippingPackageReceipt onSaved={()=>{void load();}}/></section>;
  return <ProgramWorkspace programId="sales" direct={!!targetId} title="فروش" status={<>{roleBankTest&&<p className="notice">واریز آزمایشی · دادهٔ جداگانه از حساب شرکت</p>}{error&&!draft&&<p className="notice error" role="alert">{error}</p>}{!data.warehouseOnly&&(staff||finance)&&!writableAgents.length&&<p className="notice" role="status">نقش فروش شما فعال است؛ برای ثبت فروش، مدیر فروش باید از مسیر «فروش ← تنظیمات فروش ← تخصیص خریدار به کارشناس» خریدار موجود را به شما تخصیص دهد. مجوز مشاهده گزارش به‌تنهایی اختیار ثبت در پرونده همکاران را نمی‌دهد.</p>}</>}><section className={representativeDashboard?'panel sales-portal representative-dashboard':'panel sales-portal'} dir="rtl"><div className="panelhead"><h2>{representativeDashboard?'پنل نماینده فروش':openOrderList?'پیگیری سفارش‌ها':view==='orders'?'سفارش‌ها':representativeEntry?.view==='account'?'حساب و اعتبار نماینده':representativeEntry?.view==='returns'?'مرجوعی دستگاه':rep?'پرتال نماینده فروش':'فروش و نمایندگان'}</h2></div><div className="inside">
  {(rep||data.roles.staff||data.roles.manager)&&<RepresentativeIdentityPanel key={salesApi+":"+(rep?data.agents[0]?.id||"":"staff")} kind="sales" agentId={rep?data.agents[0]?.id||"":""}/>}
  {representativeDashboard&&rep&&<>
  <div className="representative-dashboard-actions" role="group" aria-label="اقدام‌های اصلی نماینده">
   <button type="button" className="btn primary" disabled={!writableAgents.length} onClick={()=>begin('order')}><ShoppingCart aria-hidden="true"/><span>ثبت درخواست خرید</span></button>
   <button type="button" className="btn" disabled={!writableAgents.length} onClick={()=>begin('payment',{agentId:writableAgents[0]?.id||''})}><Wallet aria-hidden="true"/><span>ثبت پرداخت یا چک</span></button>
+  <button type="button" className="btn" onClick={()=>setPackageReceiptOpen(true)}><CircleCheck aria-hidden="true"/><span>اسکن و دریافت بسته</span></button>
   <button type="button" className="btn" onClick={()=>onNavigate('tasks')}><ClipboardList aria-hidden="true"/><span>کارتابل</span></button>
  </div>
  <div className="representative-account-strip">

@@ -1,3 +1,10 @@
+## 2026-11-13 — Finished-product package labels and receipt
+
+- Product passport defines units per package (default 1). Finished warehouse confirms exact reserved serials; server splits them into single-model packages, including the final partial package, without changing stock or delivery status.
+- Immutable package QR IDs, sender/recipient and serial snapshots; A5 shipping sheets and read-only reprints. Warehouse dispatch requires confirmed packaging and preserves those serials. One QR per independent package, no duplicate labels for inner cartons.
+- Sales representative scans in their home profile, reviews default checked remaining serials, explains unchecked rows and explicitly confirms. Existing transport receipt handler atomically posts selected devices once; other packages remain pending. Missing rows remain in existing follow-up, with later receipt possible.
+- Same scoped HTTP/MCP handlers, exact-operation retry and revision checks. Existing sale/transport JSON and product catalog reset/backup/freeze coverage; no new table or migration.
+
 ## 2026-11-12 — Faulty-part carton shipping labels and scan handover
 
 - Home-service representatives pack up to 100 whole claim rows from multiple repair cases into up to 20 cartons. Each carton has an immutable QR and printable A5 label with frozen sender identity, company destination and per-carton contents. Printing/reprinting is read-only; actual dispatch requires tracking and date.

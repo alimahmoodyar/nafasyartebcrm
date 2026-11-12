@@ -1,3 +1,4 @@
+import {splitShippingPackages} from '@/lib/shipping-packages';
 import {withServiceRolePreview} from '@/lib/service-role-preview';
 import {dispatchInstallments} from '@/lib/sales-dispatch-terms';
 import {list} from '@/lib/after-sales';
@@ -42,7 +43,7 @@ async function post(request:Request){try{
  checkOrigin(request);const u=await requireAccess(),b=JSON.parse(new TextDecoder().decode(await boundedBody(request,128000))),id=needed(b.id),mode=needed(b.mode),db=storage(),now=new Date().toISOString();
  if(!/^[a-f0-9-]{36}$/i.test(id))fail('شناسه عملیات معتبر نیست.');
  const shortage=shortageRoles(u);
- const allowed=mode==='shortage_action'?Object.values(shortage).some(Boolean):mode==='handoff'||mode==='cancel_handoff'?flowRole(u,'production'):['receive','dispatch'].includes(mode)?warehouseAccess(u,'finished'):['reserve','cancel_sale'].includes(mode)?salesStaff(u):mode==='handover'?salesStaff(u)||salesRep(u):mode==='acknowledge'?flowRole(u,'logistics'):false;
+ const allowed=mode==='shortage_action'?Object.values(shortage).some(Boolean):mode==='handoff'||mode==='cancel_handoff'?flowRole(u,'production'):['receive','dispatch','pack'].includes(mode)?warehouseAccess(u,'finished'):['reserve','cancel_sale'].includes(mode)?salesStaff(u):mode==='handover'?salesStaff(u)||salesRep(u):mode==='acknowledge'?flowRole(u,'logistics'):false;
  if(!allowed)fail('مجوز این عملیات یا انبار را ندارید.',403);
  const signature=JSON.stringify(b),prior:any=await db.prepare('SELECT payload,actor FROM inventory_operations WHERE id=?').bind(id).first();if(prior){if(prior.payload!==signature||prior.actor!==u.userId)fail('شناسه تکراری با درخواست متفاوت.',409);return json({saved:true,repeated:true});}
  const statements:D1PreparedStatement[]=[],checks:D1PreparedStatement[]=await salesLock(db,id);
@@ -133,6 +134,19 @@ async function post(request:Request){try{
  }else if(mode==='cancel_sale'){
  const sale=await get(needed(b.saleId),'sale');if(sale.data.state!=='reserved')fail('فقط رزرو ارسال‌نشده قابل لغو است.');const reason=needed(b.reason,4000);
  for(const did of sale.data.deviceIds){const build=await get(did,'build');if(build.data.state!=='reserved'||build.data.saleId!==sale.id)fail('وضعیت رزرو تغییر کرده است.',409);put(did,'build',{...build.data,state:'finished',saleId:null},build);event(did,'لغو رزرو فروش',{notes:reason});}put(sale.id,'sale',{...sale.data,state:'cancelled',reason,cancelledBy:u.name,cancelledAt:now},sale);
+ }else if(mode==='pack'){
+ const sale=await get(needed(b.saleId),'sale');if(sale.data.state!=='reserved'||sale.data.shippingPackages?.length)fail('بسته‌بندی فقط یک بار برای حوالهٔ رزروشده ثبت می‌شود؛ بستهٔ ثبت‌شده قابل چاپ مجدد است.',409);
+ const selected=ids(b.deviceIds);if(selected.length!==sale.data.deviceIds.length||selected.some(did=>!sale.data.deviceIds.includes(did)))fail('تمام سریال‌های رزروشدهٔ همین حواله را انتخاب کنید.');
+ if(b.confirmed!==true)fail('محتویات بسته‌ها را تأیید کنید.');
+ const items=[];
+ for(const did of selected){const build=await get(did,'build'),d=await device(did);if(build.data.state!=='reserved'||build.data.saleId!==sale.id||d.product!==sale.data.productId)fail('رزرو سریال تغییر کرده است.',409);
+ if(build.data.warehouseId){const w=(await warehouseDirectory()).find(w=>w.id===build.data.warehouseId&&w.data.active);if(!w||!warehouseMember(u,w,'inventory'))fail('این دستگاه در مسئولیت انبار شما نیست.',403);guard('EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)',w.id,w.revision);}
+ const product:any=await db.prepare("SELECT payload FROM records WHERE id=? AND kind='product'").bind(d.product).first();if(!product)fail('محصول پیدا نشد.');guard('EXISTS(SELECT 1 FROM records WHERE id=? AND payload=?)',d.product,product.payload);const p=JSON.parse(product.payload);items.push({deviceId:did,serial:d.code,productId:d.product,model:p.model||p.name,capacity:p.packageCapacity});}
+ const sender={name:needed(b.senderName),phone:needed(b.senderPhone,50),city:needed(b.senderCity),address:needed(b.senderAddress,2000)};
+ const recipient={...sale.data.recipient,city:needed(b.recipientCity||sale.data.recipient?.city),phone:needed(sale.data.recipient?.phone||sale.data.recipient?.mobile,50),address:needed(sale.data.recipient?.address,2000)};
+ const packages=splitShippingPackages(items,()=>crypto.randomUUID());
+ const order=sale.data.salesOrderId?await get(sale.data.salesOrderId,'sales_order'):null;
+ put(sale.id,'sale',{...sale.data,shippingPackages:packages,packageOrderCode:order?.data.code||sale.data.salesOrderId||'',packageSender:sender,packageRecipient:recipient,packedAt:now,packedBy:u.userId},sale);
  }else if(mode==='dispatch'){
  const primary=await get(needed(b.saleId),'sale');if(primary.data.state!=='reserved'||primary.data.replacementReturnId&&!primary.data.replacementReady)fail('این حواله قبلاً خارج یا لغو شده است.',409);
  if(primary.data.salesOrderId){
@@ -144,6 +158,7 @@ async function post(request:Request){try{
  const recipientKey=(r:any)=>[r?.name,r?.phone||r?.mobile,r?.address];
  if(related.some(line=>line.data.salesAgentId!==primary.data.salesAgentId||line.data.partyId!==primary.data.partyId||JSON.stringify(recipientKey(line.data.recipient))!==JSON.stringify(recipientKey(primary.data.recipient))))fail('گیرندهٔ حواله‌های این سفارش یکسان نیست.');
  const chosen=ids(b.deviceIds);
+ for(const line of sales){if(!line.data.shippingPackages?.length)fail('ابتدا بسته‌بندی و برچسب همین حواله را ثبت کنید.',409);const packed=line.data.shippingPackages.flatMap((p:any)=>p.deviceIds);if(packed.some((did:string)=>!chosen.includes(did)))fail('سریال خروج باید عین محتویات بسته‌های چاپ‌شده باشد.',409);}
  if(chosen.length!==sales.reduce((sum,line)=>sum+line.data.count,0))fail('تعداد سریال خروج باید برابر مجموع حواله‌های آماده باشد.');
  const swaps=new Map<string,string[]>();
  const reserved=new Set(sales.flatMap(line=>line.data.deviceIds));

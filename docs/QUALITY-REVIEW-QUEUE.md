@@ -1,3 +1,11 @@
+## Finished-product packages — 2026-11-13
+
+Scope: product packageCapacity; immutable sale.shippingPackages/contact snapshots; existing finished warehouse pack/dispatch UI; authenticated A5/QR lookup; representative camera/manual code receipt; package-scoped existing transport receipt and physical package counts. No transport simplification or continuation of the paused live faulty-part walkthrough.
+
+Focused tests: SQLite authenticated pack/print/dispatch/receipt, 4+4+2, mixed-model separation, same UUID replay, no print/pack stock movement, actual dispatch stock movement, denied other representative/driver, duplicate and foreign serial rejection, missing-row explanation, other packages staying pending, receipt during an open discrepancy and later completion, final exactly-once inventory and MCP parity. Transport/scanner regression and TypeScript checked before release. Browser camera/physical printing and actual logistics not claimed.
+
+Deferred: real phone/printer hardware verification and broad enterprise load/soak. Existing all-history fulfillment list query is pre-existing debt; new QR lookup is direct bounded sale ID, max100 serials, no new growing list.
+
 ## Faulty-part carton packaging / QR — 2026-11-12
 
 Changed scope: as_return_parcel operational JSON, as_return_destination catalog config, carton label endpoint, representative/expert/driver UI and MCP, guards against parallel legacy shipping/transport, snapshot of each existing return_review decision. Shared application data only. Approved identity is preferred for sender snapshots; legacy agency contact is a compatibility fallback. Company destination must be configured by home-service manager; unknown contact data is never fabricated. A whole claim quantity stays in one carton; splitting a claim across cartons is not implemented.
