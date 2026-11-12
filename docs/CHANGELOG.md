@@ -1,3 +1,10 @@
+## 2026-11-12 — Confirmable receipt photo framing for sales and services
+
+- Newly captured receipt photos now open a shared free-crop editor before attachment: drag/keyboard corner handles, frame movement, preview magnification, 90-degree rotation, full-frame reset, retake and explicit photo confirmation.
+- Only the confirmed JPEG enters the existing payment attachment flow. Cancel/retake preserves the previous attachment; both sales and service payment submit buttons and handlers wait while a photo is being edited.
+- Cropping uses the oriented working image pixels, independent of preview magnification. Working images are capped at a 4096-pixel longest edge and confirmed JPEGs at 10 MiB. Camera streams and temporary preview URLs are released on close/unmount.
+- No backend, bank-matching, accounting or persisted-data changes.
+
 ## 2026-11-12 — Sales payment live receipt camera
 
 - Sales bank-payment receipt capture now uses the same click-only live camera, JPEG preview and stream cleanup as service payments. The prior capture-hint file input is removed.

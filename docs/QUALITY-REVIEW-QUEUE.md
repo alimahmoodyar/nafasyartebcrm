@@ -1,3 +1,10 @@
+## 2026-11-12 — Receipt photo crop and confirmation
+
+- Scope: shared camera/editor UI for both sales and service payment forms. No new business API/MCP capability; the existing upload and payment handlers retain all authorization and financial rules.
+- PASS: receipt-photo-editor.cjs covers free-crop bounds with extreme movement, source-pixel export, rotated dimensions, zoom independent of crop pixels, pointer and keyboard handles, explicit confirm, retake/cancel and late export after unmount. receipt-camera.cjs verifies no attachment before confirmation and preservation of an existing receipt on cancel, plus media lifecycle checks.
+- PASS: service-payments-ui.cjs and sales-role-navigation-ui.cjs verify submit controls/handlers issue no payment request while editing. TypeScript/build and full Git-tree/native publication evidence recorded with release.
+- Limits: physical touchscreen/camera/browser rendering are not proven by mocked component tests. Preview zoom is for precise framing, not upscaling the exported image; working images cap the longest edge at 4096 pixels and JPEGs at 10 MiB. No business records were changed for this feature.
+
 ## 2026-11-12 — Shared receipt camera in sales bank payments
 
 - Scope: replace sales capture-hint picker with ReceiptAttachment; extend that component with optional PDF selection while leaving service receipt selection image-only. No new business capability or MCP/API change.
