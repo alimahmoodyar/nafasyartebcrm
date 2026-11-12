@@ -62,5 +62,25 @@ await form(ceoPreview,partsApi,{id:randomUUID(),mode:'catalog_decide',domain:'ho
 const creditNew=randomUUID();await action(internal,{id:creditNew,mode:'credit_propose',agentId:newRepId,limitRial:'100000',notes:'Scenario credit',confirmed:true});await action(managerPreview,{id:randomUUID(),mode:'credit_decide',requestId:creditNew,revision:1,approved:true,notes:'Approved',confirmed:true});
 const priceNew=randomUUID();await action(managerPreview,{id:priceNew,mode:'part_price_propose',partCode:'99001',priceRial:'100',validFrom:today,notes:'Scenario price',confirmed:true});await action(financePreview,{id:randomUUID(),mode:'part_price_decide',requestId:priceNew,revision:1,approved:true,notes:'Approved',confirmed:true});
 const ready=await context.run(rep,()=>partsApi.GET(new Request(base+'/api/after-sales/parts?q=99001'))),readyData=await ready.json();assert.equal(readyData.items.length,1);assert.equal(readyData.items[0].priceRial,'100');const placed=await form(rep,api,{id:randomUUID(),mode:'order',domain:'home',confirmed:true,agentId:newRepId,lines:[{tariffId:readyData.items[0].tariffId,quantity:'2',expectedTariffRevision:readyData.items[0].tariffRevision}],notes:'Scenario order'});assert.ok(placed.saved);assert.equal(sql.prepare('SELECT COUNT(*) n FROM service_ledger').get().n,0);assert.ok(sql.prepare('SELECT id FROM training_service_ledger WHERE agent_id=?').get(newRepId));
+// The manager's existing warehouse form can configure ONLY isolated warehouses.
+const setup=load('app/api/role-profiles/warehouse-setup/route.ts');
+const testWarehouseId=randomUUID();
+const setupBody={id:testWarehouseId,mode:'warehouse',confirmed:true,name:'انبار دریافت فرضی خدمات',warehouseType:'storage',directReceiptEnabled:true,quarantineWarehouseId:'',parentId:'',serviceDomain:'',serviceOwner:'',locations:['S-1-1-1','S-1-1-2'],active:true,revision:0};
+await form(admin,setup,setupBody);
+assert.equal(sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type='material_warehouse'").get().n,0);
+const configured=await context.run(warehouse,()=>flow.GET()),configuredData=await configured.json();
+assert.ok(configuredData.warehouses.some(w=>w.id==='warehouse:'+testWarehouseId&&w.canReceive),'Warehouse scope is resolved INSIDE the isolated workspace');
+const setupDenied=await context.run(warehouse,()=>setup.POST(new Request(base+'/api/setup',{method:'POST',headers:{origin:base,'content-type':'application/json'},body:JSON.stringify(setupBody)})));assert.equal(setupDenied.status,403,'Ordinary position cannot administer test setup');
+const forbiddenSetup=await context.run(admin,()=>setup.POST(new Request(base+'/api/setup',{method:'POST',headers:{origin:base,'content-type':'application/json'},body:JSON.stringify({id:randomUUID(),mode:'material'})})));assert.equal(forbiddenSetup.status,403,'Setup endpoint cannot perform arbitrary business writes');
+const qualityPosition=preview.profileSession(admin,'quality',[]),qualitySession=await context.run(qualityPosition,()=>load('app/api/session/route.ts').GET());
+const qualityScope=await qualitySession.json();assert.ok(qualityScope.profileReview.warehouseIds.includes('warehouse:'+testWarehouseId));assert.equal(qualityScope.isAdmin,false,'Quality retains its position grants');
+const receipt=await form(warehouse,flow,{id:randomUUID(),mode:'receipt',receiptVersion:2,confirmed:true,warehouseId:'warehouse:'+testWarehouseId,materialId:'material:1001',day:today,quantity:'3',receiptNote:'Synthetic receipt only',noteRoles:[],notePeople:[],evidenceIds:[],deliveryClue:{}});
+assert.ok(receipt.receiptId,'The same warehouse role can receive into the configured training warehouse');
+const qcStarted=await form(qualityPosition,flow,{id:randomUUID(),mode:'start_incoming_qc',receiptId:receipt.receiptId});
+await form(qualityPosition,flow,{id:randomUUID(),mode:'incoming_qc',receiptId:receipt.receiptId,revision:qcStarted.revision,accepted:'3',values:{appearance:'pass'},notes:'Synthetic visual check'});
+const receiptRow=JSON.parse(sql.prepare('SELECT data FROM training_flow_entities WHERE id=?').get(receipt.receiptId).data);
+assert.equal(receiptRow.state,'awaiting_warehouse');
+assert.equal(sql.prepare('SELECT COUNT(*) n FROM inventory_batches').get().n,0,'Receipt inventory remains isolated');
+const resolvedWarehouse=await context.run(warehouse,()=>load('app/api/session/route.ts').GET());const warehouseSession=await resolvedWarehouse.json();assert.ok(warehouseSession.permissions.serviceRoles.includes('inventory'));assert.ok(!warehouseSession.permissions.serviceRoles.includes('finance'));assert.equal(warehouseSession.isAdmin,false);
 console.log('PASS role-only service preview: no person/company account, all four profile modules open with real agent grants, shared expert scenario, isolated database and no hospital access.');
 })().catch(e=>{console.error(e);process.exitCode=1});

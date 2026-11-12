@@ -9,7 +9,7 @@ export const representativeSampleId=(userId:string)=>'role-sample-representative
 export function profileReviewSelection(raw:string){const [storedProfileId,buyerId='',extra]=raw.split('~');if(extra!==undefined)throw Error('invalid preview scope');return {profileId:storedProfileId==='home-service'&&buyerId?'home-service-representative':storedProfileId,buyerId:storedProfileId==='home-service-representative'||storedProfileId==='home-service'&&buyerId?'':buyerId};}
 export const profileReviewCookie='__Host-nafasyar-profile-review';
 export const profileJobRoles:Record<string,string[]>={
- 'central-store':['inventory'],'line-store':['production_store_assistant'],'line-manager':['production'],
+ 'central-store':['inventory','service_inventory'],'line-store':['production_store_assistant'],'line-manager':['production'],
  'warehouse-worker':[],'production-worker':[],'packaging-worker':[],'repair-worker':[],
  quality:['qc'],technical:['engineering','product_manager'],'finance-director':['finance_director','purchase_finance'],
  ceo:['ceo'],domestic:['domestic'],foreign:['foreign'],sales:['sales'],
@@ -27,7 +27,7 @@ export function profileSession(admin:Session,id:string,warehouses:any[],buyerId=
  const roles=profileJobRoles[id];if(!roles)throw Error('مجوزهای این پروفایل تعریف نشده است.');
  const selected=warehouses.filter(w=>w.data.active&&!w.data.deletedAt&&(id==='quality'||id==='line-store'?id==='quality'||w.data.warehouseType==='production_line':!w.data.serviceDomain&&!['production_line','quarantine'].includes(w.data.warehouseType)));
  const responsibilities=['central-store','line-store','quality'].includes(id)?selected.map(w=>({warehouseId:w.id,role:(id==='quality'?'qc':'inventory') as 'inventory'|'qc'})):[];
- let permissions=roles.length?resolveRoleAssignment({roles,...(id==='sales-representative'?{salesAgentId:buyerId}:{}),...(serviceRepresentative?{serviceAgentId:buyerId}:{}),...(['central-store','line-store','quality'].includes(id)?{...(responsibilities.length?{warehouseResponsibilities:responsibilities}:{}),warehouses:id==='line-store'?['line']:['raw','quarantine','nonconforming','finished']}:{}),...(['home-service','home-service-manager','home-service-representative','hospital-service'].includes(id)?{serviceDomains:[id==='hospital-service'?'hospital':'home']}: {})}):{read:[],write:[],eventStages:[]};
+ let permissions=roles.length?resolveRoleAssignment({roles,...(id==='sales-representative'?{salesAgentId:buyerId}:{}),...(serviceRepresentative?{serviceAgentId:buyerId}:{}),...(['central-store','line-store','quality'].includes(id)?{...(responsibilities.length?{warehouseResponsibilities:responsibilities}:{}),warehouses:id==='line-store'?['line']:['raw','quarantine','nonconforming','finished']}:{}),...(['central-store','home-service','home-service-manager','home-service-representative','hospital-service'].includes(id)?{serviceDomains:[id==='hospital-service'?'hospital':'home']}: {})}):{read:[],write:[],eventStages:[]};
  // Entry points follow the agreed profile; operation grants still come from the job policy.
  const {roleAssignment,...grants}=permissions;
  permissions={...grants,...(['central-store','line-store','quality'].includes(id)?{warehouseResponsibilities:responsibilities}:{}),manualPrograms:[...new Set(profile.links.map(l=>l.section==='warehouse'?'flow':l.section).concat(['central-store','line-store'].includes(id)?['routine-production','flow','inventory','fulfillment','sourcing','build-projects']:[]))]};

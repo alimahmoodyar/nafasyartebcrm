@@ -1,3 +1,4 @@
+import {withServiceRolePreview} from '@/lib/service-role-preview';
 import {dispatchInstallments} from '@/lib/sales-dispatch-terms';
 import {list} from '@/lib/after-sales';
 import {annualCountMovementStatements,assertWarehouseNotCounting,type CountMovement} from '@/lib/stocktake-lock';
@@ -19,7 +20,7 @@ const text=(v:unknown,max=200)=>{if(typeof v!=='string'||v.length>max)fail('مت
 const needed=(v:unknown,max=200)=>{const s=text(v,max);if(!s)fail('فیلد الزامی خالی است.');return s};
 const ids=(v:unknown)=>{if(!Array.isArray(v)||!v.length||v.length>100||new Set(v).size!==v.length)fail('بین ۱ تا ۱۰۰ سریال غیرتکراری انتخاب کنید.');return (v as unknown[]).map(x=>needed(x));};
 const json=(v:unknown)=>Response.json(v,{headers:{'Cache-Control':'no-store'}});
-export async function GET(){try{
+async function get(){try{
  const u=await requireAccess(),production=flowRole(u,'production'),inventory=warehouseAccess(u,'finished'),sales=salesStaff(u)||salesRep(u),logistics=flowRole(u,'logistics');
  const shortage=shortageRoles(u);
  if(!production&&!inventory&&!sales&&!logistics&&!Object.values(shortage).some(Boolean))fail('دسترسی محصول نهایی ندارید.',403);
@@ -37,7 +38,7 @@ export async function GET(){try{
  const orderVisible=all.filter(e=>e.type==='sales_order'&&e.data.state==='approved'&&(inventory||salesStaff(u)||salesRep(u)&&e.data.agentId===u.permissions.salesAgentId));
  return json({warehouses:physical.filter(w=>w.data.active&&(production||warehouseMember(u,w,'inventory'))).map(w=>({id:w.id,name:w.data.name,canReceive:warehouseMember(u,w,'inventory')})),builds,rows,handoffs,sales:salesVisible,orders:orderVisible.map(e=>({id:e.id,created:e.created,data:{code:e.data.code,agentId:e.data.agentId,recipient:e.data.recipient,lines:e.data.lines,deliveryMode:e.data.deliveryMode}})),carriers:inventory?members.filter(m=>(m.permissions.flowRoles?.includes('logistics')||m.permissions.transportRoles?.includes('driver'))).map(m=>({id:m.id,name:m.name})):[],roles:{production,inventory,sales,logistics,shortage}});
  }catch(e){return accessResponse(e)||Response.json({error:'دریافت کارتابل محصول نهایی انجام نشد.'},{status:503})}}
-export async function POST(request:Request){try{
+async function post(request:Request){try{
  checkOrigin(request);const u=await requireAccess(),b=JSON.parse(new TextDecoder().decode(await boundedBody(request,128000))),id=needed(b.id),mode=needed(b.mode),db=storage(),now=new Date().toISOString();
  if(!/^[a-f0-9-]{36}$/i.test(id))fail('شناسه عملیات معتبر نیست.');
  const shortage=shortageRoles(u);
@@ -200,3 +201,6 @@ export async function POST(request:Request){try{
  await db.batch([db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(id,'fulfillment_'+mode,signature,u.userId,now),...checks,...await annualCountMovementStatements(db,id,b,countMovements),...statements,...formStatements,db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,id,'fulfillment_'+mode,signature,now)]);
  let followup=true;try{await syncSalesTasks();await scanSalesMonitor({reports:false,source:'event'});}catch{followup=false;}return json({saved:true,followupPending:!followup});
  }catch(e){return accessResponse(e)||Response.json({error:/constraint|SQLITE|D1|Database/i.test(String(e))?'موجودی یا وضعیت هم‌زمان تغییر کرده است؛ هیچ تغییری ثبت نشد. تازه‌سازی کنید.':'ثبت انجام نشد؛ ورودی‌ها را بررسی کنید.'},{status:409})}}
+
+export const GET=withServiceRolePreview(get);
+export const POST=withServiceRolePreview(post);

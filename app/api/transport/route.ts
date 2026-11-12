@@ -1,3 +1,4 @@
+import {withServiceRolePreview} from '@/lib/service-role-preview';
 import {needsSalesWaybill} from '@/lib/transport-contract';
 import {withRepresentativeSample} from '@/lib/representative-sample';
 import {warehouseAccess} from '@/lib/material-flow';
@@ -169,5 +170,5 @@ async function post(request:Request){try{checkOrigin(request);const u=await requ
  let followup=true;try{await syncTransportTasks();await syncSalesTasks();await scanSalesMonitor({reports:false,source:'event'});}catch{followup=false;}return json({saved:true,id:target,followupPending:!followup});
  }catch(e){return accessResponse(e)||json({error:'ثبت حمل انجام نشد؛ وضعیت هم‌زمان تغییر کرده است. تازه‌سازی و بررسی کنید.'},409)}}
 
-export const GET=withRepresentativeSample(get);
-export const POST=withRepresentativeSample(post);
+export const GET=withServiceRolePreview(withRepresentativeSample(get));
+export const POST=withServiceRolePreview(withRepresentativeSample(post));

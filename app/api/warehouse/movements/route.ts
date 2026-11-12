@@ -1,3 +1,4 @@
+import {withServiceRolePreview} from '@/lib/service-role-preview';
 import {annualCountMovementStatements,assertWarehouseNotCounting,type CountMovement} from '@/lib/stocktake-lock';
 import {warehouseDisplayName} from '@/lib/warehouse-tree';
 import {captureForm} from '@/lib/form-control';
@@ -13,7 +14,7 @@ import {tehranDay} from '@/lib/serials';
 const fail=(m:string,s=400):never=>{throw new AccessError(m,s)};
 const text=(v:any,n=200)=>{if(typeof v!=='string'||!v.trim()||v.length>n)fail('اطلاعات الزامی معتبر نیست.');return v.trim();};
 const json=(v:any)=>Response.json(v,{headers:{'Cache-Control':'private, no-store',Vary:'Cookie, Authorization'}});
-export async function GET(){try{
+async function get(){try{
  const u=await requireAccess();if(!internalWarehouseUser(u)||!flowRole(u,'inventory'))fail('دسترسی عملیات انبار ندارید.',403);
  const db=storage(),ws=await warehouseDirectory(),own=ws.filter(w=>w.data.active&&warehouseMember(u,w,'inventory')),ownIds=new Set(own.map(w=>w.id));
  const records=(await db.prepare("SELECT id,kind,payload FROM records WHERE kind IN ('batch','device','product')").all()).results.map((r:any)=>({...r,data:JSON.parse(r.payload)}));
@@ -27,7 +28,7 @@ export async function GET(){try{
  const historicalIds=new Set(ws.filter(w=>warehouseMember(u,w,'inventory')).map(w=>w.id));const transfers=all.filter(r=>r.type==='warehouse_transfer'&&(u.isAdmin||historicalIds.has(r.data.fromWarehouseId)||historicalIds.has(r.data.toWarehouseId))).map(r=>({...r,canReceive:r.data.state==='pending'&&ownIds.has(r.data.toWarehouseId)&&warehouseAccess(u,r.data.kind==='batch'?'raw':'finished'),canCancel:r.data.state==='pending'&&ownIds.has(r.data.fromWarehouseId)&&warehouseAccess(u,r.data.kind==='batch'?'raw':'finished')}));
  return json({historicalWarehouses:ws.filter(w=>w.data.deletedAt&&transfers.some(t=>[t.data.fromWarehouseId,t.data.toWarehouseId].includes(w.id))).map(w=>({id:w.id,name:warehouseDisplayName(w),deleted:true})),warehouses:ws.filter(w=>w.data.active).map(w=>({id:w.id,name:w.data.name,locations:ownIds.has(w.id)?w.data.locations:[],own:ownIds.has(w.id)})),stock:stock.filter(s=>s.quantity>0),transfers});
  }catch(e){return accessResponse(e)||Response.json({error:'دریافت عملیات انبار ممکن نشد.'},{status:503});}}
-export async function POST(request:Request){try{
+async function post(request:Request){try{
  checkOrigin(request);const u=await requireAccess();if(!internalWarehouseUser(u)||!flowRole(u,'inventory'))fail('دسترسی عملیات انبار ندارید.',403);
  const b=JSON.parse(new TextDecoder().decode(await boundedBody(request,24000))),id=text(b.id);if(!/^[a-f\d]{8}-[a-f\d]{4}-4[a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{12}$/i.test(id)||b.confirmed!==true)fail('شناسه و تأیید عملیات لازم است.');
  const db=storage(),signature=JSON.stringify(b),prior:any=await db.prepare('SELECT actor,payload FROM inventory_operations WHERE id=?').bind(id).first();if(prior){if(prior.actor!==u.userId||prior.payload!==signature)fail('شناسه تکراری با درخواست متفاوت.',409);return json({saved:true,repeated:true});}
@@ -59,3 +60,6 @@ export async function POST(request:Request){try{
  await db.batch([db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(id,'warehouse_'+b.mode,signature,u.userId,now),...checks,...await annualCountMovementStatements(db,id,b,countMovements),...stmts,...holdChecks(db,id,touched),...forms,db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,b.transferId||id,'warehouse_'+b.mode,signature,now)]);
  return json({saved:true});
  }catch(e){return accessResponse(e)||Response.json({error:'موجودی یا وضعیت تغییر کرده است؛ هیچ تغییری ثبت نشد. تازه‌سازی کنید.'},{status:409});}}
+
+export const GET=withServiceRolePreview(get);
+export const POST=withServiceRolePreview(post);
