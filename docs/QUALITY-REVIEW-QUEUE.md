@@ -1,3 +1,8 @@
+## 2026-11-12 — Service-home tracking summary removal
+
+- Scope: remove the repeated home-page tracking summary and its unused presentation-only list/status mapping. Preserve the existing cartable action, payment schedule, payment history and ledger.
+- Verification: existing service-dashboard.cjs navigation and financial presentation test; publication/source comparison recorded separately. No new business operations or persistence.
+
 ## 2026-11-12 — Populated material catalog / absent agency regression
 
 - Confirmed cause: orderableCodes dereferenced agent.data when an administrator's unassigned service profile read a nonempty shared material catalog. Before the fix, the new API regression returned 503 with the same service-unavailable message as online.

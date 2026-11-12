@@ -1,3 +1,8 @@
+## 2026-11-12 — Remove repeated service-home tracking summary
+
+- Removed the "پیگیری کارهای من" section from the home-service representative dashboard at the owner's request. The direct cartable action remains in the main action row; the owning order, repair and return pages retain their workflows.
+- Presentation-only removal; no API, authorization, stored data, accounting or inventory changes. Existing dashboard navigation/financial presentation check passed.
+
 ## 2026-11-12 — Unassigned service profile with an existing catalog
 
 - Reproduced the exact 503 reported online: a shared material catalog existed before any shared home-service agency. The earlier empty-database regression test passed because it never evaluated the per-material eligibility filter.
