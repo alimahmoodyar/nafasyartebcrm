@@ -28,7 +28,7 @@ export async function GET(request:Request){try{
   return json({profile:visibleProfile(profile),work,activeProfile:active?.id||'',buyerChoices:await profileScopeChoices(profile.id),sample:true,unverified:[],personalPreview:false});
  }
  const previewPosition=profileSession(admin,profile.id,[],buyerId);
- if(serviceRolePreview(previewPosition))return runServiceRolePreview(previewPosition,async()=>json({profile:visibleProfile(profile),work:(await profileWork(previewPosition)).work,activeProfile:active?.id||'',buyerId:previewPosition.profileReview?.buyerId||'',buyerChoices:[],unverified:[],personalPreview:false,serviceRoleSample:true}));
+ if(serviceRolePreview(previewPosition))return runServiceRolePreview(previewPosition,async position=>json({profile:visibleProfile(profile),work:(await profileWork(position)).work,activeProfile:active?.id||'',buyerId:position.profileReview?.buyerId||'',buyerChoices:[],unverified:[],personalPreview:false,serviceRoleSample:true}));
  const templateSync=await syncReceiptTemplates(admin);if(templateSync.needsTaskSync)await syncMaterialTasks();await syncInventoryCounts();
  const buyerChoices=await profileScopeChoices(profile.id);
  const position=profileSession(admin,profile.id,(await storage().prepare("SELECT id,data FROM flow_entities WHERE type='material_warehouse'").all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)})),buyerId);

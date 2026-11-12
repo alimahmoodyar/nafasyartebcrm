@@ -1,3 +1,4 @@
+import {trainingContext} from './training-context';
 import {AccessError} from './authorization';
 import {storedAccessPermissions} from './permissions';
 import type {Session} from './permissions';
@@ -18,6 +19,8 @@ export const canLinkServiceDomains=(u:Session)=>['home','hospital'].filter(domai
 function needLink(c:LinkContext,domain:string){if(!canLinkServiceDomain(c.user,domain))fail('اتصال یا قطع اتصال نمایندگی به مجوز مدیر فروش و مدیر خدمات همان حوزه نیاز دارد.',403);}
 async function authorityGuard(c:LinkContext){
  if(c.user.isAdmin)return;
+ // Validated role previews keep the administrator as actor; there is deliberately no person account in isolated storage.
+ if(c.user.profileReview&&trainingContext.getStore()?.actor===c.user.userId)return;
  const m:any=await c.db.prepare("SELECT id,permissions FROM app_members WHERE status='active' AND (subject=? OR id=?)").bind(c.user.userId,c.user.userId.startsWith('local:')?c.user.userId.slice(6):c.user.userId).first();
  if(!m||JSON.stringify(storedAccessPermissions(m.permissions))!==JSON.stringify(c.user.permissions))fail('دسترسی حساب تغییر کرده است؛ دوباره وارد شوید.',403);
  c.guard("EXISTS(SELECT 1 FROM app_members WHERE id=? AND status='active' AND permissions=?)",m.id,m.permissions);
