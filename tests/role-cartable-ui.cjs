@@ -95,5 +95,9 @@ assert.deepEqual(navigation.pop(),['tasks','inbox']);
 const renderOtherNotice=()=>{cursor=0;return TaskNotifier({accountId:'admin',profile:{id:'central-store'},onOpen:navigate})};
 await mount(renderOtherNotice);
 assert.equal(renderOtherNotice(),null,'A different role cannot display the sales work or message count');
+
+// Root remounts its children when refreshed permissions change. It must already
+// point at the selected role, or the catalog mount exits the selected cookie.
+let routeDuringAccessRefresh;navigation=[];profileRequests=[];const selectedRole={id:'central-store',title:'مسئول انبار مرکزی',operational:true,links:[],gaps:[]};response={profiles:[selectedRole]};const renderSelection=()=>{cursor=0;return RoleTestingPanel({onNavigate:navigate,onProfile(){},onAccessChanged:async()=>{routeDuringAccessRefresh=navigation.at(-1);await Promise.resolve();}})};await mount(renderSelection);nodes(renderSelection()).find(n=>n.type==='button'&&text(n).includes(selectedRole.title)).props.onClick();await new Promise(r=>setImmediate(r));assert.deepEqual(routeDuringAccessRefresh,['role-testing','central-store'],'Access refresh/remount already sees selected role instead of a catalog that exits it');assert.equal(profileRequests.filter(x=>x.options?.body&&JSON.parse(x.options.body).mode==='exit_profile').length,0);
 console.log('PASS clear cartable entry for operational/personal profiles, no duplicate role queue, shared direct/process tabs, useful pending-QC empty state, exact domain task navigation.');
 })().catch(e=>{console.error(e);process.exitCode=1});
