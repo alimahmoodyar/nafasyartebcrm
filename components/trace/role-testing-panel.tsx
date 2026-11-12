@@ -1,4 +1,5 @@
 'use client';
+import {ServiceExpertDashboard} from './service-expert-dashboard';
 import {DriverDashboard} from './driver-dashboard';
 import {useEffect,useRef,useState} from 'react';
 import {ArrowLeftRight,Boxes,ClipboardList,Search,UserRound} from 'lucide-react';
@@ -65,6 +66,8 @@ export function RoleTestingPanel({targetId='',onNavigate,onProfile,onAccessChang
  const searchWords=query.trim().split(/\s+/).map(roleSearchText).filter(Boolean),filteredProfiles=profiles.filter(p=>{const text=roleSearchText(p.title+' '+p.group);return searchWords.every(word=>text.includes(word));});
  const salesScope=snapshot?.profile.id==='home-sales'||snapshot?.profile.id==='sales-representative';
  const scopedBuyer=snapshot?.buyerChoices?.find(choice=>choice.id===snapshot.buyerId)?.name;
+ if(snapshot?.profile.id==='home-service'&&!choosing)return <ServiceExpertDashboard accountKey={snapshot.profile.id} onNavigate={onNavigate}/>;
+ if(id==='home-service'&&!snapshot&&!error&&!choosing)return <section className="panel inside" role="status">در حال دریافت پنل کارشناس…</section>;
  if(snapshot?.profile.id==='driver'&&!choosing)return <DriverDashboard accountKey={snapshot.profile.id} onNavigate={onNavigate}/>;
  if(id==='driver'&&!snapshot&&!error&&!choosing)return <section className="panel inside" role="status">در حال دریافت پنل راننده…</section>;
  return <section className="panel" dir="rtl"><div className="panelhead"><div><h2>{snapshot?'پروفایل نقش '+snapshot.profile.title:'پروفایل نقش‌ها'}</h2><p className="subtle">جایگاه مستقل از شخص؛ بررسی مرحله‌به‌مرحله فرایندهای فروش، انبار و تولید</p></div>{id&&<button className="btn" onClick={()=>void select(null)}>همه نقش‌ها</button>}</div>

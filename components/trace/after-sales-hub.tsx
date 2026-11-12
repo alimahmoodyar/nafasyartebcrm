@@ -1,4 +1,5 @@
 'use client';
+import {ServiceExpertDashboard} from './service-expert-dashboard';
 import {ServicePaymentsPanel,ServiceFinanceWorkspace} from './service-payments-panel';
 import {ServicePartsPanel} from './service-parts-panel';
 import {useEffect,useState} from 'react';
@@ -6,7 +7,7 @@ import {ServiceContractsPanel} from './service-contracts-panel';
 import {serviceContractRights} from '@/lib/service-contracts-contract';
 import {ServiceCommercialPanel} from './service-commercial-panel';
 import type {Session} from '@/lib/permissions';
-import {serviceReadDomains,isAgent} from '@/lib/service-access';
+import {serviceReadDomains,isAgent,domainWriteAccess} from '@/lib/service-access';
 import {serviceBranchTitles} from '@/lib/after-sales-labels';
 import {AfterSalesPanel} from './after-sales-panel';
 import {HospitalPanel} from './hospital-panel';
@@ -33,6 +34,7 @@ export function AfterSalesHub({demo,user,onNavigate,transportAvailable,target=''
  const [homeView,setHomeView]=useState(targetView);
  useEffect(()=>{setDomain(entryDomain);setHomeView(targetView);},[scope]);
  useEffect(()=>{setDomain(entryDomain);setHomeView(targetView);},[target]);
+ if(!demo&&!target&&!user.isAdmin&&!user.permissions.serviceAgentId&&!user.permissions.salesAgentId&&!user.permissions.hospitalCenterId&&domainWriteAccess(user,'home')&&user.permissions.serviceRoles?.includes('coordinator'))return <ServiceExpertDashboard accountKey={scope} onNavigate={onNavigate}/>;
  if(target==='service-finance:')return <ServiceFinanceWorkspace key={scope+':finance'} agentId={user.permissions.serviceAgentId||''}/>;
  if(target.startsWith('service-payments:'))return <ServicePaymentsPanel key={scope+':'+target} agentId={user.permissions.serviceAgentId||(target==='service-payments:new'?'':target.slice('service-payments:'.length))} initialAction={target==='service-payments:new'?'new':'list'}/>;
  return <ProgramWorkspace direct={!!target||roleEntry} programId="after-sales-hub" title="خدمات پس از فروش">

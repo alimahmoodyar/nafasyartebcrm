@@ -1,3 +1,9 @@
+## 2026-11-13 — Scan-first home service agency coordinator
+
+- Added one carton scanner to the agency coordinator home, with waiting, unfinished review and history sections, bounded server search/pagination and preserved links to existing agency workflows. The same home is available to ordinary home coordinators.
+- Scanning opens the exact existing carton and associated claim/case rows. Company receipt requires observed selected items, physical receipt confirmation and storage location; its action is labelled «تأیید دریافت کارتن و شروع بررسی». Each item retains the existing observed-item/reason gate and approval/rejection handler. No receipt/approval/credit from scanning alone; no new business persistence or migration.
+- Carton history uses frozen decisions, retaining rejected-item results even after repacking; HTTP/MCP share coordinator-only workspace reads.
+
 ## 2026-11-13 — Scan-first driver home
 
 - Driver home now has one scan entry, own custody, assigned work, searchable/paginated history and a separate unlabeled-device receipt page. Operational forms open separately; admin profile explanations and mission-selection tools are removed from the driver home.

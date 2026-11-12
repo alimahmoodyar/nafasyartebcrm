@@ -33,6 +33,21 @@ function publicParcel(u:Session,p:any,carton:any){
 }
 export async function readReturnParcels(actor:Session,q:URLSearchParams){
  const u=await liveSalesUser(actor),db=storage(),code=q.get('code'),parsed=code?parseReturnCarton(code):null;if(code&&!parsed)fail('QR کارتن معتبر نیست.');
+ if(q.has('workspace')){
+  if(q.get('workspace')!=='expert')fail('بخش معتبر نیست.');
+  if(!parcelExpert(u)||!role(u,'coordinator'))fail('دسترسی بررسی داغی خدمات خانگی لازم است.',403);
+  const view=q.get('view')||'waiting',page=Number(q.get('page')||1),search=text(q.get('q')||'',100,false);
+  if(!['waiting','progress','history'].includes(view)||!Number.isSafeInteger(page)||page<1||page>1000000)fail('بخش یا صفحه معتبر نیست.');
+  // Each list row is one carton, not a whole multi-carton shipment. Frozen item
+  // decisions survive rejection/repacking and never borrow a later parcel's review.
+  const cte=`WITH cartons AS (SELECT p.id parcelId,p.created,json_extract(p.data,'$.code') code,json_extract(p.data,'$.sender.name') sender,COALESCE(json_extract(p.data,'$.tracking'),'') tracking,c.value box FROM flow_entities p,json_each(p.data,'$.cartons') c WHERE p.type='as_return_parcel' AND json_extract(p.data,'$.domain')='home' AND json_extract(c.value,'$.state') IN ('sent','with_driver','office_partial','received')), buckets AS (SELECT *,CASE WHEN json_extract(box,'$.state')='received' AND NOT EXISTS(SELECT 1 FROM json_each(box,'$.items') i WHERE json_type(i.value,'$.review') IS NULL) THEN 'history' WHEN json_extract(box,'$.state')='office_partial' OR EXISTS(SELECT 1 FROM json_each(box,'$.items') i WHERE json_type(i.value,'$.review') IS NOT NULL) THEN 'progress' ELSE 'waiting' END bucket FROM cartons)`;
+  const counts:Record<string,number>={waiting:0,progress:0,history:0};
+  for(const r of (await db.prepare(cte+' SELECT bucket,COUNT(*) n FROM buckets GROUP BY bucket').all()).results as any[])counts[r.bucket]=r.n;
+  const where=`bucket=? AND (?='' OR instr(code,?)>0 OR instr(sender,?)>0 OR instr(tracking,?)>0 OR EXISTS(SELECT 1 FROM json_each(box,'$.items') i WHERE instr(COALESCE(json_extract(i.value,'$.serial'),''),?)>0 OR instr(COALESCE(json_extract(i.value,'$.partCode'),''),?)>0 OR instr(COALESCE(json_extract(i.value,'$.caseId'),''),?)>0))`,args=[view,search,search,search,search,search,search,search];
+  const total:any=await db.prepare(cte+' SELECT COUNT(*) n FROM buckets WHERE '+where).bind(...args).first();
+  const rows=(await db.prepare(cte+' SELECT parcelId,code,sender,tracking,box,bucket FROM buckets WHERE '+where+' ORDER BY created,parcelId,json_extract(box,\'$.number\') LIMIT 20 OFFSET ?').bind(...args,(page-1)*20).all()).results.map((r:any)=>{const box=JSON.parse(r.box);return {parcelId:r.parcelId,cartonId:box.id,number:box.number,code:r.code,sender:r.sender,tracking:r.tracking,state:box.state,bucket:r.bucket,items:box.items.length,reviewed:box.items.filter((i:any)=>i.review).length}});
+  return {rows,counts,total:total?.n||0,page,pages:Math.max(1,Math.ceil((total?.n||0)/20))};
+ }
  const id=parsed?.parcelId||q.get('id')||'',cartonId=parsed?.cartonId||q.get('cartonId')||'';
  if(id){const access=await returnParcelAccess(u,id,cartonId),p=access.parcel,carton=access.carton;const claimIds=(carton?[carton]:p.data.cartons).flatMap((c:any)=>c.items.map((i:any)=>i.claimId));
  const claims=parcelExpert(u)||u.isAdmin||u.permissions.serviceAgentId?(await db.prepare("SELECT id,revision,data FROM flow_entities WHERE type='as_claim' AND id IN (SELECT value FROM json_each(?))").bind(JSON.stringify(claimIds)).all()).results.map((r:any)=>{const d=JSON.parse(r.data),item=p.data.cartons.flatMap((c:any)=>c.items).find((i:any)=>i.claimId===r.id),decision=item?.review;return {id:r.id,revision:r.revision,caseId:d.caseId,state:decision?.state||d.state,review:decision?.notes||d.review||'',reviewAllowed:d.returnParcelId===p.id&&!decision,partCode:d.partCode,serial:d.serial,receivedDay:d.receivedDay||''}}):[];

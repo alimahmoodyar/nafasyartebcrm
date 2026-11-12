@@ -1,3 +1,11 @@
+## Home service agency coordinator scanner — 2026-11-13
+
+Scope: scan-first coordinator home in role profile and ordinary service entry; existing carton receive/review forms; SQL carton-level waiting/progress/history counts and search/page; MCP read parity. Shared existing dataset only, no new records/tables/migrations.
+
+Focused checks: real SQLite role/domain denial, separate cartons in one parcel, partial receipt and unfinished review, completed/repacked rejected-item history, search and stable 20-row pages; scan causes no business write, camera mounts only on user scanner entry and unmounts after code recognition, exact carton/case route, explicit company-receipt inputs, existing per-claim observed decision. Existing domain tests cover one credit on approval, none on receipt/rejection and replay/concurrency guards. Role/cartable regression, TypeScript and production build required. Live transport walkthrough remains paused; UI validation does not create live business data.
+
+Deferred: load/query-plan measurements for JSON carton/item membership and aggregate counts, broad soak/recovery and physical camera/printer trials. No measured high-volume capacity claim.
+
 ## Scan-first driver dashboard — 2026-11-13
 
 Scope: shared role/real-driver dashboard, typed QR routing + unique authorized barcode lookup, separate operational form launch, own custody/work/history DTO with bounded SQL pagination/search, existing component initial-code props and scoped assigned-mission continuation. New read API has MCP parity; no new records/tables/blobs or reset changes.

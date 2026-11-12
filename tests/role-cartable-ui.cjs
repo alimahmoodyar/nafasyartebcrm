@@ -16,7 +16,7 @@ response={activeProfile:'home-service-customer-support',profile:{id:'home-servic
 
 const internalService={id:'home-service',title:'کارشناس خدمات پس از فروش خانگی (مسئول نمایندگی‌ها)',operational:true,links:[],gaps:[]};
 response={activeProfile:internalService.id,profile:internalService,work:[],unverified:[]};
-const renderInternalService=()=>{cursor=0;return RoleTestingPanel({targetId:internalService.id,onNavigate:navigate,onProfile(){}})};await mount(renderInternalService);assert.ok(!text(renderInternalService()).includes('انتخاب / تغییر نمایندگی آزمایشی'));
+const renderInternalService=()=>{cursor=0;return RoleTestingPanel({targetId:internalService.id,onNavigate:navigate,onProfile(){}})};await mount(renderInternalService);assert.ok(nodes(renderInternalService()).some(n=>n.type===leaves.ServiceExpertDashboard),'Coordinator opens scan-first dashboard');assert.ok(!text(renderInternalService()).includes('انتخاب / تغییر نمایندگی آزمایشی'));
 const serviceRep={id:'home-service-representative',title:'نماینده خدمات پس از فروش خانگی',operational:true,buyerScope:'optional',serviceScope:true,links:[{title:'سفارش قطعه',section:'after-sales',target:'service-parts:'},{title:'قرارداد و تمدید',section:'after-sales',target:'service-contract:'}],gaps:[]};
 response={activeProfile:serviceRep.id,profile:serviceRep,work:[],unverified:[],buyerId:'training-service-agent-1'};
 const renderServiceRep=()=>{cursor=0;return RoleTestingPanel({targetId:serviceRep.id,onNavigate:navigate,onProfile(){}})};await mount(renderServiceRep);
