@@ -7,80 +7,63 @@ const db={prepare(q){let args=[];return{bind(...a){args=a;return this},async fir
 const env={TRACE_OWNER_EMAIL:'owner@example.com',LLM_CONFIG_ENCRYPTION_KEY:require('node:crypto').randomBytes(32).toString('base64'),DB:db},cache={};
 function load(file){file=path.resolve(root,file);if(cache[file])return cache[file];const exports={};cache[file]=exports;const source=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
  vm.runInNewContext(source,{exports,require:n=>{if(n==='cloudflare:workers')return{env};if(n==='@/app/chatgpt-auth')return{getChatGPTUser:async()=>null};if(n.startsWith('@/')||n.startsWith('.')){const p=n.startsWith('@/')?path.join(root,n.slice(2)):path.resolve(path.dirname(file),n);return load(p+(path.extname(p)?'':'.ts'));}return require(n)},Response,Request,Headers,URL,URLSearchParams,Error,crypto:globalThis.crypto,Date,Intl,Set,Map,FormData,Blob,File,TextEncoder,TextDecoder,Uint8Array,ArrayBuffer,AbortController,ReadableStream,btoa,atob,setTimeout,clearTimeout,console},{filename:file});return exports;}
-const api=load('app/api/after-sales/route.ts'),context=load('lib/mcp/context.ts').mcpActor,pricing=load('lib/after-sales-pricing.ts'),base='https://test.local',today=load('lib/duties.ts').dayAt();
-const addDay=(day,n)=>new Date(Date.parse(day+'T00:00:00Z')+n*86400000).toISOString().slice(0,10),yesterday=addDay(today,-1),tomorrow=addDay(today,1);
-const actor=(role,domain='home')=>({userId:role+'-'+domain,email:role+'@test.local',name:role,isAdmin:false,permissions:{read:[],write:[],eventStages:[],serviceDomains:[domain],serviceRoles:[role],warehouses:[]}}),manager=actor('manager'),technician=actor('technician');
-function seed(id,type,data,created=new Date().toISOString()){sql.prepare('INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?)').run(id,type,JSON.stringify(data),created,created);return id;}
-function entity(id){const r=sql.prepare('SELECT * FROM flow_entities WHERE id=?').get(id);assert.ok(r,id);return{...r,data:JSON.parse(r.data)};}
-const rows=type=>sql.prepare('SELECT * FROM flow_entities WHERE type=?').all(type).map(r=>({...r,data:JSON.parse(r.data)}));
-function caseSeed(code='P',domain='home'){return seed(randomUUID(),'as_case',{domain,agentId:'',serial:randomUUID(),customer:'Customer',phone:'09123456789',complaint:'fault',contactDay:today,intake:{day:today},warranty:{state:'unknown'},state:'received',lines:[],laborLines:[],customerTotal:'0',history:[]});}
-async function op(mode,body={},status=200,user=manager){const key=['caseId','tariffId'].find(k=>body[k]),payload={id:randomUUID(),mode,domain:'home',...(key?{revision:entity(body[key]).revision}:{}),...body},request=new Request(base+'/api/after-sales',{method:'POST',headers:{origin:base,'Content-Type':'application/json'},body:JSON.stringify(payload)}),response=await context.run(user,()=>api.POST(request)),data=await response.json();assert.equal(response.status,status,mode+': '+JSON.stringify(data));return{...data,payload};}
-async function tariff(code,price,extra={},user=manager){return(await op('tariff',{kind:'part',name:'Part '+code,partCode:code,consumerPriceRial:price,validFrom:yesterday,active:true,...extra},200,user)).id;}
-const diagnosis=(caseId,partCode='P',extra={})=>({caseId,lines:[{partCode,quantity:'1',coverage:'paid',fault:'broken',cause:'wear',coverageReason:'chargeable',...extra}],laborLines:[],notes:'diagnosis'});
 
-const commercial=load('app/api/after-sales/commercial/route.ts'),tasks=load('lib/service-commercial-tasks.ts'),profile=load('lib/profile-review.ts'),permissions=load('lib/permissions.ts');
-const expert=actor('support'),finance={...actor('finance-director'),permissions:permissions.resolveRoleAssignment({roles:['finance_director']})},ceo={...actor('ceo'),permissions:permissions.resolveRoleAssignment({roles:['ceo']})},admin={userId:'actual-admin',email:'owner@example.com',name:'Actual tester',isAdmin:true,permissions:permissions.allPermissions};
-const modeRole={credit_propose:expert,credit_decide:manager,part_price_propose:manager,part_price_decide:finance,work_define:manager,labor_publish:ceo};
-async function commercialOp(mode,data={},status=200,user=modeRole[mode]){const body={mode,id:randomUUID(),domain:'home',confirmed:true,...data};const response=await context.run(user,()=>commercial.POST(new Request(base+'/api/after-sales/commercial',{method:'POST',headers:{origin:base,'content-type':'application/json'},body:JSON.stringify({domain:'home',...body})})));const result=await response.json();assert.equal(response.status,status,mode+': '+JSON.stringify(result));return {result,body};}
-async function workspace(user){const r=await context.run(user,()=>commercial.GET());assert.equal(r.status,200);return r.json();}
-async function decide(kind,id,approved=true,user){return commercialOp(kind,{requestId:id,revision:entity(id).revision,approved,notes:'Reviewed test decision'},200,user||modeRole[kind]);}
-const realMembers=[manager,expert,finance,ceo,technician];
+const context=load('lib/mcp/context.ts').mcpActor,profiles=load('lib/profile-review.ts'),runtime=load('lib/service-role-preview.ts'),base='https://test.local',today=load('lib/duties.ts').dayAt();
+const admin={userId:'actual-admin',email:'owner@example.com',name:'Actual tester',isAdmin:true,permissions:load('lib/permissions.ts').allPermissions};
+const position=id=>profiles.profileSession(admin,id,[]);
+const api=load('app/api/after-sales/route.ts'),flow=load('app/api/flow/route.ts'),parts=load('app/api/after-sales/parts/route.ts'),commercial=load('app/api/after-sales/commercial/route.ts');
+async function form(who,route,body,expected=200){const response=await context.run(who,()=>route.POST(new Request(base+'/api/form',{method:'POST',headers:{origin:base,'content-type':'application/json'},body:JSON.stringify(body)})));const data=await response.json();assert.equal(response.status,expected,JSON.stringify(data));return data;}
+async function read(who,route,url='/api/form'){const response=await context.run(who,()=>route.GET(new Request(base+url)));const data=await response.json();assert.equal(response.status,200,JSON.stringify(data));return{data,response};}
+const op=(who,route,body)=>form(who,route,{id:randomUUID(),domain:'home',confirmed:true,...body});
+const entity=id=>{const r=sql.prepare('SELECT * FROM flow_entities WHERE id=?').get(id);return{...r,data:JSON.parse(r.data)}};
 (async()=>{
-const preview=load('lib/profile-review.ts'),runtime=load('lib/service-role-preview.ts'),admin={userId:'actual-admin',email:'owner@example.com',name:'Tester',isAdmin:true,permissions:load('lib/permissions.ts').allPermissions},rep=preview.profileSession(admin,'home-service-representative',[]);
-assert.equal(rep.userId,admin.userId);assert.equal(rep.isAdmin,false);assert.equal(rep.permissions.serviceAgentId,runtime.servicePreviewAgent);assert.deepEqual(Array.from(rep.permissions.serviceRoles),['agent']);assert.equal(load('lib/permissions.ts').isUnscopedRepresentative(rep),false);
-for(const route of ['app/api/after-sales/route.ts','app/api/after-sales/parts/route.ts','app/api/after-sales/contracts/route.ts','app/api/after-sales/commercial/route.ts','app/api/after-sales/part-repairs/route.ts','app/api/after-sales/payments/route.ts']){const r=await context.run(rep,()=>load(route).GET(new Request(base+'/api/after-sales?domain=home')));assert.equal(r.status,200,route+': '+await r.clone().text());assert.equal(r.headers.get('X-Service-Role-Preview'),'isolated');}
-assert.equal(sql.prepare('SELECT COUNT(*) n FROM flow_entities').get().n,0);assert.equal(sql.prepare('SELECT COUNT(*) n FROM app_members').get().n,0);assert.ok(sql.prepare('SELECT COUNT(*) n FROM training_flow_entities').get().n>0);
-const ws=await context.run(rep,()=>api.GET(new Request(base+'/api/after-sales?domain=home'))),data=await ws.json();assert.equal(data.agents.length,1);assert.equal(data.agents[0].id,runtime.servicePreviewAgent);
-const forbidden=await context.run(rep,()=>api.GET(new Request(base+'/api/after-sales?domain=hospital')));assert.equal(forbidden.status,403);
-const internal=preview.profileSession(admin,'home-service',[]),expert=await context.run(internal,()=>load('app/api/after-sales/parts/route.ts').GET(new Request(base+'/api/after-sales/parts')));assert.equal(expert.status,200);assert.ok((await expert.json()).agents.some(a=>a.id===runtime.servicePreviewAgent));
-for(const [who,payload]of [[internal,{mode:'create'}],[rep,{mode:'create',agentId:'OTHER-AGENCY'}]]){const response=await context.run(who,()=>api.POST(new Request(base+'/api/after-sales',{method:'POST',headers:{origin:base,'content-type':'application/json'},body:JSON.stringify({id:randomUUID(),domain:'home',...payload})})));assert.equal(response.status,403,'Server rejects undefined expert intake and representative identity spoofing');}
-const commercial=load('app/api/after-sales/commercial/route.ts'),requestId=randomUUID();
-async function action(who,body){const r=await context.run(who,()=>commercial.POST(new Request(base+'/api/after-sales/commercial',{method:'POST',headers:{origin:base,'content-type':'application/json'},body:JSON.stringify({domain:'home',...body})})));assert.equal(r.status,200,await r.clone().text());return r.json()}
-await action(internal,{id:requestId,mode:'credit_propose',agentId:runtime.servicePreviewAgent,limitRial:'100000',notes:'Role scenario credit',confirmed:true});
-const managerPreview=preview.profileSession(admin,'home-service-manager',[]),tasksApi=load('app/api/tasks/route.ts');
-const queue=await context.run(managerPreview,()=>tasksApi.GET(new Request(base+'/api/tasks')));assert.equal(queue.status,200,await queue.clone().text());const q=await queue.json();assert.ok(q.positionWork.some(w=>String(w.target).includes(requestId)),'Same request arrives in manager cartable');
-await action(managerPreview,{id:randomUUID(),mode:'credit_decide',requestId,revision:1,approved:true,notes:'Role scenario approval',confirmed:true});
-const approved=sql.prepare('SELECT data FROM training_flow_entities WHERE id=?').get(runtime.servicePreviewAgent);assert.equal(JSON.parse(approved.data).creditLimitRial,'100000');assert.equal(sql.prepare('SELECT COUNT(*) n FROM flow_entities').get().n,0);assert.equal(sql.prepare('SELECT COUNT(*) n FROM app_members').get().n,0);
-
-// Cross-profile catalog work must remain in the SAME isolated storage as services.
-const warehouse=preview.profileSession(admin,'central-store',[]),engineer=preview.profileSession(admin,'technical',[]),flow=load('app/api/flow/route.ts'),records=load('app/api/records/route.ts'),production=load('app/api/production/route.ts');
-async function form(who,route,body,expected=200){const response=await context.run(who,()=>route.POST(new Request(base+'/api/form',{method:'POST',headers:{origin:base,'content-type':'application/json'},body:JSON.stringify(body)})));assert.equal(response.status,expected,await response.clone().text());assert.equal(response.headers.get('X-Service-Role-Preview'),'isolated');return response.json();}
-await form(warehouse,flow,{id:randomUUID(),mode:'material',code:'99001',name:'قطعه آزمون زنجیره',unit:'عدد',kind:'raw',specs:'صرفاً آزمون',fields:[]});
-const templatesResponse=await context.run(engineer,()=>load('app/api/quality/templates/route.ts').GET(new Request(base+'/api/quality/templates?product=training-product-1')));assert.equal(templatesResponse.status,200,await templatesResponse.clone().text());assert.ok((await templatesResponse.json()).templates.length,'Product quality reads the same isolated product');
-const created=await form(engineer,records,{kind:'product',data:{code:'TEST-E2E',name:'محصول آزمون زنجیره',group:'آزمایشی',model:'E2E',productionMode:'routine',warrantyMonths:'12',status:'فعال',notes:'Synthetic only'}},201);
-await form(engineer,production,{id:randomUUID(),mode:'bom',productId:created.record.id,previousVersion:0,lines:[{partCode:'99001',quantity:'1'}]});
-const partsApi=load('app/api/after-sales/parts/route.ts');const beforeCatalog=await context.run(internal,()=>partsApi.GET(new Request(base+'/api/after-sales/parts')));const beforeData=await beforeCatalog.json();assert.ok(beforeData.materials.some(x=>x.code==='99001'));assert.ok(beforeData.products.some(x=>x.id===created.record.id));
-assert.ok(sql.prepare("SELECT id FROM training_bom_versions WHERE product_id=?").get(created.record.id));assert.equal(sql.prepare('SELECT COUNT(*) n FROM records').get().n,0);assert.equal(sql.prepare('SELECT COUNT(*) n FROM flow_entities').get().n,0);
-const newRepId=randomUUID();await form(managerPreview,api,{id:newRepId,mode:'agent',domain:'home',confirmed:true,nationalId:'1234500001',mobile:'09123456789',name:'نماینده آزمون زنجیره',code:'TEST-E2E',province:'تهران',city:'تهران',phone:'02100000000',address:'صرفاً آزمون',active:true});
-const switched=await context.run(rep,()=>api.GET(new Request(base+'/api/after-sales?domain=home')));const switchedData=await switched.json();assert.equal(switchedData.agents.length,1);assert.equal(switchedData.agents[0].id,newRepId,'Role-only representative follows the created scenario agent');const visibleSession=await context.run(rep,()=>load('app/api/session/route.ts').GET());assert.equal((await visibleSession.json()).permissions.serviceAgentId,newRepId,'Dashboard session follows the same scenario');assert.equal(sql.prepare('SELECT COUNT(*) n FROM app_members').get().n,0);assert.equal(sql.prepare('SELECT COUNT(*) n FROM password_accounts').get().n,0);
-
-const commercialWorkspace=await context.run(internal,()=>partsApi.GET(new Request(base+'/api/after-sales/parts'))),catalogData=await commercialWorkspace.json();const scenarioAgent=catalogData.agents.find(a=>a.id===newRepId);
-await form(internal,partsApi,{id:randomUUID(),mode:'eligibility',domain:'home',confirmed:true,agentId:newRepId,revision:scenarioAgent.revision,products:[{productId:created.record.id}],notes:'Test qualification'});
-const proposal=await form(internal,partsApi,{id:randomUUID(),mode:'catalog_propose',domain:'home',confirmed:true,productId:created.record.id,catalogRevision:0,parts:[{partCode:'99001'}],notes:'Test service list'});
-const ceoPreview=preview.profileSession(admin,'ceo',[]),financePreview=preview.profileSession(admin,'finance-director',[]);
-await form(ceoPreview,partsApi,{id:randomUUID(),mode:'catalog_decide',domain:'home',confirmed:true,requestId:proposal.id,revision:1,approved:true,notes:'Test approval'});
-const creditNew=randomUUID();await action(internal,{id:creditNew,mode:'credit_propose',agentId:newRepId,limitRial:'100000',notes:'Scenario credit',confirmed:true});await action(managerPreview,{id:randomUUID(),mode:'credit_decide',requestId:creditNew,revision:1,approved:true,notes:'Approved',confirmed:true});
-const priceNew=randomUUID();await action(managerPreview,{id:priceNew,mode:'part_price_propose',partCode:'99001',priceRial:'100',validFrom:today,notes:'Scenario price',confirmed:true});await action(financePreview,{id:randomUUID(),mode:'part_price_decide',requestId:priceNew,revision:1,approved:true,notes:'Approved',confirmed:true});
-const ready=await context.run(rep,()=>partsApi.GET(new Request(base+'/api/after-sales/parts?q=99001'))),readyData=await ready.json();assert.equal(readyData.items.length,1);assert.equal(readyData.items[0].priceRial,'100');const placed=await form(rep,api,{id:randomUUID(),mode:'order',domain:'home',confirmed:true,agentId:newRepId,lines:[{tariffId:readyData.items[0].tariffId,quantity:'2',expectedTariffRevision:readyData.items[0].tariffRevision}],notes:'Scenario order'});assert.ok(placed.saved);assert.equal(sql.prepare('SELECT COUNT(*) n FROM service_ledger').get().n,0);assert.ok(sql.prepare('SELECT id FROM training_service_ledger WHERE agent_id=?').get(newRepId));
-// The manager's existing warehouse form can configure ONLY isolated warehouses.
-const setup=load('app/api/role-profiles/warehouse-setup/route.ts');
-const testWarehouseId=randomUUID();
-const setupBody={id:testWarehouseId,mode:'warehouse',confirmed:true,name:'انبار دریافت فرضی خدمات',warehouseType:'storage',directReceiptEnabled:true,quarantineWarehouseId:'',parentId:'',serviceDomain:'',serviceOwner:'',locations:['S-1-1-1','S-1-1-2'],active:true,revision:0};
-await form(admin,setup,setupBody);
-assert.equal(sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type='material_warehouse'").get().n,0);
-const configured=await context.run(warehouse,()=>flow.GET()),configuredData=await configured.json();
-assert.ok(configuredData.warehouses.some(w=>w.id==='warehouse:'+testWarehouseId&&w.canReceive),'Warehouse scope is resolved INSIDE the isolated workspace');
-const setupDenied=await context.run(warehouse,()=>setup.POST(new Request(base+'/api/setup',{method:'POST',headers:{origin:base,'content-type':'application/json'},body:JSON.stringify(setupBody)})));assert.equal(setupDenied.status,403,'Ordinary position cannot administer test setup');
-const forbiddenSetup=await context.run(admin,()=>setup.POST(new Request(base+'/api/setup',{method:'POST',headers:{origin:base,'content-type':'application/json'},body:JSON.stringify({id:randomUUID(),mode:'material'})})));assert.equal(forbiddenSetup.status,403,'Setup endpoint cannot perform arbitrary business writes');
-const qualityPosition=preview.profileSession(admin,'quality',[]),qualitySession=await context.run(qualityPosition,()=>load('app/api/session/route.ts').GET());
-const qualityScope=await qualitySession.json();assert.ok(qualityScope.profileReview.warehouseIds.includes('warehouse:'+testWarehouseId));assert.equal(qualityScope.isAdmin,false,'Quality retains its position grants');
-const receipt=await form(warehouse,flow,{id:randomUUID(),mode:'receipt',receiptVersion:2,confirmed:true,warehouseId:'warehouse:'+testWarehouseId,materialId:'material:1001',day:today,quantity:'3',receiptNote:'Synthetic receipt only',noteRoles:[],notePeople:[],evidenceIds:[],deliveryClue:{}});
-assert.ok(receipt.receiptId,'The same warehouse role can receive into the configured training warehouse');
-const qcStarted=await form(qualityPosition,flow,{id:randomUUID(),mode:'start_incoming_qc',receiptId:receipt.receiptId});
-await form(qualityPosition,flow,{id:randomUUID(),mode:'incoming_qc',receiptId:receipt.receiptId,revision:qcStarted.revision,accepted:'3',values:{appearance:'pass'},notes:'Synthetic visual check'});
-const receiptRow=JSON.parse(sql.prepare('SELECT data FROM training_flow_entities WHERE id=?').get(receipt.receiptId).data);
-assert.equal(receiptRow.state,'awaiting_warehouse');
-assert.equal(sql.prepare('SELECT COUNT(*) n FROM inventory_batches').get().n,0,'Receipt inventory remains isolated');
-const resolvedWarehouse=await context.run(warehouse,()=>load('app/api/session/route.ts').GET());const warehouseSession=await resolvedWarehouse.json();assert.ok(warehouseSession.permissions.serviceRoles.includes('inventory'));assert.ok(!warehouseSession.permissions.serviceRoles.includes('finance'));assert.equal(warehouseSession.isAdmin,false);
-console.log('PASS role-only service preview: no person/company account, all four profile modules open with real agent grants, shared expert scenario, isolated database and no hospital access.');
+ const rep=position('home-service-representative'),warehouse=position('central-store'),engineer=position('technical'),expert=position('home-service'),manager=position('home-service-manager'),ceo=position('ceo'),finance=position('finance-director'),quality=position('quality');
+ // Merely entering any role cannot create fixtures, accounts, or another workspace.
+ for(const id of ['home-service-representative','home-service','home-service-manager','central-store','technical','quality','logistics','ceo','finance-director']){
+  const p=position(id);await runtime.runServiceRolePreview(p,resolved=>{assert.equal(resolved.userId,admin.userId);assert.equal(resolved.isAdmin,false);return Promise.resolve()});
+ }
+ assert.equal(sql.prepare('SELECT COUNT(*) n FROM flow_entities').get().n,0);
+ assert.equal(sql.prepare('SELECT COUNT(*) n FROM training_flow_entities').get().n,0);
+ assert.equal(sql.prepare('SELECT COUNT(*) n FROM app_members').get().n,0);
+ // Existing application warehouse, created using its ordinary owning handler.
+ const warehouseOperation=randomUUID(),warehouseId='warehouse:'+warehouseOperation;
+ await form(admin,flow,{id:warehouseOperation,mode:'warehouse',confirmed:true,name:'انبار مرکزی پرند',warehouseType:'storage',directReceiptEnabled:true,quarantineWarehouseId:'',parentId:'',serviceDomain:'',serviceOwner:'',locations:['P-1-1-1'],active:true,revision:0});
+ const warehouseRead=await read(warehouse,flow);
+ assert.equal(warehouseRead.response.headers.get('X-Service-Role-Preview'),'shared');
+ assert.ok(warehouseRead.data.warehouses.some(w=>w.id===warehouseId&&w.canReceive));
+ await op(warehouse,flow,{mode:'material',code:'99001',name:'قطعه مشترک',unit:'عدد',kind:'raw',specs:'Test',fields:[{key:'appearance',label:'ظاهر',type:'result',unit:'',min:'',max:'',required:true}]});
+ const product=await form(engineer,load('app/api/records/route.ts'),{kind:'product',data:{code:'TEST-E2E',name:'محصول مشترک',group:'اکسیژن‌ساز',model:'E2E',productionMode:'routine',warrantyMonths:'12',status:'فعال',notes:'Test'}},201);
+ await op(engineer,load('app/api/production/route.ts'),{mode:'bom',productId:product.record.id,previousVersion:0,lines:[{partCode:'99001',quantity:'1'}]});
+ assert.ok(sql.prepare('SELECT id FROM bom_versions WHERE product_id=?').get(product.record.id));
+ const newAgent=randomUUID();await form(manager,api,{id:newAgent,mode:'agent',domain:'home',confirmed:true,nationalId:'1234500001',mobile:'09123456789',name:'نماینده مشترک',code:'SHARED-E2E',province:'تهران',city:'تهران',phone:'02100000000',address:'Test',active:true});
+ const session=await read(rep,load('app/api/session/route.ts'));
+ assert.equal(session.data.permissions.serviceAgentId,newAgent);
+ assert.equal(session.data.userId,admin.userId);assert.equal(session.data.isAdmin,false);
+ const catalog=await read(expert,parts);assert.ok(catalog.data.materials.some(m=>m.code==='99001'));assert.ok(catalog.data.products.some(p=>p.id===product.record.id));
+ await op(expert,parts,{mode:'eligibility',agentId:newAgent,revision:entity(newAgent).revision,products:[{productId:product.record.id}],notes:'Test'});
+ const proposal=await op(expert,parts,{mode:'catalog_propose',productId:product.record.id,catalogRevision:0,parts:[{partCode:'99001'}],notes:'Test'});
+ await op(ceo,parts,{mode:'catalog_decide',requestId:proposal.id,revision:1,approved:true,notes:'Admin role walkthrough'});
+ const credit=await op(expert,commercial,{mode:'credit_propose',agentId:newAgent,limitRial:'100000',notes:'Test'});
+ await op(manager,commercial,{mode:'credit_decide',requestId:credit.id,revision:1,approved:true,notes:'Test'});
+ const price=await op(manager,commercial,{mode:'part_price_propose',partCode:'99001',priceRial:'100',validFrom:today,notes:'Test'});
+ await op(finance,commercial,{mode:'part_price_decide',requestId:price.id,revision:1,approved:true,notes:'Test'});
+ const ready=await read(rep,parts,'/api/after-sales/parts?q=99001');assert.equal(ready.data.items.length,1);
+ const item=ready.data.items[0];await op(rep,api,{mode:'order',agentId:newAgent,lines:[{tariffId:item.tariffId,quantity:'2',expectedTariffRevision:item.tariffRevision}],notes:'Test'});
+ assert.ok(sql.prepare('SELECT id FROM service_ledger WHERE agent_id=?').get(newAgent));
+ const receipt=await op(warehouse,flow,{mode:'receipt',receiptVersion:2,warehouseId,materialId:'material:99001',day:today,quantity:'2',receiptNote:'Test shared receipt',noteRoles:[],notePeople:[],evidenceIds:[],deliveryClue:{}});
+ assert.ok(receipt.receiptId);
+ const started=await op(quality,flow,{mode:'start_incoming_qc',receiptId:receipt.receiptId});
+ await op(quality,flow,{mode:'incoming_qc',receiptId:receipt.receiptId,revision:started.revision,accepted:'2',values:{appearance:'pass'},notes:'Test'});
+ assert.equal(entity(receipt.receiptId).data.state,'awaiting_warehouse');
+ assert.ok(sql.prepare('SELECT batch_id FROM inventory_batches').get());
+ const bank=load('app/api/sales/bank/route.ts');
+ for(const id of ['sales-finance','treasurer']){const current=await read(position(id),bank,'/api/sales/bank?roleTest=true');assert.ok(current.data.agents.some(a=>a.id===newAgent),'Legacy roleTest links see shared service representative');}
+ assert.equal((await context.run(rep,()=>bank.GET(new Request(base+'/api/sales/bank?roleTest=true')))).status,403);
+ const other=await form(rep,api,{id:randomUUID(),mode:'create',domain:'home',agentId:'OTHER',serial:'S',customer:'C',phone:'09123456789',day:today,complaint:'fault'},403);assert.ok(other.error);
+ const hospital=await context.run(rep,()=>api.GET(new Request(base+'/api/after-sales?domain=hospital')));assert.equal(hospital.status,403);
+ const setup=load('app/api/role-profiles/warehouse-setup/route.ts');await form(admin,setup,{mode:'warehouse'},410);await form(rep,setup,{mode:'warehouse'},403);
+ for(const table of ['flow_entities','records','inventory_batches','service_ledger','app_members'])assert.equal(sql.prepare('SELECT COUNT(*) n FROM training_'+table).get().n,0,table+' never redirected');
+ assert.ok(sql.prepare("SELECT actor FROM access_audit WHERE action='automatic_representative_account'").all().every(a=>a.actor===admin.userId));
+ assert.equal(entity(newAgent).data.creditLimitRial,'100000');
+ console.log('PASS shared role workflow: existing Parand warehouse, catalog, BOM, representative, approvals, order, receipt/QC and bank visibility share application records; actor/scope preserved; no implicit training writes.');
 })().catch(e=>{console.error(e);process.exitCode=1});

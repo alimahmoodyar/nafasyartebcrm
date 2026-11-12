@@ -1,3 +1,12 @@
+## 2026-11-12 — Shared service walkthrough correction
+
+- Replaces the earlier assumption that service-role walkthroughs must use isolated training storage. The owner confirmed all current application records are pre-production test data and specifically requested existing central Parand stock/workflows.
+- Removed implicit service-role seed/database redirection and the separate setup UI. Existing isolated records are left untouched; records required for the shared walkthrough must be entered through owning forms, not copied with SQL or an API shortcut.
+- PASS: automated shared warehouse/catalog/product/BOM/representative/eligibility/catalog approval/credit/price/order/receipt/QC chain, shared bank role visibility and denial tests; service-payment matching, duplicate/reversal tests; role cartable UI. TypeScript --noEmit PASS.
+- Online evidence still pending: open Parand warehouse, inspect shared records, then execute receiving/exit/repair/payment through forms. Prior isolated balances do not establish any shared-system balance.
+- Admin role-preview approvals remain actions of the actual administrator; not evidence that separately assigned personnel approved.
+- No data deletion, reset, schema migration or automatic transfer between datasets is authorized by this correction.
+
 # صف بازبینی کیفیت
 
 ## وضعیت مبنا

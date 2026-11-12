@@ -26,6 +26,7 @@
 
 ## Admin workflow testing and role access
 
+- Owner clarification, 2026-11-12: all current application data is for pre-production testing. Execute the cross-profile business walkthrough against the existing shared application data and existing warehouses, specifically the central Parand warehouse. Do not create a separate training warehouse or redirect role-profile actions to isolated training tables for this walkthrough. Create needed records through their owning UI forms and preserve the authenticated administrator as actor. This supersedes earlier assumptions that this walkthrough must be isolated from existing application data. It does not authorize deleting/resetting any data; the owner will decide when to reset before actual use. Automated test fixtures may remain isolated.
 - The system administrator may advance an end-to-end workflow from the owning module for process testing and operational oversight. Keep each action in its domain module; do not create a parallel admin-only workflow.
 - Administrator actions must pass the same workflow state, validation, confirmation, idempotency and data-integrity checks as other users. Record the authenticated administrator as the actual actor; never impersonate a business role or fabricate an approval by another person.
 - Configure ordinary users later with explicit, least-privilege access per role and operation. Navigation visibility is not authorization: enforce record and action permissions in the server handler, and keep HTTP, UI and MCP behavior aligned.

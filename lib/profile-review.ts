@@ -6,7 +6,7 @@ import {roleProfiles} from './role-profiles';
 // Stable per administrator and only materialized in isolated preview storage.
 export const representativeSampleId=(userId:string)=>'role-sample-representative:'+userId;
 // Compatibility is limited to old admin preview cookies; API scopes stay strict.
-export function profileReviewSelection(raw:string){const [storedProfileId,buyerId='',extra]=raw.split('~');if(extra!==undefined)throw Error('invalid preview scope');return {profileId:storedProfileId==='home-service'&&buyerId?'home-service-representative':storedProfileId,buyerId:storedProfileId==='home-service-representative'||storedProfileId==='home-service'&&buyerId?'':buyerId};}
+export function profileReviewSelection(raw:string){const [storedProfileId,buyerId='',extra]=raw.split('~');if(extra!==undefined)throw Error('invalid preview scope');return {profileId:storedProfileId==='home-service'&&buyerId?'home-service-representative':storedProfileId,buyerId:buyerId==='training-service-agent-1'?'':buyerId};}
 export const profileReviewCookie='__Host-nafasyar-profile-review';
 export const profileJobRoles:Record<string,string[]>={
  'central-store':['inventory','service_inventory'],'line-store':['production_store_assistant'],'line-manager':['production'],

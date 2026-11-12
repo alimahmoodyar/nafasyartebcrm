@@ -1,3 +1,10 @@
+## 2026-11-12 — Shared service-role business data
+
+- Owner correction: the service/warehouse/technical/QC/approval walkthrough uses the existing application dataset and central Parand warehouse. Role entry no longer seeds or redirects these profiles into training tables. Existing isolated records are retained, not migrated or deleted.
+- Retired the separate warehouse setup entry; all warehouse maintenance remains in its owning module. Legacy bank roleTest links now use the ordinary shared bank handler with normal role checks.
+- Unbound administrator service-representative previews follow the most recently created active home-service representative in the shared dataset; explicit scopes remain fixed, and ordinary representative accounts retain their own scope. Entering a role creates no representative or bank account.
+- Automated verification: shared catalog/BOM/approval/order/receipt/QC chain, bank visibility and access denials, payment matching/reversal tests and cartable UI checks. Online form execution remains a separate task after deployment.
+
 ## 2026-11-12 — رفع صفحه خالی مدیر خدمات و فرم کیفیت محصول آزمایشی
 
 - ورودی پروفایل مدیر خدمات با وجود مجوز مشاهده چند حوزه، حوزهٔ عملیاتی تعیین‌شدهٔ همان نقش را باز می‌کند.
