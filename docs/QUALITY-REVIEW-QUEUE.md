@@ -125,3 +125,8 @@
 
 ## ادامه سناریوی سه تعمیر و واریزی — 2026-11-12
 سه فعال‌سازی فرضی از فرم مدیر ثبت شد (یک گارانتی جاری، دو منقضی). دریافت انبار در مرورگر به نبود انبار دارای سیاست دریافت و قرنطینه برخورد کرد؛ هیچ رسید/خروج/تعمیر/پرداختی برای این ادامه هنوز ثبت نشده است. تنظیم همان انبار از فرم موجود مدیریت به ورودی مجزای آزمون متصل شد؛ فقط admin واقعی و mode=warehouse. حذف انبار از این ورودی عرضه نمی‌شود. مسئولیت پروفایل انبار و کیفیت پس از ورود به storage آزمون دوباره محاسبه می‌شود. نقش مرکزی به مجوز موجود service_inventory حوزه home و کار آماده‌سازی سفارش خدمات متصل شد؛ مجوز مالی یا مدیر اضافه نشد. مسیرهای حرکت، fulfillment و transport نیز wrapper مجزای مشترک دارند. آزمون service-role-preview دریافت و کنترل کیفیت جدید، مرزبندی شرکت/آزمون و رد دسترسی نامجاز را تأیید کرد؛ role-cartable-ui موفق بود. بازخوانی مرورگر و تکمیل سه تعمیر، خروج انبار و تطبیق بانکی هنوز باقی است.
+## 2026-11-12 — Direct service payment entry
+
+- Scope: home navigation, explicit new/list payment view, one-time draft opening and explanatory unassigned-profile form. Existing server authorization and financial matching rules are unchanged.
+- PASS: service-payments-ui.cjs and service-dashboard.cjs. Tests include disabled/unsubmitted unassigned drafts, preserved inputs after refresh, cancel without reopening, reviewer scope and history routing. TypeScript and native publication/source evidence recorded with the release.
+- No business data writes performed for this UI change. Browser rendering is not claimed by the component tests.

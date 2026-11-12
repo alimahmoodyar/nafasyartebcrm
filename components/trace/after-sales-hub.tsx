@@ -33,7 +33,7 @@ export function AfterSalesHub({demo,user,onNavigate,transportAvailable,target=''
  const [homeView,setHomeView]=useState(targetView);
  useEffect(()=>{setDomain(entryDomain);setHomeView(targetView);},[scope]);
  useEffect(()=>{setDomain(entryDomain);setHomeView(targetView);},[target]);
- if(target.startsWith('service-payments:'))return <ServicePaymentsPanel key={scope+':'+target} agentId={user.permissions.serviceAgentId||target.slice('service-payments:'.length)}/>;
+ if(target.startsWith('service-payments:'))return <ServicePaymentsPanel key={scope+':'+target} agentId={user.permissions.serviceAgentId||(target==='service-payments:new'?'':target.slice('service-payments:'.length))} initialAction={target==='service-payments:new'?'new':'list'}/>;
  return <ProgramWorkspace direct={!!target||roleEntry} programId="after-sales-hub" title="خدمات پس از فروش">
   <SubprogramNavigation showLabel={!representativeParts} items={domains.map(d=>[d,serviceBranchTitles[d]] as [string,string])} value={domain} onChange={setDomain}/>
   {!domains.length&&<p className="notice">دسترسی خدمات پس از فروش برای این حساب تعریف نشده است.</p>}

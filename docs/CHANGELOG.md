@@ -2473,3 +2473,8 @@
 - تنظیم انبار محیط آزمون با همان فرم و handler مدیریت انبار؛ ورودی مدیریتی فقط تنظیم warehouse را در storage مجزا می‌پذیرد. هیچ انبار یا موجودی به‌صورت seed در این اصلاح ساخته نمی‌شود.
 - مسئولیت انبار و کیفیت داخل محدوده آزمایشی خوانده می‌شود؛ نقش انبار مرکزی به وظیفه موجود انبار خدمات و ورودی آماده‌سازی قطعات متصل شد. APIهای حرکت انبار، fulfillment و حمل نیز همان محدوده آزمون را حفظ می‌کنند.
 - آزمون تفکیک داده، رد دسترسی نقش عادی به تنظیم مدیریتی، رد عملیات نامرتبط، دریافت و کنترل کیفیت از نقش‌های جدا موفق شد. اجرای آنلاین ادامه سناریو هنوز انجام نشده است.
+## 2026-11-12 — Direct service deposit form from home
+
+- The home deposit action now opens a new-payment form immediately after its scoped data loads, rather than opening only payment history. The history action remains separate.
+- Unassigned administrator role previews can inspect the form and see its missing agency/account prerequisite; final submission remains disabled and guarded. No agency, bank account or financial entry is created implicitly.
+- Focused UI checks cover direct entry, draft preservation on refresh, cancellation, reviewer-only access and separate history navigation.
