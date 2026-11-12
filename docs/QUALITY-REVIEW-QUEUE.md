@@ -1,3 +1,10 @@
+## 2026-11-12 — Populated material catalog / absent agency regression
+
+- Confirmed cause: orderableCodes dereferenced agent.data when an administrator's unassigned service profile read a nonempty shared material catalog. Before the fix, the new API regression returned 503 with the same service-unavailable message as online.
+- Fixed only the absent-agency eligibility calculation: no allowed product codes, no data writes or parallel storage. Existing role, domain, ordinary-account denial and financial/stock guards remain active.
+- PASS: service-role-preview.cjs with the new material-present/agency-absent read and the existing full shared catalog/BOM/order/receipt/QC chain. TypeScript --noEmit PASS after the final API error-text change; publication evidence is recorded separately.
+- Earlier v247 tests covered empty tables and a fully configured agency, but missed this intermediate state. Do not treat prior checks as proof of this case.
+
 ## 2026-11-12 — Representative profile without a shared agency
 
 - Confirmed online alerts from account, commercial, contract and payment reads against the unassigned administrator role marker. This was a regression from the preceding shared-data release; the previous full chain test began with an actual agency and missed the empty starting state.

@@ -44,6 +44,8 @@ const entity=id=>{const r=sql.prepare('SELECT * FROM flow_entities WHERE id=?').
  assert.equal(warehouseRead.response.headers.get('X-Service-Role-Preview'),'shared');
  assert.ok(warehouseRead.data.warehouses.some(w=>w.id===warehouseId&&w.canReceive));
  await op(warehouse,flow,{mode:'material',code:'99001',name:'قطعه مشترک',unit:'عدد',kind:'raw',specs:'Test',fields:[{key:'appearance',label:'ظاهر',type:'result',unit:'',min:'',max:'',required:true}]});
+ // A shared catalog can exist before its first service agency: this was the live failing state.
+ const populatedEmpty=await read(rep,api,'/api/after-sales?domain=home');assert.equal(populatedEmpty.data.unassignedProfile,true);assert.equal(populatedEmpty.data.materials.length,0);
  const product=await form(engineer,load('app/api/records/route.ts'),{kind:'product',data:{code:'TEST-E2E',name:'محصول مشترک',group:'اکسیژن‌ساز',model:'E2E',productionMode:'routine',warrantyMonths:'12',status:'فعال',notes:'Test'}},201);
  await op(engineer,load('app/api/production/route.ts'),{mode:'bom',productId:product.record.id,previousVersion:0,lines:[{partCode:'99001',quantity:'1'}]});
  assert.ok(sql.prepare('SELECT id FROM bom_versions WHERE product_id=?').get(product.record.id));

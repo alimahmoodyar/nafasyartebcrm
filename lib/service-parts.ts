@@ -10,7 +10,7 @@ import {trainingContext} from './training-context';
 export const catalogId=(productId:string)=>'service-parts:home:'+productId;
 export const servicePartText=(v:unknown)=>String(v??'').replace(/ي/g,'ی').replace(/ك/g,'ک').replace(/[۰-۹]/g,c=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(c))).replace(/[\u200c\s]+/g,' ').trim().toLowerCase();
 export async function servicePartProducts(){return (await storage().prepare("SELECT id,payload FROM records WHERE kind='product'").all()).results.map((r:any)=>({id:r.id,...JSON.parse(r.payload)}));}
-export function orderableCodes(agent:any,catalogs:any[]){const ids=new Set<string>(agent.data.allowedServiceProducts||[]),codes=new Set<string>();for(const c of catalogs)if(c.data.domain==='home'&&ids.has(c.data.productId)&&c.data.approved===true)for(const code of c.data.partCodes||[])codes.add(String(code));return codes;}
+export function orderableCodes(agent:any,catalogs:any[]){const ids=new Set<string>(agent?.data?.allowedServiceProducts||[]),codes=new Set<string>();for(const c of catalogs)if(c.data.domain==='home'&&ids.has(c.data.productId)&&c.data.approved===true)for(const code of c.data.partCodes||[])codes.add(String(code));return codes;}
 export async function servicePartEntitlement(agent:any,code:string){
  const catalogs=(await list('as_service_part_catalog')).filter(c=>c.data.domain==='home'&&(agent.data.allowedServiceProducts||[]).includes(c.data.productId));
  if(!agent.data.active||agent.data.domain!=='home'||!orderableCodes(agent,catalogs).has(code))throw new AccessError('این قطعه در فهرست مصوب دستگاه‌های مجاز نماینده نیست.',403);

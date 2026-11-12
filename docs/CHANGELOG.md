@@ -1,3 +1,10 @@
+## 2026-11-12 — Unassigned service profile with an existing catalog
+
+- Reproduced the exact 503 reported online: a shared material catalog existed before any shared home-service agency. The earlier empty-database regression test passed because it never evaluated the per-material eligibility filter.
+- Removed the generic migration-0015 advice from unexpected service-read errors; it did not identify the actual failure.
+- Missing agency eligibility now yields an empty allowed-code set. This prevents the missing-data dereference while retaining all actual agency/authorization/write checks. No data or storage routing changes.
+- Added the mixed-data regression (material exists, agency absent) before the existing full shared workflow. The new assertion failed with the reported service-unavailable message before the one-line fix, and passes after it.
+
 ## 2026-11-12 — Empty service-role profile regression
 
 - Reproduced the online representative dashboard showing inactive/missing-agency errors after the shared-data switch. The administrator's unassigned role identity is not an actual agency and must not be validated as an inactive one on read.
