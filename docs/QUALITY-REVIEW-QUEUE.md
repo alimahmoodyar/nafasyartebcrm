@@ -1,3 +1,7 @@
+## Driver package pickup — 2026-11-13
+
+Focused extension of existing finished-package QR/receipt UI and fulfillment custody handler. Exact assigned carrier identity gates reads and writes, even without a mission. Existing mission assignment cannot be bypassed. Package-level missing rows do not mark other packages missing; same-operation replay and CAS protect custody history. No new entity/table/FK/blob or vehicle-checklist attestation. Automated driver/shared receipt tests and TypeScript/build required; no real camera/physical shipping claimed.
+
 ## Finished-product packages — 2026-11-13
 
 Scope: product packageCapacity; immutable sale.shippingPackages/contact snapshots; existing finished warehouse pack/dispatch UI; authenticated A5/QR lookup; representative camera/manual code receipt; package-scoped existing transport receipt and physical package counts. No transport simplification or continuation of the paused live faulty-part walkthrough.

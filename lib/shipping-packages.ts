@@ -24,3 +24,11 @@ export function packageReceiptSelection(all:string[],previous:string[],chosen:un
  if(!Array.isArray(chosen)||new Set(chosen).size!==chosen.length||chosen.some(id=>typeof id!=='string'||!allowed.includes(id)))throw Error('سریال‌های این نوبت باید از ماندهٔ همین بسته باشند.');
  return {chosen:chosen as string[],pending:remaining.filter(id=>!chosen.includes(id)),missing:allowed.filter(id=>!chosen.includes(id))};
 }
+
+// Authorization uses authenticated carrier identity, not possession of the QR.
+export function assignedPackageDriver(u:{isAdmin:boolean;userId:string;permissions:any},sale:any,mission?:any){
+ if(u.isAdmin)return true;
+ if(!u.permissions.transportRoles?.includes('driver')&&!u.permissions.flowRoles?.includes('logistics'))return false;
+ if(!['local:'+sale.carrierId,sale.carrierSubject].includes(u.userId))return false;
+ return !mission?.driverId||mission.driverId===sale.carrierId;
+}

@@ -5,7 +5,7 @@ import {entity,warehouseAccess} from '@/lib/material-flow';
 import {warehouseDirectory,warehouseMember} from '@/lib/material-warehouses';
 import {salesRep,salesStaff,salesScope} from '@/lib/sales';
 import {transportAccess} from '@/lib/transport';
-import {parseShippingQr,shippingQr} from '@/lib/shipping-packages';
+import {assignedPackageDriver,parseShippingQr,shippingQr} from '@/lib/shipping-packages';
 const esc=(v:unknown)=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
 async function get(request:Request){try{
  const u=await requireAccess(),q=new URL(request.url).searchParams;
@@ -14,14 +14,16 @@ async function get(request:Request){try{
  if(!saleId||saleId.length>200)throw new AccessError('شناسه بسته معتبر نیست.',400);
  const db=storage(),row:any=await db.prepare("SELECT * FROM flow_entities WHERE type='sale' AND id=?").bind(saleId).first();
  if(!row)throw new AccessError('بسته پیدا نشد.',404);const sale=entity(row),d=sale.data;
- if(u.isAdmin){}else if(salesRep(u)||salesStaff(u)){await salesScope(u,d.salesAgentId,'read');}
+ const missionRow=d.transportId?await db.prepare("SELECT * FROM flow_entities WHERE type='transport' AND id=?").bind(d.transportId).first():null,linked=missionRow?entity(missionRow):null;
+ const pickupAllowed=assignedPackageDriver(u,d,linked?.data);
+ if(u.isAdmin||pickupAllowed){}else if(salesRep(u)||salesStaff(u)){await salesScope(u,d.salesAgentId,'read');}
  else if(warehouseAccess(u,'finished')){const ws=await warehouseDirectory();for(const did of d.deviceIds){const b:any=await db.prepare("SELECT data FROM flow_entities WHERE id=? AND type='build'").bind(did).first();const wid=b&&JSON.parse(b.data).warehouseId;const w=ws.find(w=>w.id===wid&&w.data.active);if(!w||!warehouseMember(u,w,'inventory'))throw new AccessError('بسته در دسترسی شما نیست.',404);}}
  else if(d.transportId){await transportAccess(u,d.transportId);}else throw new AccessError('بسته در دسترسی شما نیست.',404);
  if(d.state==='cancelled')throw new AccessError('حواله لغو شده است.',409);
  const packages=d.shippingPackages||[],p=packages.find((p:any)=>p.id===packageId);
  if(packageId&&!p||!packages.length)throw new AccessError('بسته پیدا نشد.',404);
- const mission=d.transportId?await transportAccess(u,d.transportId):null;
- if(q.get('format')!=='print')return Response.json({saleId,packages:packages.map((p:any)=>({...p,qrText:shippingQr(saleId,p.id)})),package:p?{...p,qrText:shippingQr(saleId,p.id)}:null,recipient:d.packageRecipient,mission:mission?{id:mission.id,revision:mission.revision,state:mission.data.state,receivedDeviceIds:mission.data.receivedDeviceIds||[],packageReceipts:mission.data.packageReceipts||[]}:null},{headers:{'Cache-Control':'private, no-store'}});
+ const mission=d.transportId?(pickupAllowed?linked:await transportAccess(u,d.transportId)):null;
+ if(q.get('format')!=='print')return Response.json({saleId,pickup:{allowed:pickupAllowed,state:d.state,receivedDeviceIds:d.acknowledgedDeviceIds||[],packageReceipts:d.pickupPackageReceipts||[]},packages:packages.map((p:any)=>({...p,qrText:shippingQr(saleId,p.id)})),package:p?{...p,qrText:shippingQr(saleId,p.id)}:null,recipient:d.packageRecipient,mission:mission?{id:mission.id,revision:mission.revision,state:mission.data.state,receivedDeviceIds:mission.data.receivedDeviceIds||[],packageReceipts:mission.data.packageReceipts||[]}:null},{headers:{'Cache-Control':'private, no-store'}});
  const {qrcode,drawingSVG}=await import('@bwip-js/generic');
  const contact=(title:string,c:any)=>'<section><h2>'+title+'</h2><b>'+esc(c?.name)+'</b><p>شهر: '+esc(c?.city)+' · تلفن: <bdi>'+esc(c?.phone)+'</bdi></p><p>'+esc(c?.address)+'</p></section>';
  const html=(p:any)=>'<article><h1>برگه ارسال محصول نهایی</h1><h2>بسته '+p.number+' از '+packages.length+' — شامل '+p.deviceIds.length+' دستگاه</h2><p>سفارش: <bdi>'+esc(d.packageOrderCode||d.salesOrderId||'—')+'</bdi> · حواله: <bdi>'+esc(saleId)+'</bdi></p><div class="contacts">'+contact('فرستنده',d.packageSender)+contact('گیرنده',d.packageRecipient)+'</div><h2>'+esc(p.model)+'</h2><table><thead><tr><th>سریال دستگاه‌های داخل همین بسته</th></tr></thead><tbody>'+p.serials.map((s:string)=>'<tr><td><bdi>'+esc(s)+'</bdi></td></tr>').join('')+'</tbody></table>'+qrcode({bcid:'qrcode',text:shippingQr(saleId,p.id),scale:3,padding:4,backgroundcolor:'FFFFFF'},drawingSVG())+'<p>شناسه بسته: <bdi>'+esc(p.id)+'</bdi></p><p>اسکن، فرم بررسی سریال‌ها را باز می‌کند؛ دریافت فقط با تأیید ثبت می‌شود.</p></article>';

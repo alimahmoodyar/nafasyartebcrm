@@ -29,10 +29,23 @@ for(const [i,id] of devices.entries()){insert(id,'build',{state:'reserved',saleI
  const print=await (await get(rep,'?saleId=sale&format=print')).text();assert.ok(print.includes('NF-0'));assert.equal((print.match(/<svg/g)||[]).length,3);assert.ok(!print.includes('مادر'));assert.equal(record('device:0').data.state,'reserved');
  await post(admin,{...pack,id:crypto.randomUUID()},409);
  const dispatch={id:crypto.randomUUID(),mode:'dispatch',saleId:'sale',deviceIds:devices,carrierId:'driver',handedOver:true};await post(admin,dispatch);await post(admin,dispatch);assert.equal(sql.prepare("SELECT SUM(quantity) n FROM inventory_balances WHERE warehouse='finished'").get().n,0);assert.equal(sql.prepare("SELECT SUM(quantity) n FROM inventory_balances WHERE warehouse='in_transit'").get().n,10000);
+
+ const wrong=actor('wrong-driver',{transportRoles:['driver']});
+ const pickup=(p,chosen,notes='')=>({id:crypto.randomUUID(),mode:'pickup_package',saleId:'sale',packageId:p.id,deviceIds:chosen,notes,confirmed:true});
+ await get(driver,'?code='+encodeURIComponent(contract.shippingQr('sale',p[0].id)));
+ await get(wrong,'?code='+encodeURIComponent(contract.shippingQr('sale',p[0].id)),404);
+ await post(wrong,pickup(p[0],p[0].deviceIds),403);
+ await post(driver,pickup(p[0],[devices[8]]),409);
+ await post(driver,pickup(p[0],p[0].deviceIds.slice(0,2)),400);
+ const partial=pickup(p[0],p[0].deviceIds.slice(0,2),'two missing');await post(driver,partial);await post(driver,partial);assert.equal(record('sale').data.acknowledgedDeviceIds.length,2);assert.equal(record(devices[0]).data.state,'in_transit');
+ await post(driver,pickup(p[0],p[0].deviceIds.slice(2)));await post(driver,pickup(p[1],p[1].deviceIds));assert.equal(record('sale').data.acknowledgedDeviceIds.length,8);
  const sale=record('sale');sql.prepare('UPDATE flow_entities SET data=? WHERE id=?').run(JSON.stringify({...sale.data,transportId:'mission'}),'sale');
- insert('mission','transport',{kind:'sale',salesAgentId:'agent',sourceId:'sale',sourceIds:['sale'],items:devices.map((id,i)=>({deviceId:id,serial:'NF-'+i,quantity:1})),route:'direct',state:'offered',offeredDay:today,collectedDay:today,packages:3,receivedDeviceIds:[],history:[]});
+ insert('mission','transport',{kind:'sale',salesAgentId:'agent',sourceId:'sale',sourceIds:['sale'],items:devices.map((id,i)=>({deviceId:id,serial:'NF-'+i,quantity:1})),route:'direct',state:'assigned',driverId:'driver',packages:3,receivedDeviceIds:[],history:[]});
+
+ await post(driver,pickup(p[2],p[2].deviceIds));assert.equal(record('mission').data.state,'collected');assert.equal(record('mission').data.collectedDeviceIds.length,10);assert.equal(record('sale').data.acknowledgedDeviceIds.length,10);assert.equal(record(devices[0]).data.state,'in_transit');
+ await post(driver,{id:crypto.randomUUID(),mode:'offer',missionId:'mission',revision:record('mission').revision,day:today,handoverTo:'Test representative',notes:'Test handover',confirmed:true},200,transport);
  const receive=(packageId,chosen,notes='')=>({id:crypto.randomUUID(),mode:'receipt',missionId:'mission',revision:record('mission').revision,packageId,deviceIds:chosen,day:today,result:notes?'shortage':'complete',notes,confirmed:true});
- await post(driver,receive(p[0].id,p[0].deviceIds),404,transport);
+ await post(driver,receive(p[0].id,p[0].deviceIds),403,transport);
  await post(rep,receive(p[0].id,[devices[9]]),409,transport);
  const first=receive(p[0].id,p[0].deviceIds);const race=await Promise.all([first,{...first,id:crypto.randomUUID()}].map(body=>context.run(rep,()=>transport.POST(req('/api/transport',body)))));assert.deepEqual(race.map(r=>r.status).sort(),[200,409]);await post(rep,first,200,transport);assert.equal(record('mission').data.state,'offered');assert.equal(record('mission').data.receivedDeviceIds.length,4);assert.equal(record(devices[4]).data.state,'in_transit');
  await post(rep,receive(p[1].id,p[1].deviceIds.slice(0,3)),400,transport);

@@ -1,4 +1,5 @@
-import {splitShippingPackages} from '@/lib/shipping-packages';
+import {syncTransportTasks} from '@/lib/transport';
+import {assignedPackageDriver,packageReceiptSelection,splitShippingPackages} from '@/lib/shipping-packages';
 import {withServiceRolePreview} from '@/lib/service-role-preview';
 import {dispatchInstallments} from '@/lib/sales-dispatch-terms';
 import {list} from '@/lib/after-sales';
@@ -43,7 +44,7 @@ async function post(request:Request){try{
  checkOrigin(request);const u=await requireAccess(),b=JSON.parse(new TextDecoder().decode(await boundedBody(request,128000))),id=needed(b.id),mode=needed(b.mode),db=storage(),now=new Date().toISOString();
  if(!/^[a-f0-9-]{36}$/i.test(id))fail('شناسه عملیات معتبر نیست.');
  const shortage=shortageRoles(u);
- const allowed=mode==='shortage_action'?Object.values(shortage).some(Boolean):mode==='handoff'||mode==='cancel_handoff'?flowRole(u,'production'):['receive','dispatch','pack'].includes(mode)?warehouseAccess(u,'finished'):['reserve','cancel_sale'].includes(mode)?salesStaff(u):mode==='handover'?salesStaff(u)||salesRep(u):mode==='acknowledge'?flowRole(u,'logistics'):false;
+ const allowed=mode==='shortage_action'?Object.values(shortage).some(Boolean):mode==='handoff'||mode==='cancel_handoff'?flowRole(u,'production'):['receive','dispatch','pack'].includes(mode)?warehouseAccess(u,'finished'):['reserve','cancel_sale'].includes(mode)?salesStaff(u):mode==='handover'?salesStaff(u)||salesRep(u):['acknowledge','pickup_package'].includes(mode)?flowRole(u,'logistics'):false;
  if(!allowed)fail('مجوز این عملیات یا انبار را ندارید.',403);
  const signature=JSON.stringify(b),prior:any=await db.prepare('SELECT payload,actor FROM inventory_operations WHERE id=?').bind(id).first();if(prior){if(prior.payload!==signature||prior.actor!==u.userId)fail('شناسه تکراری با درخواست متفاوت.',409);return json({saved:true,repeated:true});}
  const statements:D1PreparedStatement[]=[],checks:D1PreparedStatement[]=await salesLock(db,id);
@@ -193,6 +194,26 @@ async function post(request:Request){try{
  const sale=await get(needed(b.saleId),'sale');const agent=await get(sale.data.salesAgentId||sale.data.partyId,'sales_agent');if(!agent.data.active)fail('نماینده یا شعبه غیرفعال است.');if(salesRep(u)&&agent.id!==u.permissions.salesAgentId)fail('این حواله متعلق به حساب شما نیست.',403);if(!['branch','representative','reseller','end_customer'].includes(agent.data.kind))fail('این حواله برای تحویل مشتری معتبر نیست.');const selected=ids(b.deviceIds);const handed=new Set<string>(sale.data.handedOverDeviceIds||[]);if(selected.some(d=>!sale.data.deviceIds.includes(d)||handed.has(d)))fail('سریال برای این تحویل معتبر نیست یا قبلاً ثبت شده است.',409);const customerName=needed(b.customerName,200),customerMobile=text(b.customerMobile||'',50),customerNationalId=text(b.customerNationalId||'',20),customerCity=text(b.customerCity||'',100),customerAddress=needed(b.customerAddress,2000),notes=text(b.notes||'',2000);if(customerNationalId&&!/^\d{10}$/.test(customerNationalId))fail('کد ملی مشتری باید ۱۰ رقم باشد.');if(customerMobile&&!/^(?:09\d{9}|\+989\d{9})$/.test(customerMobile))fail('موبایل مشتری معتبر نیست.');const order= sale.data.salesOrderId?await get(sale.data.salesOrderId,'sales_order'):null;const invoice=order?.data.invoiceId||sale.data.invoiceId||'';const day=tehranDay(),dealerName=agent.data.name,distributionId=(did:string)=>'distribution:'+did;
  for(const did of selected){const build=await get(did,'build');if(sale.data.deliveryMode==='consignment'){if(build.data.state!=='consigned'||build.data.saleId!==sale.id)fail('سریال شعبه امانی آماده تحویل نهایی نیست.',409);entry(did,'consignment:'+agent.id,-1000);entry(did,'delivered',1000);put(did,'build',{...build.data,state:'delivered',deliveredAt:now,customerName,customerMobile,customerNationalId,customerAddress},build);}else if(build.data.state!=='delivered'||build.data.saleId!==sale.id)fail('سریال فروش قطعی در وضعیت تحویل مقصد نیست.',409);const current:any=await db.prepare("SELECT * FROM records WHERE id=? AND kind='distribution'").bind(distributionId(did)).first();const previous=current?JSON.parse(current.payload):{};if(previous.customerName&&previous.customerName!==customerName)fail('برای این سریال مشتری نهایی قبلاً ثبت شده است.',409);const next={...previous,serial:(await device(did)).code,dealerCode:agent.id,dealerName,dealerDate:previous.dealerDate||day,invoice:previous.invoice||invoice,customerName,customerMobile,customerNationalId,customerCity,customerAddress,notes,device:did,deliveryDate:day,updatedAt:now,updatedBy:u.name,source:'تحویل نهایی فروش'};if(current){guard('EXISTS(SELECT 1 FROM records WHERE id=? AND payload=?)',current.id,current.payload);statements.push(db.prepare('UPDATE records SET payload=? WHERE id=? AND payload=?').bind(JSON.stringify(next),current.id,current.payload),db.prepare('INSERT INTO access_audit(id,actor,target,action,before,after,at) VALUES(?,?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,distributionId(did),'handover_distribution',current.payload,JSON.stringify(next),now));}else{statements.push(db.prepare("INSERT INTO records(id,kind,payload,created) VALUES(?,'distribution',?,?)").bind(distributionId(did),JSON.stringify(next),now),db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,distributionId(did),'handover_distribution',JSON.stringify(next),now));}event(did,'تحویل مشتری نهایی',{customerName,customerMobile,customerCity,notes});}
  const allHanded=[...handed,...selected],nextState=allHanded.length===sale.data.deviceIds.length?'delivered':sale.data.deliveryMode==='consignment'?'consignment_received':sale.data.state;put(sale.id,'sale',{...sale.data,handedOverDeviceIds:allHanded,customerHandoverAt:now,customerHandoverBy:u.name,state:nextState},sale);
+ }else if(mode==='pickup_package'){
+ const sale=await get(needed(b.saleId),'sale'),d=sale.data;
+ const mission=d.transportId?await get(d.transportId,'transport'):null;
+ if(!assignedPackageDriver(u,d,mission?.data))fail('فقط رانندهٔ تحویل‌گیرندهٔ این بسته مجاز است.',403);
+ if(d.state!=='in_transit'||mission&&!['requested','assigned'].includes(mission.data.state))fail('بسته در مرحلهٔ دریافت از انبار نیست.',409);
+ if(mission&&(mission.data.kind!=='sale'||!(mission.data.sourceIds||[mission.data.sourceId]).includes(sale.id)))fail('مرجع حمل با بسته سازگار نیست.',409);
+ const p=d.shippingPackages?.find((p:any)=>p.id===b.packageId);if(!p)fail('بسته در این حواله پیدا نشد.',404);
+ if(b.confirmed!==true)fail('دریافت همین بسته را تأیید کنید.');
+ const prior:string[]=d.acknowledgedDeviceIds||[];
+ if(p.deviceIds.every((did:string)=>prior.includes(did)))fail('این بسته قبلاً دریافت شده است.',409);
+ const result=packageReceiptSelection(d.deviceIds,prior,b.deviceIds,p.deviceIds),notes=result.missing.length?needed(b.notes||'',4000):text(b.notes||'',4000);
+ const acknowledgedDeviceIds=[...prior,...result.chosen],complete=acknowledgedDeviceIds.length===d.deviceIds.length;
+ const pickupShortageIds=[...new Set([...(d.pickupShortageIds||[]).filter((did:string)=>!result.chosen.includes(did)),...result.missing])];
+ const stamp={packageId:p.id,deviceIds:result.chosen,missing:result.missing,by:u.name,actor:u.userId,at:now,notes};
+ put(sale.id,'sale',{...d,acknowledgedDeviceIds,pickupShortageIds,pickupPackageReceipts:[...(d.pickupPackageReceipts||[]),stamp],carrierReceipts:[...(d.carrierReceipts||[]),stamp],...(complete?{acknowledgedAt:now,acknowledgedBy:u.name,acknowledgedActor:u.userId}:{})},sale);
+ if(mission){const m=mission.data,sourceIds=m.sourceIds||[m.sourceId],sources=await Promise.all(sourceIds.map((sid:string)=>sid===sale.id?Promise.resolve(sale):get(sid,'sale')));const collectedDeviceIds=[...new Set([...(m.collectedDeviceIds||[]),...sources.flatMap((s:any)=>s.id===sale.id?acknowledgedDeviceIds:s.data.acknowledgedDeviceIds||[])])];
+ const pending=m.items.map((i:any)=>i.deviceId).filter((did:string)=>!collectedDeviceIds.includes(did));
+ put(mission.id,'transport',{...m,collectedDeviceIds,pickupShortageIds:[...new Set([...(m.pickupShortageIds||[]).filter((did:string)=>!result.chosen.includes(did)),...result.missing])],...(!pending.length?{state:'collected',collectedDay:tehranDay(),condition:notes||'دریافت بسته‌ها با تأیید راننده ثبت شد.'}:{}),history:[...m.history,{mode:'pickup_package',...stamp}]},mission);
+ }
+ for(const did of result.chosen)event(did,'تأیید دریافت تدارکات',{packageId:p.id,notes});
  }else if(mode==='acknowledge'){
  const sale=await get(needed(b.saleId),'sale');if(sale.data.transportId)fail('تأیید دریافت را در مأموریت تدارکات انجام دهید.');if(sale.data.state!=='in_transit'||sale.data.acknowledgedAt)fail('این حواله در انتظار تأیید تدارکات نیست.',409);if(!u.isAdmin&&!['local:'+sale.data.carrierId,sale.data.carrierSubject].includes(u.userId))fail('فقط تحویل‌گیرنده تعیین‌شده می‌تواند تأیید کند.',403);
  const sales=sale.data.dispatchBatchId?(await list('sale')).filter(line=>line.data.dispatchBatchId===sale.data.dispatchBatchId):[sale];
@@ -214,7 +235,7 @@ async function post(request:Request){try{
  }
  const formStatements=await captureForm(id,'fulfillment.'+mode,b,u);
  await db.batch([db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(id,'fulfillment_'+mode,signature,u.userId,now),...checks,...await annualCountMovementStatements(db,id,b,countMovements),...statements,...formStatements,db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,id,'fulfillment_'+mode,signature,now)]);
- let followup=true;try{await syncSalesTasks();await scanSalesMonitor({reports:false,source:'event'});}catch{followup=false;}return json({saved:true,followupPending:!followup});
+ let followup=true;try{if(mode==='pickup_package')await syncTransportTasks();await syncSalesTasks();await scanSalesMonitor({reports:false,source:'event'});}catch{followup=false;}return json({saved:true,followupPending:!followup});
  }catch(e){return accessResponse(e)||Response.json({error:/constraint|SQLITE|D1|Database/i.test(String(e))?'موجودی یا وضعیت هم‌زمان تغییر کرده است؛ هیچ تغییری ثبت نشد. تازه‌سازی کنید.':'ثبت انجام نشد؛ ورودی‌ها را بررسی کنید.'},{status:409})}}
 
 export const GET=withServiceRolePreview(get);

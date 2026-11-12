@@ -1,3 +1,7 @@
+## 2026-11-13 — Driver package scan pickup
+
+- Assigned logistics driver scans an opaque package QR, reviews default checked remaining serials and explicitly confirms pickup. No preassigned mission is required; an existing assigned/requested mission is synchronized in the same transaction. Missing serials require explanation; replay and wrong-driver access are rejected. Warehouse custody remains separate from destination receipt, stock and money.
+
 ## 2026-11-13 — Finished-product package labels and receipt
 
 - Product passport defines units per package (default 1). Finished warehouse confirms exact reserved serials; server splits them into single-model packages, including the final partial package, without changing stock or delivery status.
