@@ -1,3 +1,9 @@
+## 2026-11-12 — Sales payment live receipt camera
+
+- Sales bank-payment receipt capture now uses the same click-only live camera, JPEG preview and stream cleanup as service payments. The prior capture-hint file input is removed.
+- Retained optional image/PDF selection, attachment removal and the existing sales upload/payment flow. A replacement attachment gets a fresh upload request ID. PDF attachments display their name without attempting image preview.
+- No API, accounting, bank matching or permission changes.
+
 ## 2026-11-12 — In-form service receipt camera
 
 - Replaced the capture-hint file input in the service deposit form with a dedicated camera action using getUserMedia after the user's click. The camera shows live video, captures JPEG into the existing optional upload flow, and previews the selected receipt. File selection remains a separate action.

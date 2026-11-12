@@ -1,3 +1,9 @@
+## 2026-11-12 — Shared receipt camera in sales bank payments
+
+- Scope: replace sales capture-hint picker with ReceiptAttachment; extend that component with optional PDF selection while leaving service receipt selection image-only. No new business capability or MCP/API change.
+- PASS: receipt-camera.cjs (permission/capture/cleanup plus PDF selection without image rendering), sales-role-navigation-ui.cjs (actual payment form uses camera component and retains PDF), service-payments-ui.cjs (existing service integration). TypeScript/build and full source/publication proof recorded with release.
+- Physical camera/device permissions remain unverified by mocked tests. Existing sales receipt size and server validation stay unchanged.
+
 ## 2026-11-12 — Receipt camera instead of file-picker capture hint
 
 - Scope: service-payment attachment UI only, with live video, JPEG capture, preview URL lifecycle and separate file selection. Existing upload authorization and payment handler unchanged; no new business MCP capability needed.

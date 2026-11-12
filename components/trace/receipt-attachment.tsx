@@ -1,12 +1,13 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
+import {Camera} from 'lucide-react';
 
-export function ReceiptAttachment({file,onChange,disabled=false}:{file:File|null;onChange:(file:File|null)=>void;disabled?:boolean}){
+export function ReceiptAttachment({file,onChange,disabled=false,allowPdf=false}:{file:File|null;onChange:(file:File|null)=>void;disabled?:boolean;allowPdf?:boolean}){
  const video=useRef<HTMLVideoElement|null>(null),stream=useRef<MediaStream|null>(null),request=useRef(0);
  const [open,setOpen]=useState(false),[waiting,setWaiting]=useState(false),[ready,setReady]=useState(false),[error,setError]=useState(''),[preview,setPreview]=useState('');
  function stop(){request.current++;stream.current?.getTracks().forEach(track=>track.stop());stream.current=null;if(video.current)video.current.srcObject=null;setOpen(false);setWaiting(false);setReady(false)}
  useEffect(()=>()=>{request.current++;stream.current?.getTracks().forEach(track=>track.stop());stream.current=null},[]);
- useEffect(()=>{if(!file){setPreview('');return}const url=URL.createObjectURL(file);setPreview(url);return()=>URL.revokeObjectURL(url)},[file]);
+ useEffect(()=>{if(!file||!file.type.startsWith('image/')){setPreview('');return}const url=URL.createObjectURL(file);setPreview(url);return()=>URL.revokeObjectURL(url)},[file]);
  useEffect(()=>{if(disabled)stop()},[disabled]);
  useEffect(()=>{const hidden=()=>{if(document.hidden)stop()};document.addEventListener('visibilitychange',hidden);return()=>document.removeEventListener('visibilitychange',hidden)},[]);
  useEffect(()=>{if(open&&stream.current&&video.current){video.current.srcObject=stream.current;void video.current.play().catch(()=>{stop();setError('پیش‌نمایش دوربین باز نشد؛ دوباره تلاش کنید.')})}},[open,waiting]);
@@ -21,9 +22,9 @@ export function ReceiptAttachment({file,onChange,disabled=false}:{file:File|null
   const frame=video.current;if(!frame.videoWidth||!frame.videoHeight)return;const id=request.current,canvas=document.createElement('canvas');canvas.width=frame.videoWidth;canvas.height=frame.videoHeight;const context=canvas.getContext('2d');if(!context){setError('ثبت عکس در این مرورگر ممکن نشد.');return}context.drawImage(frame,0,0);setReady(false);
   canvas.toBlob(blob=>{if(request.current!==id)return;if(!blob){setReady(true);setError('عکس ثبت نشد؛ دوباره تلاش کنید.');return}onChange(new File([blob],'receipt-'+Date.now()+'.jpg',{type:'image/jpeg'}));stop()},'image/jpeg',0.9);
  }
- return <div className="wide"><p>عکس رسید (اختیاری)</p><div className="tools"><label className="btn">انتخاب عکس رسید<input type="file" accept="image/*" disabled={disabled} onChange={e=>{const selected=e.target.files?.[0];if(selected){stop();setError('');onChange(selected)}e.target.value=''}}/></label><button type="button" className="btn" disabled={disabled||waiting} onClick={()=>void start()}>عکس گرفتن از رسید</button></div>
+ return <div className="wide"><p>عکس رسید (اختیاری)</p><div className="tools"><label className="btn">{allowPdf?'انتخاب عکس یا فایل رسید':'انتخاب عکس رسید'}<input className="sr-only" type="file" accept={allowPdf?'image/*,application/pdf,.pdf':'image/*'} disabled={disabled} onChange={e=>{const selected=e.target.files?.[0];if(selected){stop();setError('');onChange(selected)}e.target.value=''}}/></label><button type="button" className="btn" disabled={disabled||waiting} onClick={()=>void start()}><Camera size={18} aria-hidden="true"/>عکس گرفتن از رسید</button></div>
  {error&&<p className="notice error" role="alert">{error}</p>}
  {open&&<div role="region" aria-label="دوربین رسید" className="notice"><p>{waiting?'در انتظار اجازهٔ دوربین…':'رسید را داخل تصویر قرار دهید و «گرفتن عکس» را بزنید.'}</p><video ref={video} autoPlay muted playsInline onCanPlay={()=>setReady(true)} style={{width:'100%',maxHeight:360,objectFit:'contain',display:waiting?'none':'block'}}/><div className="tools"><button type="button" className="btn primary" disabled={disabled||!ready} onClick={take}>گرفتن عکس</button><button type="button" className="btn" onClick={stop}>بستن دوربین</button></div></div>}
- {file&&<div><p>رسید انتخاب‌شده: {file.name}</p>{preview&&<img src={preview} alt="پیش‌نمایش عکس رسید" style={{maxWidth:'100%',maxHeight:280,objectFit:'contain'}}/>}<p className="subtle">عکس همراه با ثبت اعلام واریزی ارسال می‌شود.</p></div>}
+ {file&&<div><p>رسید انتخاب‌شده: {file.name}</p>{preview&&<img src={preview} alt="پیش‌نمایش عکس رسید" style={{maxWidth:'100%',maxHeight:280,objectFit:'contain'}}/>}<p className="subtle">پیوست هنگام ثبت پرداخت ارسال می‌شود.</p></div>}
  </div>;
 }

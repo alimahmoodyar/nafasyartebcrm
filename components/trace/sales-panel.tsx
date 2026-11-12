@@ -1,5 +1,6 @@
 'use client';
-import {Camera,CircleCheck,ClipboardList,Clock,History,Search,ShoppingCart,TriangleAlert,Wallet} from 'lucide-react';
+import {ReceiptAttachment} from './receipt-attachment';
+import {CircleCheck,ClipboardList,Clock,History,Search,ShoppingCart,TriangleAlert,Wallet} from 'lucide-react';
 import {CartonSerials} from './carton-serials';
 import {custodyConditions,custodyKinds} from '@/lib/sales-custody';
 import {RefreshButton} from './refresh-button';
@@ -506,17 +507,8 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
  {draft.mode==='payment'&&<>{draft.method==='check'&&pick('checkPurpose','کاربرد چک',{payment:'پرداخت فاکتور',collateral:'ضمانت اعتبار'})}{!roleBankTest&&draft.checkPurpose!=='collateral'&&<PaymentLink draft={draft} orders={data.orders} invoices={data.accounts.find((a:any)=>a.agentId===draft.agentId)?.invoices||[]} onChange={change}/>}{!roleBankTest&&pick('method','روش پرداخت',{bank:'واریز بانکی',cash:'نقد با رسید',check:'چک'})}{field('amount','مبلغ، ریال',true,true)}{solar('day','تاریخ پرداخت / تحویل چک')}{(draft.method==='check'||draft.method==='bank'&&!assignedPaymentAccounts&&!paymentDestination)&&field('bank','بانک')}{draft.method==='bank'&&<><label className="field">حساب مقصد شرکت<select required={Object.keys(paymentAccountChoices).length>0&&!draft.paymentId} value={paymentDestination} onChange={e=>change('receivingAccountId',e.target.value)}><option value="">انتخاب حساب مقصد</option>{Object.entries(paymentAccountChoices).map(([id,label])=><option key={id} value={id}>{String(label)}</option>)}</select></label>{paymentAccount&&<p className="notice wide"><strong>{paymentAccount.title}</strong>{paymentAccount.number&&<> · شماره حساب <bdi>{paymentAccount.number}</bdi></>}{paymentAccount.iban&&<> · شبا <bdi>{paymentAccount.iban}</bdi></>}{paymentAccount.cardNumber&&<> · شماره کارت <bdi>{paymentAccount.cardNumber}</bdi></>}</p>}{assignedPaymentAccounts&&!Object.keys(paymentAccountChoices).length&&!draft.paymentId&&<p className="notice wide">مالی هنوز حساب مقصدی برای این خریدار تخصیص نداده است.</p>}</>}{field('reference',draft.method==='check'?'شناسه چک':draft.method==='bank'?'کد رهگیری':'شماره رسید',draft.method!=='bank'||assignedPaymentAccounts)}{draft.method==='check'&&solar('checkDue','سررسید چک')}{field('notes','توضیح پرداخت',false)}{!roleBankTest&&files(draft.agentId).length>0&&<label className="field">انتخاب رسید قبلاً بارگذاری‌شده<select value={draft.fileId||''} onChange={e=>change('fileId',e.target.value)}><option value="">بارگذاری فایل جدید</option>{files(draft.agentId).map((f:any)=><option key={f.id} value={f.id}>{f.data.title} · {f.data.filename}</option>)}</select></label>}<p className="notice wide">اعلام پرداخت یا تحویل چک هنوز بدهی را کم نمی‌کند. واریز دارای حساب مقصد، تاریخ، مبلغ، کد رهگیری ثبت‌شده با گردش بانک کنترل می‌شود؛ تطبیق قطعی وصول و تخصیص به فاکتور را ثبت می‌کند. موارد مبهم برای بررسی مالی می‌ماند.</p></>}
  {!roleBankTest&&draft.mode==='payment'&&draft.method==='bank'&&!draft.fileId&&<fieldset className="field wide">
   <legend>عکس یا فایل رسید (اختیاری، تا ۱۰ مگابایت)</legend>
-  <div className="tools">
-   <label className="btn">
-    <Camera size={18} aria-hidden="true"/> عکس گرفتن از رسید
-    <input className="sr-only" type="file" accept="image/*" capture="environment" onChange={e=>{const photo=e.target.files?.[0];if(photo)setFile(photo);e.target.value='';}}/>
-   </label>
-   <label className="btn">
-    انتخاب عکس یا فایل
-    <input className="sr-only" type="file" accept="image/*,application/pdf,.pdf" onChange={e=>{const receipt=e.target.files?.[0];if(receipt)setFile(receipt);e.target.value='';}}/>
-   </label>
-  </div>
-  {file&&<p><bdi>{file.name}</bdi> <button className="btn" type="button" onClick={()=>setFile(null)}>حذف پیوست</button></p>}
+  <ReceiptAttachment key={draft.id} file={file} disabled={busy} allowPdf onChange={next=>{change('fileRequestId',crypto.randomUUID());setFile(next)}}/>
+  {file&&<button className="btn" type="button" onClick={()=>setFile(null)}>حذف پیوست</button>}
  </fieldset>}
  {!roleBankTest&&(draft.mode==='file'||draft.mode==='payment'&&draft.method!=='bank')&&!draft.fileId&&<>{draft.mode==='file'&&field('title','عنوان مدرک')}<label className="field">{draft.mode==='payment'?(draft.method==='check'?'تصویر چک':'رسید پرداخت'):'فایل خصوصی'} (حداکثر ۱۰ مگابایت){draft.mode==='payment'&&draft.method!=='check'?' — اختیاری':''}<input key={draft.fileRequestId} type="file" required={draft.mode==='payment'&&draft.method==='check'} onChange={e=>setFile(e.target.files?.[0]||null)}/></label></>}
  {draft.mode==='check_disposition_request'&&pick('disposition','نوع درخواست',{return:'استرداد چک',collateral:'تبدیل به ضمانت'})}
