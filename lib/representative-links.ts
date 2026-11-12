@@ -1,3 +1,4 @@
+import {linkedIdentityId} from './representative-identity-contract';
 import {profileExecutionContext} from './profile-execution-context';
 import {trainingContext} from './training-context';
 import {AccessError} from './authorization';
@@ -55,10 +56,11 @@ export async function salesRepresentationLinks(c:LinkContext,body:any,old:Entity
  c.guard("NOT EXISTS(SELECT 1 FROM flow_entities WHERE type='as_agent' AND json_extract(data,'$.domain')=? AND json_extract(data,'$.linkedSalesAgentId')=? AND id NOT IN (SELECT value FROM json_each(?)))",domain,sourceId,JSON.stringify([...sameDomain.map(agent=>agent.id),targetId]));
  c.guard("NOT EXISTS(SELECT 1 FROM flow_entities WHERE type='sales_agent' AND id<>? AND EXISTS(SELECT 1 FROM json_each(json_extract(data,'$.linkedServiceAgentIds')) WHERE value=?))",sourceId,targetId);
  for(const agent of sameDomain.filter(agent=>agent.id!==targetId)){current(c,agent);c.put(agent.id,'as_agent',history(c,{...agent.data,serviceRepresentation:true,salesRepresentation:false,linkedSalesAgentId:''},'unlink-sales',sourceId),agent);}
- if(existing){if(existing.data.linkedSalesAgentId!==sourceId)c.put(existing.id,'as_agent',history(c,{...existing.data,serviceRepresentation:true,salesRepresentation:true,linkedSalesAgentId:sourceId},'link-sales',sourceId),existing);}
+ const sharedIdentity=linkedIdentityId(data,existing?.data);if(sharedIdentity)data={...data,identityId:sharedIdentity};
+ if(existing){if(existing.data.linkedSalesAgentId!==sourceId||existing.data.identityId!==sharedIdentity)c.put(existing.id,'as_agent',history(c,{...existing.data,...(sharedIdentity?{identityId:sharedIdentity}:{}),serviceRepresentation:true,salesRepresentation:true,linkedSalesAgentId:sourceId},'link-sales',sourceId),existing);}
  else{
   const code=taskRequired(body.serviceCode,80),location=normalizeIranLocation(data.province,data.city),phone=text(data.phone||data.mobile,50);if(!location.city)fail('برای ساخت نمایندگی خدمات، شهر یا شهرستان را انتخاب کنید.');if(!phone||phone.length>30)fail('برای نمایندگی خدمات، شماره تماس معتبر حداکثر ۳۰ نویسه وارد کنید.');if(!data.address||data.address.length>1000)fail('نشانی مشترک نمایندگی فروش و خدمات حداکثر ۱۰۰۰ نویسه باشد.');c.guard("NOT EXISTS(SELECT 1 FROM flow_entities WHERE type='as_agent' AND json_extract(data,'$.code')=?)",code);
-  c.put(targetId,'as_agent',history(c,{domain,agentId:targetId,name:data.name,code,city:location.city,province:location.province,coverage:[],phone,address:data.address,active:data.active,nationalId:data.nationalId||'',mobile:data.mobile||'',serviceRepresentation:true,salesRepresentation:true,linkedSalesAgentId:sourceId},'link-sales',sourceId));
+  c.put(targetId,'as_agent',history(c,{domain,...(sharedIdentity?{identityId:sharedIdentity}:{}),agentId:targetId,name:data.name,code,city:location.city,province:location.province,coverage:[],phone,address:data.address,active:data.active,nationalId:data.nationalId||'',mobile:data.mobile||'',serviceRepresentation:true,salesRepresentation:true,linkedSalesAgentId:sourceId},'link-sales',sourceId));
  }
  const next=[...services.filter(agent=>agent.data.domain!==domain).map(agent=>agent.id),targetId];
  const changed=JSON.stringify(ids.slice().sort())!==JSON.stringify(next.slice().sort());
@@ -76,7 +78,8 @@ export async function serviceRepresentationLinks(c:LinkContext,body:any,old:Enti
  const selectedId=sales?taskRequired(body.linkedSalesAgentId,200):'',selectedSales=sales?(selectedId===existingSales?.id?existingSales:await read(c.db,selectedId,'sales_agent')):null;
  if(selectedSales){if(!representationKind(selectedSales.data.kind||'representative'))fail('فقط نماینده یا عامل فروش قابل اتصال است.');requireRevision(body,'linkedSalesRevision',selectedSales);current(c,selectedSales);c.guard("NOT EXISTS(SELECT 1 FROM flow_entities WHERE type='as_agent' AND id<>? AND json_extract(data,'$.domain')=? AND json_extract(data,'$.linkedSalesAgentId')=?)",sourceId,domain,selectedSales.id);}
  if(existingSales&&existingSales.id!==selectedSales?.id){const remaining=sourceIds(existingSales).filter(id=>id!==sourceId);c.put(existingSales.id,'sales_agent',history(c,{...existingSales.data,salesRepresentation:true,serviceRepresentation:!!remaining.length,linkedServiceAgentIds:remaining},'unlink-service',sourceId),existingSales);}
- if(selectedSales&&selectedSales.id!==existingSales?.id){const ids=sourceIds(selectedSales);if(ids.includes(sourceId))fail('ارتباط یک‌طرفه موجود است؛ مدیر سامانه بررسی کند.',409);c.put(selectedSales.id,'sales_agent',history(c,{...selectedSales.data,salesRepresentation:true,serviceRepresentation:true,linkedServiceAgentIds:[...ids,sourceId]},'link-service',sourceId),selectedSales);}
+ const sharedIdentity=selectedSales?linkedIdentityId(data,selectedSales.data):data.identityId;if(sharedIdentity)data={...data,identityId:sharedIdentity};
+ if(selectedSales&&(selectedSales.id!==existingSales?.id||selectedSales.data.identityId!==sharedIdentity)){const ids=sourceIds(selectedSales);if(ids.includes(sourceId)&&selectedSales.id!==existingSales?.id)fail('ارتباط یک‌طرفه موجود است؛ مدیر سامانه بررسی کند.',409);c.put(selectedSales.id,'sales_agent',history(c,{...selectedSales.data,...(sharedIdentity?{identityId:sharedIdentity}:{}),salesRepresentation:true,serviceRepresentation:true,linkedServiceAgentIds:[...new Set([...ids,sourceId])]},'link-service',sourceId),selectedSales);}
  return {...data,serviceRepresentation:true,salesRepresentation:sales,linkedSalesAgentId:selectedSales?.id||'',...(previousId!==(selectedSales?.id||'')?{representationLinkHistory:history(c,data,sales?'link-sales':'unlink-sales',selectedSales?.id||previousId).representationLinkHistory}:{})};
 }
 

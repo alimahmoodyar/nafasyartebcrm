@@ -1,4 +1,5 @@
 'use client';
+import {RepresentativeIdentityPanel} from './representative-identity-panel';
 import {ReceiptAttachment} from './receipt-attachment';
 import {CircleCheck,ClipboardList,Clock,History,Search,ShoppingCart,TriangleAlert,Wallet} from 'lucide-react';
 import {CartonSerials} from './carton-serials';
@@ -388,6 +389,7 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
   return <SalesCallsPanel buyer={entry.startsWith('referral:')?'':entry} referralId={entry.startsWith('referral:')?entry.slice('referral:'.length):''} onNavigate={onNavigate}/>;
  }
  return <ProgramWorkspace programId="sales" direct={!!targetId} title="فروش" status={<>{roleBankTest&&<p className="notice">واریز آزمایشی · دادهٔ جداگانه از حساب شرکت</p>}{error&&!draft&&<p className="notice error" role="alert">{error}</p>}{!data.warehouseOnly&&(staff||finance)&&!writableAgents.length&&<p className="notice" role="status">نقش فروش شما فعال است؛ برای ثبت فروش، مدیر فروش باید از مسیر «فروش ← تنظیمات فروش ← تخصیص خریدار به کارشناس» خریدار موجود را به شما تخصیص دهد. مجوز مشاهده گزارش به‌تنهایی اختیار ثبت در پرونده همکاران را نمی‌دهد.</p>}</>}><section className={representativeDashboard?'panel sales-portal representative-dashboard':'panel sales-portal'} dir="rtl"><div className="panelhead"><h2>{representativeDashboard?'پنل نماینده فروش':openOrderList?'پیگیری سفارش‌ها':view==='orders'?'سفارش‌ها':representativeEntry?.view==='account'?'حساب و اعتبار نماینده':representativeEntry?.view==='returns'?'مرجوعی دستگاه':rep?'پرتال نماینده فروش':'فروش و نمایندگان'}</h2></div><div className="inside">
+ {(rep||data.roles.staff||data.roles.manager)&&<RepresentativeIdentityPanel key={salesApi+":"+(rep?data.agents[0]?.id||"":"staff")} kind="sales" agentId={rep?data.agents[0]?.id||"":""}/>}
  {representativeDashboard&&rep&&<>
  <div className="representative-dashboard-actions" role="group" aria-label="اقدام‌های اصلی نماینده">
   <button type="button" className="btn primary" disabled={!writableAgents.length} onClick={()=>begin('order')}><ShoppingCart aria-hidden="true"/><span>ثبت درخواست خرید</span></button>

@@ -1,3 +1,11 @@
+## Shared representative identity — 2026-11-12
+
+Scope: representative identity UI/API/MCP, explicit sales/service linkage, private attachments, reset/backup coverage. Identity is a separate reviewed record; old login and commercial identity fields are deliberately not rewritten by approval. Existing agent code, activity grants, qualifications, contracts and balances remain authoritative in their original modules. Explicit linked profiles share an identity ID; merging two already distinct dossiers is blocked rather than discarding one history. Commercial unlinking preserves the existing person's identity/history.
+
+Validation: isolated real-SQLite authenticated HTTP checks for own versus assigned sales access, service-domain access, manager/creator access, draft/submit/review/return, retained approved snapshot, legal/natural conditional fields, scoped documents, file idempotency and integrity, stable retries, stale/concurrent updates, pagination, reset preservation/freeze and MCP parity. Hook-based UI checks for no personal-data fetch before opening, own/reviewer controls, unsaved approval protection, retry UUID and late-response scope guards. TypeScript and affected existing linkage/account/reset/navigation tests recorded in release audit. No company records seeded; no browser/physical-device validation claimed.
+
+Deferred: direct merge of already independent identity dossiers needs an explicit owner-approved reconciliation flow. Wider multi-year performance/load targets remain as in ENTERPRISE-QUALITY.md; bounded identity lists/history are implemented, not an enterprise capacity claim. Existing service-support-profile test debt from the previous driver work remains documented below.
+
 ## 2026-11-12 — Independent driver initial device receipt
 
 - PASS: driver-receipts.cjs (real SQLite/HTTP handlers): no-mission creation; ownership/domain separation; optional unreadable serial; no premature case/warranty/stock/financial posting; QR label privacy/read-only reprint; intake-only physical confirmation; revision/idempotency races and known-serial active-receipt duplicate guard; atomic case creation/link rollback; active/history scopes; reset freeze and both reset predicates; dedicated intake role grants/domain scoping; MCP tools registered to shared handlers.

@@ -1,3 +1,4 @@
+// representative_identity and representative_identity_file are preserved agency identity data in both reset scopes, like sales_agent/as_agent. Generic 0016 flow/inventory freeze protects every write. Private R2 originals are included by resetFiles in backup; no new table or FK.
 // transport_receipt is operational flow_entities JSON: both scopes back up/delete receipt custody/history and as_case links. Generic 0016 flow/inventory freeze protects atomic writes. No new table, FK or R2 object; printing is read-only.
 // Service bank claims reuse sales_payment with serviceDomain/serviceAgentId; receipts reuse sales_file. Journal entries use existing service_ledger. Existing operational reset/backup, private sales-files cleanup, FK-safe offsets-first deletion and generic freeze cover all of them; no new table or exemption.
 // Payment requests, supplier credits/offsets, shipment manifests, receipt links, return movements and delivery decisions are JSON on existing purchase_payable, purchase_order and receipt entities. Existing operational backup/reset and freeze also cover linked files and inventory movements.
@@ -89,7 +90,7 @@ export const resetTables:Record<string,string>={
 };
 // Member contacts are preserved account identity data, keyed by app_members.id.
 // Existing 0016 generic flow_entities freeze protects their atomic writes; no new migration.
-export const resetFlowPreserved=['hospital_center','account_profile','member_contact','position','duty_template','duty_catalog_install','transport_migration','development_request','as_agent','sales_agent'];
+export const resetFlowPreserved=['representative_identity','representative_identity_file','hospital_center','account_profile','member_contact','position','duty_template','duty_catalog_install','transport_migration','development_request','as_agent','sales_agent'];
 // material_photo is catalog data: active and removed originals/thumbnails survive operations reset with material; full reset backs up both object keys and deletes all photo rows. Generic 0016 flow/inventory freeze protects upload/removal; no new table/FK. Training uses existing flow and bucket isolation.
 // Shared print layouts are configuration; existing flow_entities freeze and backup apply.
 // Service representation contract versions and current pointers on as_agent: operations preserve catalog/history; full reset removes contracts and leaves explicit missing-reference state, never invents validity. Generic flow freeze covers atomic renewal/termination and warning closure; no new table/FK/blob.

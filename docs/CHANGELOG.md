@@ -1,3 +1,10 @@
+## 2026-11-12 — Shared representative identity
+
+- One reviewed identity dossier for explicitly linked sales/service agencies, available to the representative, scoped sales expert, same-domain service coordinator/support and defining manager. Searchable, paginated agency selection; natural/legal identity, responsible contact, agency address and private PDF/image evidence.
+- Draft/submit/approve/return workflow retains approved snapshots while revisions await review. Server-controlled agency code/activity and existing qualifications remain separate. Identity completion never activates an agency or changes login credentials, commercial terms, stock or ledgers.
+- Full audit, revision/transaction guards, retry UUIDs, scoped file downloads and HTTP/MCP parity. Identity and its documents follow the same preserved reset policy as agency profiles; file backups include private originals. No new database migration.
+- Existing independent driver receipts/intake work from the preceding authorized task is included in this release; shared-data behavior is preserved.
+
 ## 2026-11-12 — Independent driver device receipt and company intake
 
 - Driver profile/transport workspace can register one-device initial pickup from a carrier without any preassigned mission. Optional mission references are validated against assigned inbound device work; they do not automatically complete that mission.
