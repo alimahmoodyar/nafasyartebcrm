@@ -1,3 +1,10 @@
+## 2026-11-12 — Representative finance workspace and searchable deposits
+
+- Renamed the home deposit action to Financial (مالی). Its landing view shows pending bank matching openly, with separate new-deposit and history views.
+- History combines tracking/record search with status, inclusive payment-date range, IRR bounds and destination-account filters. Count and pagination use the same scoped SQL predicates; finance review is derived from the existing two-day coverage and unique bank-evidence rules.
+- Rejected deposits can be edited or deleted by their own representative (or administrator). Deletion requires the current revision, no financial/bank history, an idempotent operation and an atomic recheck; the deleted record is retained in access audit. Other states cannot be deleted.
+- HTTP and MCP expose the same filters and delete operation. No new tables, implicit data, migrations or changes to automatic matching/posting rules.
+
 ## 2026-11-12 — Remove repeated service-home tracking summary
 
 - Removed the "پیگیری کارهای من" section from the home-service representative dashboard at the owner's request. The direct cartable action remains in the main action row; the owning order, repair and return pages retain their workflows.

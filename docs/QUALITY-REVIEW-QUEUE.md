@@ -1,3 +1,10 @@
+## 2026-11-12 — Finance navigation, history filters and rejected-deposit deletion
+
+- Scope: financial home with open pending-bank list, new/history navigation, combined server-side search/filter/count/page, and audited rejected-only deletion. UI, HTTP and MCP share domain handlers.
+- PASS: service-payments.cjs covers cross-agent scope, filtering before pagination, literal wildcard/injection input, combined date/amount/account filters, derived waiting/review classifications including ready bank evidence, invalid filters, delete permission/state/revision, concurrent rollback, retry idempotency, audit retention and unchanged account balance; existing bank import/reversal cases remain passing. UI/dashboard tests cover navigation and search controls plus prior draft lifecycle/permission cases.
+- TypeScript/build and full Git-tree/native live-version publication checks recorded with release evidence. No application records entered/deleted during implementation; isolated SQLite test fixtures only. Component tests do not claim browser rendering.
+- Pre-existing scaling debt: bankEntities still loads the bank evidence collection for matching/review metadata. New payment rows/counts are SQL-filtered and bounded, but broad-volume performance of the existing bank matcher has not been measured or guaranteed. Account filter choices currently use assigned approved receiving accounts.
+
 ## 2026-11-12 — Service-home tracking summary removal
 
 - Scope: remove the repeated home-page tracking summary and its unused presentation-only list/status mapping. Preserve the existing cartable action, payment schedule, payment history and ledger.
