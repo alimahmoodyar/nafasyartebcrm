@@ -1,3 +1,9 @@
+## 2026-11-12 — Remove driver entry mission gate
+
+- Scope: role-testing-panel navigation/text and local camera test only. No backend authorization, mission visibility or posting changes; selecting an actual review mission remains scoped.
+- PASS: role-cartable-ui.cjs verifies direct driver role entry via POST with no mission selector, missionless camera test result without requests, and required actual mission when explicitly opening scoped review. Existing role/cartable/navigation cases remain passing. TypeScript/build/source/live proof recorded with release.
+- No mission or other application data was created for camera testing. Physical phone camera testing is still not claimed.
+
 ## 2026-11-12 — Transport phone scanner
 
 - Scope: shared camera code scanner, transport-only camera action on existing carton selection, other mission-item matching, authorized batch alias reads and confirmed-operation scan history. New dependency @zxing/browser 0.2.1 is exact-pinned with the pnpm lockfile; decoder import is deferred until a user click. No new table, inventory formula, automatic confirmation or parallel workflow.

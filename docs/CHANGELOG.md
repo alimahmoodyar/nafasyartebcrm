@@ -1,3 +1,9 @@
+## 2026-11-12 — Direct driver profile entry
+
+- Removed the initial mission-selection gate and the "enter without mission" option from driver role entry. The driver profile opens directly like other optional-scope roles.
+- Mission-scoped administrator review remains an explicit action inside the profile and still requires a real mission; server grants and assigned-driver access rules are unchanged.
+- Added a local camera code-reader test on the driver profile so a phone/QR can be tested with no mission and no business request, stock change or delivery confirmation.
+
 ## 2026-11-12 — Driver phone QR/barcode scanning
 
 - Driver collection and delivery forms now open an in-page phone camera on explicit click, with rear-camera preference, local QR/1D barcode decoding and separate manual entry. The decoder is dynamically loaded only when scanning starts.
