@@ -1,3 +1,9 @@
+## 2026-11-12 — In-form service receipt camera
+
+- Replaced the capture-hint file input in the service deposit form with a dedicated camera action using getUserMedia after the user's click. The camera shows live video, captures JPEG into the existing optional upload flow, and previews the selected receipt. File selection remains a separate action.
+- Camera tracks stop on capture, close, disabled submission, page hiding and form unmount. Late permission responses after cancellation are stopped too. Permission-denied/unavailable-camera messages are explicit; no automatic file-picker substitution.
+- No backend, financial or data changes. Cancel still closes the unsaved deposit form without posting it.
+
 ## 2026-11-12 — Representative finance workspace and searchable deposits
 
 - Renamed the home deposit action to Financial (مالی). Its landing view shows pending bank matching openly, with separate new-deposit and history views.

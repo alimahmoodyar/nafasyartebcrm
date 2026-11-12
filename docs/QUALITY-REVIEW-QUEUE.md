@@ -1,3 +1,9 @@
+## 2026-11-12 — Receipt camera instead of file-picker capture hint
+
+- Scope: service-payment attachment UI only, with live video, JPEG capture, preview URL lifecycle and separate file selection. Existing upload authorization and payment handler unchanged; no new business MCP capability needed.
+- PASS: receipt-camera.cjs mocked media API covers click-only access request, rear-camera preference/no audio, capture, preview, denied permissions, late request cancellation, page hiding, unmount cleanup and disabled state; service-payments-ui.cjs confirms attachment component integration. TypeScript and publication evidence are recorded with release.
+- Physical device/browser permission and camera hardware are not validated by mocked component tests. Browser permissions may already be remembered or blocked by embedding policy; errors remain visible and file selection remains available separately.
+
 ## 2026-11-12 — Finance navigation, history filters and rejected-deposit deletion
 
 - Scope: financial home with open pending-bank list, new/history navigation, combined server-side search/filter/count/page, and audited rejected-only deletion. UI, HTTP and MCP share domain handlers.
