@@ -24,7 +24,7 @@ export function purchaseCompletion(c:any,rows:any[]){const d=c.data,delivery:str
  const receiptIds=new Set(invoices.flatMap((i:any)=>i.lines.flatMap((l:any)=>l.receiptIds||[])));for(const s of rows.filter(r=>r.type==='purchase_service'&&(r.data.costs||[]).some((a:any)=>a.kind==='receipt'&&receiptIds.has(a.targetId)))){const v=serviceSummary(s,rows);if(!v.complete)cost.push('خدمت وابسته '+s.data.title+': '+v.blockers.join(' / '));}
  const blockers=[...new Set([...delivery,...cost,...financial])];return {delivery:[...new Set(delivery)],cost:[...new Set(cost)],financial:[...new Set(financial)],blockers,ready:!blockers.length,closed:!!d.completion&&!blockers.length,stale:!!d.completion&&!!blockers.length};}
 
-export function purchaseOrderCanAutoClose(order:any,rows:any[]){
+export function purchaseOrderCanAutoClose(order:any,rows:any[]){if(order.data.urgentFinance?.state==='pending'||order.data.urgentFinance?.state==='fail')return false;
  try{
  const data=order.data;
  if(data.pendingSupplierCredit||!['issued','paid','preparing','shipped'].includes(data.state)||needsPurchaseConfirmation(data)||!data.totalRial||moneyMicro(data.totalRial)<=BigInt(0))return false;

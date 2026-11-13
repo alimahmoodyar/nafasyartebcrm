@@ -1,3 +1,7 @@
+## 2026-11-13 — Procurement operating rules and CEO exceptions
+
+Supply manager selection, three valid quotes or quote-bound CEO exception; normal pre-issue financial control and outstanding urgent financial review. Line-scoped decision/execution/development cartable, linked development deep links, held discrepant receipts and engineering-only documented concessions. See docs/PROCUREMENT-OPERATIONS.md for scope and validation.
+
 ## 2026-11-13 — optional paired phone/desktop work
 
 Explicit same-account/same-position pairing through a two-minute single-use QR; shared scanner/navigation and two-way standard form fields with per-field/context CAS. Unsent edits and same-field conflicts are visible, two simultaneous browser submissions reserve one stage, uncertain responses never auto-retry, and completed stages refresh before reuse. Auth/scope/device checks and operational reset/freeze coverage retained; HTTP/MCP use one handler. Pair QR is separate from business labels. Local files/camera and custom inner-dialog actions are not remotely mirrored; see PAIRED-WORKSPACE.md for exact coverage and tests.

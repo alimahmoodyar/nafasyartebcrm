@@ -9,7 +9,7 @@ import {formatDateTime} from '@/lib/persian-date';
 import {AlertDialog,AlertDialogTrigger,AlertDialogContent,AlertDialogHeader,AlertDialogTitle,AlertDialogDescription,AlertDialogFooter,AlertDialogCancel,AlertDialogAction} from '@/components/ui/alert-dialog';
 const blank=()=>({kind:'feature',title:'',section:'',problem:'',desired:'',impact:'',example:''});
 const nf=(n:number)=>n.toLocaleString('fa-IR');
-export function DevelopmentPanel({accountId,demo,onReal}:{accountId:string;demo:boolean;onReal:()=>void}){
+export function DevelopmentPanel({accountId,demo,onReal,targetId=""}:{accountId:string;demo:boolean;onReal:()=>void;targetId?:string}){
  const [data,setData]=useState<any>(null),[selected,setSelected]=useState<DevelopmentRequest|null>(null),[draft,setDraft]=useState(blank),[form,setForm]=useState(false);
  const [state,setState]=useState(''),[query,setQuery]=useState(''),[search,setSearch]=useState(''),[offset,setOffset]=useState(0),[tick,setTick]=useState(0);
  const [busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[error,setError]=useState(''),[notice,setNotice]=useState(''),[note,setNote]=useState(''),[review,setReview]=useState('reviewing'),[copyFallback,setCopyFallback]=useState('');
@@ -21,6 +21,7 @@ export function DevelopmentPanel({accountId,demo,onReal}:{accountId:string;demo:
  function closeDetail(){detailGeneration.current++;setSelected(null);setDetailLoading(false);setCloseOpen(false);setNote('');}
  const backRef=useWorkspaceBack(()=>{if(!busy)closeDetail()},!!selected||detailLoading);
  useEffect(()=>{alive.current=true;return()=>{alive.current=false;detailGeneration.current++}},[]);
+ useEffect(()=>{if(targetId&&!demo)void open(targetId)},[targetId,accountId,demo]);
  const headers={'Content-Type':'application/json','x-assistant-account':accountId};
  useEffect(()=>{if(demo){setLoading(false);return;}let active=true;const c=new AbortController();setLoading(true);setError('');
   fetch('/api/development?'+new URLSearchParams({state,queue,query:search,offset:String(offset)}),{cache:'no-store',headers:{'x-assistant-account':accountId},signal:c.signal}).then(async r=>{const d:any=await r.json();if(!active)return;if(!r.ok||d.accountId!==accountId)throw new Error(d.error||'حساب تغییر کرده است؛ صفحه را تازه کنید.');setData(d);}).catch(e=>{if(active)setError(e.message||'دریافت ممکن نشد.')}).finally(()=>{if(active)setLoading(false)});return()=>{active=false;c.abort()};

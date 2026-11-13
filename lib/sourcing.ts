@@ -1,3 +1,4 @@
+
 import {warehouseTarget} from './warehouse-workspace';
 import {sourcingStepDestination} from './sourcing-review-contract';
 import {hasDeliveryDays,needsPurchaseConfirmation,purchaseDeliveryStatus} from './sourcing-delivery';
@@ -101,12 +102,11 @@ export function nextWork(p:any,quotes:any[],orders:any[],lines:any[],receipts?:a
  }
  if (qs.some(q => !q.data.unavailable && q.data.technical === 'pending')) {
   add('technical:'+l.partCode+':'+l.round, 'engineering', 'بررسی فنی پیشنهاد '+l.name);
- } else if (qs.some(q => q.data.supplierLinkId && !q.data.unavailable && q.data.technical === 'pass' && !['pass','fail'].includes(q.data.financial))) {
-  add('financial:'+l.partCode+':'+l.round, 'finance', 'کنترل مالی پیشنهاد '+l.name);
  } else if (!returned.length&&!qs.some(q=>!q.data.unavailable&&q.data.ceoReturn&&!Object.keys(q.data.ceoReturn.answers).length)) {
-  add('award:'+l.partCode+':'+l.round, 'ceo', 'مقایسه و انتخاب تأمین‌کننده '+l.name);
+  add('award:'+l.partCode+':'+l.round, 'commerce_manager', 'مقایسه و انتخاب تأمین‌کننده '+l.name);
  }}}}
  for(const o of orders.filter(o=>o.data.planId===p.id&&!['cancelled','closed'].includes(o.data.state))){
+  if(o.data.state==='awaiting_funding'&&o.data.procurementVersion===2){const q=quotes.find(q=>q.id===o.data.quoteId);if(q&&q.data.financial!=='pass')add('financial:'+o.data.partCode+':'+q.data.round,'finance','کنترل مالی پیشنهاد منتخب');}
   const today=dayAt(),delivery=receipts&&purchaseDeliveryStatus(o,receipts,today);
   if(delivery?.reminder)add('delivery_reminder:'+o.id+':'+today,o.data.route,'یادآوری تحویل · '+o.data.supplier,today);
   if(o.data.deliveryExtension?.state==='pending')add('delivery_extension:'+o.id,'ceo','تصمیم تمدید رسمی تحویل · '+o.data.supplier);
@@ -122,7 +122,7 @@ export function nextWork(p:any,quotes:any[],orders:any[],lines:any[],receipts?:a
  }
  if(receipts){
   for(const o of orders.filter(o=>o.data.planId===p.id&&o.data.state!=='cancelled')){
-   const arrivals=receipts.filter(r=>r.data.purchaseOrderId===o.id),delivery=purchaseDeliveryStatus(o,arrivals,dayAt());
+   const arrivals=receipts.filter(r=>r.data.purchaseOrderId===o.id||r.data.purchaseHold?.orderId===o.id),delivery=purchaseDeliveryStatus(o,arrivals,dayAt());
    if(o.data.pendingSupplierCredit)steps.push({key:'supplier_credit:'+o.id,role:'finance',title:'تعیین تکلیف پیش‌پرداخت لغوشده · '+o.data.supplier,sourceSection:'sourcing',sourceId:'purchase-payable:'});
    if(delivery?.late&&!o.data.deliveryAlertDecisions?.[delivery.due]){
     const done=!delivery.missing||!!o.data.remainderResolution;
@@ -130,6 +130,7 @@ export function nextWork(p:any,quotes:any[],orders:any[],lines:any[],receipts?:a
     add('delivery_alert:'+o.id+':'+delivery.due,role,done?'تحویل دیررس تعیین تکلیف شد؛ بررسی اخطار · '+o.data.supplier:'دیرکرد تحویل · '+o.data.supplier,delivery.due);
    }
    for(const receipt of arrivals){
+    if(receipt.data.purchaseHold)add('receipt_hold:'+receipt.id,o.data.route,'تعیین تکلیف مغایرت خرید · '+receipt.data.purchaseHold.reason);
     const acknowledgements=o.data.receiptAcknowledgements||{};
     if(!acknowledgements[receipt.id+':receipt'])add('purchase_receipt_notice:'+receipt.id,o.data.route,'رسید ورود کالا ثبت شد · '+o.data.supplier);
     if(receipt.data.qc&&!acknowledgements[receipt.id+':quality'])add('purchase_quality_notice:'+receipt.id,o.data.route,'نتیجه کنترل کیفیت ثبت شد · '+o.data.supplier);
@@ -144,6 +145,8 @@ export function nextWork(p:any,quotes:any[],orders:any[],lines:any[],receipts?:a
    }
   }
  }
+ for(const x of p.data.exceptions||[]){if(['pending','development'].includes(x.state))steps.push({key:'exception:'+x.id,role:'ceo',title:(x.state==='development'?'پیگیری توسعه: ':'نیازمند تصمیم: ')+x.title,sourceSection:'sourcing',sourceId:p.id});else if(x.state==='assigned')steps.push({key:'exception:'+x.id,role:x.ownerRole,title:'اجرای تصمیم: '+x.title,sourceSection:'sourcing',sourceId:p.id});}
+ for(const o of orders.filter(o=>o.data.planId===p.id&&o.data.urgentFinance?.state==='pending'))steps.push({key:'urgent_finance:'+o.id,role:'finance',title:'کنترل مالی باز خرید فوری · '+o.data.supplier,sourceSection:'sourcing',sourceId:p.id});
  return supplierWork(p,steps,quotes,lines).map(s=>sourcingStepDestination(s,p.id));}
 export async function followupStatements(plan:any,steps:ReturnType<typeof nextWork>,now:string){
  if(plan.data.origin==='replenishment'&&!plan.data.manualRequest)return replenishTasks(plan,await replenishSteps(plan,steps),now);

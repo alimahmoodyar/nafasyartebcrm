@@ -1,3 +1,7 @@
+## Procurement baseline 2026-11-13
+
+Focused automated SQLite/auth/domain and component checks cover normal/urgent purchases, CEO exception/development, permissions/replay/races, holds/concessions and reset. TypeScript and affected delivery, service, settlement, comparison and direct-request regressions checked. Browser-control unavailable: do not claim an actual multi-role browser walkthrough. Existing sourcing all-history loads are legacy debt; new decision arrays are bounded and extra receipt order lookup is SQL-limited to 100. No new migration or live-data mutation. Comprehensive finance and weighted supplier decisions remain deferred.
+
 ## Paired phone/desktop work — 2026-11-13
 
 Scope: explicit two-device invite/membership, exact effective role scope, server-mediated work/draft state, typed schema/record keys, conflict and stale-work isolation, stage submission single-flight, unknown-response hold, shared scanner dispatch and one HTTP/MCP handler. Focused API/SQLite, DOM and two-isolated-UI-context tests cover concurrency, unsent edits, freeze and access. No business fixtures on the live site. Phone camera/actual separate-device validation and realistic multi-user network/load/soak are not claimed. File/camera/inner-dialog mirroring is not implemented; current explicit UI guidance and PAIRED-WORKSPACE.md define the boundary. Future per-module custom-widget/file adapters must keep the same server scopes and must not replay automatic business writes.
