@@ -1,3 +1,7 @@
+## 2026-11-13 — explicit stock choice on manual warehouse purchase requests
+
+Manual requests show usable/free stock and default to the entered quantity. Inventory may explicitly subtract free stock using a current server preview; stale choices and zero purchases are rejected. Original amount, choice, stock basis and final procurement amount stay in case/history; downstream does not subtract again. Returned cases preserve prior intent, UI/HTTP/MCP share the calculation, and no stock is moved or reserved. Automatic production/project demand is unchanged.
+
 ## 2026-11-13 — role-scoped asset custody and maintenance
 
 Shared immutable asset QR, sender/recipient handover, custodian-approved controlled/external custody, personal/representative assets, signed receipts and SMS.ir-ready expiring verification links; timed service/fault/usage records, production-counter transaction integration and CEO/delegated disposal with financial follow-up. Existing shared data and reset/freeze protections retained. Actual SMS configuration and hardware delivery are not claimed as verified; see ASSET-WORKFLOW.md.
