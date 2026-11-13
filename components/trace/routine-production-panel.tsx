@@ -1,6 +1,7 @@
 import {InventoryCountsPanel} from './inventory-counts-panel';
 import {WorkerCustodyPanel} from './worker-custody-panel';
 'use client';
+import {AssetEquipmentPicker} from './asset-equipment-picker';
 import {RefreshButton} from './refresh-button';
 import {ProductLabelSettings} from './product-label-settings';
 import {workMembers} from '@/lib/routine-planning';
@@ -64,7 +65,7 @@ export function RoutineProductionPanel({demo=false,finishedProduction,targetId='
  {draft.mode==='start'&&input('count','تعداد قابل شروع این عملیات','number')}
  {draft.mode==='adjust'&&<>{input('leaveMinutes','مرخصی (دقیقه)','number')}{input('downtimeMinutes','توقف تأییدشده؛ کمبود مواد، خرابی و… (دقیقه)','number')}{input('setupMinutes','آماده‌سازی همین کار؛ خالی = سیاست','number',false)}<label><input type="checkbox" checked={draft.overtimeApproved} onChange={e=>field('overtimeApproved',e.target.checked)}/> اضافه‌کاری این کار مجاز است</label></>}
  {['output','quality'].includes(draft.mode)&&<>{input('good','تعداد سالم','number')}{input('scrap','تعداد ضایعات','number')}{input('reworkCount','تعداد نیازمند دوباره‌کاری','number')}</>}
- {['output','close'].includes(draft.mode)&&<label className="field">شناسه قالب / ماشین‌آلات استفاده‌شده (جدا با ویرگول)<input value={(draft.assetIds||[]).join(',')} onChange={e=>field('assetIds',e.target.value.split(',').map((x:string)=>x.trim()).filter(Boolean))}/></label>}{draft.mode==='output'&&<><label><input type="checkbox" checked={draft.overtime} onChange={e=>field('overtime',e.target.checked)}/> خروجی اضافه‌کاری</label>{draft.overtime&&input('overtimeReference','مرجع تأیید اضافه‌کاری')}{input('varianceReason','دلیل مغایرت مصرف / مواد دوباره‌کاری','text',false)}</>}
+ {['output','close'].includes(draft.mode)&&<AssetEquipmentPicker value={draft.assetIds||[]} onChange={ids=>field('assetIds',ids)}/>}{draft.mode==='output'&&<><label><input type="checkbox" checked={draft.overtime} onChange={e=>field('overtime',e.target.checked)}/> خروجی اضافه‌کاری</label>{draft.overtime&&input('overtimeReference','مرجع تأیید اضافه‌کاری')}{input('varianceReason','دلیل مغایرت مصرف / مواد دوباره‌کاری','text',false)}</>}
  {draft.mode==='close'&&<>{input('actualMinutes','زمان واقعی کار عادی (دقیقه)','number')}{input('overtimeMinutes','زمان واقعی اضافه‌کاری (دقیقه)','number')}{input('overtimeReference','مرجع اضافه‌کاری','text',!!draft.overtimeMinutes)}</>}
  {draft.mode==='quality'&&<>{draftLot?.data.destination==='line'&&<p className="notice">تعداد تأییدشده به موجودی قابل‌مصرف نیمه‌آماده خط تولید اضافه می‌شود. مسئول کیفیت: {draftLot.data.qcMemberName}</p>}{input('reference','شماره / مرجع کنترل کیفیت')}{Number(draft.good)>0&&draftLot?.data.destination!=='line'&&pick('warehouseId','انبار مقصد (تعریف‌شده توسط کاربر)',(data.warehouses||[]).map((w:any)=>[w.id,w.name]))}{Number(draft.good)>0&&draftLot?.data.destination!=='line'&&!data.warehouses?.length&&<p className="notice">ابتدا انبار مقصد را در تنظیمات انبار تعریف کنید.</p>}</>}
  {draft.mode==='cost'&&<>{input('overhead','سربار تخصیصی (ریال؛ صفر را صریح وارد کنید)')}{input('basis','مبنای مصوب تخصیص سربار')}{input('reference','مرجع تأیید مالی')}</>}
