@@ -298,3 +298,8 @@ Focused tests cover default vs explicit subtraction, precision, reserved/rejecte
 ## 2026-11-13 — Paired internal form navigation
 
 Registered view-only actions now mirror exact receipt/form opening, read-only searches, selections and dialog close. Search fields are checkpointed before the next action; commercial POSTs retain single-flight and permission checks. Protocol 2 requires refreshing both devices and reconnecting under the same role. See `quality-reviews/2026-11-13-paired-view-follow.md`. Publication is tracked separately in the external release audit.
+
+
+## 2026-11-13 — Pairing handshake race
+
+Fixed the phone heartbeat racing an unfinished QR join and invalidating its new device capability. Confirmed handles are persisted only after server acceptance; duplicate scans are deduplicated and old heartbeat responses cannot clear a replacement connection. Reproduced before fix and verified delayed-join, repeat-scan, replacement and existing form-sync scenarios against the UI/SQLite harness. No business data or permissions changed. Physical-device QA remains unverified.

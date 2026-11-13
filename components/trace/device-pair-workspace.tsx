@@ -9,20 +9,22 @@ type Pending={value:SharedField['value'];version:number;label:string;epoch:numbe
 export function DevicePairWorkspace({accountKey,section,target,onNavigate,profileWorkspace=false}:{accountKey:string;section:string;target:string;profileWorkspace?:boolean;onNavigate:(s:string,t?:string)=>void|boolean}){
  const [view,setView]=useState<SharedPair|null>(null),[open,setOpen]=useState(false),[joinText,setJoinText]=useState(''),[qr,setQr]=useState(''),[inviteLink,setInviteLink]=useState(''),[error,setError]=useState(''),[pendingCount,setPendingCount]=useState(0),[conflicts,setConflicts]=useState<string[]>([]);
  const state=useRef<SharedPair|null>(null),pending=useRef(new Map<string,Pending>()),muted=useRef(false),busy=useRef(false),dead=useRef(false),clock=useRef(0),keys=useRef(new Map<string,any>()),lastWork=useRef(''),applied=useRef(new Map<string,number>()),originalFetch=useRef<typeof fetch|null>(null),apiRef=useRef<(mode:string,extra?:any)=>Promise<any>>(async()=>{}),navigate=useRef(onNavigate),current=useRef({section,target});navigate.current=onNavigate;current.current={section,target};
+ const connecting=useRef(false),connectionGeneration=useRef(0);
  const sessionKey='nafasyar-device-pair:'+accountKey;const isUnshared=(s:string)=>unsharedSections.has(s)&&!(s==='role-testing'&&profileWorkspace);
  const conflictKeys=useRef<string[]>([]),suspended=useRef(false),localWork=useRef<SharedWork|null>(null),remoteMutationBlocked=useRef(false);conflictKeys.current=conflicts;
  const deliveredActions=useRef(new Set<string>()),uiOutbox=useRef<any[]>([]),sendingUi=useRef(false),applyingUi=useRef(false);
  const actionContext=(d:SharedPair)=>JSON.stringify(d.work)+'@'+(d.actions?.at(-1)?.id||'initial');
  function display(d:SharedPair|null){state.current=d;setView(d);}
- async function api(mode:string,extra:any={}){
-  const current=state.current,handle=JSON.parse(sessionStorage.getItem(sessionKey)||'null'),deviceKey=handle?.deviceKey;
+ async function api(mode:string,extra:any={},binding?:{id?:string;deviceKey:string}){
+  const stored=sessionStorage.getItem(sessionKey),handle=binding||JSON.parse(stored||'null'),deviceKey=handle?.deviceKey,generation=connectionGeneration.current;
+  const current=state.current?.id===handle?.id?state.current:null;
   if(!deviceKey)throw Error('شناسهٔ این دستگاه در دسترس نیست.');
-  const response=await (originalFetch.current||fetch)('/api/device-pair',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({protocol:2,id:current?.id||handle?.id,deviceKey,revision:current?.revision,epoch:current?.epoch,mode,...extra})});const d:any=await response.json();
-  if(!response.ok){if([401,403,404,410].includes(response.status)){sessionStorage.removeItem(sessionKey);display(null);}throw Object.assign(Error(d.error||'ارتباط برقرار نشد.'),{status:response.status})}return d;
+  const response=await (originalFetch.current||fetch)('/api/device-pair',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({protocol:2,id:handle?.id,deviceKey,revision:current?.revision,epoch:current?.epoch,mode,...extra})});const d:any=await response.json();
+  if(!response.ok){if(!binding&&!connecting.current&&generation===connectionGeneration.current&&sessionStorage.getItem(sessionKey)===stored&&[401,403,404,410].includes(response.status)){sessionStorage.removeItem(sessionKey);display(null);}throw Object.assign(Error(d.error||'ارتباط برقرار نشد.'),{status:response.status})}return d;
  }
  apiRef.current=api;
  async function accept(d:SharedPair){
-  if(dead.current)return;const handle=JSON.parse(sessionStorage.getItem(sessionKey)||'null');if(handle?.id&&handle.id!==d.id)return;const old=state.current;if(old?.id===d.id&&old.revision>d.revision)return;display(d);clock.current=Date.now();
+  if(dead.current)return;const handle=JSON.parse(sessionStorage.getItem(sessionKey)||'null');if(!handle?.id||handle.id!==d.id)return;const old=state.current;if(old?.id===d.id&&old.revision>d.revision)return;display(d);clock.current=Date.now();
   if(old&&(d.epoch!==old.epoch||(d.actions?.at(-1)?.id||'')!==(old.actions?.at(-1)?.id||''))){
    // Never discard an unsent edit just because a peer opened another record.
    if(pending.current.size){suspended.current=true;setError('کار در دستگاه دیگر عوض شد؛ تغییرات ارسال‌نشدهٔ این فرم را بررسی کنید.');setConflicts([...pending.current.keys()]);return;}
@@ -75,12 +77,34 @@ export function DevicePairWorkspace({accountKey,section,target,onNavigate,profil
   if(JSON.stringify(state.current.work)===JSON.stringify(work)&&!state.current.commit)return;
   try{const next=await apiRef.current('work',{work});lastWork.current=JSON.stringify(work)+'@'+next.epoch;localWork.current=work;applied.current.clear();await accept(next);setError('');}catch(e){setError((e as Error).message)}
  }
- async function create(){if(pending.current.size){setError('تغییرات ارسال‌نشده را بررسی کنید؛ اتصال تازه نساختیم.');return}try{if(state.current)await api('close');const deviceKey=Array.from(crypto.getRandomValues(new Uint8Array(32))).map(x=>x.toString(16).padStart(2,'0')).join('');sessionStorage.setItem(sessionKey,JSON.stringify({deviceKey}));const next=await api('create');sessionStorage.setItem(sessionKey,JSON.stringify({deviceKey,id:next.id}));await accept(next);const code=pairInviteUrl(location.origin,next.id,next.invite);setInviteLink(code);const {qrcode,drawingSVG}=await import('@bwip-js/generic');setQr('data:image/svg+xml;charset=utf-8,'+encodeURIComponent(qrcode({bcid:'qrcode',text:code,scale:3,padding:4,backgroundcolor:'FFFFFF'},drawingSVG()) as string));setError('');setOpen(true);}catch(e){setError((e as Error).message)}}
- async function join(code:string){const invite=pairInviteFromCode(code,location.origin);if(!invite){setError('QR اتصال همین سامانه را اسکن کنید.');return}try{if(state.current)await api('close');const deviceKey=Array.from(crypto.getRandomValues(new Uint8Array(32))).map(x=>x.toString(16).padStart(2,'0')).join('');sessionStorage.setItem(sessionKey,JSON.stringify({deviceKey,id:invite.id}));const next=await api('join',invite);await accept(next);setQr('');setOpen(false);setError('');}catch(e){setError((e as Error).message)}}
+ function newDeviceKey(){return Array.from(crypto.getRandomValues(new Uint8Array(32))).map(x=>x.toString(16).padStart(2,'0')).join('')}
+ async function establish(invite?:{id:string;invite:string}){
+  // Keep the capability private in this transaction until the server accepts it.
+  // Heartbeats and duplicate scanner callbacks must not race an unfinished join.
+  if(connecting.current)return;
+  if(invite&&state.current?.id===invite.id&&state.current.paired){setOpen(false);return;}
+  if(pending.current.size){setError('تغییرات ارسال‌نشده را بررسی کنید؛ اتصال تازه نساختیم.');return;}
+  connecting.current=true;const generation=++connectionGeneration.current;
+  const binding={deviceKey:newDeviceKey(),...(invite?{id:invite.id}:{})};
+  try{
+   if(state.current)await api('close');
+   if(generation!==connectionGeneration.current||dead.current)return;
+   sessionStorage.removeItem(sessionKey);display(null);deliveredActions.current.clear();uiOutbox.current=[];lastWork.current='';localWork.current=null;applied.current.clear();
+   const next=await api(invite?'join':'create',invite||{},binding);
+   if(generation!==connectionGeneration.current||dead.current){void api('close',{}, {...binding,id:next.id}).catch(()=>{});return;}
+   sessionStorage.setItem(sessionKey,JSON.stringify({...binding,id:next.id}));await accept(next);setError('');
+   if(invite){setQr('');setOpen(false);return;}
+   const code=pairInviteUrl(location.origin,next.id,next.invite);setInviteLink(code);const {qrcode,drawingSVG}=await import('@bwip-js/generic');
+   if(generation!==connectionGeneration.current||dead.current)return;
+   setQr('data:image/svg+xml;charset=utf-8,'+encodeURIComponent(qrcode({bcid:'qrcode',text:code,scale:3,padding:4,backgroundcolor:'FFFFFF'},drawingSVG()) as string));setOpen(true);
+  }catch(e){if(generation===connectionGeneration.current&&!dead.current)setError((e as Error).message)}finally{if(generation===connectionGeneration.current)connecting.current=false;}
+ }
+ async function create(){await establish()}
+ async function join(code:string){if(connecting.current)return;const invite=pairInviteFromCode(code,location.origin);if(!invite){setError('QR اتصال همین سامانه را اسکن کنید.');return;}await establish(invite)}
  async function disconnect(){if(pending.current.size){setError('تغییرات ارسال‌نشده دارید؛ ابتدا آن‌ها را همگام یا کپی کنید.');return}try{await api('close');pending.current.clear();setPendingCount(0);setConflicts([]);sessionStorage.removeItem(sessionKey);display(null);setQr('');setError('');}catch(e){setError((e as Error).message)}}
  useEffect(()=>{
   dead.current=false;const native=window.fetch.bind(window);originalFetch.current=native;
-  let pollRunning=false,stopped=false;const pulse=async()=>{if(stopped||pollRunning||busy.current||!sessionStorage.getItem(sessionKey))return;pollRunning=true;try{await accept(await apiRef.current('poll'));if(!pending.current.size)setError('');}catch(e){setError((e as Error).message);if(state.current)display({...state.current,connected:false})}finally{pollRunning=false}};
+  let pollRunning=false,stopped=false;const pulse=async()=>{if(stopped||connecting.current||pollRunning||busy.current||!sessionStorage.getItem(sessionKey))return;pollRunning=true;const generation=connectionGeneration.current;try{const next=await apiRef.current('poll');if(stopped||connecting.current||generation!==connectionGeneration.current)return;await accept(next);if(!pending.current.size)setError('');}catch(e){if(stopped||connecting.current||generation!==connectionGeneration.current)return;setError((e as Error).message);if(state.current)display({...state.current,connected:false})}finally{pollRunning=false}};
   const navigation=(event:Event)=>{const d=(event as CustomEvent).detail;if(d){localWork.current={kind:'navigate',section:d.section,target:d.target||''};void publishWork(localWork.current)}};
   const scan=(event:Event)=>{const code=(event as CustomEvent).detail?.code;if(code){localWork.current={kind:'scan',code};void publishWork(localWork.current)}};
   const joinEvent=(event:Event)=>void join((event as CustomEvent).detail.code);
@@ -116,7 +140,7 @@ export function DevicePairWorkspace({accountKey,section,target,onNavigate,profil
   window.addEventListener('nafasyar-pair-navigation',navigation);window.addEventListener('nafasyar-pair-scan',scan);window.addEventListener('nafasyar-pair-join',joinEvent);document.addEventListener('click',gesture,true);document.addEventListener('click',openAction,true);document.addEventListener('submit',openAction,true);document.addEventListener('keydown',openAction,true);document.addEventListener('keydown',gesture,true);document.addEventListener('input',input,true);document.addEventListener('change',input,true);window.addEventListener('beforeunload',unload);
   const interval=setInterval(()=>{void pulse();if(pending.current.size)void handlers.current.flush();else void handlers.current.replay();if(uiOutbox.current.length)void sendUi()},1500);
   const hash=pairInviteFromCode(location.href,location.origin);if(hash){history.replaceState(null,'',location.pathname+location.search);void join(location.origin+'/#device-pair='+hash.id+'.'+hash.invite)}else void pulse();
-  return()=>{stopped=true;dead.current=true;clearInterval(interval);window.fetch=native;window.removeEventListener('nafasyar-pair-navigation',navigation);window.removeEventListener('nafasyar-pair-scan',scan);window.removeEventListener('nafasyar-pair-join',joinEvent);document.removeEventListener('click',gesture,true);document.removeEventListener('click',openAction,true);document.removeEventListener('submit',openAction,true);document.removeEventListener('keydown',openAction,true);document.removeEventListener('keydown',gesture,true);document.removeEventListener('input',input,true);document.removeEventListener('change',input,true);window.removeEventListener('beforeunload',unload);const handle=sessionStorage.getItem(sessionKey);if(handle){void apiRef.current('close').catch(()=>{});sessionStorage.removeItem(sessionKey)}pending.current.clear();state.current=null;};
+  return()=>{stopped=true;dead.current=true;connectionGeneration.current++;connecting.current=false;clearInterval(interval);window.fetch=native;window.removeEventListener('nafasyar-pair-navigation',navigation);window.removeEventListener('nafasyar-pair-scan',scan);window.removeEventListener('nafasyar-pair-join',joinEvent);document.removeEventListener('click',gesture,true);document.removeEventListener('click',openAction,true);document.removeEventListener('submit',openAction,true);document.removeEventListener('keydown',openAction,true);document.removeEventListener('keydown',gesture,true);document.removeEventListener('input',input,true);document.removeEventListener('change',input,true);window.removeEventListener('beforeunload',unload);const handle=sessionStorage.getItem(sessionKey);if(handle){const binding=JSON.parse(handle);void native('/api/device-pair',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({protocol:2,mode:'close',id:binding.id,deviceKey:binding.deviceKey})}).catch(()=>{});if(sessionStorage.getItem(sessionKey)===handle)sessionStorage.removeItem(sessionKey)}pending.current.clear();state.current=null;};
  },[accountKey]);
  // The interval always calls the current handlers, including conflict state.
  const handlers=useRef({flush,replay:async()=>{await replayActions();await replay();}});handlers.current={flush,replay:async()=>{await replayActions();await replay();}};
