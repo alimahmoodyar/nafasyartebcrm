@@ -1,3 +1,7 @@
+## 2026-11-13 — optional paired phone/desktop work
+
+Explicit same-account/same-position pairing through a two-minute single-use QR; shared scanner/navigation and two-way standard form fields with per-field/context CAS. Unsent edits and same-field conflicts are visible, two simultaneous browser submissions reserve one stage, uncertain responses never auto-retry, and completed stages refresh before reuse. Auth/scope/device checks and operational reset/freeze coverage retained; HTTP/MCP use one handler. Pair QR is separate from business labels. Local files/camera and custom inner-dialog actions are not remotely mirrored; see PAIRED-WORKSPACE.md for exact coverage and tests.
+
 ## 2026-11-13 — explicit stock choice on manual warehouse purchase requests
 
 Manual requests show usable/free stock and default to the entered quantity. Inventory may explicitly subtract free stock using a current server preview; stale choices and zero purchases are rejected. Original amount, choice, stock basis and final procurement amount stay in case/history; downstream does not subtract again. Returned cases preserve prior intent, UI/HTTP/MCP share the calculation, and no stock is moved or reserved. Automatic production/project demand is unchanged.

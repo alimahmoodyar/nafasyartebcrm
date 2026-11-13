@@ -33,3 +33,7 @@
 ## Asset labels (2026-11-13)
 
 `NAFASYAR-ASSET/1:<UUID>` identifies the permanent asset passport. Current holder, exact pending recipient, assigned technician/executor, assigned receiving warehouse, custodian and authorized disposal reviewer see only their current actions. Scan is read-only; receipt needs exact scan and explicit final confirmation. External-link scans are additionally bounded to the verified holder/request/custody cycle. Missing/retired/unauthorized identities never create stock receipts. Producer: `app/api/assets/print/route.ts`; resolver tests: `tests/asset-workflow.cjs`. Existing labels need no reprint.
+
+## QR اتصال دستگاه‌ها؛ غیر از لیبل کالا
+
+تولیدکنندهٔ `device-pair-workspace.tsx` از `pairInviteUrl` استفاده می‌کند. این کد لیبل تجاری یا مجوز دامنه نیست؛ دعوت کوتاه‌عمر و یک‌بارمصرف برای دو نشستِ همان حساب و همان نقش است. اسکنر مشترک آن را به جریان اتصال می‌فرستد، نه دریافت انبار. دعوت خراب، مصرف‌شده، منقضی یا متعلق به حساب/نقش دیگر رد می‌شود و هیچ کالا، موجودی، دریافت یا تأییدی ایجاد نمی‌کند. آزمون‌های `device-pair.cjs` و `device-pair-ui.cjs` تولید/مصرف همین پیوند و مرزهای دسترسی را بررسی می‌کنند.

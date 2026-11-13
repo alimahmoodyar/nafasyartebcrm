@@ -78,6 +78,10 @@
 // consumerPriceRial and estimate tariff snapshots are existing JSON fields.
 // Operations reset preserves the definitions/prices; full reset backs up/deletes them.
 // Migration 0016 flow/inventory freeze guards the whole import; no new tables or blobs.
+// device_pair holds only short-lived operational connection/draft state. Existing
+// full flow_entities backups, both deletion scopes and 0016 maintenance freeze
+// cover it; no new table, FK, blob or preservation exception. Raw device/invite
+// capabilities are never stored; closing scrubs drafts and expiry denies access.
 export const resetScopes:Record<string,string>={operations:'پاک‌سازی سوابق و موجودی؛ حفظ تعاریف کالا',full:'پاک‌سازی سوابق، موجودی و تعاریف کالا'};
 // build_intake, approval/specification versions and linked build_project are operational
 // flow_entities: both scopes back up/delete them; generic 0016 freezes all mutations.

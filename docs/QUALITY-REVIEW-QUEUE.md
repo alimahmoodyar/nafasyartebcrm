@@ -1,3 +1,7 @@
+## Paired phone/desktop work — 2026-11-13
+
+Scope: explicit two-device invite/membership, exact effective role scope, server-mediated work/draft state, typed schema/record keys, conflict and stale-work isolation, stage submission single-flight, unknown-response hold, shared scanner dispatch and one HTTP/MCP handler. Focused API/SQLite, DOM and two-isolated-UI-context tests cover concurrency, unsent edits, freeze and access. No business fixtures on the live site. Phone camera/actual separate-device validation and realistic multi-user network/load/soak are not claimed. File/camera/inner-dialog mirroring is not implemented; current explicit UI guidance and PAIRED-WORKSPACE.md define the boundary. Future per-module custom-widget/file adapters must keep the same server scopes and must not replay automatic business writes.
+
 ## 2026-11-13 — Shared workflow scan
 
 Scope: server-authorized read-only resolver, scan UI, external supplier reference, exact warehouse transfer/receipt navigation, five existing label families. New domain/React UI/producer policy tests plus affected regressions pass; see quality-reviews/2026-11-13-shared-scan.md. No schema migration or live business data mutation. Device camera/physical printer verification is not claimed; existing camera component unchanged. Existing broad domain workspace loaders remain prior debt, not used by the new exact resolver.

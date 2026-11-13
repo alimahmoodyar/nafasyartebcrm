@@ -1,5 +1,11 @@
 # Nafasyar development rules
 
+## Paired phone and desktop workflow (owner agreement 2026-11-13)
+
+- Owner approved explicit, optional pairing of two devices signed into the same account using a short-lived QR. Do not broadcast scans, navigation or form contents to every session of that account. Each device retains its own authentication and current server-enforced role/record permissions.
+- Intended experience: a phone scan opens the authorized work on both paired devices; shared form edits and final submission results stay synchronized. Preserve required domain confirmations and prevent duplicate commits, silent overwrites and loss of unsent edits during disconnects. Switching role, losing authorization, logout and unpairing must not leave access through the pairing.
+- Implementation contract and explicit coverage limits are in `docs/PAIRED-WORKSPACE.md`. Browser-local scanner events alone are not evidence of cross-device synchronization. Preserve shared-work epochs, record/schema field keys, visible conflict/unsent-edit handling and single-flight submission; never silently broaden this into remote button execution or file/camera sharing. Deployment is established only by native publication and full source comparison evidence.
+
 ## Shared workflow label rule
 
 - Owner agreement 2026-11-13: follow `docs/WORKFLOW-LABEL-POLICY.md` for every QR/barcode print path. Labels identify an immutable object; the shared server resolver selects permitted current work using the authenticated role, record scope and current state. Never encode authority or an automatic stock/payment approval.
