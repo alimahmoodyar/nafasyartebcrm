@@ -29,6 +29,11 @@ async function get(){try{
  const db=storage(),physical=await warehouseDirectory(),ownIds=new Set(physical.filter(w=>w.data.active&&warehouseMember(u,w,'inventory')).map(w=>w.id)),all=(await db.prepare("SELECT * FROM flow_entities WHERE type IN ('build','handoff','sale','sales_order','print','finaltest') ORDER BY created DESC,id DESC").all()).results.map(entity);
  const records=(await db.prepare("SELECT id,kind,payload FROM records WHERE kind IN ('device','product')").all()).results.map((r:any)=>({id:r.id,kind:r.kind,data:JSON.parse(r.payload)}));
  const handoffs=all.filter(e=>e.type==='handoff'&&(production||inventory&&(!e.data.warehouseId||ownIds.has(e.data.warehouseId))||Object.values(e.data.shortages||{}).some(s=>canActOnShortage(shortage,(s as Shortage).stage))));
+ if(!production&&!inventory&&!sales&&!logistics){
+  const scoped=handoffs.map(h=>{const d=h.data,selected=Object.keys(d.shortages||{}).filter(id=>canActOnShortage(shortage,d.shortages[id].stage)),ids=new Set(selected);return {id:h.id,revision:h.revision,created:h.created,data:{by:d.by,notes:d.notes||'',state:d.state,deviceIds:selected,pending:(d.pending||[]).filter((id:string)=>ids.has(id)),received:(d.received||[]).filter((id:string)=>ids.has(id)),shortages:Object.fromEntries(selected.map(id=>[id,d.shortages[id]])),history:(d.history||[]).filter((x:any)=>x.deviceIds?.some((id:string)=>ids.has(id))).map((x:any)=>({...x,deviceIds:x.deviceIds.filter((id:string)=>ids.has(id))}))}}});
+  const visible=new Set(scoped.flatMap(h=>h.data.deviceIds));
+  return json({warehouses:[],builds:[],rows:records.filter((r:any)=>r.kind==='device'&&visible.has(r.id)).map((r:any)=>({id:r.id,kind:r.kind,data:{code:r.data.code,model:r.data.model}})),handoffs:scoped,sales:[],orders:[],carriers:[],roles:{production,inventory,sales,logistics,shortage}});
+ }
  const shortageDeviceIds=new Set(handoffs.flatMap(h=>Object.keys(h.data.shortages||{})));
  const rows=records.filter((r:any)=>r.kind==='product'||production||inventory||sales||shortageDeviceIds.has(r.id)||all.some(e=>e.type==='sale'&&e.data.deviceIds?.includes(r.id)&&['local:'+e.data.carrierId,e.data.carrierSubject].includes(u.userId)));
  const prints=new Set(all.filter(e=>e.type==='print').map(e=>e.data.planId));

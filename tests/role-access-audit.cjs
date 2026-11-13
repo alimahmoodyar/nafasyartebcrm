@@ -48,7 +48,7 @@ for(const [id,u] of users){
  check(nav.canOpenSection(u,'hospital'),['ceo','sales_manager','service_manager'].includes(id),'hospital supervisory navigation',id);
  check(nav.canOpenSection(u,'costing'),['finance','finance_director','accounting_head','warehouse_finance'].includes(id),'costing exact role',id);
  check(nav.canOpenSection(u,'pricing'),['finance','finance_director','accounting_head','warehouse_finance','ceo'].includes(id),'pricing exact role',id);
- check(nav.canOpenSection(u,'finance-control'),['finance','finance_director','accounting_head'].includes(id),'control exact role',id);
+ check(nav.canOpenSection(u,'finance-control'),['finance','finance_director','accounting_head','purchase_finance'].includes(id),'control exact role',id);
  check(nav.canOpenSection(u,'guarantees'),['treasurer','finance_director'].includes(id),'guarantees exact role',id);
  check(nav.canOpenSection(u,'treasury'),['treasurer','finance_director','accounting_head','ceo_payment','purchase_finance'].includes(id),'treasury exact role',id);
  check(auth.can(u,'product','write'),has(expected.productWrite,id),'productWrite',id);check(auth.can(u,'firmware','write'),has(expected.firmwareWrite,id),'firmwareWrite',id);
@@ -61,7 +61,7 @@ for(const [id,u] of users){
  }
 if(qa&&!qa.design)assert.equal(qms.qvisible({type:'qms_record',data:{private:true}},qa,[]),false,id+': design data leak');
  const actor=await hr.hrActor(u,members).catch(()=>null);for(const r of ['hr','payroll','approver','finance','treasury','executive_viewer','reporter'])check(actor?.has(r),id==='personnel_'+r||r==='executive_viewer'&&id==='ceo','personnel:'+r,id);
- check(service.domainAccess(u,'home'),id.startsWith('service_')||['ceo','sales_manager'].includes(id),'serviceHome',id);check(service.domainAccess(u,'hospital'),['ceo','sales_manager','service_manager'].includes(id),'serviceHospitalScope',id);
+ check(service.domainAccess(u,'home'),id.startsWith('service_')||['ceo','sales_manager','finance_director'].includes(id),'serviceHome',id);check(service.domainAccess(u,'hospital'),['ceo','sales_manager','service_manager'].includes(id),'serviceHospitalScope',id);
  check(serviceAccess.domainWriteAccess(u,'home'),id.startsWith('service_'),'serviceHomeWrite',id);check(serviceAccess.domainWriteAccess(u,'hospital'),false,'serviceHospitalWriteScope',id);
  if(id.startsWith('service_')&&id!=='service_agent')for(const r of ['support','intake','technician','coordinator','inventory','finance'])check(service.role(u,r),id==='service_'+r||id==='service_manager','service:'+r,id);
  check(flow.warehouseAccess(u,'raw'),['inventory','warehouse_supervisor'].includes(id),'warehouseRaw',id);check(flow.warehouseAccess(u,'finished'),false,'warehouseFinishedScope',id);check(flow.warehouseAccess(u,'line'),id==='production_store_assistant','warehouseLine',id);

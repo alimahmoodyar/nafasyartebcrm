@@ -97,7 +97,7 @@ presets['بازرگانی خارجی']={read:[],write:[],eventStages:[],supplyRo
 
 // Versioned, explicit workflow dependencies. Assignments store both intent and the
 // validated effective snapshot; editing unrelated account fields never infers roles.
-export const rolePolicyVersion=10;
+export const rolePolicyVersion=11;
 export type JobRole={id:string;label:string;group:string;actions:string;programs:string[];grants:Permissions;scope?:'warehouses'|'services'|'salesAgent'|'serviceAgent'};
 const emptyGrants=():Permissions=>({read:[],write:[],eventStages:[]});
 const job=(id:string,label:string,group:string,actions:string,grants:Partial<Permissions>,scope?:JobRole['scope']):JobRole=>({id,label,group,actions,programs:roleWorkflowPrograms[id]||[],grants:{...emptyGrants(),...grants},scope});

@@ -1,0 +1,421 @@
+{
+  "createdUtc": "2026-11-13T05:47:03.165Z",
+  "data": {
+    "batches": 100000,
+    "receipts": 100000,
+    "cases": 100000,
+    "years": "2020Ã¢â‚¬â€œ2026"
+  },
+  "environment": {
+    "node": "v24.22.1",
+    "platform": "win32",
+    "engine": "Local node:sqlite; same process/data/queries before and after; no D1/network SLA claim"
+  },
+  "before": {
+    "metrics": [
+      {
+        "name": "incoming-qc-exact",
+        "samples": 30,
+        "p95Ms": 444.3797999999988,
+        "minMs": 271.95880000000034,
+        "maxMs": 455.7428
+      },
+      {
+        "name": "incoming-qc-unknown",
+        "samples": 30,
+        "p95Ms": 465.9494999999988,
+        "minMs": 270.3455000000031,
+        "maxMs": 729.9724000000024
+      },
+      {
+        "name": "office-open",
+        "samples": 30,
+        "p95Ms": 995.4320999999982,
+        "minMs": 498.05019999999786,
+        "maxMs": 1108.5720000000001
+      },
+      {
+        "name": "office-history",
+        "samples": 30,
+        "p95Ms": 1024.943499999994,
+        "minMs": 499.94860000000335,
+        "maxMs": 1026.0310000000027
+      },
+      {
+        "name": "office-serial",
+        "samples": 30,
+        "p95Ms": 1489.2813000000024,
+        "minMs": 648.0595999999932,
+        "maxMs": 1491.0834000000032
+      },
+      {
+        "name": "office-search",
+        "samples": 30,
+        "p95Ms": 1452.2019999999902,
+        "minMs": 818.0331999999908,
+        "maxMs": 1482.7596000000049
+      }
+    ],
+    "write": {
+      "samples": 5,
+      "transactions": "1000 batches + 1000 receipts + 1000 cases + 1000 serial updates, rollback each sample",
+      "medianMs": 134.81669999999576,
+      "maxMs": 156.2390000000014
+    },
+    "bytes": 84254720
+  },
+  "after": {
+    "metrics": [
+      {
+        "name": "incoming-qc-exact",
+        "samples": 30,
+        "p95Ms": 1.2115999999805354,
+        "minMs": 0.5217999999877065,
+        "maxMs": 1.53959999998915
+      },
+      {
+        "name": "incoming-qc-unknown",
+        "samples": 30,
+        "p95Ms": 0.2131000000226777,
+        "minMs": 0.15479999998933636,
+        "maxMs": 0.27829999997629784
+      },
+      {
+        "name": "office-open",
+        "samples": 30,
+        "p95Ms": 10.076099999976577,
+        "minMs": 7.3804999999993015,
+        "maxMs": 10.36030000000028
+      },
+      {
+        "name": "office-history",
+        "samples": 30,
+        "p95Ms": 9.410199999983888,
+        "minMs": 7.755000000004657,
+        "maxMs": 11.660200000012992
+      },
+      {
+        "name": "office-serial",
+        "samples": 30,
+        "p95Ms": 0.6216999999887776,
+        "minMs": 0.4122999999963213,
+        "maxMs": 1.045299999997951
+      },
+      {
+        "name": "office-search",
+        "samples": 30,
+        "p95Ms": 753.0335000000196,
+        "minMs": 470.6649000000034,
+        "maxMs": 905.1708999999973
+      }
+    ],
+    "write": {
+      "samples": 5,
+      "transactions": "1000 batches + 1000 receipts + 1000 cases + 1000 serial updates, rollback each sample",
+      "medianMs": 365.45410000000265,
+      "maxMs": 687.8678999999829
+    },
+    "bytes": 102608896
+  },
+  "migrationMs": 2548.5930999999982,
+  "additionalDatabaseBytes": 18354176,
+  "unchangedLogicalTables": 94,
+  "idempotentMigration": true,
+  "integrityCheck": "ok",
+  "foreignKeyViolations": 0,
+  "plans": [
+    {
+      "query": "SELECT id,payload FROM records WHERE kind='batch' AND json_extract(payload,'$.code')=? LIMIT 2",
+      "plan": [
+        {
+          "id": 4,
+          "parent": 0,
+          "notused": 61,
+          "detail": "SEARCH records USING INDEX idx_records_kind_code (kind=? AND <expr>=?)"
+        }
+      ]
+    },
+    {
+      "query": "SELECT id,data,revision FROM flow_entities WHERE type='receipt' AND id=? UNION ALL SELECT id,data,revision FROM flow_entities WHERE type='receipt' AND json_extract(data,'$.batchId')=? AND id<>? LIMIT 2",
+      "plan": [
+        {
+          "id": 1,
+          "parent": 0,
+          "notused": 0,
+          "detail": "COMPOUND QUERY"
+        },
+        {
+          "id": 2,
+          "parent": 1,
+          "notused": 0,
+          "detail": "LEFT-MOST SUBQUERY"
+        },
+        {
+          "id": 6,
+          "parent": 2,
+          "notused": 39,
+          "detail": "SEARCH flow_entities USING INDEX sqlite_autoindex_flow_entities_1 (id=?)"
+        },
+        {
+          "id": 21,
+          "parent": 1,
+          "notused": 0,
+          "detail": "UNION ALL"
+        },
+        {
+          "id": 24,
+          "parent": 21,
+          "notused": 60,
+          "detail": "SEARCH flow_entities USING INDEX idx_flow_receipt_batch (<expr>=?)"
+        }
+      ]
+    },
+    {
+      "query": "SELECT * FROM flow_entities WHERE type='material_warehouse' ORDER BY created,id",
+      "plan": [
+        {
+          "id": 4,
+          "parent": 0,
+          "notused": 62,
+          "detail": "SEARCH flow_entities USING INDEX idx_flow_type (type=?)"
+        },
+        {
+          "id": 18,
+          "parent": 0,
+          "notused": 0,
+          "detail": "USE TEMP B-TREE FOR ORDER BY"
+        }
+      ]
+    },
+    {
+      "query": "SELECT r.id FROM flow_entities r,json_each(r.data,'$.identityHistory') h WHERE r.type='receipt' AND json_array_length(r.data,'$.identityHistory')>0 AND json_extract(h.value,'$.from.code')=? LIMIT 1",
+      "plan": [
+        {
+          "id": 5,
+          "parent": 0,
+          "notused": 62,
+          "detail": "SEARCH r USING INDEX idx_receipt_retired_candidates (type=?)"
+        },
+        {
+          "id": 10,
+          "parent": 0,
+          "notused": 0,
+          "detail": "SCAN h VIRTUAL TABLE INDEX 3:"
+        }
+      ]
+    },
+    {
+      "query": "SELECT COUNT(*) n FROM flow_entities WHERE type='as_case' AND json_extract(data,'$.domain')='home' AND COALESCE(json_extract(data,'$.agentId'),'')='' AND NOT (json_extract(data,'$.state') IN ('closed','resolved','returned'))",
+      "plan": [
+        {
+          "id": 4,
+          "parent": 0,
+          "notused": 60,
+          "detail": "SEARCH flow_entities USING INDEX idx_office_open_created (type=? AND <expr>=? AND <expr>=?)"
+        }
+      ]
+    },
+    {
+      "query": "SELECT id,revision,data FROM flow_entities WHERE type='as_case' AND json_extract(data,'$.domain')='home' AND COALESCE(json_extract(data,'$.agentId'),'')='' AND NOT (json_extract(data,'$.state') IN ('closed','resolved','returned')) ORDER BY created DESC,id LIMIT 20 OFFSET ?",
+      "plan": [
+        {
+          "id": 8,
+          "parent": 0,
+          "notused": 60,
+          "detail": "SEARCH flow_entities USING INDEX idx_office_open_created (type=? AND <expr>=? AND <expr>=?)"
+        }
+      ]
+    },
+    {
+      "query": "SELECT COUNT(*) n FROM flow_entities WHERE type='as_case' AND json_extract(data,'$.domain')='home' AND COALESCE(json_extract(data,'$.agentId'),'')='' AND json_extract(data,'$.state') IN ('closed','resolved','returned')",
+      "plan": [
+        {
+          "id": 4,
+          "parent": 0,
+          "notused": 60,
+          "detail": "SEARCH flow_entities USING INDEX idx_office_history_created (type=? AND <expr>=? AND <expr>=?)"
+        }
+      ]
+    },
+    {
+      "query": "SELECT id,revision,data FROM flow_entities WHERE type='as_case' AND json_extract(data,'$.domain')='home' AND COALESCE(json_extract(data,'$.agentId'),'')='' AND json_extract(data,'$.state') IN ('closed','resolved','returned') ORDER BY created DESC,id LIMIT 20 OFFSET ?",
+      "plan": [
+        {
+          "id": 8,
+          "parent": 0,
+          "notused": 60,
+          "detail": "SEARCH flow_entities USING INDEX idx_office_history_created (type=? AND <expr>=? AND <expr>=?)"
+        }
+      ]
+    },
+    {
+      "query": "SELECT COUNT(*) n FROM flow_entities WHERE type='as_case' AND json_extract(data,'$.domain')='home' AND COALESCE(json_extract(data,'$.agentId'),'')='' AND json_extract(data,'$.serial')=?",
+      "plan": [
+        {
+          "id": 4,
+          "parent": 0,
+          "notused": 52,
+          "detail": "SEARCH flow_entities USING COVERING INDEX idx_office_serial_created (type=? AND <expr>=? AND <expr>=? AND <expr>=?)"
+        }
+      ]
+    },
+    {
+      "query": "SELECT id,revision,data FROM flow_entities WHERE type='as_case' AND json_extract(data,'$.domain')='home' AND COALESCE(json_extract(data,'$.agentId'),'')='' AND json_extract(data,'$.serial')=? ORDER BY created DESC,id LIMIT 20 OFFSET ?",
+      "plan": [
+        {
+          "id": 8,
+          "parent": 0,
+          "notused": 59,
+          "detail": "SEARCH flow_entities USING INDEX idx_office_serial_created (type=? AND <expr>=? AND <expr>=? AND <expr>=?)"
+        }
+      ]
+    },
+    {
+      "query": "SELECT id FROM flow_entities WHERE type='as_case' AND json_extract(data,'$.domain')='home' AND COALESCE(json_extract(data,'$.agentId'),'')='' AND json_extract(data,'$.serial')=? AND json_extract(data,'$.state') NOT IN ('closed','resolved','returned') ORDER BY created DESC,id LIMIT 1",
+      "plan": [
+        {
+          "id": 5,
+          "parent": 0,
+          "notused": 59,
+          "detail": "SEARCH flow_entities USING INDEX idx_office_serial_created (type=? AND <expr>=? AND <expr>=? AND <expr>=?)"
+        }
+      ]
+    },
+    {
+      "query": "SELECT payload FROM records WHERE kind='device' AND json_extract(payload,'$.code')=? LIMIT 1",
+      "plan": [
+        {
+          "id": 4,
+          "parent": 0,
+          "notused": 61,
+          "detail": "SEARCH records USING INDEX idx_records_kind_code (kind=? AND <expr>=?)"
+        }
+      ]
+    },
+    {
+      "query": "SELECT COUNT(*) n FROM flow_entities WHERE type='as_case' AND json_extract(data,'$.domain')='home' AND COALESCE(json_extract(data,'$.agentId'),'')='' AND NOT (json_extract(data,'$.state') IN ('closed','resolved','returned')) AND (instr(json_extract(data,'$.serial'),?)>0 OR instr(json_extract(data,'$.customer'),?)>0 OR instr(json_extract(data,'$.phone'),?)>0 OR instr(COALESCE(json_extract(data,'$.model'),''),?)>0)",
+      "plan": [
+        {
+          "id": 4,
+          "parent": 0,
+          "notused": 60,
+          "detail": "SEARCH flow_entities USING INDEX idx_office_open_created (type=? AND <expr>=? AND <expr>=?)"
+        }
+      ]
+    },
+    {
+      "query": "SELECT id,revision,data FROM flow_entities WHERE type='as_case' AND json_extract(data,'$.domain')='home' AND COALESCE(json_extract(data,'$.agentId'),'')='' AND NOT (json_extract(data,'$.state') IN ('closed','resolved','returned')) AND (instr(json_extract(data,'$.serial'),?)>0 OR instr(json_extract(data,'$.customer'),?)>0 OR instr(json_extract(data,'$.phone'),?)>0 OR instr(COALESCE(json_extract(data,'$.model'),''),?)>0) ORDER BY created DESC,id LIMIT 20 OFFSET ?",
+      "plan": [
+        {
+          "id": 8,
+          "parent": 0,
+          "notused": 60,
+          "detail": "SEARCH flow_entities USING INDEX idx_office_open_created (type=? AND <expr>=? AND <expr>=?)"
+        }
+      ]
+    }
+  ],
+  "baselineGithubCommit": "44073ba5e34fd4696cc508649a10f37440fb8b58",
+  "regressions": [
+    {
+      "name": "finance-shortage-ui",
+      "exitCode": 0,
+      "ms": 1130
+    },
+    {
+      "name": "lookup-index-migration",
+      "exitCode": 0,
+      "ms": 1036
+    },
+    {
+      "name": "incoming-qc-scan",
+      "exitCode": 0,
+      "ms": 4131
+    },
+    {
+      "name": "incoming-qc-scan-ui",
+      "exitCode": 0,
+      "ms": 1497
+    },
+    {
+      "name": "incoming-qc-scanner-ui",
+      "exitCode": 0,
+      "ms": 858
+    },
+    {
+      "name": "finance-shortage-access",
+      "exitCode": 0,
+      "ms": 11256
+    },
+    {
+      "name": "workflow-role-access",
+      "exitCode": 0,
+      "ms": 11607
+    },
+    {
+      "name": "service-office-ui",
+      "exitCode": 0,
+      "ms": 1001
+    },
+    {
+      "name": "service-office-intake-ui",
+      "exitCode": 0,
+      "ms": 1580
+    },
+    {
+      "name": "finished-receiving-ui",
+      "exitCode": 0,
+      "ms": 1600
+    },
+    {
+      "name": "shipping-package-ui",
+      "exitCode": 0,
+      "ms": 1090
+    },
+    {
+      "name": "service-office",
+      "exitCode": 0,
+      "ms": 11522
+    },
+    {
+      "name": "shipping-packages",
+      "exitCode": 0,
+      "ms": 11118
+    },
+    {
+      "name": "shipping-report",
+      "exitCode": 0,
+      "ms": 11591
+    },
+    {
+      "name": "role-access-audit",
+      "exitCode": 0,
+      "ms": 5630
+    },
+    {
+      "name": "profile-permissions-and-receipt-edit",
+      "exitCode": 0,
+      "ms": 12944
+    },
+    {
+      "name": "role-composition",
+      "exitCode": 0,
+      "ms": 4098
+    },
+    {
+      "name": "warehouse-profile-roles",
+      "exitCode": 0,
+      "ms": 13220
+    },
+    {
+      "name": "mcp-integration",
+      "exitCode": 0,
+      "ms": 9607
+    },
+    {
+      "name": "system-reset",
+      "exitCode": 0,
+      "ms": 10584
+    }
+  ]
+}

@@ -176,6 +176,20 @@
       "when": 1794420000000,
       "tag": "0024_passkeys",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1794506400000,
+      "tag": "0025_service_payment_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1794547894448,
+      "tag": "0026_lookup_indexes",
+      "breakpoints": true
     }
   ]
 }

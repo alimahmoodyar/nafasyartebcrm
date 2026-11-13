@@ -1,3 +1,7 @@
+## 2026-11-13 — Scoped finance shortage access and measured lookup indexes
+
+Declare existing shortage workflow participation explicitly; restrict shortage-only fulfillment data to authorized serials/stages, keep warehouse/sales writes denied and CEO approval independent. Add six schema-only nonunique indexes and bounded exact-row queries; measure before/after results, query plans, logical row equality, write overhead and storage. Preserve role-training proposal with an onboarding/personnel milestone reminder.
+
 ## 2026-11-13 — End-of-day quality corrections
 
 Keep delivered office repair cases open until final customer confirmation, consistently with QR lookup and duplicate-visit protection. Restore administrator incoming-QC label lookup with full permission sets while preserving non-admin scope restrictions. Add reproducible local multi-year volume/backup checks and a transparent review report including the pre-existing navigation-test failure.

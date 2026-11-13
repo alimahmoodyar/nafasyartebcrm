@@ -1,6 +1,6 @@
 import {sql} from "drizzle-orm";
 import {sqliteTable,text,index,integer,uniqueIndex,check} from "drizzle-orm/sqlite-core";
-export const records=sqliteTable("records",{id:text("id").primaryKey(),kind:text("kind").notNull(),payload:text("payload").notNull(),created:text("created").notNull()},t=>[index("idx_records_kind").on(t.kind)]);
+export const records=sqliteTable("records",{id:text("id").primaryKey(),kind:text("kind").notNull(),payload:text("payload").notNull(),created:text("created").notNull()},t=>[index("idx_records_kind").on(t.kind),index("idx_records_kind_code").on(t.kind,sql`json_extract(${t.payload},'$.code')`)]);
 
 export const appIdentity=sqliteTable("app_identity",{id:text("id").primaryKey(),subject:text("subject").notNull().unique()});
 export const appMembers=sqliteTable("app_members",{id:text("id").primaryKey(),email:text("email").notNull().unique(),name:text("name").notNull(),unit:text("unit").notNull(),status:text("status").notNull(),subject:text("subject").unique(),permissions:text("permissions").notNull(),revision:integer("revision").notNull().default(1),created:text("created").notNull(),updated:text("updated").notNull()});
@@ -112,7 +112,7 @@ export const assistantTurns=sqliteTable('assistant_turns',{
 
 export const flowEntities=sqliteTable('flow_entities',{
  id:text('id').primaryKey(),type:text('type').notNull(),data:text('data').notNull(),revision:integer('revision').notNull().default(1),created:text('created').notNull(),updated:text('updated').notNull(),
-},t=>[index('idx_flow_type').on(t.type)]);
+},t=>[index('idx_flow_type').on(t.type),index('idx_flow_receipt_batch').on(sql`json_extract(${t.data},'$.batchId')`).where(sql`type='receipt'`),index('idx_receipt_retired_candidates').on(t.type,t.id).where(sql`type='receipt' AND json_array_length(data,'$.identityHistory')>0`),index('idx_office_serial_created').on(t.type,sql`json_extract(${t.data},'$.domain')`,sql`COALESCE(json_extract(${t.data},'$.agentId'),'')`,sql`json_extract(${t.data},'$.serial')`,sql`${t.created} DESC`,t.id).where(sql`type='as_case' AND json_extract(data,'$.domain')='home' AND COALESCE(json_extract(data,'$.agentId'),'')=''`),index('idx_office_open_created').on(t.type,sql`json_extract(${t.data},'$.domain')`,sql`COALESCE(json_extract(${t.data},'$.agentId'),'')`,sql`${t.created} DESC`,t.id).where(sql`type='as_case' AND json_extract(data,'$.domain')='home' AND COALESCE(json_extract(data,'$.agentId'),'')='' AND NOT (json_extract(data,'$.state') IN ('closed','resolved','returned'))`),index('idx_office_history_created').on(t.type,sql`json_extract(${t.data},'$.domain')`,sql`COALESCE(json_extract(${t.data},'$.agentId'),'')`,sql`${t.created} DESC`,t.id).where(sql`type='as_case' AND json_extract(data,'$.domain')='home' AND COALESCE(json_extract(data,'$.agentId'),'')='' AND json_extract(data,'$.state') IN ('closed','resolved','returned')`)]);
 export const flowSlots=sqliteTable('flow_slots',{
  location:text('location').primaryKey(),batchId:text('batch_id').notNull().references(()=>records.id),quantity:integer('quantity').notNull(),
 },t=>[check('flow_slot_nonnegative',sql`${t.quantity} >= 0`)]);

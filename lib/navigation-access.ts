@@ -36,7 +36,7 @@ export function canOpenSection(user:Session,s:string):boolean{
   return roles.sales||roles.engineering;
  }
  if(s==='sales-returns')return Object.values(returnRoles(u)).some(Boolean);
- if(s==='fulfillment'&&internal&&Object.values(shortageRoles(u)).some(Boolean))return true;
+ if(s==='fulfillment'&&internal&&!p.roleAssignment&&Object.values(shortageRoles(u)).some(Boolean))return true;
  if(s==='routine-production'&&internal&&u.productionParticipant===true)return true;
  if(s==='warehouse')return internal&&(!!p.supplyRoles?.includes('inventory')||canOpenSection(u,'flow')||canOpenSection(u,'inventory')||canOpenSection(u,'batch')||canOpenSection(u,'fulfillment')&&warehouseAccess(u,'finished')||canOpenSection(u,'after-sales')&&!!p.serviceRoles?.includes('inventory'));
  if(!u.isAdmin&&!selfServicePrograms.includes(s)){

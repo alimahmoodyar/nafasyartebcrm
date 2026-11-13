@@ -1,0 +1,18 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),ts=require('typescript'),React=require('react'),{webcrypto}=require('node:crypto');
+const root=path.resolve(__dirname,'..'),cache={},leaves={};let slots=[],cursor=0,effects=[],calls=[],fixture,reply,initial='receive',saved=0;
+const react={...React,useState:init=>{const i=cursor++;if(!(i in slots))slots[i]=typeof init==='function'?init():init;return[slots[i],v=>slots[i]=typeof v==='function'?v(slots[i]):v]},useEffect:(fn,deps)=>{const i=cursor++,old=slots[i];if(!old||deps.some((v,j)=>v!==old[j]))effects.push(fn);slots[i]=deps}};
+const leaf=name=>leaves[name]||(leaves[name]=function Leaf(){return null});
+function load(file){file=path.resolve(root,file);if(cache[file])return cache[file];const exports={};cache[file]=exports;vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText,{exports,require:n=>{if(n==='react')return react;if(n==='react/jsx-runtime')return require(n);if(n.startsWith('./')||n.startsWith('@/components/'))return new Proxy({},{get:(_,key)=>leaf(key)});if(!n.startsWith('@/'))return require(n);return load(path.join(root,n.slice(2))+'.ts')},fetch:async(url,options={})=>{calls.push({url,...options});return reply||{ok:true,json:async()=>fixture}},crypto:webcrypto,Date,Intl,JSON,Map,Set,console},{filename:file});return exports;}
+const {FulfillmentPanel}=load('components/trace/fulfillment-panel.tsx');
+const nodes=x=>Array.isArray(x)?x.flatMap(nodes):React.isValidElement(x)?[x,...nodes(x.props.children)]:[],text=x=>Array.isArray(x)?x.map(text).join(''):React.isValidElement(x)?text(x.props.children):x==null?'':String(x);
+function tree(){cursor=0;return FulfillmentPanel({demo:false,embedded:true,initialTab:initial,onSaved(){saved++}})}
+const button=title=>nodes(tree()).find(n=>n.type==='button'&&text(n)===title),tick=async()=>{for(let i=0;i<3;i++){effects.splice(0).forEach(f=>f());await new Promise(r=>setImmediate(r));tree()}};
+async function mount(roles,extra={},tab='receive'){slots=[];cursor=0;effects=[];calls=[];reply=null;initial=tab;fixture={roles,rows:[],builds:[],handoffs:[],sales:[],orders:[],warehouses:[{id:'finished-warehouse',name:'Finished warehouse',canReceive:true}],...extra};tree();await tick()}
+
+(async()=>{
+const roles={production:false,inventory:false,sales:false,logistics:false,shortage:{finance:true,line:false,production:false,ceo:false}};
+await mount(roles,{},'handoff-receive');assert.ok(text(tree()).includes('پیگیری کسری محصول نهایی'));assert.ok(text(tree()).includes('پروندهٔ کسری در انتظار اقدام شما نیست'));assert.ok(!text(tree()).includes('دسترسی تحویل یا دریافت محصول نهایی برای این حساب فعال نیست'));
+const h={id:'h',created:'2026-11-02',data:{by:'Warehouse',state:'pending',deviceIds:['d'],pending:[],received:[],history:[],shortages:{d:{stage:'finance',notes:'Review loss'}}}};
+await mount(roles,{handoffs:[h],rows:[{id:'d',kind:'device',data:{code:'SERIAL'}}]},'handoff-receive');assert.ok(button('ثبت بررسی مالی و ارجاع به مدیرعامل'));for(const title of ['ثبت دریافت فیزیکی','تأیید نهایی مفقودی','بازگرداندن درخواست به خط','ارجاع ۰ دستگاه به انبار'])assert.ok(!button(title),title);assert.ok(calls.every(c=>!c.method));button('ثبت بررسی مالی و ارجاع به مدیرعامل').props.onClick();assert.ok(nodes(tree()).some(n=>n.type==='form'));assert.ok(calls.every(c=>!c.method),'Opening the form is not approval');
+console.log('PASS finance shortage UI: only scoped review entry/form, no warehouse/sales/CEO actions, accurate empty text, no automatic write.');
+})().catch(e=>{console.error(e);process.exitCode=1});

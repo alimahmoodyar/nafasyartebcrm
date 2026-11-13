@@ -1,3 +1,7 @@
+## Finance navigation and lookup index follow-up — 2026-11-13
+
+Closed the two requested follow-ups from the end-of-day review: explicit shortage workflow participation with server-scoped finance reads/actions and six append-only lookup indexes. Full before/after controlled measurement, logical-row equality, idempotent migration, query plans, index space and write overhead are in quality-reviews/2026-11-13-finance-index-followup.md and index-evidence.json. Existing broad all-history snapshot debt and production workload/soak are separate from these completed changes. Role-training proposal and milestone reminder saved, not implemented.
+
 ## End-of-day review — 2026-11-13
 
 Reviewed 33 commits/153 changed files since documented b0f2815 through 0163d3c. Fixed office delivered-before-confirmation list inconsistency and full-permission administrator QC lookup denial, with reproducing regressions. 33/34 initial suites passed; the workflow-role-access purchase_finance/fulfillment invariant also fails unchanged baseline and remains explicitly open. 300k lightweight multi-year synthetic rows, 30 samples/path and complete 94-table local backup/hash/reopen succeeded; query plans identify missing dedicated JSON indexes. No live database mutation/migration or renewed paused transport walkthrough. See quality-reviews/2026-11-13-end-of-day.md and evidence JSON. Next: reconcile shortage navigation invariant, plan/test JSON indexes, production-sized concurrency/soak and D1/R2 recovery with agreed workload/RTO/RPO.

@@ -1,3 +1,4 @@
+import {accessPermissions} from './permissions';
 import type {Session} from './permissions';
 
 export const shortageStages = {
@@ -25,7 +26,8 @@ export const shortageActions = {
 export type ShortageAction = keyof typeof shortageActions;
 export type Shortage = {stage:ShortageStage;notes:string;at:string;by:string;parts?:{batchId:string;quantity:number}[]};
 export function shortageRoles(u:Session){
- const p=u.permissions,profile=u.profileReview?.id;
+ const p=accessPermissions(u.permissions),profile=u.profileReview?.id;
+ if(!u.isAdmin&&(p.salesAgentId||p.serviceAgentId||p.hospitalCenterId||p.salesRoles?.includes('agent')||p.serviceRoles?.includes('agent')||p.qmsRoles?.includes('observer')))return {line:false,production:false,finance:false,ceo:false};
  return {
   line:u.isAdmin||(profile?profile==='line-store':!!p.flowRoles?.includes('inventory')&&!!p.warehouses?.includes('line')),
   production:u.isAdmin||(profile?profile==='line-manager':!!p.flowRoles?.includes('production')),

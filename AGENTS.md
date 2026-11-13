@@ -48,3 +48,7 @@
 - Append actual performer and recorder separately for each office technical action. Self defaults to authenticated staff; manager/admin may record another active home technician only with a reason and CAS-protected membership. Never fabricate another person’s work/approval in role preview.
 
 - Service stages show both Persian date and Tehran clock with seconds. Server history timestamps are registration instants; preserve performer/recorder and state transitions. Never invent a clock for day-only legacy data or call inter-stage elapsed/waiting time actual technician labor. Flag backdated declared days and exclude missing/backdated/negative records from precise duration averages, showing the valid sample count.
+
+## Deferred role training reminder
+
+- Owner request 2026-11-13: preserve docs/ROLE-TRAINING-PLAN.md. When work reaches role training, personnel modules, employee profile completion or user onboarding, proactively remind the owner of the role-sized text, workflow schematic, field/form help and actual short screen-recording proposal before deciding implementation scope. This is a project milestone reminder, not a scheduled notification or authorization to implement training now. Do not claim an external reminder has been scheduled.
