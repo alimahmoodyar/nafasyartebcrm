@@ -46,4 +46,4 @@ const content=<section ref={backRef} className="panel inside assets-panel"><div 
 return <LayoutAccountProvider accountId={data.accountId}>{embedded?content:<ProgramWorkspace programId="assets" title="اموال شرکت" direct={!!targetId}>{content}</ProgramWorkspace>}</LayoutAccountProvider>;
 }
 
-export function AssetsPanel(props:{demo?:boolean;targetId?:string;memberId?:string;embedded?:boolean}){const [legacy,setLegacy]=useState(false);if(legacy)return <><button className="btn" onClick={()=>setLegacy(false)}>بازگشت به اموال</button><LegacyAssetsPanel {...props}/></>;return <AssetWorkspace initialId={props.targetId} embedded={props.embedded} onLegacy={()=>setLegacy(true)}/>;}
+export function AssetsPanel(props:{demo?:boolean;targetId?:string;memberId?:string;embedded?:boolean}){const [legacy,setLegacy]=useState(false);if(legacy)return <><button className="btn" onClick={()=>setLegacy(false)}>بازگشت به اموال</button><LegacyAssetsPanel {...props}/></>;return <AssetWorkspace initialId={props.targetId} memberId={props.memberId} embedded={props.embedded} onLegacy={()=>setLegacy(true)}/>;}
