@@ -1,3 +1,7 @@
+## 2026-11-13 — Incoming receipt QC by label
+
+Existing batch labels now open the exact incoming receipt QC form from the assigned quality profile or authenticated label link. Receipt completion, assignment, template and current revision are checked server-side; completed scans show the result without repeating QC or stock movements. Existing label content and receipt/QC process remain in place. Added read-only HTTP/MCP resolution and focused integration/UI coverage.
+
 ## 2026-11-13 — Service stage timestamps
 
 - Show Persian date and Tehran clock with seconds at reception, technical work logs, every case-history action, current-stage cards and printed reception documents. New delivery/return writes retain explicit server timestamps and history state transitions in the same atomic operation.

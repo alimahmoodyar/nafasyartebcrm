@@ -1,3 +1,9 @@
+## Incoming receipt QC label scan — 2026-11-13
+
+Scope: existing unique batch code and public label preserved; assigned QC scan resolves exact receipt via bounded queries, existing form/snapshot/revision and existing start marker. Lookup is read-only; opening a ready form uses the existing QC-start lock/timestamp. Incomplete warehouse ingress blocks both UI and direct start/result writes, with atomic quarantine quantity guard. Completed QC is read-only; no scan-driven stock movement. No schema/migration/reset-contract change or live business fixtures.
+
+Focused checks: same-material separate receipts; numeric/Persian/rich/same-site label parsing and external/mismatched denial; role and warehouse assignment; unknown/retired/ambiguous codes; incomplete ingress and concurrent rollback; exact template/revision and partial rejection; idempotent result and completed re-scan; UI existing form routing and locked/result states; receipt identity/edit/completion and batch-label regressions; TypeScript and production build. Existing broad flow snapshot loading remains performance debt; physical phone/printer and high-volume tests deferred. Full tracked-tree checks required before push and after succeeded live deployment.
+
 ## Service stage timestamp visibility — 2026-11-13
 
 Scope: existing case history/workLog/intake timestamps, explicit deliveredAt/returnedAt and from/to states, Persian/Tehran second-resolution timeline/list/receipt, exact valid recorded-duration averages and sample counts on existing UI/HTTP/MCP reports. No new persistent type/table/FK or migration; existing as_case backup/reset and 0016 freeze cover atomic fields.

@@ -1,4 +1,6 @@
 'use client';
+import {IncomingQcScanner} from './incoming-qc-scanner';
+import {warehouseTarget} from '@/lib/warehouse-workspace';
 import {ServiceExpertDashboard} from './service-expert-dashboard';
 import {DriverDashboard} from './driver-dashboard';
 import {useEffect,useRef,useState} from 'react';
@@ -84,7 +86,7 @@ export function RoleTestingPanel({targetId='',onNavigate,onProfile,onAccessChang
   </>:<>
   {snapshot.profile.id==='home-service-representative'&&<p className="notice">آزمون مستقل نقش؛ بدون انتساب به شخص. فرم‌ها و گردش‌ها با نقش‌های خدمات، مدیرعامل و مالی روی داده‌های آزمایشی مشترک اجرا می‌شوند.</p>}
   {!salesScope&&snapshot.profile.id!=='home-service-representative'&&(snapshot.profile.buyerScope==='optional'||snapshot.profile.missionScope)&&<div className="tools"><p>{scopedBuyer||(snapshot.profile.missionScope?'کارتابل راننده':'پیش‌نمایش بدون پرونده خریدار')}</p><button className="btn" onClick={()=>void open(snapshot.profile,true)}>{snapshot.profile.missionScope?'انتخاب مأموریت برای بررسی':snapshot.buyerId?'تغییر پرونده خریدار':'انتخاب پرونده خریدار'}</button></div>}
-  {snapshot.profile.id==='central-store'&&<BatchLookup/>}
+  {snapshot.profile.id==='central-store'&&<BatchLookup/>}{snapshot.profile.id==='quality'&&<IncomingQcScanner onResolved={d=>onNavigate('warehouse',warehouseTarget('flow','qc-scan:'+encodeURIComponent(d.batch.code),'receipts'))}/>}
   {!snapshot.profile.pendingWorkflow&&<button className="panel inside" disabled={loading} style={{cursor:"pointer",textAlign:"right",width:"100%"}} onClick={()=>onNavigate("tasks")}><ClipboardList size={28}/><h3>کارتابل ({snapshot.work.length.toLocaleString("fa-IR")})</h3><p>{snapshot.sample?'کارهای فرایندی این جایگاه':'پیام‌های مستقیم و کارهای فرایندی این جایگاه'}</p></button>}
   {snapshot.profile.pendingWorkflow?<p className="notice">پروفایل این نقش ایجاد شده است. پس از تعریف فرایندها، فرم‌ها، کارتابل و دسترسی‌های مربوط به همین نقش اضافه می‌شوند.</p>:!snapshot.profile.operational?<div className="inside"><h3>پروفایل شخصی</h3><p>کارکرد، فیش حقوقی، مرخصی، مساعده، شرح وظایف و اموال امانی در این پروفایل قرار می‌گیرند. نمایش اطلاعات شخصی پس از اتصال فرد انجام می‌شود؛ برای این جایگاه فعلاً کارتابل عملیاتی تعریف نشده است.</p></div>:<>
   <h3><Boxes size={20} style={{display:'inline',marginLeft:8}}/>شروع کار و گزارش‌ها</h3><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:12}}>{snapshot.profile.links.map((a,i)=><button className="btn" key={i} disabled={loading} onClick={()=>onNavigate(a.section,a.target||(snapshot.profile.missionScope&&a.section==='transport'?snapshot.buyerId:undefined))}>{a.title}<ArrowLeftRight size={16}/></button>)}</div>

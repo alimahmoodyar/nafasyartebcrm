@@ -1,4 +1,6 @@
 "use client";
+import {warehouseTarget} from '@/lib/warehouse-workspace';
+import {incomingQcCode} from '@/lib/incoming-qc-contract';
 import {SalesReturnPanel,DeviceSalesReturnHistory} from '@/components/trace/sales-return-panel';
 import {DeviceBom} from '@/components/trace/bom-list';
 import {WarehouseHistoryPanel} from '@/components/trace/warehouse-history-panel';
@@ -109,6 +111,8 @@ function Workspace(){
  const [loginScreen,setLoginScreen]=useState(false);
  const [deleteError,setDeleteError]=useState("");
  const [identity,setIdentity]=useState<Session|null>(null),[authLoading,setAuthLoading]=useState(true);
+ const incomingQcOpened=useRef('');
+ useEffect(()=>{if(!identity)return;const q=new URLSearchParams(window.location.search),raw=q.get('incomingQc');if(!raw)return;const key=identity.userId+':'+(identity.profileReview?.id||'')+':'+raw;if(incomingQcOpened.current===key)return;incomingQcOpened.current=key;const code=incomingQcCode(raw,window.location.origin);if(code&&navigate('warehouse',warehouseTarget('flow','qc-scan:'+encodeURIComponent(code),'receipts'))){const url=new URL(window.location.href);url.searchParams.delete('incomingQc');window.history.replaceState(null,'',url.pathname+url.search+url.hash)}},[identity?.userId,identity?.profileReview?.id]);
  useEffect(()=>{if(!identity)return;const code=new URLSearchParams(window.location.search).get('batch');if(code&&code.length<=100)window.location.replace('/b/'+encodeURIComponent(code)+'?details=1');},[identity?.userId]);
  const canRead=(kind:Kind)=>!!identity?.permissions.read.includes(kind);const canWrite=(kind:Kind)=>!!identity?.permissions.write.includes(kind);
  const sessionRequest=useRef(0),principal=useRef<Session|null>(null);principal.current=identity;

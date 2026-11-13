@@ -1,0 +1,42 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),ts=require('typescript');
+const {DatabaseSync}=require('node:sqlite');const root=path.resolve(__dirname,'..');const sql=new DatabaseSync(':memory:');sql.exec('PRAGMA foreign_keys=ON');for(const f of fs.readdirSync(path.join(root,'drizzle')).filter(f=>f.endsWith('.sql')).sort())sql.exec(fs.readFileSync(path.join(root,'drizzle',f),'utf8'));
+let beforeBatch=null;
+const db={prepare(q){let args=[];return{bind(...a){args=a;return this},async first(){return sql.prepare(q).get(...args)||null},async all(){return {results:sql.prepare(q).all(...args)}},async run(){return {meta:{changes:sql.prepare(q).run(...args).changes}}}}},async batch(stmts){if(beforeBatch){const hook=beforeBatch;beforeBatch=null;hook();}sql.exec('BEGIN');try{const r=[];for(const s of stmts)r.push(await s.run());sql.exec('COMMIT');return r;}catch(e){sql.exec('ROLLBACK');throw e;}}};
+const objects=new Map();const bucket={async put(k,b){objects.set(k,b.slice(0));return {key:k}},async get(k){const b=objects.get(k);return b?{arrayBuffer:async()=>b.slice(0)}:null},async delete(k){objects.delete(k)}};
+let barcodeModule=null;let identity=null;const env={TRACE_OWNER_EMAIL:'owner@example.com',LLM_CONFIG_ENCRYPTION_KEY:require('node:crypto').randomBytes(32).toString('base64'),DB:db,BUCKET:bucket};
+const cache={};function load(file){file=path.resolve(root,file);if(cache[file])return cache[file];const exports={};cache[file]=exports;const source=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+vm.runInNewContext(source,{exports,require:n=>{if(n==='@bwip-js/generic')return barcodeModule;if(n==='cloudflare:workers')return {env};if(n==='@/app/chatgpt-auth')return {getChatGPTUser:async()=>identity};if(n.startsWith('@/')||n.startsWith('.')){const p=n.startsWith('@/')?path.join(root,n.slice(2)):path.resolve(path.dirname(file),n);return load(p+(path.extname(p)?'':'.ts'));}return require(n)},Response,Request,URL,URLSearchParams,Error,crypto:globalThis.crypto,structuredClone,Date,Intl,Set,Map,FormData,Blob,File,TextEncoder,TextDecoder,Uint8Array,ArrayBuffer,AbortController,ReadableStream,btoa,atob,setTimeout:(f,n)=>setTimeout(f,Math.min(n,10)),clearTimeout,console},{filename:file});return exports;}
+
+
+
+
+
+
+const ctx=load('lib/mcp/context.ts').mcpActor,flow=load('app/api/flow/route.ts'),api=load('app/api/incoming-qc/route.ts');
+const admin={userId:'owner',name:'Owner',isAdmin:true,permissions:load('lib/permissions.ts').allPermissions};let user=admin;
+const entity=(id,type,data)=>sql.prepare('INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?)').run(id,type,JSON.stringify(data),'2026-11-06','2026-11-06');
+const row=id=>{const r=sql.prepare('SELECT * FROM flow_entities WHERE id=?').get(id);return {...r,data:JSON.parse(r.data)}};
+async function post(b,status=200){const r=await ctx.run(user,()=>flow.POST(new Request('https://test.local/api/flow',{method:'POST',headers:{origin:'https://test.local','Content-Type':'application/json'},body:JSON.stringify(b)}))),d=await r.json();assert.equal(r.status,status,JSON.stringify(d));return d;}
+async function scan(code,status=200){const r=await ctx.run(user,()=>api.GET(new Request('https://test.local/api/incoming-qc?'+new URLSearchParams({code})))),d=await r.json();assert.equal(r.status,status,JSON.stringify(d));assert.ok(!JSON.stringify(d).includes('PRIVATE-SUPPLIER'));return d;}
+const batch=id=>JSON.parse(sql.prepare('SELECT payload FROM records WHERE id=?').get(id).payload);
+const snapshot=()=>JSON.stringify({ops:sql.prepare('SELECT * FROM inventory_operations ORDER BY id').all(),entries:sql.prepare('SELECT * FROM inventory_entries ORDER BY id').all(),balances:sql.prepare('SELECT * FROM inventory_balances ORDER BY item_id').all(),receipts:sql.prepare("SELECT * FROM flow_entities WHERE type='receipt' ORDER BY id").all()});
+(async()=>{
+const wh=require('./helpers/receiving-warehouse.cjs')(sql),qc={userId:'local:'+wh.qcId,name:'QC',isAdmin:false,permissions:JSON.parse(sql.prepare('SELECT permissions FROM app_members WHERE id=?').get(wh.qcId).permissions)};
+entity('mat','material',{code:'11100001',name:'Valve',unit:'عدد',specs:'Pressure 2 bar',fields:[{key:'pressure',label:'Pressure check',type:'result',required:true}],sourcingRoutes:['domestic']});
+const receive=async()=>post({id:crypto.randomUUID(),mode:'receipt',receiptVersion:2,confirmed:true,materialId:'mat',warehouseId:wh.id,quantity:'3',day:'2026-11-06',supplier:'PRIVATE-SUPPLIER'});
+const a=(await receive()).receiptId,b=(await receive()).receiptId,code=batch(a).code,second=batch(b).code;assert.notEqual(code,second);user=qc;
+const before=snapshot();const d=await scan(code);assert.equal(d.receipt.id,a);assert.equal(d.receipt.revision,1);assert.equal(d.reason,'ready');assert.equal(d.receipt.data.fields[0].key,'pressure');assert.equal(d.receipt.data.quantity,3000);assert.equal((await scan(second)).receipt.id,b);
+const rich=load('lib/batch-qr.ts').batchQrText({id:a,data:batch(a)},'https://test.local');assert.equal((await scan(rich)).receipt.id,a);assert.equal((await scan('https://test.local/b/'+code)).receipt.id,a);assert.equal((await scan(code.replace(/[0-9]/g,n=>'۰۱۲۳۴۵۶۷۸۹'[Number(n)]))).receipt.id,a);assert.equal(snapshot(),before,'Lookup is read-only');
+await scan('11100001',400);await scan('https://evil.test/b/'+code,400);await scan(rich.replace('https://test.local/b/'+code,'https://test.local/b/'+second),400);await scan('11100001-14050101-999999',404);
+user={...qc,userId:'local:other',permissions:{read:[],write:[],eventStages:[],flowRoles:['qc']}};await scan(code,404);user={...qc,permissions:{read:[],write:[],eventStages:[],flowRoles:['inventory']}};await scan(code,403);user={...qc,permissions:{...qc.permissions,serviceAgentId:'agent'}};await scan(code,403);user=qc;
+const original=sql.prepare('SELECT quantity FROM inventory_balances WHERE item_id=?').get(b).quantity;sql.prepare('UPDATE inventory_balances SET quantity=0 WHERE item_id=?').run(b);assert.equal((await scan(second)).reason,'awaiting_receipt');
+await post({id:crypto.randomUUID(),mode:'start_incoming_qc',receiptId:b,revision:1},409);await post({id:crypto.randomUUID(),mode:'incoming_qc',receiptId:b,accepted:'3',values:{pressure:'pass'}},409);
+sql.prepare('UPDATE inventory_balances SET quantity=? WHERE item_id=?').run(original,b);beforeBatch=()=>sql.prepare('UPDATE inventory_balances SET quantity=0 WHERE item_id=?').run(b);await post({id:crypto.randomUUID(),mode:'start_incoming_qc',receiptId:b,revision:1},409);assert.equal(row(b).data.qcStartedAt,undefined);sql.prepare('UPDATE inventory_balances SET quantity=? WHERE item_id=?').run(original,b);
+await post({id:crypto.randomUUID(),mode:'start_incoming_qc',receiptId:a,revision:1});assert.ok(row(a).data.qcStartedAt);const op={id:crypto.randomUUID(),mode:'incoming_qc',receiptId:a,revision:row(a).revision,accepted:'2',values:{pressure:'pass'},notes:'One rejected'};await post(op);const completed=snapshot();await post(op);assert.equal(snapshot(),completed);assert.equal((await scan(code)).reason,'completed');assert.equal((await scan(code)).canInspect,false);assert.equal((await scan(code)).receipt.data.accepted,2000);assert.equal((await scan(code)).receipt.data.rejected,1000);assert.equal(snapshot(),completed);await post({...op,id:crypto.randomUUID()},409);
+// A batch registered ahead of its warehouse receipt remains locked.
+const rec=sql.prepare('SELECT * FROM records WHERE id=?').get(b);sql.prepare('DELETE FROM flow_entities WHERE id=?').run(b);const pending=await scan(second);assert.equal(pending.receipt,null);assert.equal(pending.reason,'awaiting_receipt');
+// Duplicate and retired labels never select an arbitrary row.
+sql.prepare('INSERT INTO records(id,kind,payload,created) SELECT ?,kind,payload,created FROM records WHERE id=?').run('duplicate',a);await scan(code,409);sql.prepare('DELETE FROM records WHERE id=?').run('duplicate');
+entity('retired','receipt',{identityHistory:[{from:{code:'11100001-14050101-888'}}]});await scan('11100001-14050101-888',410);
+console.log('PASS incoming QC scan: exact same-material receipt, legacy/current QR, Persian digits, unsafe input denial, assigned access, readonly lookup, incomplete ingress lock and atomic race rollback, current form/revision, partial rejection, replay and completed readonly, ambiguous/retired labels.');
+})().catch(e=>{console.error(e);process.exit(1)});
