@@ -40,7 +40,7 @@ export const serviceForms:Record<string,ServiceField[]>={
  activation_preview:[f('source','نام فایل / مرجع قبلی'),rows('rows','سوابق فعال‌سازی',[f('serial','سریال'),day,f('months','مدت گارانتی (ماه)','quantity')])],
 };
 serviceForms.activation_import=serviceForms.activation_preview;
-serviceForms.office_intake=[...serviceForms.create.filter(f=>f.key!=='agentId'),...serviceForms.intake.filter(f=>f.key!=='day')];
+serviceForms.office_intake=[...serviceForms.create.filter(f=>f.key!=='agentId').map(f=>f.key==='day'?{...f,label:'تاریخ پذیرش'}:f.key==='productId'?{...f,label:'محصول / مدل ثبت‌شده'}:f),...serviceForms.intake.filter(f=>f.key!=='day')];
 serviceForms.worklog=[notes];
 export function visibleServiceFields(mode:string,data:any,ownAgent=false):ServiceField[]{
  const fields=(serviceForms[mode]||[]).filter(f=>!(mode==='create'&&ownAgent&&['agentId','province','city'].includes(f.key)));

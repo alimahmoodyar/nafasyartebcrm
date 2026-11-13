@@ -1,3 +1,9 @@
+## 2026-11-13 — Office reception form defaults
+
+- Customer province/city start blank; reception date/model labels match company-office intake. Cancelling an unsubmitted reception returns to the office home. Missing consumer price is rejected as an incomplete estimate before parsing any blank amount.
+- Preserved failed-test counts for legacy repairs recorded before performer work logs.
+- Added a component-level reception test after observing the live form; no live device/customer record was created during browser verification.
+
 ## 2026-11-13 — Company-office device reception and service technician
 
 - Added an independent «سرویسکار خدمات پس از فروش خانگی» role profile; customer-response staff now have support/intake grants and direct office reception. Existing agency-coordinator and agent workflows remain separate. Office home provides a device scanner, explicit reception, bounded open/history search and exact serial history.

@@ -1,3 +1,7 @@
+## Office reception browser follow-up — 2026-11-13
+
+Observed the actual technician home and customer-response reception modal in live v265. Fixed inherited first-province selection for the new office form; blank location and unconfirmed physical receipt now tested through the actual AfterSalesPanel hooks (service-office-intake-ui), including serial seed, explicit reception-date label and cancellation to home. Missing-price input now returns the incomplete-estimate error before integer parsing. Office SQLite scenario and TypeScript/build repeated for the changed paths. No business form was submitted in the browser; no physical camera/printer claim.
+
 ## Company-office device service — 2026-11-13
 
 Scope: independent home technician role + response/intake role, office-intake atomic as_case extension, bounded office serial/QR/open/history read API and MCP, permanent manufacturing/service QR printing, existing per-stage service UI/HTTP, performer vs recorder history/report projection, private photo camera and same-file upload retry. Shared application data only; no new entity type/table/FK/migration/reset exemption.
