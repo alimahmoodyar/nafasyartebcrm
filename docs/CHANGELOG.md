@@ -1,3 +1,9 @@
+# 2026-11-13 — اسکن مشترک وابسته به نقش
+
+- شناسایی مشترک پنج خانوادهٔ لیبل، انتخاب کار مجاز سمت سرور، فرم دریافت و تعیین ماهیت برای کد خارجی و مرجع ذخیره‌شدهٔ آن؛ انتقال انبار و دریافت دستگاه به پروندهٔ اصلی متصل می‌مانند.
+- ورودی اسکن در پروفایل‌ها و انبار؛ سازگاری لیبل‌های قبلی و جلوگیری از تبدیل کد داخلی نامعتبر یا غیرمجاز به رسید جدید.
+- قاعدهٔ دائمی چاپ لیبل در WORKFLOW-LABEL-POLICY و آزمون ثبت هر تولیدکنندهٔ QR؛ بدون مهاجرت یا تغییر دادهٔ موجود.
+
 ## 2026-11-13 — Scoped finance shortage access and measured lookup indexes
 
 Declare existing shortage workflow participation explicitly; restrict shortage-only fulfillment data to authorized serials/stages, keep warehouse/sales writes denied and CEO approval independent. Add six schema-only nonunique indexes and bounded exact-row queries; measure before/after results, query plans, logical row equality, write overhead and storage. Preserve role-training proposal with an onboarding/personnel milestone reminder.

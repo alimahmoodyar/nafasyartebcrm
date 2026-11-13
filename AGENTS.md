@@ -1,5 +1,11 @@
 # Nafasyar development rules
 
+## Shared workflow label rule
+
+- Owner agreement 2026-11-13: follow `docs/WORKFLOW-LABEL-POLICY.md` for every QR/barcode print path. Labels identify an immutable object; the shared server resolver selects permitted current work using the authenticated role, record scope and current state. Never encode authority or an automatic stock/payment approval.
+- Before adding a label producer, document its roles/stages/actions, unknown/retired/ambiguous behavior and compatibility; register it in `tests/workflow-label-policy.cjs` and test the generated label against the shared resolver. General scanners reuse `/api/workflow-scan`; in-form physical item verification retains domain checks.
+- Unknown supplier labels may open receiving/identification only for assigned active receiving warehouse staff, retaining the original code as an inert reference. Invalid, retired or unauthorized internal labels never become new receipts. Do not create parallel business data.
+
 ## Process discovery with the owner
 
 - For every process described by the owner, check five elements: actor, action, conditions/preconditions, expected result, and exception/failure behavior.

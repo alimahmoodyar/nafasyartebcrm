@@ -1,4 +1,5 @@
 'use client';
+import {WorkflowScanButton} from './workflow-scan-button';
 import {WarehouseSupplyPanel} from './warehouse-supply-panel';
 import {WarehouseDispatchPanel} from './warehouse-dispatch-panel';
 import {WarehouseHistoryPanel} from './warehouse-history-panel';
@@ -49,7 +50,7 @@ export function WarehouseHub({user,records,demo,onSaved,onOpen,onNavigate,target
   </ProgramWorkspace>;
  }
  return <ProgramWorkspace programId="warehouse" title="انبار" direct={!!active&&!!targetId}>
-  <SubprogramNavigation showLabel={false} items={available.map(([key])=>[key,warehouseGroupTitles[key]])} value={group} onChange={openGroup}/>
+  {!demo&&!group&&<WorkflowScanButton/>}<SubprogramNavigation showLabel={false} items={available.map(([key])=>[key,warehouseGroupTitles[key]])} value={group} onChange={openGroup}/>
   {group&&<ProgramWorkspace key={group+(active||taskOverview?'leaf':'menu')} programId={'warehouse-'+group} title={warehouseGroupTitles[group]} direct={group==='operations'||!!active||taskOverview}>
    {group!=='operations'&&group!=='dispatch'&&!taskOverview&&<SubprogramNavigation showLabel={false} items={choices.map(item=>[item.key,item.title])} value={leaf} onChange={key=>{if(!choices.some(item=>item.key===key))return false;setLeaf(key);setFocus('');}}/>}
    <nav className="warehouse-page-path" aria-label="مسیر صفحه انبار" dir="rtl"><ol>{['انبار',warehouseGroupTitles[group],...(active&&active.title!==warehouseGroupTitles[group]?[active.title]:[])].map((title,index,path)=><li key={index}>{index>0&&<span className="warehouse-page-path__separator" aria-hidden="true">←</span>}<span aria-current={index===path.length-1?'page':undefined}>{title}</span></li>)}</ol></nav>

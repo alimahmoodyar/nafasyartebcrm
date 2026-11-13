@@ -1,3 +1,7 @@
+## 2026-11-13 — Shared workflow scan
+
+Scope: server-authorized read-only resolver, scan UI, external supplier reference, exact warehouse transfer/receipt navigation, five existing label families. New domain/React UI/producer policy tests plus affected regressions pass; see quality-reviews/2026-11-13-shared-scan.md. No schema migration or live business data mutation. Device camera/physical printer verification is not claimed; existing camera component unchanged. Existing broad domain workspace loaders remain prior debt, not used by the new exact resolver.
+
 ## Finance navigation and lookup index follow-up — 2026-11-13
 
 Closed the two requested follow-ups from the end-of-day review: explicit shortage workflow participation with server-scoped finance reads/actions and six append-only lookup indexes. Full before/after controlled measurement, logical-row equality, idempotent migration, query plans, index space and write overhead are in quality-reviews/2026-11-13-finance-index-followup.md and index-evidence.json. Existing broad all-history snapshot debt and production workload/soak are separate from these completed changes. Role-training proposal and milestone reminder saved, not implemented.
