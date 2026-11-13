@@ -13,7 +13,7 @@ export async function syncAssetWorkflowTasks(){const db=storage(),policy:any=awa
     if(d.signatureRequired&&!d.signedReceiptId)add(keepers,'signature:'+d.custodyId,'رسید امضاشده تحویل اموال');
     if(d.annualDue&&d.annualDue<=dayAt())add(keepers,'presence:'+d.custodyId+':'+d.annualDue,'تأیید دوره‌ای اموال امانی');
     if(d.returnDue&&d.returnDue<=dayAt()&&!d.continuous)add(keepers,'return:'+d.custodyId,'پیگیری برگشت اموال امانی');
-    if(d.issue?.state==='open')add(d.technicalId?[d.technicalId]:keepers,'fault:'+d.issue.id,'بررسی خرابی / خطر اموال');
+    if(d.issue?.state==='open')add(d.technicalId?[d.technicalId]:keepers,'fault:'+(d.issue.id||d.issue.at||r.revision),'بررسی خرابی / خطر اموال');
     if(assetServiceDue(d))add([...new Set([...keepers,d.servicePlan.executorId].filter(Boolean))],'service:'+d.servicePlan.baseAt,'سرویس سررسیدشده اموال');
     if(d.service?.state==='awaiting_review')add(d.technicalId?[d.technicalId]:keepers,'review:'+d.service.id,'تأیید فنی پایان سرویس');
     if(d.disposal?.state==='pending')add(members.filter(assetInternal).filter(m=>{const p=storedAccessPermissions(m.permissions);return p.assetRoles?.includes('disposal')||p.supplyRoles?.includes('ceo')||!!delegatedRole&&p.roleAssignment?.roles?.includes(delegatedRole)}).map(m=>m.id),'disposal:'+d.disposal.id,'تصمیم خروج اموال');

@@ -34,7 +34,7 @@ assert.equal((await step(keeper,id,'transfer',{holderKind:'employee',holderId:'a
 assert.equal(entity(id).data.holderKind,'stock','request never changes custody');
 assert.equal((await step(bob,id,'accept_transfer',{scan:qr.assetQrText(id),condition:'good'})).status,404);
 assert.equal((await step(alice,id,'accept_transfer',{scan:'NAFASYAR-ASSET/1:'+crypto.randomUUID(),condition:'good'})).status,400);
-let accept=await step(alice,id,'accept_transfer',{scan:qr.assetQrText(id),condition:'good'});assert.equal(accept.status,200,JSON.stringify(accept));assert.equal(entity(id).data.holderId,'alice');
+let accept=await step(alice,id,'accept_transfer',{scan:qr.assetQrText(id),condition:'damaged'});assert.equal(accept.status,200,JSON.stringify(accept));assert.equal(entity(id).data.holderId,'alice');assert.equal(entity(id).data.issue.id,accept.body.id);assert.ok(sql.prepare("SELECT id FROM duty_runs WHERE template_id='asset-workflow' AND json_extract(data,'$.stage')=? AND state='open'").get('fault:'+accept.body.id),'damage creates a uniquely actionable task');
 let again=await ctx.run(alice,()=>wf.POST(req('/api/assets/workflow',accept.body)));assert.equal(again.status,200);assert.equal((await again.json()).repeated,true);
 assert.equal((await step(alice,id,'transfer',{holderKind:'employee',holderId:'bob',location:'desk2',condition:'good'})).status,200);
 assert.equal((await step(alice,id,'transfer',{holderKind:'employee',holderId:'keeper',location:'desk3',condition:'good'})).status,409);
