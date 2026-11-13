@@ -1,3 +1,8 @@
+## 2026-11-13 — Service stage timestamps
+
+- Show Persian date and Tehran clock with seconds at reception, technical work logs, every case-history action, current-stage cards and printed reception documents. New delivery/return writes retain explicit server timestamps and history state transitions in the same atomic operation.
+- Add a stage registration timeline and exact registration-to-registration intervals. Existing performance reports include mean recorded reception-to-exit minutes and valid sample counts; these include waits and are not active technician labor hours. Missing clocks, negative intervals and declared dates differing from registration days are not invented or included in precise averages.
+
 ## 2026-11-13 — Office reception form defaults
 
 - Customer province/city start blank; reception date/model labels match company-office intake. Cancelling an unsubmitted reception returns to the office home. Missing consumer price is rejected as an incomplete estimate before parsing any blank amount.

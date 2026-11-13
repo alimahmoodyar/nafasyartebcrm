@@ -1,0 +1,7 @@
+'use client';
+import {serviceCaseTiming,serviceStageEvents,serviceElapsed,serviceMoment} from '@/lib/service-timing';
+import {serviceActions,caseStates} from '@/lib/after-sales-labels';
+export function ServiceStageTimeline({data}:{data:any}){
+ const timing=serviceCaseTiming(data),events=serviceStageEvents(data);
+ return <section className="notice" aria-label="تاریخ و ساعت مراحل پرونده"><h3>تاریخ و ساعت مراحل پرونده</h3><p>ساعت‌ها به وقت تهران و زمان ثبت عملیات در سامانه‌اند.</p><p>ثبت پذیرش: <strong>{serviceMoment(timing.intakeAt,data.intake?.day)}</strong></p>{timing.exitAt&&<p>ثبت تحویل / عودت: <strong>{serviceMoment(timing.exitAt,data.deliveredDay||data.returnedDay)}</strong></p>}{timing.elapsedMs!==null&&<p>فاصلهٔ ثبت پذیرش تا تحویل (ساعت:دقیقه:ثانیه): <bdi>{serviceElapsed(timing.elapsedMs)}</bdi></p>}{timing.backdated&&<p>تاریخ اعلام‌شده با روز ثبت متفاوت است؛ این پرونده وارد میانگین زمان دقیق نمی‌شود.</p>}<p className="subtle">فاصلهٔ مراحل شامل انتظار قطعه و پاسخ مشتری است؛ معادل ساعت کار واقعی سرویسکار نیست.</p><div className="as-table"><table><thead><tr><th>اقدام / مرحله</th><th>تاریخ و ساعت ثبت</th><th>ثبت‌کننده</th><th>فاصله از ثبت قبلی (ساعت:دقیقه:ثانیه)</th></tr></thead><tbody>{events.map((e:any)=><tr key={e.index}><td>{serviceActions[e.mode]||e.mode}{e.toState&&<small> · {caseStates[e.toState]||e.toState}</small>}</td><td>{serviceMoment(e.at)}</td><td>{e.by||e.actor||'—'}</td><td><bdi>{serviceElapsed(e.elapsedMs)}</bdi></td></tr>)}</tbody></table></div></section>;
+}

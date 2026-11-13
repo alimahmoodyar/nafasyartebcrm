@@ -1,3 +1,9 @@
+## Service stage timestamp visibility — 2026-11-13
+
+Scope: existing case history/workLog/intake timestamps, explicit deliveredAt/returnedAt and from/to states, Persian/Tehran second-resolution timeline/list/receipt, exact valid recorded-duration averages and sample counts on existing UI/HTTP/MCP reports. No new persistent type/table/FK or migration; existing as_case backup/reset and 0016 freeze cover atomic fields.
+
+Checks: fixed UTC/offset and Tehran midnight tests, second precision, exact interval arithmetic, missing/invalid/day-only/backdated/negative exclusion, legacy history fallback, actual static timeline render, authenticated office chain and stage transition/exit timestamps, office UI/after-sales regression, TypeScript/build. No live device data changed; physical event time and active technician labor are never inferred from late registration. Existing full-domain service snapshot/report scalability debt remains unchanged.
+
 ## Office reception browser follow-up — 2026-11-13
 
 Observed the actual technician home and customer-response reception modal in live v265. Fixed inherited first-province selection for the new office form; blank location and unconfirmed physical receipt now tested through the actual AfterSalesPanel hooks (service-office-intake-ui), including serial seed, explicit reception-date label and cancellation to home. Missing-price input now returns the incomplete-estimate error before integer parsing. Office SQLite scenario and TypeScript/build repeated for the changed paths. No business form was submitted in the browser; no physical camera/printer claim.
