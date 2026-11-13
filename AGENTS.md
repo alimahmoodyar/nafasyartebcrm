@@ -58,3 +58,7 @@
 ## Deferred role training reminder
 
 - Owner request 2026-11-13: preserve docs/ROLE-TRAINING-PLAN.md. When work reaches role training, personnel modules, employee profile completion or user onboarding, proactively remind the owner of the role-sized text, workflow schematic, field/form help and actual short screen-recording proposal before deciding implementation scope. This is a project milestone reminder, not a scheduled notification or authorization to implement training now. Do not claim an external reminder has been scheduled.
+
+## Company assets agreement (2026-11-13)
+
+- Follow `docs/ASSET-WORKFLOW.md` for two-party custody, controlled transfers, external signed/mobile confirmation, technical service/usage, safe stops and CEO/delegated disposal. Reuse existing company assets, personnel, representatives and warehouses. Never equate a scan with final receipt or provider configuration with actual SMS delivery. Preserve role/audit identity, immutable history and shared-label policy.

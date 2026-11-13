@@ -1,0 +1,8 @@
+import {requireAccess,checkOrigin,accessResponse} from '@/lib/authorization';
+import {boundedBody} from '@/lib/firmware-storage';
+import {createAssetLink,revokeAssetLink} from '@/lib/asset-links';
+import {assetIdentity} from '@/lib/asset-workflow';
+import {storage} from '@/lib/storage';
+const headers={'Cache-Control':'private, no-store','Referrer-Policy':'no-referrer'};
+export async function GET(request:Request){try{const a=await assetIdentity(await requireAccess());if(!a.custodian)return Response.json({error:'دسترسی لازم است.'},{status:403,headers});const q=new URL(request.url).searchParams,offset=Math.max(0,Number(q.get('offset'))||0),rs=(await storage().prepare("SELECT id,data,created FROM flow_entities WHERE type='asset_link' ORDER BY created DESC,id DESC LIMIT 31 OFFSET ?").bind(offset).all()).results as any[];return Response.json({records:rs.slice(0,30).map(r=>{const d=JSON.parse(r.data);return {id:r.id,created:r.created,kind:d.kind,state:d.state,holderName:d.holderName,expires:d.expires,receiptId:d.receiptId};}),hasMore:rs.length>30},{headers});}catch(e){return accessResponse(e)||Response.json({error:'دریافت ممکن نشد.'},{status:503,headers});}}
+export async function POST(request:Request){try{checkOrigin(request);const u=await requireAccess(),b=JSON.parse(new TextDecoder().decode(await boundedBody(request,16000)));return Response.json(b.mode==='revoke'?await revokeAssetLink(u,b.linkId):await createAssetLink(u,b,new URL(request.url).origin),{headers});}catch(e){return accessResponse(e)||Response.json({error:'ثبت لینک قطعی نشد؛ فهرست را بررسی کنید.'},{status:409,headers});}}

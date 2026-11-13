@@ -1,3 +1,4 @@
+import {productionAssetUsage} from '@/lib/asset-production';
 import {incomingReceiptQuantity} from '@/lib/incoming-qc';
 import {withServiceRolePreview} from '@/lib/service-role-preview';
 import {syncReceiptTemplates} from '@/lib/receipt-template-sync';
@@ -303,7 +304,8 @@ async function previewPOST(request:Request){try{
  const expected:Record<string,number>={};for(const l of lines){let remaining=scaled(l.quantity);const candidates=(await db.prepare("SELECT f.id,f.data,i.quantity FROM flow_entities f JOIN inventory_balances i ON i.item_id=f.id AND i.warehouse=? JOIN records r ON r.id=f.id WHERE f.type='receipt' AND json_extract(r.payload,'$.partCode')=? AND json_extract(r.payload,'$.status')='تأیید' AND i.quantity>0 ORDER BY json_extract(f.data,'$.day'),f.created,f.id").bind(custodyWarehouse,l.partCode).all()).results;for(const c of candidates as any[]){const receipt=JSON.parse(c.data);if(receipt.expiry&&receipt.expiry<tehranDay())continue;const q=Math.min(remaining,c.quantity);if(q)expected[c.id]=q;remaining-=q;if(!remaining)break;}}
  const actual=Object.fromEntries(materials.map(m=>[m.batchId,m.quantity]));if(JSON.stringify(Object.entries(actual).sort())!==JSON.stringify(Object.entries(expected).sort())&&!notes)fail('برای تغییر بچ قدیمی‌تر پیشنهادی یا مقدار BOM، توضیح فنی بنویسید.');
  }
- if(lines.some((l:any)=>!totals[l.partCode]))fail('همه قطعات BOM را مشخص کنید.');if(lines.some((l:any)=>totals[l.partCode]!==scaled(l.quantity))&&!notes)fail('تفاوت مصرف واقعی با BOM به توضیح نیاز دارد.');put(build.id,'build',{...build.data,state:mode==='prepare'?'prepared':'assembled',materials,notes,...(mode==='prepare'?{latestQc:null}:{builtAt:now,builtBy:u.name})},build);if(mode==='build')event(build.id,'مونتاژ',{operator:build.data.assembler,notes});
+ if(lines.some((l:any)=>!totals[l.partCode]))fail('همه قطعات BOM را مشخص کنید.');if(lines.some((l:any)=>totals[l.partCode]!==scaled(l.quantity))&&!notes)fail('تفاوت مصرف واقعی با BOM به توضیح نیاز دارد.');put(build.id,'build',{...build.data,state:mode==='prepare'?'prepared':'assembled',materials,notes,...(mode==='prepare'?{latestQc:null}:{builtAt:now,builtBy:u.name})},build);if(mode==='build'){const equipment=await productionAssetUsage({assetIds:Array.isArray(b.assetIds)?b.assetIds:[],partId:bom.product_id,quantity:1,operationId:id,actor:u.userId,name:u.name,now});checks.push(...equipment.guards);stmts.push(...equipment.writes);}
+ if(mode==='build')event(build.id,'مونتاژ',{operator:build.data.assembler,notes});
  }else if(mode==='reject'){
  const batch=await record(needed(b.batchId),'batch');await get(batch.id,'receipt');const quantity=scaled(b.quantity),reason=needed(b.reason,4000);entry(batch.id,'line',-quantity);entry(batch.id,'nonconforming',quantity);put(id,'repair',{kind:'line_reject',batchId:batch.id,quantity,reason,by:u.name});
  }else if(mode==='repair'){

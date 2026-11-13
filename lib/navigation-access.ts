@@ -50,7 +50,7 @@ export function canOpenSection(user:Session,s:string):boolean{
  if(s==='sales-bank')return internal&&(salesManager(u)||salesFinance(u)||financialWorkflowRole(p,'',[],'treasury'));
  if(s==='treasury')return internal&&(u.isAdmin||financialAccess(u,'treasury'));
  // Personal custody is inside personnel; the standalone program is for custodians.
- if(s==='assets')return internal&&(u.isAdmin||!!p.assetRoles?.includes('custodian'));
+ if(s==='assets')return internal&&(u.isAdmin||!!p.assetRoles?.length);
  if(s==='activation-code')return canGenerateActivationCode(u);
  // Personnel is a self-service entry point for every internal employee; HR
  // scope and sensitive fields remain enforced by the personnel domain API.
@@ -81,7 +81,7 @@ export function sectionDestination(user:Session,section:string,target=''){
  const p=accessPermissions(user.permissions);
  if(section==='fulfillment'&&target.startsWith('handoff-shortage:'))return {section,target};
  if(warehouseLegacySections.includes(section as any)&&canOpenSection(user,section)&&canOpenSection(user,'warehouse'))return {section:'warehouse',target:warehouseTarget(section,target)};
- if(section==='assets'&&!user.isAdmin&&!p.assetRoles?.includes('custodian')&&!p.hospitalCenterId&&!p.salesAgentId&&!p.serviceAgentId)return {section:'personnel',target:'asset:'+target};
+ if(section==='assets'&&!user.isAdmin&&!p.assetRoles?.length&&!p.hospitalCenterId&&!p.salesAgentId&&!p.serviceAgentId)return {section:'personnel',target:'asset:'+target};
  return {section,target};
 }
 

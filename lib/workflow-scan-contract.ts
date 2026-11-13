@@ -1,16 +1,18 @@
 import {incomingQcCode} from './incoming-qc-contract';
+import {assetLabelId} from './asset-label';
 import {parseShippingQr} from './shipping-packages';
 import {parseReturnCarton} from './service-return-parcel-contract';
 import {driverReceiptId} from './driver-receipt-contract';
 import {parseServiceDeviceQr,serviceDeviceSerial} from './service-device-contract';
 /** Labels identify objects, never a role, mutable action, permission or approval. */
-export const workflowLabelFamilies=['batch','device','shipping','return','receipt'] as const;
-export type ScanAction={id:string;title:string;kind:'navigate'|'shipping'|'return'|'receipt'|'transfer';section?:string;target?:string;code?:string;driver?:boolean;expert?:boolean;intake?:boolean;domain?:string};
+export const workflowLabelFamilies=['batch','device','shipping','return','receipt','asset'] as const;
+export type ScanAction={id:string;title:string;kind:'navigate'|'shipping'|'return'|'receipt'|'transfer'|'asset';section?:string;target?:string;code?:string;driver?:boolean;expert?:boolean;intake?:boolean;domain?:string};
 export type ScanResult={kind:string;message:string;actions:ScanAction[]};
 export function parseWorkflowLabel(value:string,origin:string){
  const raw=typeof value==='string'?value.replace(/\r\n?/g,'\n').trim():'';
  if(!raw||raw.length>3000||/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(raw))throw Error('کد خوانده‌شده معتبر نیست.');
  const batch=incomingQcCode(raw,origin);if(batch)return {kind:'batch' as const,code:batch,raw};
+ if(assetLabelId(raw))return {kind:'asset' as const,code:assetLabelId(raw),raw};
  if(raw.startsWith('NAFASYAR-SHIP/1:')){parseShippingQr(raw);return {kind:'shipping' as const,code:raw,raw};}
  if(raw.startsWith('NAFASYAR-RETURN/1:')&&parseReturnCarton(raw))return {kind:'return' as const,code:raw,raw};
  if(raw.startsWith('NAFASYAR-RECEIPT/1:')&&driverReceiptId(raw))return {kind:'receipt' as const,code:driverReceiptId(raw),raw};

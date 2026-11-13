@@ -1,0 +1,10 @@
+import {storage} from './storage';
+import {afail,assetRow} from './asset-workflow';
+import {assetServiceDue} from './asset-workflow-tasks';
+// Included in the original production transaction. A retry cannot count equipment twice.
+export async function productionAssetUsage(input:{assetIds:string[];partId:string;quantity:number;minutes?:number;operationId:string;actor:string;name:string;now:string}){
+ const db=storage(),ids=[...new Set(input.assetIds)];if(ids.length>20)afail('حداکثر بیست تجهیز برای یک گزارش مجاز است.');const guards:D1PreparedStatement[]=[],writes:D1PreparedStatement[]=[],usage=[];
+ for(const id of ids){const r=await assetRow(id);if(!r||r.type!=='asset_item')afail('تجهیز انتخابی پیدا نشد.');const d=structuredClone(r.data);if(!['mold','machine'].includes(d.assetKind)||d.lifecycle==='disposed'||d.useState==='stopped'||d.servicePlan?.blockWhenDue&&assetServiceDue(d))afail('تجهیز متوقف، خارج از چرخه یا نیازمند سرویس الزامی است.',409);if(!Array.isArray(d.productIds)||!d.productIds.includes(input.partId))afail('تجهیز به کالای این گزارش تولید متصل نیست.');const cycles=input.quantity?Math.ceil(input.quantity/Math.max(1,d.cavities||1)):0,hours=(input.minutes||0)/60;d.meters={hours:(d.meters?.hours||0)+hours,cycles:(d.meters?.cycles||0)+cycles};usage.push({assetId:id,cycles,hours,cavities:d.cavities||1,quantity:input.quantity,partId:input.partId});
+ guards.push(db.prepare('UPDATE inventory_operations SET guard=CASE WHEN EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?) THEN guard ELSE 0 END WHERE id=?').bind(id,r.revision,input.operationId));writes.push(db.prepare('UPDATE flow_entities SET data=?,revision=revision+1,updated=? WHERE id=? AND revision=?').bind(JSON.stringify(d),input.now,id,r.revision),db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'asset_event',?,1,?,?)").bind('asset-production:'+input.operationId+':'+id,JSON.stringify({assetId:id,mode:'production_meter',actor:input.actor,name:input.name,at:input.now,notes:'کارکرد از گزارش تولید',details:usage.at(-1)}),input.now,input.now));
+ }return {guards,writes,usage};
+}

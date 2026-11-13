@@ -28,6 +28,10 @@ async function transferActions(u:Session,itemId:string,kind:string):Promise<Scan
 export async function resolveWorkflowScan(u:Session,raw:string,origin:string):Promise<ScanResult>{
  let label:ReturnType<typeof parseWorkflowLabel>;try{label=parseWorkflowLabel(raw,origin)}catch(e){throw new AccessError((e as Error).message,400)}
  const db=storage(),actions:ScanAction[]=[];
+ if(label.kind==='asset'){
+  const {accessWorkflowAsset}=await import('./asset-workflow');const {r}=await accessWorkflowAsset(u,label.code);
+  return {kind:'asset',message:r.data.lifecycle==='disposed'?'این مال از چرخه خارج شده؛ سابقه حفظ است.':'شناسنامه و اقدامات مجاز همین مال',actions:[{id:'asset',title:'اموال و تحویل / سرویس',kind:'asset',target:r.id,code:label.raw}]};
+ }
  if(label.kind==='shipping'){
   const d=await response(await packages(new Request(origin+'/api/finished-packages?'+new URLSearchParams({code:label.code}))));
   actions.push({id:'shipping',title:d.pickup?.allowed?'دریافت بسته از انبار و ادامهٔ حمل':'مشاهدهٔ بسته و دریافت مقصد',kind:'shipping',code:label.code,driver:!!d.pickup?.allowed});

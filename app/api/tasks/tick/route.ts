@@ -3,6 +3,7 @@ import {syncInventoryCounts} from '@/lib/inventory-counts';
 import {syncReminders} from '@/lib/reminders';
 import {syncTreasuryTasks} from '@/lib/treasury-tasks';
 import {syncPurchaseInvoiceTasks} from '@/lib/purchase-invoice-tasks';
+import {syncAssetWorkflowTasks} from '@/lib/asset-workflow-tasks';
 import {syncAssetTasks} from '@/lib/assets-tasks';
 import {syncForeignTasks} from '@/lib/foreign-purchase-tasks';
 import {installForeignPosition} from '@/lib/foreign-purchase';
@@ -41,7 +42,7 @@ export async function POST(request:Request){try{
  await syncInventoryCounts();await syncSalesTasks();
  await syncLeadTasks();
  await syncPurchaseInvoiceTasks();
- await syncAssetTasks();await syncPersonnelTasks();await syncForeignTasks();
+ await syncAssetTasks();await syncAssetWorkflowTasks();await syncPersonnelTasks();await syncForeignTasks();
  await syncQmsTasks();
  await scanSalesMonitor({source});
  await syncServiceTasks();

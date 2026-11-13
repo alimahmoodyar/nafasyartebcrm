@@ -1,3 +1,7 @@
+## 2026-11-13 — role-scoped asset custody and maintenance
+
+Shared immutable asset QR, sender/recipient handover, custodian-approved controlled/external custody, personal/representative assets, signed receipts and SMS.ir-ready expiring verification links; timed service/fault/usage records, production-counter transaction integration and CEO/delegated disposal with financial follow-up. Existing shared data and reset/freeze protections retained. Actual SMS configuration and hardware delivery are not claimed as verified; see ASSET-WORKFLOW.md.
+
 # 2026-11-13 — اسکن مشترک وابسته به نقش
 
 - شناسایی مشترک پنج خانوادهٔ لیبل، انتخاب کار مجاز سمت سرور، فرم دریافت و تعیین ماهیت برای کد خارجی و مرجع ذخیره‌شدهٔ آن؛ انتقال انبار و دریافت دستگاه به پروندهٔ اصلی متصل می‌مانند.

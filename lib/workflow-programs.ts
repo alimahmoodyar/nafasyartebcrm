@@ -24,7 +24,7 @@ export const roleWorkflowPrograms:Record<string,string[]>={
  sales_finance:['sales','sales-bank'],sales_viewer:['sales'],sales_report_viewer:['sales'],
  delivery:['sales','fulfillment','transport'],
  transport_manager:['transport','sourcing'],driver:['transport'],
- custodian:['assets'],firmware:['firmware','device'],
+ asset_disposal_approver:['assets'],custodian:['assets'],firmware:['firmware','device'],
  viewer:['overview','analytics','product','batch','device','event','service','action','distribution','firmware'],
  product_manager:['product'],
  treasurer:['treasury','guarantees','sales-bank'],finance_director:['after-sales','build-projects','treasury','guarantees','costing','pricing','finance-control','transport'],

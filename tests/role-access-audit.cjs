@@ -72,7 +72,7 @@ if(qa&&!qa.design)assert.equal(qms.qvisible({type:'qms_record',data:{private:tru
  check(nav.canOpenSection(u,'qms'),!!u.permissions.qmsRoles?.length||has(expected.design,id),'QMS navigation',id);
  check(nav.canOpenSection(u,'sales'),has(expected.salesStaff,id)||has(expected.salesManager,id)||has(expected.salesFinance,id)||['sales_viewer','sales_report_viewer','ceo','sales_agent'].includes(id),'sales navigation',id);
  check(nav.canOpenSection(u,'routine-production'),['production','production_worker','production_store_assistant','engineering','qc','ceo'].includes(id),'routine production navigation',id);
- check(nav.canOpenSection(u,'assets'),id==='custodian','assets navigation',id);
+ check(nav.canOpenSection(u,'assets'),['custodian','asset_disposal_approver'].includes(id),'assets navigation',id);
  check(nav.canOpenSection(u,'personnel'),!['sales_agent','service_agent'].includes(id),'personnel navigation',id);
  check(nav.canOpenSection(u,'guarantees'),['treasurer','finance_director'].includes(id),'guarantees navigation',id);
  check(nav.canOpenSection(u,'users'),false,'admin users',id);check(nav.canOpenSection(u,'llm'),false,'admin LLM',id);check(nav.canOpenSection(u,'system-reset'),false,'admin reset',id);

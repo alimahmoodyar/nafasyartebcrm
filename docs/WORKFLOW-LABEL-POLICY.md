@@ -29,3 +29,7 @@
 قبل از افزودن چاپ QR/بارکد، شیء مرجع، نقش‌ها، مراحل، کارهای مجاز، حالت بدون کار، اسکن تکراری، ابطال، نسخه و سازگاری لیبل قبلی مشخص شود. تولیدکننده باید در آزمون `workflow-label-policy.cjs` ثبت شود و نمونهٔ خروجی با resolver مشترک آزموده شود. اسکنر تطبیق اقلامِ داخل یک فرم می‌تواند تخصصی بماند؛ اسکن عمومی باید از resolver مشترک استفاده کند.
 
 عملیات مالی، مصرف موجودی، تأیید QC، دریافت جزئی و برگشت به همان handler موجود سپرده می‌شود. UI، HTTP و MCP از یک resolver استفاده می‌کنند. اسکن تنها شناسایی و بازکردن مسیر است.
+
+## Asset labels (2026-11-13)
+
+`NAFASYAR-ASSET/1:<UUID>` identifies the permanent asset passport. Current holder, exact pending recipient, assigned technician/executor, assigned receiving warehouse, custodian and authorized disposal reviewer see only their current actions. Scan is read-only; receipt needs exact scan and explicit final confirmation. External-link scans are additionally bounded to the verified holder/request/custody cycle. Missing/retired/unauthorized identities never create stock receipts. Producer: `app/api/assets/print/route.ts`; resolver tests: `tests/asset-workflow.cjs`. Existing labels need no reprint.

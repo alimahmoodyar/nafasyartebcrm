@@ -1,4 +1,5 @@
 'use client';
+import {AssetWorkspace} from './asset-workspace';
 import {RefreshButton} from './refresh-button';
 import {NumberInput} from '@/components/trace/number-input';
 import {useEffect,useRef,useState} from 'react';
@@ -9,7 +10,7 @@ import {Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription} from '@
 import {assetHolderKinds,assetConditions} from '@/lib/assets-contract';
 import {formatDate,formatDateTime,localDay} from '@/lib/persian-date';
 const modeLabels:Record<string,string>={register:'ثبت مال جدید',edit:'ویرایش مشخصات',transfer:'تحویل / برگشت مال',confirm_annual:'ثبت تأیید کتبی پیمانکار',request_clearance:'درخواست تسویه اموال ترک کار',approve_clearance:'تأیید تسویه اموال',cancel_clearance:'لغو فرایند ترک کار'};
-export function AssetsPanel({demo=false,targetId='',memberId='',embedded=false}:{demo?:boolean;targetId?:string;memberId?:string;embedded?:boolean}){
+function LegacyAssetsPanel({demo=false,targetId='',memberId='',embedded=false}:{demo?:boolean;targetId?:string;memberId?:string;embedded?:boolean}){
 const detailAnchor=useRef<HTMLElement|null>(null);
 const [data,setData]=useState<any>(null),[selected,setSelected]=useState(targetId),[view,setView]=useState('mine'),[query,setQuery]=useState(''),[mode,setMode]=useState(''),[draft,setDraft]=useState<any>({}),[op,setOp]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');
 async function load(){if(demo)return;const r=await fetch('/api/assets',{cache:'no-store'}),j:any=await r.json();if(!r.ok)throw Error(j.error||'دریافت اموال انجام نشد.');setData(j)}
@@ -44,3 +45,5 @@ const content=<section ref={backRef} className="panel inside assets-panel"><div 
 </section>;
 return <LayoutAccountProvider accountId={data.accountId}>{embedded?content:<ProgramWorkspace programId="assets" title="اموال شرکت" direct={!!targetId}>{content}</ProgramWorkspace>}</LayoutAccountProvider>;
 }
+
+export function AssetsPanel(props:{demo?:boolean;targetId?:string;memberId?:string;embedded?:boolean}){const [legacy,setLegacy]=useState(false);if(legacy)return <><button className="btn" onClick={()=>setLegacy(false)}>بازگشت به اموال</button><LegacyAssetsPanel {...props}/></>;return <AssetWorkspace initialId={props.targetId} embedded={props.embedded} onLegacy={()=>setLegacy(true)}/>;}
