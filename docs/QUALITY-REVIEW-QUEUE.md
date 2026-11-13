@@ -308,3 +308,8 @@ Fixed the phone heartbeat racing an unfinished QR join and invalidating its new 
 ## 2026-11-13 — Role-local pairing and stable scope
 
 Pairing is hidden on the administrator landing page until a role is selected, and shows the active role label. The server and UI use the same canonical role identity: grant lists and warehouse responsibilities compare by content rather than database ordering; display titles are excluded. Account, role/member, representative/mission, warehouse scope and actual permissions remain binding. Scope and two-device regressions cover equivalent reordered grants and rejected genuine scope changes. Refresh and reconnect both devices after this release. Physical-device verification remains pending.
+
+
+## 2026-11-13 — Pairing placement follows the visible page
+
+Observed in the live browser: home retained a prior driver profile cookie and displayed pairing above PersonalHome. Hide pairing on home and the role catalog regardless of restored role state; show it on the matching selected role page and downstream authorized work. Regression covers retained role on home, empty catalog target, wrong role target and valid role/warehouse work. This corrects the incomplete role-presence-only condition.

@@ -2,5 +2,5 @@ import type {Session} from './permissions';
 // Grant lists are sets. Their database/display ordering is not an access change.
 function canonical(value:any):any{return Array.isArray(value)?value.map(canonical).sort((a,b)=>{const x=JSON.stringify(a),y=JSON.stringify(b);return x<y?-1:x>y?1:0;}):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(k=>[k,canonical(value[k])])):value;}
 export function pairScopeKey(user:Session){return JSON.stringify(canonical({id:user.userId,admin:user.isAdmin,permissions:user.permissions,profile:user.profileReview?{id:user.profileReview.id,warehouseIds:user.profileReview.warehouseIds,buyerId:user.profileReview.buyerId||'',missionId:user.profileReview.missionId||''}:null,preview:user.rolePreview?{memberId:user.rolePreview.memberId}:null}));}
-export function pairWorkspaceAvailable(user:Session){return !user.permissions.hospitalCenterId&&(!user.isAdmin||!!user.profileReview||!!user.rolePreview);}
+export function pairWorkspaceAvailable(user:Session,section:string,target=''){if(user.permissions.hospitalCenterId||section==='home'||section==='users')return false;if(section==='role-testing')return !!user.profileReview&&target===user.profileReview.id;return !user.isAdmin||!!user.profileReview||!!user.rolePreview;}
 export function pairRoleLabel(user:Session){return user.profileReview?.title||user.name;}

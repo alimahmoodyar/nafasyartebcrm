@@ -35,3 +35,8 @@
 پیوستن اتمی در رابط: کلید گوشی تا پذیرش سرور فقط در حافظهٔ درخواست باقی می‌ماند و بررسی دوره‌ای در این فاصله اجرا نمی‌شود. بازخوانی‌های دیررس اتصال قدیمی حق پاک‌کردن اتصال جدید را ندارند. اسکن تکراری در حین پیوستن یا پس از اتصال موفق همان QR، درخواست عضویت تازه نمی‌سازد.
 
 ورود اتصال برای مدیر در صفحهٔ عمومی پیش از انتخاب نقش نمایش داده نمی‌شود؛ ابتدا پروفایل نقش را باز کنید. نام نقش فعال کنار اتصال دیده می‌شود. هویت اتصال در رابط و سرور از یک قرارداد مشترک می‌آید؛ ترتیب فهرست مجوزها، مسئولیت‌های انبار و عنوان نمایشی نقش، تغییر دسترسی محسوب نمی‌شود. تفاوت واقعی حساب، شناسه نقش، نمایندگی/ماموریت یا مجوز همچنان اتصال را رد می‌کند.
+
+
+## 2026-11-13 — Pairing placement follows the visible page
+
+Observed in the live browser: home retained a prior driver profile cookie and displayed pairing above PersonalHome. Hide pairing on home and the role catalog regardless of restored role state; show it on the matching selected role page and downstream authorized work. Regression covers retained role on home, empty catalog target, wrong role target and valid role/warehouse work. This corrects the incomplete role-presence-only condition.
