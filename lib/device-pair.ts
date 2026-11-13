@@ -1,3 +1,4 @@
+import {pairScopeKey} from './device-pair-scope';
 import {AccessError,realSession,requireAccess} from './authorization';
 import {digest,newToken} from './password-auth';
 import {storage} from './storage';
@@ -9,8 +10,7 @@ export type PairDocument={protocol?:number;actions?:import('./paired-open-action
 function fail(message:string,status=400):never{throw new AccessError(message,status)}
 const token=(v:unknown)=>typeof v==='string'&&/^[a-f0-9]{64}$/.test(v)?v:fail('شناسهٔ اتصال معتبر نیست.');
 const uuid=(v:unknown)=>typeof v==='string'&&/^[a-f0-9-]{36}$/.test(v)?v:fail('شناسهٔ کار معتبر نیست.');
-const stable=(v:any):any=>Array.isArray(v)?v.map(stable):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,stable(v[k])])):v;
-async function actor(){const effective=await requireAccess(),real=await realSession();return {owner:real.userId,scope:await digest(JSON.stringify(stable({id:effective.userId,admin:effective.isAdmin,permissions:effective.permissions,profile:effective.profileReview||null,preview:effective.rolePreview||null})))};}
+async function actor(){const effective=await requireAccess(),real=await realSession();return {owner:real.userId,scope:await digest(pairScopeKey(effective))}}
 function cleanWork(v:any):PairWork{
  if(v?.kind==='scan'&&typeof v.code==='string'&&v.code.trim()&&v.code.length<=3000)return {kind:'scan',code:v.code};
  if(v?.kind==='navigate'&&typeof v.section==='string'&&/^[a-z][a-z0-9-]{0,80}$/.test(v.section)&&typeof (v.target??'')==='string'&&(v.target||'').length<=500)return {kind:'navigate',section:v.section,target:v.target||''};

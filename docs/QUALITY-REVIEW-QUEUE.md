@@ -303,3 +303,8 @@ Registered view-only actions now mirror exact receipt/form opening, read-only se
 ## 2026-11-13 — Pairing handshake race
 
 Fixed the phone heartbeat racing an unfinished QR join and invalidating its new device capability. Confirmed handles are persisted only after server acceptance; duplicate scans are deduplicated and old heartbeat responses cannot clear a replacement connection. Reproduced before fix and verified delayed-join, repeat-scan, replacement and existing form-sync scenarios against the UI/SQLite harness. No business data or permissions changed. Physical-device QA remains unverified.
+
+
+## 2026-11-13 — Role-local pairing and stable scope
+
+Pairing is hidden on the administrator landing page until a role is selected, and shows the active role label. The server and UI use the same canonical role identity: grant lists and warehouse responsibilities compare by content rather than database ordering; display titles are excluded. Account, role/member, representative/mission, warehouse scope and actual permissions remain binding. Scope and two-device regressions cover equivalent reordered grants and rejected genuine scope changes. Refresh and reconnect both devices after this release. Physical-device verification remains pending.

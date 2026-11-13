@@ -1,0 +1,11 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),ts=require('typescript'),vm=require('node:vm');const out={};vm.runInNewContext(ts.transpileModule(fs.readFileSync('lib/device-pair-scope.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,{exports:out});
+const {pairScopeKey:key,pairWorkspaceAvailable:available}=out;
+const admin={userId:'owner',name:'Owner',isAdmin:true,permissions:{read:['material','product'],write:['product'],warehouseResponsibilities:[{warehouseId:'one',role:'inventory'},{warehouseId:'two',role:'inventory'}]}};
+assert.equal(available(admin),false,'no pairing before selecting an admin role');
+const user={...admin,isAdmin:false,profileReview:{id:'central-store',title:'انبار',warehouseIds:['one','two']}};assert.equal(available(user),true);
+const reordered={...user,profileReview:{...user.profileReview,title:'عنوان جدید',warehouseIds:['two','one']},permissions:{...user.permissions,read:['product','material'],warehouseResponsibilities:[...user.permissions.warehouseResponsibilities].reverse()}};
+assert.equal(key(user),key(reordered),'ordering and display title cannot invalidate identical grants');
+for(const changed of [{...user,userId:'someone-else'},{...user,permissions:{...user.permissions,read:['material']}},{...user,profileReview:{...user.profileReview,id:'quality'}},{...user,profileReview:{...user.profileReview,buyerId:'other'}}])assert.notEqual(key(user),key(changed));
+assert.equal(available({...user,permissions:{...user.permissions,hospitalCenterId:'x'}}),false);
+const page=fs.readFileSync('app/page.tsx','utf8');assert.ok(page.includes('pairWorkspaceAvailable(identity)&&<DevicePairWorkspace'));assert.ok(page.includes('key={pairScopeKey(identity)} accountKey={pairScopeKey(identity)}'));
+console.log('PASS pairing scope: role-only entry, order-invariant grants, display-only title, strict user/role/record/grant boundaries and stable UI identity');

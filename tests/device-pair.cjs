@@ -47,6 +47,8 @@ a=await connected();await req(alice,{mode:'poll',id:a.id,deviceKey:keyA,protocol
 // Invitation and peer presence have independent lifetimes.
 a=await create();let d=row(a.id);d.inviteUntil=Date.now()-1;sql.prepare('UPDATE flow_entities SET data=? WHERE id=?').run(JSON.stringify(d),a.id);await req(alice,{mode:'join',id:a.id,deviceKey:keyB,invite:a.invite},409);await run(a,'close');
 a=await connected();a=await run(a,'work',{work:{kind:'scan',code:'x'}});a=await run(a,'fields',{changes:[{key:field,value:'private',version:0}]});d=row(a.id);d.bSeen=Date.now()-30000;sql.prepare('UPDATE flow_entities SET data=? WHERE id=?').run(JSON.stringify(d),a.id);a=await run(a,'poll');assert.equal(a.connected,false);assert.deepEqual(Object.keys(a.fields),[]);await run(a,'begin',{operationId:op},keyA,409);await run(a,'close');
+// Equivalent permission lists in a different order are the same scope.
+a=await connected();const reordered={...alice,permissions:{...allPermissions,read:[...allPermissions.read].reverse(),write:[...allPermissions.write].reverse()}};await req(reordered,{mode:'poll',id:a.id,deviceKey:keyA});await run(a,'close');
 // A member's changed permissions close and scrub the pairing.
 a=await connected();await req({...alice,permissions:{...allPermissions,warehouses:['changed']}},{mode:'poll',id:a.id,deviceKey:keyA},403);assert.equal(row(a.id).closed,true);
 a=await connected();await req(alice,{mode:'poll',id:a.id,deviceKey:keyA},403,{origin:'https://evil.local'});await run(a,'close');
