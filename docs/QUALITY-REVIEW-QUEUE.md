@@ -1,3 +1,7 @@
+## SMS ordinary sending 2026-11-13
+
+Provider payload/failure tests and asset-link OTP regression passed. No schema/inventory/financial changes. Owner-selected sender and destination required for live sending; provider acceptance and handset receipt remain separate evidence. Procurement form review and domestic role split remain paused.
+
 ## Procurement baseline 2026-11-13
 
 Focused automated SQLite/auth/domain and component checks cover normal/urgent purchases, CEO exception/development, permissions/replay/races, holds/concessions and reset. TypeScript and affected delivery, service, settlement, comparison and direct-request regressions checked. Browser-control unavailable: do not claim an actual multi-role browser walkthrough. Existing sourcing all-history loads are legacy debt; new decision arrays are bounded and extra receipt order lookup is SQL-limited to 100. No new migration or live-data mutation. Comprehensive finance and weighted supplier decisions remain deferred.

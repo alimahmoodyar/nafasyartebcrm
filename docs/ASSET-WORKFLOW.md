@@ -22,15 +22,16 @@ Owner-approved first release: reuse company assets and the shared application da
 
 ## SMS.ir configuration and hosting boundary
 
-Provider chosen by owner: **sms.ir**. Fixed HTTPS Verify API follows the official provider SDK: https://github.com/IPeCompany/SmsPanelV2.nodejs/blob/master/index.js (SendVerifyCode). No new dependency.
+Provider chosen by owner: **sms.ir**. Owner clarification 2026-11-13: use ordinary line-based sending, with **no Template ID**. Fixed HTTPS `/v1/send/bulk` follows the official provider SDK: https://github.com/IPeCompany/SmsPanelV2.nodejs/blob/master/index.js (`SendBulk`). No new dependency.
 
 Configure only in secure hosting environment settings:
 
 - `SMSIR_API_KEY` (secret; never paste in chat or commit)
-- `SMSIR_VERIFY_TEMPLATE_ID` (approved quick-send template ID)
-- `SMSIR_VERIFY_CODE_PARAM` (template parameter name, default `CODE`)
+- `SMSIR_LINE_NUMBER` (the owner-selected line from the account's `/v1/line` response)
 
-Expected template: a company asset-confirmation OTP message with the matching parameter. Provider HTTP success alone is insufficient; API `status=1` is required. Missing configuration fails closed and does not move custody. No live SMS was sent by development tests.
+`SMSIR_VERIFY_TEMPLATE_ID` and `SMSIR_VERIFY_CODE_PARAM` are no longer used. The server sends one six-digit, five-minute OTP to the exact registered mobile with a fixed Persian Nafasyar message. Client input cannot change host, sender, message text or recipient. HTTP success alone is insufficient: `status=1` and one positive message ID are required. Missing line/key fails closed. Provider acceptance is distinct from handset delivery; ordinary SMS may be affected by the destination's blocked-advertising status. Do not automatically retry ambiguous network failures and duplicate sends. Existing OTP rate/attempt/session controls remain.
+
+Synthetic tests never send real SMS. Live account access was separately verified using read-only credit/line endpoints; actual sending requires an owner-chosen line and explicit test destination. No arbitrary contractor is a test recipient.
 
 The existing Site audience is preserved. An expiring asset link does not bypass Sites access controls; a contractor outside the permitted Site audience must be granted appropriate visitor access before using it. This release does not make the whole ERP public. Hardware printing/camera and actual provider delivery require a separate physical/provider check and must not be reported as tested by the synthetic suites.
 

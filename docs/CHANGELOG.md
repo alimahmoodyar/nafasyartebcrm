@@ -1,3 +1,7 @@
+## 2026-11-13 — Ordinary SMS.ir OTP sending
+
+Owner-selected line-based sending replaces template-only verification. Requires SMSIR_API_KEY and SMSIR_LINE_NUMBER; accepts only one validated mobile/code, fixed provider endpoint and positive message ID. Asset-link authentication/rate controls remain. Live configuration and delivery are confirmed separately from synthetic tests.
+
 ## 2026-11-13 — Procurement operating rules and CEO exceptions
 
 Supply manager selection, three valid quotes or quote-bound CEO exception; normal pre-issue financial control and outstanding urgent financial review. Line-scoped decision/execution/development cartable, linked development deep links, held discrepant receipts and engineering-only documented concessions. See docs/PROCUREMENT-OPERATIONS.md for scope and validation.
