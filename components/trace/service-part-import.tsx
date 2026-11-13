@@ -68,7 +68,7 @@ export function ServicePartImport({domain,onSaved}:{domain:string;onSaved:()=>vo
    <p className="subtle">قطعات و قیمت مصرف‌کننده برای بررسی پیش از ثبت؛ برای دیدن همه ستون‌ها، جدول را افقی جابه‌جا کنید.</p>
    <div style={{maxHeight:420,overflow:'auto',maxWidth:'100%'}}>
     <table className="stocktable" aria-label="قطعات و قیمت مصرف‌کننده برای بررسی پیش از ثبت"><thead><tr><th>ردیف فایل</th><th>کد قطعه</th><th>نام قطعه</th><th>واحد</th><th>قیمت مصرف‌کننده برای هر واحد، ریال</th></tr></thead>
-     <tbody>{displayRows.map((row,index)=><tr key={row.code}><td>{count(row.sourceRow??index+1)}</td><td><bdi dir="ltr">{row.code}</bdi></td><td>{row.name}</td><td>{row.unit}</td><td style={{whiteSpace:'nowrap'}}>{money(row.consumerPriceRial)}</td></tr>)}</tbody>
+     <tbody>{displayRows.map((row,index)=><tr data-pair-row={JSON.stringify(row.code)} key={row.code}><td>{count(row.sourceRow??index+1)}</td><td><bdi dir="ltr">{row.code}</bdi></td><td>{row.name}</td><td>{row.unit}</td><td style={{whiteSpace:'nowrap'}}>{money(row.consumerPriceRial)}</td></tr>)}</tbody>
     </table>
    </div>
    <button type="button" className="btn" disabled={locked||!isIsoDay(validFrom)} onClick={()=>void run()}>بررسی و پیش‌نمایش ثبت</button>

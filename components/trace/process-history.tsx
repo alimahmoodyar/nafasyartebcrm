@@ -77,14 +77,14 @@ export function ProcessHistory({waiting,revision,onOpen}:{waiting:boolean;revisi
   {loading?<p role="status">در حال دریافت سوابق…</p>:<>
    <div className="tools"><span>{num(filtered.length)} نتیجه</span><button className="btn" type="button" disabled={!filtered.length} onClick={()=>void download()}>خروجی اکسل</button></div>
    {totals.size>0&&<details open><summary>جمع تحویل به تفکیک کالا</summary>{[...totals.values()].map(r=><p key={JSON.stringify([r.material,r.unit])}>{r.material} · ارسال {num(r.sent)} {r.unit} · تأیید دریافت {num(r.received)} {r.unit}</p>)}</details>}
-   {filtered.slice(shownPage*25,(shownPage+1)*25).map(row=><article className="flow-card" key={row.id}>
+   {filtered.slice(shownPage*25,(shownPage+1)*25).map(row=><article data-pair-row={JSON.stringify(row.id)} className="flow-card" key={row.id}>
     <h3>{row.title}</h3><p><span lang="fa" translate="no">{title(row.process)}</span> · {formatDateTime(row.date)} · {row.status}</p>
     {row.receivedAt&&<p>تأیید دریافت خط · {formatDateTime(row.receivedAt)}</p>}
     <p>{[row.reference,row.batches,row.place,row.actor,row.supplier,row.order].filter(Boolean).join(' · ')}</p>
     {row.quantity!=null&&<p>مقدار {num(row.quantity)} {row.unit}{row.process==='issue'&&row.received!=null&&' · دریافت خط '+num(row.received)}</p>}
-    {(row.task||row.section)&&<button type="button" className="btn" onClick={()=>onOpen(row)}>مشاهدهٔ پرونده</button>}
+    {(row.task||row.section)&&<button data-pair-open="process-history:3a71b0869e32" type="button" className="btn" onClick={()=>onOpen(row)}>مشاهدهٔ پرونده</button>}
    </article>)}
-   {filtered.length>25&&<div className="tools"><button type="button" className="btn" disabled={!shownPage} onClick={()=>setPage(shownPage-1)}>صفحهٔ قبل</button><button type="button" className="btn" disabled={(shownPage+1)*25>=filtered.length} onClick={()=>setPage(shownPage+1)}>صفحهٔ بعد</button></div>}
+   {filtered.length>25&&<div className="tools"><button data-pair-open="process-history:fe4499ea9511" type="button" className="btn" disabled={!shownPage} onClick={()=>setPage(shownPage-1)}>صفحهٔ قبل</button><button data-pair-open="process-history:a61c8fcff1b8" type="button" className="btn" disabled={(shownPage+1)*25>=filtered.length} onClick={()=>setPage(shownPage+1)}>صفحهٔ بعد</button></div>}
   </>}
  </section>;
 }

@@ -29,14 +29,14 @@ export function HospitalInstallationFields({value,products,projects=[],catalog,l
   </div>}
   <strong>سرویس‌ها و قطعات مصرفی</strong>
   {plans.map((p:any,i:number)=><section className="hospital-plan" key={i} aria-label={'سرویس '+(i+1)}>
-   <div className="hospital-plan-heading"><label className="field">هر چند ساعت کارکرد؟<NumberInput aria-label={'بازه سرویس '+(i+1)} required type="number" min={1} max={100000} step={1} value={p.intervalHours} onChange={e=>updatePlan(i,'intervalHours',e.target.value)}/></label>{plans.length>1&&<button type="button" className="btn" aria-label={'حذف سرویس '+(i+1)} onClick={()=>set('services',plans.filter((_:any,j:number)=>j!==i))}>حذف سرویس</button>}</div>
+   <div className="hospital-plan-heading"><label className="field">هر چند ساعت کارکرد؟<NumberInput aria-label={'بازه سرویس '+(i+1)} required type="number" min={1} max={100000} step={1} value={p.intervalHours} onChange={e=>updatePlan(i,'intervalHours',e.target.value)}/></label>{plans.length>1&&<button data-pair-open="hospital-installation-fields:c5dfdd0bc64c" type="button" className="btn" aria-label={'حذف سرویس '+(i+1)} onClick={()=>set('services',plans.filter((_:any,j:number)=>j!==i))}>حذف سرویس</button>}</div>
    {p.lines.map((l:any,j:number)=><div className="hospital-consumable-row" key={j}>
     <select aria-label={'کالا سرویس '+(i+1)+' ردیف '+(j+1)} required value={l.partCode} onChange={e=>updatePart(i,j,'partCode',e.target.value)}><option value="">کالا / کد کالا</option>{parts.filter((p:any)=>p.unit==='عدد').map((p:any)=><option key={p.code} value={p.code}>{p.name} · {p.code}</option>)}</select>
     <input aria-label={'کد فنی سرویس '+(i+1)+' ردیف '+(j+1)} required placeholder="کد فنی" value={l.technicalCode||''} onChange={e=>updatePart(i,j,'technicalCode',e.target.value)}/>
     <NumberInput aria-label={'تعداد سرویس '+(i+1)+' ردیف '+(j+1)} title="تعداد کل برای یک سرویس دستگاه" required type="number" min={1} max={10000} step={1} value={l.quantity??1} onChange={e=>updatePart(i,j,'quantity',e.target.value)}/>
-    <button type="button" className="btn" aria-label={'حذف کالا سرویس '+(i+1)+' ردیف '+(j+1)} disabled={p.lines.length===1} onClick={()=>updatePlan(i,'lines',p.lines.filter((_:any,k:number)=>j!==k))}>×</button>
+    <button data-pair-open="hospital-installation-fields:ccf8443bcd8d" type="button" className="btn" aria-label={'حذف کالا سرویس '+(i+1)+' ردیف '+(j+1)} disabled={p.lines.length===1} onClick={()=>updatePlan(i,'lines',p.lines.filter((_:any,k:number)=>j!==k))}>×</button>
    </div>)}
-   <button type="button" className="btn" disabled={p.lines.length>=50} onClick={()=>updatePlan(i,'lines',[...p.lines,{partCode:'',technicalCode:'',quantity:1}])}>افزودن قطعه</button>
+   <button data-pair-open="hospital-installation-fields:ed7e4e40739b" type="button" className="btn" disabled={p.lines.length>=50} onClick={()=>updatePlan(i,'lines',[...p.lines,{partCode:'',technicalCode:'',quantity:1}])}>افزودن قطعه</button>
   </section>)}
   <div><button type="button" className="btn" disabled={plans.length>=12} onClick={()=>set('services',[...plans,{intervalHours:'',lines:structuredClone(plans[0].lines)}])}>افزودن بازه سرویس</button></div>
   <small className="subtle">تعداد، کل مصرف یک سرویس همین دستگاه است. فهرست سرویس بزرگ را کامل وارد کنید؛ قطعات دوره کوچک‌تر هم در آن باشند.</small>

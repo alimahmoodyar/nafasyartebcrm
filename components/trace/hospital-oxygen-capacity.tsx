@@ -24,8 +24,8 @@ export function HospitalOxygenCapacity({initial,onSubmit}:{initial?:SurveyAnswer
  return <section className="panel inside" dir="rtl">
   <h2>ظرفیت‌سنجی اولیه گازهای بیمارستانی</h2>
   <div className="tools" aria-label="روش ظرفیت‌سنجی">
-   <button type="button" className={method==='htm'?'btn primary':'btn'} aria-pressed={method==='htm'} onClick={()=>setMethod('htm')}>روش HTM</button>
-   <button type="button" className={method==='cylinder'?'btn primary':'btn'} aria-pressed={method==='cylinder'} onClick={()=>setMethod('cylinder')}>تطبیق کپسولی اکسیژن</button>
+   <button data-pair-open="hospital-oxygen-capacity:7d1868b9ad51" type="button" className={method==='htm'?'btn primary':'btn'} aria-pressed={method==='htm'} onClick={()=>setMethod('htm')}>روش HTM</button>
+   <button data-pair-open="hospital-oxygen-capacity:2d38550f78a7" type="button" className={method==='cylinder'?'btn primary':'btn'} aria-pressed={method==='cylinder'} onClick={()=>setMethod('cylinder')}>تطبیق کپسولی اکسیژن</button>
   </div>
   <div hidden={method!=='htm'}><HtmForm initial={initial?.method==="htm"?initial:undefined} onSubmit={onSubmit}/></div>
   <div hidden={method!=='cylinder'}><CylinderForm initial={initial?.method==="cylinder"?initial:undefined} onSubmit={onSubmit}/></div>
@@ -64,7 +64,7 @@ function HtmForm({initial,onSubmit}:{initial?:HtmSurvey;onSubmit?:Questionnaire}
    const update=(value:string)=>{setCoverage(current=>({...current,[id]:{...current[id],[network]:value}}));clear();};
    return <div key={network} className="tools">
     <label className="field">{networkLabels[network]} · تعداد {kind==='theatre'||kind==='maternityTheatre'?'مجموعهٔ عمل':oxygenSections[kind].unit}<input type="number" min="0" max={count} step="1" value={input==='all'?count:input} onChange={e=>update(e.target.value)}/></label>
-    <button type="button" className="btn" aria-pressed={input==='all'} onClick={()=>update('all')}>همهٔ این ردیف</button>
+    <button data-pair-open="hospital-oxygen-capacity:3177ec4821fa" type="button" className="btn" aria-pressed={input==='all'} onClick={()=>update('all')}>همهٔ این ردیف</button>
    </div>;
   });
  }
@@ -108,7 +108,7 @@ function HtmForm({initial,onSubmit}:{initial?:HtmSurvey;onSubmit?:Questionnaire}
     <div className="hospital-network-option is-active"><OxygenIcon aria-hidden="true"/><strong>اکسیژن</strong><small>خروجی پایه</small></div>
     {networks.map(network=>{
      const Icon=networkIcons[network];
-     return <button type="button" key={network} className="hospital-network-option" aria-pressed={selected[network]} onClick={()=>{setSelected(current=>({...current,[network]:!current[network]}));clear();}}>
+     return <button data-pair-open="hospital-oxygen-capacity:4ba01db5b7c1" data-pair-item={JSON.stringify([network])} type="button" key={network} className="hospital-network-option" aria-pressed={selected[network]} onClick={()=>{setSelected(current=>({...current,[network]:!current[network]}));clear();}}>
       <Icon aria-hidden="true"/><strong>{networkLabels[network]}</strong><small>{selected[network]?'فعال':'افزودن خروجی'}</small>
      </button>;
     })}
@@ -125,13 +125,13 @@ function HtmForm({initial,onSubmit}:{initial?:HtmSurvey;onSubmit?:Questionnaire}
     <summary>تفکیک چند واحد بستری در یک دپارتمان</summary>
     <p>تعداد تخت هر واحد را جدا وارد کنید و برای واحدهای یک دپارتمان نام گروه یکسان بنویسید.</p>
     {wardSections.map(kind=><label key={kind} className="field">نام گروه ردیف اصلی {oxygenSections[kind].label}<input maxLength={80} value={wardGroups[kind]||''} onChange={e=>{setWardGroups({...wardGroups,[kind]:e.target.value});clear();}}/></label>)}
-    {wards.map((row,index)=><div className="form-grid" key={row.id}>
+    {wards.map((row,index)=><div data-pair-row={JSON.stringify(row.id)} className="form-grid" key={row.id}>
      <label className="field">نوع واحد<select value={row.kind} onChange={e=>{setWards(wards.map((r,i)=>i===index?{...r,kind:e.target.value as OxygenSection}:r));clear();}}>{wardSections.map(kind=><option key={kind} value={kind}>{oxygenSections[kind].label}</option>)}</select></label>
      <label className="field">تعداد تخت<input type="number" min="1" max="10000" step="1" required value={row.count} onChange={e=>{setWards(wards.map((r,i)=>i===index?{...r,count:e.target.value}:r));clear();}}/></label>
      <label className="field">نام گروه<input maxLength={80} value={row.department} onChange={e=>{setWards(wards.map((r,i)=>i===index?{...r,department:e.target.value}:r));clear();}}/></label>
-     {coverageInput(row.id,row.kind,row.count)}<button type="button" className="btn" onClick={()=>{setWards(wards.filter((_,i)=>i!==index));clear();}}>حذف واحد</button>
+     {coverageInput(row.id,row.kind,row.count)}<button data-pair-open="hospital-oxygen-capacity:046f81dec577" type="button" className="btn" onClick={()=>{setWards(wards.filter((_,i)=>i!==index));clear();}}>حذف واحد</button>
     </div>)}
-    <button type="button" className="btn" disabled={wards.length+sections.length>=100} onClick={()=>{setWards([...wards,{id:crypto.randomUUID(),kind:'ward',count:'',department:''}]);clear();}}>افزودن واحد بستری</button>
+    <button data-pair-open="hospital-oxygen-capacity:35ce77095289" type="button" className="btn" disabled={wards.length+sections.length>=100} onClick={()=>{setWards([...wards,{id:crypto.randomUUID(),kind:'ward',count:'',department:''}]);clear();}}>افزودن واحد بستری</button>
    </details>
    {selected.air&&<label className="field">اتاق‌های جراحی عمدهٔ دهان دارای هوای پزشکی (اختیاری)<input type="number" min="0" max="10000" step="1" value={dentalAir} onChange={e=>{setDentalAir(e.target.value);clear();}}/></label>}
    <label className="hospital-network-check"><input type="checkbox" checked={surgical} onChange={e=>{setSurgical(e.target.checked);clear();}}/> ابزار جراحی پنوماتیک متصل به شبکهٔ ۷ بار دارید؟</label>
@@ -182,9 +182,9 @@ function CylinderForm({initial,onSubmit}:{initial?:CylinderSurvey;onSubmit?:Ques
    {rows.map((row,index)=><div className="form-grid" key={index}>
     <label className="field">حجم اسمی کپسول (لیتر)<input type="number" min="0.1" max="1000" step="any" required value={row.volume} onChange={e=>change(index,'volume',e.target.value)}/></label>
     <label className="field">تعداد کپسول مصرفی در روز<input type="number" min="0.001" max="100000" step="any" required value={row.count} onChange={e=>change(index,'count',e.target.value)}/></label>
-    {rows.length>1&&<button type="button" className="btn" onClick={()=>{setRows(rows.filter((_,i)=>i!==index));setResult(null);}}>حذف اندازه</button>}
+    {rows.length>1&&<button data-pair-open="hospital-oxygen-capacity:445734f07547" type="button" className="btn" onClick={()=>{setRows(rows.filter((_,i)=>i!==index));setResult(null);}}>حذف اندازه</button>}
    </div>)}
-   <button type="button" className="btn" onClick={()=>{setRows([...rows,emptyCylinder()]);setResult(null);}}>افزودن اندازهٔ کپسول</button>
+   <button data-pair-open="hospital-oxygen-capacity:294223ff87a1" type="button" className="btn" onClick={()=>{setRows([...rows,emptyCylinder()]);setResult(null);}}>افزودن اندازهٔ کپسول</button>
    <div className="form-grid">
     <label className="field">فشار پرشدن کپسول (بار)<input type="number" min="1" max="400" step="any" value={pressure} required onChange={e=>{setPressure(e.target.value);setResult(null);}}/></label>
     <label className="field">چند ساعت در روز اوج مصرف دارید؟<input type="number" min="0.01" max="24" step="any" value={hours} required onChange={e=>{setHours(e.target.value);setResult(null);}}/></label>

@@ -50,13 +50,13 @@ export function SalesReturnPanel({targetId='',demo=false}:{targetId?:string;demo
  if(demo)return <p className="notice">برای مشاهده پرونده مرجوعی، محیط شرکت یا آزمایش نقش را باز کنید.</p>;
  return <section className="panel"><div className="panelhead"><h2>مرجوعی دستگاه</h2><button type="button" className="btn" disabled={busy} onClick={()=>{setError('');void load();}}>تازه‌سازی</button></div>
  <div className="inside">{error&&<p className="notice error" role="alert">{error}</p>}{data&&!data.items.length&&<p className="empty">پرونده‌ای در این کارتابل پیدا نشد.</p>}
- {data?.items.map((row:any)=><article className="flow-card" key={row.id}>
+ {data?.items.map((row:any)=><article data-pair-row={JSON.stringify(row.id)} className="flow-card" key={row.id}>
   <h3>{row.buyer} · <bdi>{row.serial}</bdi></h3><p>{row.status} · {row.resolution==='replacement'?'دستگاه جایگزین':'عودت وجه'}</p><p>{row.reason}</p>
   {row.waybill&&<p>بارنامه <bdi>{row.waybill.number}</bdi> · <a className="link" href={'/api/sales/files?id='+encodeURIComponent(row.waybill.fileId)}>{row.waybill.filename}</a></p>}
   {row.inspection&&<p>گزارش خدمات: {row.inspection.report}</p>}
   {row.technical&&<p>تصمیم فنی: {row.technical.action}{row.technical.personnel&&<> · پیگیری داخلی: {row.technical.personnel}</>}</p>}
   {row.settlement&&<p>کسر از بدهی {Number(row.settlement.offset).toLocaleString('fa-IR')} ریال · پرداخت مازاد {Number(row.settlement.payable).toLocaleString('fa-IR')} ریال {row.settlement.paidAt?'(پرداخت شد)':''}</p>}
-  <div className="tools">{row.actions.map((mode:ReturnAction)=><button key={mode} type="button" className="btn" disabled={busy} onClick={()=>{setError('');setAction({row,mode,id:crypto.randomUUID()});}}>{returnActions[mode]}</button>)}</div>
+  <div className="tools">{row.actions.map((mode:ReturnAction)=><button data-pair-open="sales-return-panel:2efad016b950" data-pair-item={JSON.stringify([mode])} key={mode} type="button" className="btn" disabled={busy} onClick={()=>{setError('');setAction({row,mode,id:crypto.randomUUID()});}}>{returnActions[mode]}</button>)}</div>
   {action&&action.row.id===row.id&&<form key={action.id} className="formgrid" onSubmit={submit}>
    <h4 className="wide">{returnActions[action.mode]}</h4>
    {scanned.includes(action.mode)&&<label className="field">سریال دستگاه<input name="serial" dir="ltr" required autoFocus /></label>}
@@ -70,7 +70,7 @@ export function SalesReturnPanel({targetId='',demo=false}:{targetId?:string;demo
    {action.mode==='technical'&&<label className="field wide">رسیدگی داخلی به خطای انسانی، در صورت نیاز<textarea name="personnel" maxLength={4000}/></label>}
    {action.mode==='pack'&&<label className="flow-check"><input type="checkbox" name="packed" required/>بسته‌بندی و لیبل سریال کنترل شد</label>}
    {prompts[action.mode]&&<p className="wide notice">{prompts[action.mode]}</p>}
-   <div className="tools"><button type="submit" className="btn primary" disabled={busy}>تأیید و ثبت</button><button type="button" className="btn" disabled={busy} onClick={()=>setAction(null)}>بازگشت</button></div>
+   <div className="tools"><button type="submit" className="btn primary" disabled={busy}>تأیید و ثبت</button><button data-pair-open="sales-return-panel:4aaf19513f8b" type="button" className="btn" disabled={busy} onClick={()=>setAction(null)}>بازگشت</button></div>
   </form>}
  </article>)}</div></section>;
 }
@@ -84,7 +84,7 @@ export function DeviceSalesReturnHistory({deviceId}:{deviceId:string}){
   return ()=>abort.abort();
  },[deviceId]);
  if(!history.length)return null;
- return <div className="detailsection"><h2>سابقه مرجوعی و تعمیر</h2>{history.map(row=><article key={row.id} className="flow-card">
+ return <div className="detailsection"><h2>سابقه مرجوعی و تعمیر</h2>{history.map(row=><article data-pair-row={JSON.stringify(row.id)} key={row.id} className="flow-card">
   <h3>{row.status} · {formatDate(row.openedAt)}</h3><p>{row.reason}</p>
   {row.serviceReport&&<p>گزارش خدمات: {row.serviceReport}</p>}{row.technicalResult&&<p>نتیجه فنی: {row.technicalResult}</p>}
   {row.repairs.map((r:any,i:number)=><p key={i}>{r.method==='replace'?'تعویض':'تعمیر'} {r.part} · {r.report}</p>)}

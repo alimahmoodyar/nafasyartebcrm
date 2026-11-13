@@ -90,9 +90,9 @@ export function SalesBuyerAssignments({initialBuyerId='',onSaved}:{initialBuyerI
      <label className="field">نوع خریدار<select value={kindFilter} onChange={e=>setKindFilter(e.target.value)}><option value="">همه خریداران</option>{Object.entries(partnerKinds).filter(([kind])=>kind!=='referrer').map(([kind,name])=><option key={kind} value={kind}>{name}</option>)}</select></label>
     </div><p role="status">{shown.toLocaleString('fa-IR')} خریدار در فهرست</p>
     {!groups.length&&<p>{data.buyers.length?'موردی با این جست‌وجو و فیلترها پیدا نشد.':'هنوز خریداری ثبت نشده است.'}</p>}
-    {groups.map(group=><div key={group.id||'unassigned'} className="flow-card"><h4>{group.name} · {group.buyers.length.toLocaleString('fa-IR')} از {group.total.toLocaleString('fa-IR')} خریدار</h4>
+    {groups.map(group=><div data-pair-row={JSON.stringify(group.id||'unassigned')} key={group.id||'unassigned'} className="flow-card"><h4>{group.name} · {group.buyers.length.toLocaleString('fa-IR')} از {group.total.toLocaleString('fa-IR')} خریدار</h4>
      {group.id&&!group.eligible&&<p>مسئول فعلی فعال یا دارای نقش فروش نیست؛ کارشناس دیگری انتخاب کنید.</p>}
-     <div className="sales-table"><table><thead><tr><th scope="col">خریدار</th><th scope="col">نوع خریدار</th><th scope="col">تخصیص</th></tr></thead><tbody>{group.buyers.map(b=><tr key={b.id}><td>{b.name}</td><td>{partnerKinds[b.kind]||'خریدار'}</td><td><button type="button" className="btn" disabled={busy} onClick={()=>{chooseBuyer(b.id);formRef.current?.scrollIntoView({behavior:'smooth',block:'start'});}}>{b.ownerId?'تغییر کارشناس':'انتخاب کارشناس'}<span className="sr-only"> برای {b.name}</span></button></td></tr>)}</tbody></table></div>
+     <div className="sales-table"><table><thead><tr><th scope="col">خریدار</th><th scope="col">نوع خریدار</th><th scope="col">تخصیص</th></tr></thead><tbody>{group.buyers.map(b=><tr data-pair-row={JSON.stringify(b.id)} key={b.id}><td>{b.name}</td><td>{partnerKinds[b.kind]||'خریدار'}</td><td><button type="button" className="btn" disabled={busy} onClick={()=>{chooseBuyer(b.id);formRef.current?.scrollIntoView({behavior:'smooth',block:'start'});}}>{b.ownerId?'تغییر کارشناس':'انتخاب کارشناس'}<span className="sr-only"> برای {b.name}</span></button></td></tr>)}</tbody></table></div>
     </div>)}
    </section>
   </>}

@@ -57,7 +57,7 @@ export function HospitalGasSurveyPanel({onAnswers}:{onAnswers:(answers:SurveyAns
   catch(error){setError((error as Error).message);}finally{setBusy(false);}
  }
  return <section className="panel inside" dir="rtl">
-  <button type="button" className="btn" aria-expanded={open} onClick={()=>setOpen(!open)}>لینک پرسش‌نامه و پاسخ‌ها</button>
+  <button data-pair-open="hospital-gas-survey-panel:c4ad25218ef4" type="button" className="btn" aria-expanded={open} onClick={()=>setOpen(!open)}>لینک پرسش‌نامه و پاسخ‌ها</button>
   {open&&<>
    <form className="space-y-3" onSubmit={create}>
     <h3>ساخت لینک پرسش‌نامه</h3>
@@ -73,7 +73,7 @@ export function HospitalGasSurveyPanel({onAnswers}:{onAnswers:(answers:SurveyAns
    {message&&<p role="status">{message}</p>}
    <h3>پرسش‌نامه‌ها</h3>
    <button type="button" className="btn" disabled={busy} onClick={()=>void load().catch(error=>setError(error.message))}>تازه‌سازی پاسخ‌ها</button>
-   {data?.surveys.map(survey=><article className="flow-card" key={survey.id}>
+   {data?.surveys.map(survey=><article data-pair-row={JSON.stringify(survey.id)} className="flow-card" key={survey.id}>
     <strong>{survey.center}</strong>
     <p>{survey.submitted?'پاسخ دریافت شد':survey.revoked?'لغوشده':survey.link?'در انتظار پاسخ':'منقضی‌شده'} · مهلت {new Date(survey.expires).toLocaleDateString('fa-IR')}</p>
     {survey.link&&<div className="tools"><button type="button" className="btn" onClick={()=>void copy(survey.link!)}>کپی لینک</button><button type="button" className="btn" disabled={busy} onClick={()=>void revoke(survey)}>لغو لینک</button></div>}

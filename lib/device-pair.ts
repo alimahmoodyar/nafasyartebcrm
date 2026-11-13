@@ -5,7 +5,7 @@ import {storage} from './storage';
 export const PAIR_INVITE_MS=120_000,PAIR_LIFE_MS=8*3600_000,PAIR_PRESENT_MS=20_000;
 export type PairWork={kind:'scan'|'navigate';code?:string;section?:string;target?:string};
 export type PairField={value:string|boolean|string[];version:number;by:string};
-export type PairDocument={owner:string;scope:string;a:string;b:string;inviteHash:string;inviteUntil:number;expires:number;closed:boolean;aSeen:number;bSeen:number;work:PairWork|null;epoch:number;fields:Record<string,PairField>;commit:{id:string;by:string;state:'sending'|'done'|'uncertain';status?:number}|null};
+export type PairDocument={protocol?:number;actions?:import('./paired-open-actions').PairedOpenAction[];owner:string;scope:string;a:string;b:string;inviteHash:string;inviteUntil:number;expires:number;closed:boolean;aSeen:number;bSeen:number;work:PairWork|null;epoch:number;fields:Record<string,PairField>;commit:{id:string;by:string;state:'sending'|'done'|'uncertain';status?:number}|null};
 function fail(message:string,status=400):never{throw new AccessError(message,status)}
 const token=(v:unknown)=>typeof v==='string'&&/^[a-f0-9]{64}$/.test(v)?v:fail('شناسهٔ اتصال معتبر نیست.');
 const uuid=(v:unknown)=>typeof v==='string'&&/^[a-f0-9-]{36}$/.test(v)?v:fail('شناسهٔ کار معتبر نیست.');
@@ -19,18 +19,19 @@ function cleanWork(v:any):PairWork{
 function cleanValue(v:any):PairField['value']{if(typeof v==='boolean'||typeof v==='string'&&v.length<=16000||Array.isArray(v)&&v.length<=200&&v.every(s=>typeof s==='string'&&s.length<=2000))return v;return fail('مقدار فیلد بیش از حد مجاز است.');}
 export function pairView(id:string,revision:number,d:PairDocument,side:'a'|'b',now=Date.now()){
  const connected=!!d.b&&now-d.aSeen<PAIR_PRESENT_MS&&now-d.bSeen<PAIR_PRESENT_MS;
- return {id,revision,side,paired:!!d.b,connected,expires:d.expires,inviteUntil:d.inviteUntil,work:d.work,epoch:d.epoch,fields:connected?d.fields:{},commit:d.commit};
+ return {id,revision,side,paired:!!d.b,connected,expires:d.expires,inviteUntil:d.inviteUntil,work:d.work,epoch:d.epoch,actions:connected?(d.actions||[]):[],fields:connected?d.fields:{},commit:d.commit};
 }
 /** Connection state only. Never executes a business operation or grants record access. */
 export async function devicePair(mode:string,b:any={}){
  const who=await actor(),db=storage(),now=Date.now(),key=await digest(token(b.deviceKey));
  if(mode==='create'){
+  if(b.protocol!==2)fail('هر دو دستگاه را تازه‌سازی کنید و دوباره وصل شوید.',409);
   // Bound the number of active sessions per real person. Expired connection data is
   // scrubbed in small batches; domain data and audit history are never removed.
   await db.prepare("DELETE FROM flow_entities WHERE id IN (SELECT id FROM flow_entities WHERE type='device_pair' AND CAST(json_extract(data,'$.expires') AS INTEGER)<? LIMIT 20)").bind(now).run();
   const active:any=await db.prepare("SELECT count(*) n FROM flow_entities WHERE type='device_pair' AND json_extract(data,'$.owner')=? AND json_extract(data,'$.closed')=0 AND json_extract(data,'$.expires')>?").bind(who.owner,now).first();
   if(active.n>=6)fail('اتصال‌های قبلی را قطع کنید و دوباره تلاش کنید.',429);
-  const id=crypto.randomUUID(),invite=newToken(),d:PairDocument={...who,a:key,b:'',inviteHash:await digest(invite),inviteUntil:now+PAIR_INVITE_MS,expires:now+PAIR_LIFE_MS,closed:false,aSeen:now,bSeen:0,work:null,epoch:0,fields:{},commit:null};
+  const id=crypto.randomUUID(),invite=newToken(),d:PairDocument={protocol:2,...who,a:key,b:'',inviteHash:await digest(invite),inviteUntil:now+PAIR_INVITE_MS,expires:now+PAIR_LIFE_MS,closed:false,aSeen:now,bSeen:0,work:null,epoch:0,actions:[],fields:{},commit:null};
   await db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'device_pair',?,1,?,?)").bind(id,JSON.stringify(d),new Date(now).toISOString(),new Date(now).toISOString()).run();
   return {...pairView(id,1,d,'a',now),invite};
  }
@@ -38,11 +39,15 @@ export async function devicePair(mode:string,b:any={}){
  if(!row)fail('اتصال پیدا نشد یا پایان یافته است.',404);
  const d:PairDocument=JSON.parse(row.data);if(d.owner!==who.owner)fail('این اتصال متعلق به حساب شما نیست.',403);
  const side=key===d.a?'a':key===d.b?'b':null;
+ if(mode==='close'&&side){
+  await db.prepare("UPDATE flow_entities SET data=json_set(data,'$.closed',json('true'),'$.fields',json('{}'),'$.actions',json('[]'),'$.work',NULL,'$.inviteHash',''),revision=revision+1 WHERE id=? AND type='device_pair'").bind(id).run();return {closed:true};
+ }
+ if(b.protocol!==2||d.protocol!==2)fail('نسخهٔ اتصال تغییر کرده است؛ هر دو دستگاه را تازه‌سازی و دوباره وصل کنید.',410);
  if(!side&&mode!=='join')fail('این دستگاه عضو اتصال نیست.',403);
  if(d.closed||d.expires<=now)fail('اتصال پایان یافته است؛ دوباره وصل شوید.',410);
  if(d.scope!==who.scope){
   // A permission/profile change closes the old pair, including its drafts.
-  if(side)await db.prepare("UPDATE flow_entities SET data=json_set(data,'$.closed',json('true'),'$.fields',json('{}'),'$.work',NULL),revision=revision+1 WHERE id=? AND type='device_pair'").bind(id).run();
+  if(side)await db.prepare("UPDATE flow_entities SET data=json_set(data,'$.closed',json('true'),'$.fields',json('{}'),'$.actions',json('[]'),'$.work',NULL),revision=revision+1 WHERE id=? AND type='device_pair'").bind(id).run();
   fail('نقش یا دسترسی تغییر کرده است؛ دو دستگاه را با نقش یکسان دوباره وصل کنید.',403);
  }
  if(mode==='join'){
@@ -53,9 +58,6 @@ export async function devicePair(mode:string,b:any={}){
  }
  if(!side)fail('این دستگاه عضو اتصال نیست.',403);
  const path=side==='a'?'$.aSeen':'$.bSeen';
- if(mode==='close'){
-  await db.prepare("UPDATE flow_entities SET data=json_set(data,'$.closed',json('true'),'$.fields',json('{}'),'$.work',NULL,'$.inviteHash',''),revision=revision+1 WHERE id=? AND type='device_pair'").bind(id).run();return {closed:true};
- }
  if(mode==='poll'){
   await db.prepare("UPDATE flow_entities SET data=json_set(data,?,?) WHERE id=? AND type='device_pair'").bind(path,now,id).run();
   const current:any=await db.prepare("SELECT data,revision FROM flow_entities WHERE id=? AND type='device_pair'").bind(id).first();const fresh:PairDocument=JSON.parse(current.data);
@@ -69,7 +71,15 @@ export async function devicePair(mode:string,b:any={}){
  let changes:any={};
  if(mode==='work'){
   if(d.commit?.state==='sending'||d.commit?.state==='uncertain')fail('نتیجهٔ ثبت قبلی روشن نیست؛ ابتدا سابقهٔ همان عملیات را بررسی کنید.',409);
-  changes={work:cleanWork(b.work),epoch:d.epoch+1,fields:{},commit:null};
+  changes={work:cleanWork(b.work),epoch:d.epoch+1,actions:[],fields:{},commit:null};
+ }else if(mode==='ui'){
+  if(!d.work||d.commit?.state==='sending'||d.commit?.state==='uncertain')fail('تا مشخص‌شدن نتیجهٔ ثبت، فرم دیگری باز نکنید.',409);
+  const actionId=uuid(b.actionId);const actions=d.actions||[];
+  if(actions.some(a=>a.id===actionId))return pairView(id,row.revision,d,side,now);
+  if(actions.length>=120)fail('برای ادامه، صفحهٔ مشترک را دوباره باز کنید.',409);
+  if(typeof b.key!=='string'||!/^[a-z0-9-]+:[a-f0-9]{12}$/.test(b.key)||typeof b.item!=='string'||b.item.length>2000||typeof b.label!=='string'||b.label.length>200)fail('فرم مشترک معتبر نیست.');
+  const nextActions=[...actions,{id:actionId,key:b.key,item:b.item,label:b.label,by:side,beforeFields:d.fields}];if(JSON.stringify(nextActions).length>500000)fail('حجم کار مشترک زیاد شده است؛ صفحه را دوباره باز کنید.',409);
+  changes={actions:nextActions,fields:{},commit:null};
  }else if(mode==='fields'){
   if(d.commit)fail('این مرحله ثبت شده یا در حال ثبت است؛ فرم را تازه کنید.',409);
   if(!d.work)fail('ابتدا یک کار مشترک باز کنید.');

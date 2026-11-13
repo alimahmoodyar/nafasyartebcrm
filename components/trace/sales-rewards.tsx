@@ -91,7 +91,7 @@ export function SalesRewards({period,manage=false,focusId='',buyerId=''}:{period
  const d=draft?.data;
  return <section className={manage?undefined:'representative-rewards'} aria-label={period?titles[period]:'هدف و پاداش فروش'}>
   {error&&<p className="notice error" role="alert">{error}</p>}
-  {manage&&library.manager&&<button type="button" className="btn primary" disabled={busy} onClick={()=>start(null)}>تعریف هدف و پاداش</button>}
+  {manage&&library.manager&&<button data-pair-open="sales-rewards:2577340cea2c" type="button" className="btn primary" disabled={busy} onClick={()=>start(null)}>تعریف هدف و پاداش</button>}
   {manage&&library.manager&&formOpen&&<form key={draft?.id||'new'} onSubmit={save}>
    <fieldset className="formgrid" disabled={busy}>
     <label className="field">نماینده یا عامل فروش<select name="agentId" required defaultValue={d?.agentId||''}><option value="">انتخاب کنید</option>{library.agents.filter(a=>a.eligible).map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
@@ -104,7 +104,7 @@ export function SalesRewards({period,manage=false,focusId='',buyerId=''}:{period
     {kind!=='cash'&&<label className="field">مدل دستگاه پاداش<select name="productId" defaultValue={d?.productId||''} required><option value="">انتخاب کنید</option>{library.products.map(product=><option key={product.id} value={product.id}>{product.name}</option>)}</select></label>}
     {kind==='fixed'&&<label className="field">تعداد دستگاه پاداش<input name="quantity" inputMode="numeric" defaultValue={d?.quantity||''} required/></label>}
     {kind==='equivalent'&&<label className="field">ارزش مبنای هر دستگاه (ریال)<input name="unitValue" inputMode="numeric" defaultValue={d?.unitValue||''} required/></label>}
-    <div className="tools"><button className="btn primary">ذخیره</button><button type="button" className="btn" onClick={()=>setFormOpen(false)}>انصراف</button></div>
+    <div className="tools"><button className="btn primary">ذخیره</button><button data-pair-open="sales-rewards:5e64f4379b7f" type="button" className="btn" onClick={()=>setFormOpen(false)}>انصراف</button></div>
    </fieldset>
   </form>}
   {periods.map(key=>{
@@ -120,7 +120,7 @@ export function SalesRewards({period,manage=false,focusId='',buyerId=''}:{period
      const product=library.products.find(item=>item.id===p.productId)?.name||p.productId;
      const status=p.state==='approved'?'ثبت‌شده':reward.progress.ready?'در انتظار تأیید مالی':reward.progress.ended?'پایان دوره · پاداش قابل ثبت ندارد':reward.progress.started?'در جریان':'هنوز شروع نشده';
      const showEncouragement=!manage&&p.state!=='approved'&&!reward.progress.ended&&BigInt(r.actual)<BigInt(p.target);
-     return <article key={reward.id} className="flow-card">
+     return <article data-pair-row={JSON.stringify(reward.id)} key={reward.id} className="flow-card">
       <strong>{periodLabel}{library.sample?' · آزمایشی':''}{manage?' · '+(library.agents.find(a=>a.id===p.agentId)?.name||''):''}</strong>
       {p.productIds.length===1&&<p>مدل هدف · {library.products.find(item=>item.id===p.productIds[0])?.name||p.productIds[0]}</p>}
       {progressLine('تعداد دستگاه',r.actual,p.target,'دستگاه')}
@@ -129,11 +129,11 @@ export function SalesRewards({period,manage=false,focusId='',buyerId=''}:{period
        {!showEncouragement&&p.kind==='equivalent'&&r.remainder!=='0'&&<> · ماندهٔ کمتر از ارزش یک دستگاه {format(r.remainder)} ریال</>}
       </p>
       {manage&&<p className="subtle">{formatDate(p.start)} تا {formatDate(p.end)} · خرید خالص مشمول {format(r.net)} ریال</p>}
-      {manage&&p.state!=='approved'&&library.manager&&<button type="button" className="link" disabled={busy} onClick={()=>start(reward)}>ویرایش طرح</button>}
-      {manage&&p.state!=='approved'&&library.finance&&reward.progress.ready&&<button type="button" className="link" disabled={busy} onClick={()=>{setReview(reward);setFormOpen(false);setOperation(crypto.randomUUID());setError('');}}>بررسی و تأیید</button>}
+      {manage&&p.state!=='approved'&&library.manager&&<button data-pair-open="sales-rewards:307dfffa9a49" type="button" className="link" disabled={busy} onClick={()=>start(reward)}>ویرایش طرح</button>}
+      {manage&&p.state!=='approved'&&library.finance&&reward.progress.ready&&<button data-pair-open="sales-rewards:38fd388d689b" type="button" className="link" disabled={busy} onClick={()=>{setReview(reward);setFormOpen(false);setOperation(crypto.randomUUID());setError('');}}>بررسی و تأیید</button>}
       {manage&&review?.id===reward.id&&library.finance&&reward.progress.ready&&p.state!=='approved'&&<div className="tools">
        <button type="button" className="btn primary" disabled={busy} onClick={()=>void submit({mode:'approve',id:reward.id,revision:reward.revision,result:review.progress.result})}>تأیید و ثبت پاداش</button>
-       <button type="button" className="btn" disabled={busy} onClick={()=>setReview(null)}>انصراف</button>
+       <button data-pair-open="sales-rewards:c890e9b4ec51" type="button" className="btn" disabled={busy} onClick={()=>setReview(null)}>انصراف</button>
       </div>}
      </article>;
     })}

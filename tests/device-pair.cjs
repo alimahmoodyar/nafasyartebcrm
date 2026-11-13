@@ -10,7 +10,7 @@ const {mcpActor}=load('lib/mcp/context.ts'),{allPermissions}=load('lib/permissio
 const route=load('app/api/device-pair/route.ts'),contract=load('lib/device-pair-contract.ts');
 const alice={userId:'alice',email:'a@test.local',name:'A',isAdmin:true,permissions:allPermissions};
 const bob={...alice,userId:'bob'};const keyA='a'.repeat(64),keyB='b'.repeat(64),keyC='c'.repeat(64),origin='https://test.local';
-async function req(actor,b,expected=200,headers={origin}){const r=await mcpActor.run(actor,()=>route.POST(new Request(origin+'/api/device-pair',{method:'POST',headers:{...headers,'content-type':'application/json'},body:JSON.stringify(b)})));const d=await r.json();assert.equal(r.status,expected,JSON.stringify(d));return d;}
+async function req(actor,b,expected=200,headers={origin}){const r=await mcpActor.run(actor,()=>route.POST(new Request(origin+'/api/device-pair',{method:'POST',headers:{...headers,'content-type':'application/json'},body:JSON.stringify({protocol:2,...b})})));const d=await r.json();assert.equal(r.status,expected,JSON.stringify(d));return d;}
 const row=id=>JSON.parse(sql.prepare("SELECT data FROM flow_entities WHERE id=?").get(id).data);
 async function create(){return req(alice,{mode:'create',deviceKey:keyA})}
 async function connected(){let a=await create();await req(alice,{mode:'join',deviceKey:keyB,id:a.id,invite:a.invite});a=await req(alice,{mode:'poll',deviceKey:keyA,id:a.id});assert.equal(a.connected,true);return a;}
@@ -34,6 +34,16 @@ a=await run(a,'finish',{operationId:op,status:200});assert.equal(a.commit.state,
 a=await run(a,'work',{work:{kind:'navigate',section:'inventory',target:'receipt:test'}});assert.equal(a.epoch,2);assert.deepEqual(Object.keys(a.fields),[]);await req(alice,{id:a.id,deviceKey:keyB,revision:a.revision,epoch:1,mode:'fields',changes:[{key:field,value:'old record edit',version:0}]},409);
 // A lost response blocks retries indefinitely until reviewed/connection closed.
 a=await run(a,'begin',{operationId:op});a=await run(a,'finish',{operationId:op,uncertain:true});await run(a,'work',{work:{kind:'scan',code:'next'}},keyB,409);await run(a,'begin',{operationId:op},keyB,409);await run(a,'close',{},keyB);assert.deepEqual(row(a.id).fields,{});await run(a,'poll',{},keyA,410);
+// UI commands checkpoint prior fields and stay within the same protected work.
+a=await connected();a=await run(a,'work',{work:{kind:'navigate',section:'inventory',target:''}});
+a=await run(a,'fields',{changes:[{key:field,value:'receipt two',version:0}]});
+const actionId=crypto.randomUUID(),ui={actionId,key:'material-flow:4dbc6aa0c98e',item:'["receipt-2"]',label:'ویرایش رسید'};
+a=await run(a,'ui',ui);assert.equal(a.actions.length,1);assert.equal(a.actions[0].beforeFields[field].value,'receipt two');assert.equal(Object.keys(a.fields).length,0);
+a=await run(a,'ui',ui);assert.equal(a.actions.length,1,'retried intent is not replayed twice');
+await run(a,'ui',{...ui,actionId:crypto.randomUUID(),key:'button:nth-child(2)'},keyA,400);
+a=await run(a,'begin',{operationId:op});await run(a,'ui',{...ui,actionId:crypto.randomUUID()},keyB,409);
+a=await run(a,'finish',{operationId:op,uncertain:true});await run(a,'ui',{...ui,actionId:crypto.randomUUID()},keyB,409);await run(a,'close');assert.equal(row(a.id).actions.length,0);
+a=await connected();await req(alice,{mode:'poll',id:a.id,deviceKey:keyA,protocol:1},410);await req(alice,{mode:'close',id:a.id,deviceKey:keyA,protocol:1});assert.equal(row(a.id).closed,true);
 // Invitation and peer presence have independent lifetimes.
 a=await create();let d=row(a.id);d.inviteUntil=Date.now()-1;sql.prepare('UPDATE flow_entities SET data=? WHERE id=?').run(JSON.stringify(d),a.id);await req(alice,{mode:'join',id:a.id,deviceKey:keyB,invite:a.invite},409);await run(a,'close');
 a=await connected();a=await run(a,'work',{work:{kind:'scan',code:'x'}});a=await run(a,'fields',{changes:[{key:field,value:'private',version:0}]});d=row(a.id);d.bSeen=Date.now()-30000;sql.prepare('UPDATE flow_entities SET data=? WHERE id=?').run(JSON.stringify(d),a.id);a=await run(a,'poll');assert.equal(a.connected,false);assert.deepEqual(Object.keys(a.fields),[]);await run(a,'begin',{operationId:op},keyA,409);await run(a,'close');

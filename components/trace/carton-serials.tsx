@@ -26,7 +26,7 @@ export function CartonSerials({items,selected,onChange,manual=true,camera=false,
   {[...models].map(([model,rows])=>{
    const marked=rows.filter(row=>chosen.has(row.deviceId)).length;
    return <fieldset key={model}><legend>{model} · {marked.toLocaleString('fa-IR')} از {rows.length.toLocaleString('fa-IR')}</legend>
-    {manual&&<button type="button" className="btn" disabled={disabled} onClick={()=>onChange(marked===rows.length?selected.filter(id=>!rows.some(row=>row.deviceId===id)):[...new Set([...selected,...rows.map(row=>row.deviceId)])])}>{marked===rows.length?'برداشتن تیک‌های این مدل':'انتخاب همهٔ سریال‌های این مدل'}</button>}
+    {manual&&<button data-pair-open="carton-serials:7e2cc4bfa8a4" type="button" className="btn" disabled={disabled} onClick={()=>onChange(marked===rows.length?selected.filter(id=>!rows.some(row=>row.deviceId===id)):[...new Set([...selected,...rows.map(row=>row.deviceId)])])}>{marked===rows.length?'برداشتن تیک‌های این مدل':'انتخاب همهٔ سریال‌های این مدل'}</button>}
     {rows.map(row=><label className="flow-check" key={row.deviceId}><input type="checkbox" checked={chosen.has(row.deviceId)} disabled={disabled||!manual} onChange={e=>onChange(e.target.checked?[...selected,row.deviceId]:selected.filter(id=>id!==row.deviceId))}/><bdi>{row.serial}</bdi></label>)}
    </fieldset>;
   })}

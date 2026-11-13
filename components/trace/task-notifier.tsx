@@ -58,12 +58,12 @@ export function TaskNotifier({accountId,profile,onOpen}:{accountId:string;profil
  if(!work.length&&!messages)return null;
  const first=work[0];
  return <div className="task-nudge">
-  {first&&<button type="button" className="link" onClick={()=>onOpen(first.section||'tasks',first.section?first.target:'mine')}
+  {first&&<button data-pair-open="task-notifier:5c21c71928c4" type="button" className="link" onClick={()=>onOpen(first.section||'tasks',first.section?first.target:'mine')}
    title={first.title} aria-label={'باز کردن کار فرایندی: '+first.title}>
    <Bell size={18}/><span className="task-question">{first.title}{first.hint&&' · '+first.hint}</span>
    <span>{work.length.toLocaleString('fa-IR')} کار فرایندی باز</span>
   </button>}
-  {messages>0&&<button type="button" className="link" onClick={()=>onOpen('tasks','inbox')} aria-label="باز کردن پیام‌های مستقیم">
+  {messages>0&&<button data-pair-open="task-notifier:0aa31c121e09" type="button" className="link" onClick={()=>onOpen('tasks','inbox')} aria-label="باز کردن پیام‌های مستقیم">
    {!first&&<Bell size={18}/>}<span>{messages.toLocaleString('fa-IR')} پیام مستقیم خوانده‌نشده</span>
   </button>}
  </div>;

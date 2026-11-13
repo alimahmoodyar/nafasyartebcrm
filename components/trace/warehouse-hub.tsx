@@ -55,9 +55,9 @@ export function WarehouseHub({user,records,demo,onSaved,onOpen,onNavigate,target
    {group!=='operations'&&group!=='dispatch'&&!taskOverview&&<SubprogramNavigation showLabel={false} items={choices.map(item=>[item.key,item.title])} value={leaf} onChange={key=>{if(!choices.some(item=>item.key===key))return false;setLeaf(key);setFocus('');}}/>}
    <nav className="warehouse-page-path" aria-label="مسیر صفحه انبار" dir="rtl"><ol>{['انبار',warehouseGroupTitles[group],...(active&&active.title!==warehouseGroupTitles[group]?[active.title]:[])].map((title,index,path)=><li key={index}>{index>0&&<span className="warehouse-page-path__separator" aria-hidden="true">←</span>}<span aria-current={index===path.length-1?'page':undefined}>{title}</span></li>)}</ol></nav>
    {group==='tasks'&&!demo&&<div className="tools">
-    <button type="button" className="btn" onClick={()=>onNavigate('tasks','inbox')}>پیام‌های مستقیم کاربران</button>
+    <button data-pair-open="warehouse-hub:98e4e07f015b" type="button" className="btn" onClick={()=>onNavigate('tasks','inbox')}>پیام‌های مستقیم کاربران</button>
    </div>}
-   {taskOverview&&<>{choices.map(item=><div key={item.key}>{render(item)}</div>)}</>}
+   {taskOverview&&<>{choices.map(item=><div data-pair-row={JSON.stringify(item.key)} key={item.key}>{render(item)}</div>)}</>}
    {group==='operations'&&<WarehouseOperations key={leaf+focus} entries={choices} initial={active} renderSource={render} demo={demo} onSaved={onSaved}/>}
    {group==='dispatch'&&<WarehouseDispatchPanel key={focus} targetId={focus} demo={demo} user={user} onSaved={onSaved} onNavigate={onNavigate}/>}
    {group!=='operations'&&group!=='dispatch'&&active&&render(active)}

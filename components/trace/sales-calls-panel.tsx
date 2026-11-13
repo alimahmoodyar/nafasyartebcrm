@@ -32,7 +32,7 @@ export function SalesCallsPanel({buyer='',referralId='',compact=false,onNavigate
   }catch(e){setError((e as Error).message);return false;}finally{setBusy(false);}
  }
  if(!data)return compact?null:<p>{error||'در حال دریافت فرم تماس…'}</p>;
- if(compact)return <button type="button" className="btn" onClick={()=>onNavigate?.('sales','sales-view:calls')}><Phone size={17}/> ثبت تماس فروش</button>;
+ if(compact)return <button data-pair-open="sales-calls-panel:98e7bce49a54" type="button" className="btn" onClick={()=>onNavigate?.('sales','sales-view:calls')}><Phone size={17}/> ثبت تماس فروش</button>;
  const report=data.report;
  const partner=kind==='partner'||data.agents.some((a:any)=>a.partner&&'agent:'+a.id===contact);
  const results=Object.entries(partner?partnerCallResults:leadCallResults);
@@ -51,12 +51,12 @@ export function SalesCallsPanel({buyer='',referralId='',compact=false,onNavigate
     if(await save({mode:'resolve_referral',callId:call.id,revision:call.revision,decision:form.get('decision')}))await refresh().catch(e=>setError(e.message));
    }}><label>تصمیم مدیر فروش<textarea name="decision" required maxLength={2000}/></label>
    <div className="tools"><button className="btn primary" disabled={busy}>ثبت تصمیم و بستن ارجاع</button></div></form>}
-   <button type="button" className="btn" onClick={()=>onNavigate?.('tasks','mine')}>بازگشت به کارتابل</button>
+   <button data-pair-open="sales-calls-panel:df37b48af634" type="button" className="btn" onClick={()=>onNavigate?.('tasks','mine')}>بازگشت به کارتابل</button>
   </div></section>;
  }
  return <section className="panel" dir="rtl">
   <div className="panelhead"><div><h2><Phone size={22}/> ثبت تماس فروش</h2><p className="subtle">{data.name} · {new Intl.DateTimeFormat('fa-IR',{dateStyle:'medium',timeStyle:'short'}).format(new Date())}</p></div>
-  {data.manager&&<button type="button" className="btn" onClick={()=>setShowReport(!showReport)}>{showReport?'فرم ثبت تماس':'گزارش عملکرد و پیگیری'}</button>}</div>
+  {data.manager&&<button data-pair-open="sales-calls-panel:59da2f66222d" type="button" className="btn" onClick={()=>setShowReport(!showReport)}>{showReport?'فرم ثبت تماس':'گزارش عملکرد و پیگیری'}</button>}</div>
   <div className="inside">
   {data.sample&&<p className="notice">پیش‌نمایش با داده‌های آزمایشی</p>}
   {error&&<p role="alert" className="notice error">{error}</p>}{message&&<p role="status" className="notice">{message}</p>}
@@ -72,15 +72,15 @@ export function SalesCallsPanel({buyer='',referralId='',compact=false,onNavigate
    <p>بیمارستانی، ماه جاری: {report.hospitalMonth.active} پرونده در جریان از {report.hospitalMonth.cases} پرونده</p>
    <p>بیمارستانی، فصل جاری: {report.hospitalQuarter.orders} پرونده رسیده به سفارش از {report.hospitalQuarter.cases} پرونده</p>
    <h3>پرونده‌های نیازمند پیگیری</h3>
-   {(data.referrals||[]).filter((row:any)=>row.data.referral.state==='open').map((row:any)=><p key={row.id}><button type="button" className="link" onClick={()=>onNavigate?.('sales','sales-view:calls:referral:'+row.id)}>رسیدگی به ارجاع · {row.data.name}</button> · {row.data.referral.request}</p>)}
-   {data.open.map((a:any)=><p key={a.id}><button type="button" className="link" onClick={()=>{setKind('partner');setContact('agent:'+a.id);setShowReport(false)}}>{a.name}</button> · {a.reasons.join('؛ ')} · {a.due}</p>)}
+   {(data.referrals||[]).filter((row:any)=>row.data.referral.state==='open').map((row:any)=><p key={row.id}><button data-pair-open="sales-calls-panel:520a06475d56" data-pair-item={JSON.stringify([row.id])} type="button" className="link" onClick={()=>onNavigate?.('sales','sales-view:calls:referral:'+row.id)}>رسیدگی به ارجاع · {row.data.name}</button> · {row.data.referral.request}</p>)}
+   {data.open.map((a:any)=><p key={a.id}><button data-pair-open="sales-calls-panel:30604e40eb98" data-pair-item={JSON.stringify([a.id])} type="button" className="link" onClick={()=>{setKind('partner');setContact('agent:'+a.id);setShowReport(false)}}>{a.name}</button> · {a.reasons.join('؛ ')} · {a.due}</p>)}
   </div>:<form onSubmit={async e=>{
    e.preventDefault();const form=e.currentTarget,f=new FormData(form);
    if(follow&&(!isIsoDay(nextDue)||nextDue<data.today)){setMessage('');setError('برای موعد پیگیری، تاریخ امروز یا بعد از آن را انتخاب کنید.');return;}
    const ok=await save({mode:'call',callKind:kind,result,agentId:contact.startsWith('agent:')?contact.slice(6):'',leadId:contact.startsWith('lead:')?contact.slice(5):'',name:f.get('name'),phone:f.get('phone'),productId:f.get('product'),notes:f.get('notes'),nextAction:f.get('nextAction'),nextDue:follow?nextDue:null,nextTime:f.get('nextTime'),managerRequest:f.get('managerRequest')});
    if(ok){form.reset();setResult('');setFollow(false);setNextDue('');setRefer(false);await refresh().catch(e=>setError(e.message));}
   }}>
-   <fieldset><legend>نوع تماس</legend><div className="tools">{kinds.map(([key,label,Icon])=><button key={key} type="button" aria-pressed={kind===key} className={'btn '+(kind===key?'primary':'')} onClick={()=>{setKind(key);setContact('');setResult('');setRefer(false)}}><Icon size={18}/> {label}</button>)}</div></fieldset>
+   <fieldset><legend>نوع تماس</legend><div className="tools">{kinds.map(([key,label,Icon])=><button data-pair-open="sales-calls-panel:cbdfdafe8de2" data-pair-item={JSON.stringify([key])} key={key} type="button" aria-pressed={kind===key} className={'btn '+(kind===key?'primary':'')} onClick={()=>{setKind(key);setContact('');setResult('');setRefer(false)}}><Icon size={18}/> {label}</button>)}</div></fieldset>
    {data.open.find((a:any)=>'agent:'+a.id===contact)&&<p className="notice">{data.open.find((a:any)=>'agent:'+a.id===contact).reasons.join('؛ ')}</p>}
    <div className="formgrid">
     <label>مخاطب<select value={contact} onChange={e=>{setContact(e.target.value);setResult('');setRefer(false)}} required><option value="">انتخاب مخاطب</option>{kind!=='partner'&&<option value="new">مخاطب تازه</option>}{data.agents.filter((a:any)=>kind!=='partner'||a.partner).map((a:any)=><option key={a.id} value={'agent:'+a.id}>{a.name}</option>)}{kind!=='partner'&&data.leads.map((l:any)=><option key={l.id} value={'lead:'+l.id}>{l.name} · سرنخ فروش</option>)}</select></label>
@@ -107,7 +107,7 @@ export function SalesCallsPanel({buyer='',referralId='',compact=false,onNavigate
      <label>ساعت<input name="nextTime" type="time"/></label>
     </div>}
    </fieldset>
-   <div className="tools"><button className="btn primary" disabled={busy}>ثبت تماس</button><button type="button" className="btn" onClick={()=>onNavigate?.('tasks')}>انصراف</button></div>
+   <div className="tools"><button className="btn primary" disabled={busy}>ثبت تماس</button><button data-pair-open="sales-calls-panel:226e8ea629d7" type="button" className="btn" onClick={()=>onNavigate?.('tasks')}>انصراف</button></div>
   </form>}
   {!showReport&&contact&&contact!=='new'&&<details><summary>سابقه تماس‌های این پرونده</summary>{data.calls.filter((r:any)=>contact===('agent:'+r.data.agentId)||contact===('lead:'+r.data.leadId)).map((r:any)=><p key={r.id}>{r.data.day} · {callResultLabels[r.data.result as keyof typeof callResultLabels]} · {r.data.notes}{r.data.referral&&<> · {r.data.referral.state==='resolved'?'تصمیم مدیر: '+r.data.referral.decision:'ارجاع‌شده به مدیر فروش'}</>}</p>)}</details>}
   </div>

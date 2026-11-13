@@ -39,7 +39,7 @@ export function WorkspaceBackButton({visible=true}:{visible?:boolean}){
  useLayoutEffect(()=>{if(!modal)return;const update=()=>{const rect=anchor.current?.getBoundingClientRect();if(!rect)return;const next={left:Math.max(8,Math.min(rect.left,window.innerWidth-rect.width-8)),top:Math.max(8,Math.min(rect.top,window.innerHeight-rect.height-8)),width:rect.width,height:rect.height};setPosition(old=>Object.keys(next).every(k=>old[k as keyof typeof old]===next[k as keyof typeof next])?old:next);};update();const observer=typeof ResizeObserver==='undefined'?null:new ResizeObserver(update);if(anchor.current)observer?.observe(anchor.current);window.addEventListener('resize',update);window.addEventListener('scroll',update,true);return()=>{observer?.disconnect();window.removeEventListener('resize',update);window.removeEventListener('scroll',update,true);};},[modal]);
  if(!back&&!registry||!visible&&!modal)return null;
  const run=()=>registry?registry.run():back?.(),content=<><ArrowRight size={18}/>بازگشت</>;
- return <><button ref={anchor} data-workspace-header-back type="button" className="btn" onClick={run} aria-hidden={modal?true:undefined} disabled={!!modal} style={modal?{visibility:'hidden'}:undefined}>{content}</button>{modal&&createPortal(<button data-workspace-header-back type="button" className="btn workspace-modal-back" style={{position:'fixed',...position,zIndex:60,pointerEvents:'auto'}} onClick={run}>{content}</button>,modal)}</>;
+ return <><button data-pair-open="program-workspace:000000000002" ref={anchor} data-workspace-header-back type="button" className="btn" onClick={run} aria-hidden={modal?true:undefined} disabled={!!modal} style={modal?{visibility:'hidden'}:undefined}>{content}</button>{modal&&createPortal(<button data-pair-open="program-workspace:000000000002" data-workspace-header-back type="button" className="btn workspace-modal-back" style={{position:'fixed',...position,zIndex:60,pointerEvents:'auto'}} onClick={run}>{content}</button>,modal)}</>;
 }
 type Menu={items:[string,string][];value:string;onChange:(key:string)=>void|boolean};
 const ProgramPathContext=createContext('');
@@ -90,7 +90,7 @@ export function SubprogramNavigation({items,value,onChange,showLabel=true,inline
  const signature=JSON.stringify(items),register=inline?undefined:context?.register;
  useLayoutEffect(()=>{if(!register)return;register({items:JSON.parse(signature),value,onChange:select});return()=>register(null)},[register,signature,value,select]);
  useEffect(()=>{if(previous.current!==value){previous.current=value;context?.reveal()}},[value,context?.reveal]);
- if(inline||!context)return <nav className="tools" aria-label="زیر‌برنامه‌ها">{items.map(([key,title])=><button className={'btn '+(value===key?'primary':'')} key={key} aria-pressed={value===key} onClick={()=>select(key)}>{title}</button>)}</nav>;
+ if(inline||!context)return <nav className="tools" aria-label="زیر‌برنامه‌ها">{items.map(([key,title])=><button data-pair-open="program-workspace:000000000001" data-pair-item={JSON.stringify([items.map(([k])=>k).join("|"),key])} className={'btn '+(value===key?'primary':'')} key={key} aria-pressed={value===key} onClick={()=>select(key)}>{title}</button>)}</nav>;
  const title=items.find(([key])=>key===value)?.[1];return showLabel&&title?<p className="subtle" aria-label="مسیر زیر‌برنامه">{title}</p>:null;
 }
 
@@ -98,8 +98,8 @@ export function IconSections({scope,title='برنامه‌های این بخش',
  const [selected,setSelected]=useState(items[0]?.key||'');
  const active=items.some(item=>item.key===selected)?selected:items[0]?.key||'';
  if(!items.length)return null;
- if(inline)return <div>{items.map(item=><section key={item.key}><h3>{item.title}</h3>{item.content}</section>)}</div>;
- return <ProgramWorkspace programId={scope} title={title}><SubprogramNavigation items={items.map(item=>[item.key,item.title])} value={active} onChange={setSelected}/>{items.map(item=><div className="program-workspace-content" key={item.key} hidden={active!==item.key}>{item.content}</div>)}</ProgramWorkspace>;
+ if(inline)return <div>{items.map(item=><section data-pair-row={JSON.stringify(item.key)} key={item.key}><h3>{item.title}</h3>{item.content}</section>)}</div>;
+ return <ProgramWorkspace programId={scope} title={title}><SubprogramNavigation items={items.map(item=>[item.key,item.title])} value={active} onChange={setSelected}/>{items.map(item=><div data-pair-row={JSON.stringify(item.key)} className="program-workspace-content" key={item.key} hidden={active!==item.key}>{item.content}</div>)}</ProgramWorkspace>;
 }
 
 function menuText(value:ReactNode):string{if(typeof value==='string'||typeof value==='number')return String(value);if(Array.isArray(value))return value.map(menuText).join('');if(isValidElement<{children?:ReactNode}>(value))return menuText(value.props.children);return '';}

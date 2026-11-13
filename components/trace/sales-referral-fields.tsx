@@ -2,7 +2,7 @@
 
 export function SalesReferralFields({kind,value='',choices,disabled=false,onChange}:{kind?:string;value?:string;choices:{id:string;name:string}[];disabled?:boolean;onChange:(id:string)=>void}){
  const selected=choices.find(c=>c.id===value);
- const existing=<div className="notice wide"><p>این سفارش با معرف پورسانتی{selected?' «'+selected.name+'»':''} آماده شده است. پورسانت فقط طبق قرارداد مصوب و وصول وجه محاسبه می‌شود.</p><button type="button" className="btn" disabled={disabled} onClick={()=>onChange('')}>فروش مستقیم، بدون معرف</button></div>;
+ const existing=<div className="notice wide"><p>این سفارش با معرف پورسانتی{selected?' «'+selected.name+'»':''} آماده شده است. پورسانت فقط طبق قرارداد مصوب و وصول وجه محاسبه می‌شود.</p><button data-pair-open="sales-referral-fields:811ec541ac7c" type="button" className="btn" disabled={disabled} onClick={()=>onChange('')}>فروش مستقیم، بدون معرف</button></div>;
  // Ordinary representative, reseller and consignment orders do not ask for an intermediary.
  if(kind!=='end_customer')return value?existing:null;
  if(!choices.length||value&&!selected)return value?existing:null;

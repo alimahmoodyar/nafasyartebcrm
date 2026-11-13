@@ -60,7 +60,7 @@ function DialogPortal({
 function DialogClose({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Close>) {
-  return <DialogPrimitive.Close data-slot="dialog-close" {...props} />
+  return <DialogPrimitive.Close data-pair-open="dialog:000000000001" data-slot="dialog-close" {...props} />
 }
 
 function DialogOverlay({
@@ -112,7 +112,7 @@ function DialogContent({
     className
   )
   const closeButton = showCloseButton && (
-    <DialogPrimitive.Close
+    <DialogPrimitive.Close data-pair-open="dialog:000000000001"
       data-slot="dialog-close"
       className="absolute top-4 right-4 rounded-xs opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
     >

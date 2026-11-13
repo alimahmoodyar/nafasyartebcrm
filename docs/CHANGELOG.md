@@ -2616,3 +2616,8 @@ Existing batch labels now open the exact incoming receipt QC form from the assig
 - The home deposit action now opens a new-payment form immediately after its scoped data loads, rather than opening only payment history. The history action remains separate.
 - Unassigned administrator role previews can inspect the form and see its missing agency/account prerequisite; final submission remains disabled and guarded. No agency, bank account or financial entry is created implicitly.
 - Focused UI checks cover direct entry, draft preservation on refresh, cancellation, reviewer-only access and separate history navigation.
+
+
+## 2026-11-13 — Paired internal form navigation
+
+Registered view-only actions now mirror exact receipt/form opening, read-only searches, selections and dialog close. Search fields are checkpointed before the next action; commercial POSTs retain single-flight and permission checks. Protocol 2 requires refreshing both devices and reconnecting under the same role. See `quality-reviews/2026-11-13-paired-view-follow.md`. Publication is tracked separately in the external release audit.

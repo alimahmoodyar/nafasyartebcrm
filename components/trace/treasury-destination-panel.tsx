@@ -53,13 +53,13 @@ export function TreasuryDestinationPanel({test,accountId}:{test:boolean;accountI
   {error&&!review&&<p className="error" role="alert">{error}</p>}
   {!data&&!error&&<p role="status">در حال دریافت…</p>}
   {data&&!accounts.length&&<p>حساب مقصدی برای نمایش وجود ندارد.</p>}
-  <div className="grid">{accounts.map(account=><article className="card" key={account.id}>
+  <div className="grid">{accounts.map(account=><article data-pair-row={JSON.stringify(account.id)} className="card" key={account.id}>
    <h3>{account.data.title}</h3>
    <p>شماره حساب <bdi>{account.data.number}</bdi></p>
    <p>شبا <bdi>{account.data.iban}</bdi></p>
    {account.data.cardNumber&&<p>شماره کارت <bdi>{account.data.cardNumber}</bdi></p>}
    <p>{account.data.state==='review'?'در انتظار تأیید مدیر مالی':'تأییدشده'}</p>
-   {data?.roles.manager&&account.data.state==='review'&&<button type="button" className="btn" disabled={busy} onClick={()=>{setError('');setReview(account);}}>بررسی و تأیید</button>}
+   {data?.roles.manager&&account.data.state==='review'&&<button data-pair-open="treasury-destination-panel:6d3068e7bbe7" type="button" className="btn" disabled={busy} onClick={()=>{setError('');setReview(account);}}>بررسی و تأیید</button>}
   </article>)}</div>
   <Dialog open={!!review} onOpenChange={open=>{if(!open&&!busy)setReview(null);}}>
    <DialogContent dir="rtl"><DialogTitle>تأیید حساب مقصد فروش</DialogTitle>

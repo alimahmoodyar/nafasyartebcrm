@@ -13,7 +13,7 @@ type Library={manage:boolean;files:SalesResource[]};
 export function RepresentativeResources(){
  const [open,setOpen]=useState(false);
  return <>
-  <button type="button" className="link" onClick={()=>setOpen(true)}>{salesResourcesTitle}</button>
+  <button data-pair-open="sales-resources:d3f3194aa03e" type="button" className="link" onClick={()=>setOpen(true)}>{salesResourcesTitle}</button>
   <Dialog open={open} onOpenChange={setOpen}>
    <DialogContent className="modal sm:max-w-2xl">
     <DialogTitle>{salesResourcesTitle}</DialogTitle>
@@ -84,10 +84,10 @@ export function SalesResources({management=false}:{management?:boolean}){
      <label className="field">دسته<select name="category" defaultValue={draft?.category||'catalog'}>{Object.entries(categories).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
      <label className="field">مخاطب<select name="audience" defaultValue={draft?.audience||'all'}>{Object.entries(audiences).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
      <label className="field">فایل (حداکثر ۱۰ مگابایت)<input name="file" type="file" required/></label>
-     <div className="tools"><button className="btn primary">{draft?'ذخیرهٔ نسخهٔ جایگزین':'انتشار فایل'}</button><button type="button" className="btn" onClick={()=>setFormOpen(false)}>انصراف</button></div>
+     <div className="tools"><button className="btn primary">{draft?'ذخیرهٔ نسخهٔ جایگزین':'انتشار فایل'}</button><button data-pair-open="sales-resources:c258b2891ffb" type="button" className="btn" onClick={()=>setFormOpen(false)}>انصراف</button></div>
     </fieldset>
    </form>}
-   {files.length?<ul>{files.map(file=><li key={file.id}>
+   {files.length?<ul>{files.map(file=><li data-pair-row={JSON.stringify(file.id)} key={file.id}>
     <strong>{file.title}</strong> · {categories[file.category]}{manage&&<> · {audiences[file.audience]}</>}
     {' '}<a className="link" href={endpoint+'?id='+encodeURIComponent(file.id)} aria-label={'دانلود '+file.title}>دانلود</a>
     {manage&&<button type="button" className="link" disabled={busy} onClick={()=>start(file)}>جایگزینی فایل</button>}

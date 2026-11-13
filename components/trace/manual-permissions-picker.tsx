@@ -100,7 +100,7 @@ export function ManualPermissionsPicker({permissions:p,onChange,salesAgents,serv
    {manualPermissionSections.filter(s=>matches(s.title)).map(s=>{
     const ownerOnly='ownerOnly' in s&&s.ownerOnly,enabled=!ownerOnly&&visible(s.key),Icon=s.icon;
     const target='group' in s?(s.group==='trace'?'trace-product':s.group):undefined;
-    return <div key={s.key} data-section={s.key} data-access={ownerOnly?'admin-only':enabled?'visible':'hidden'} style={{border:'1px solid '+(enabled?'#a9d7c3':'var(--border)'),borderRadius:12,padding:10,background:enabled?'#edf8f2':'#f7f8fc',fontSize:13}}>
+    return <div data-pair-row={JSON.stringify(s.key)} key={s.key} data-section={s.key} data-access={ownerOnly?'admin-only':enabled?'visible':'hidden'} style={{border:'1px solid '+(enabled?'#a9d7c3':'var(--border)'),borderRadius:12,padding:10,background:enabled?'#edf8f2':'#f7f8fc',fontSize:13}}>
      {target?<a href={'#manual-'+target} aria-label={'تنظیم دسترسی '+s.title} style={{display:'flex',alignItems:'center',gap:7,minHeight:38,color:'inherit',textDecoration:'none'}}><Icon size={19} aria-hidden="true"/><strong>{s.title}</strong></a>:<div style={{display:'flex',alignItems:'center',gap:7,minHeight:38}}><Icon size={19} aria-hidden="true"/><strong>{s.title}</strong></div>}
      <span style={{display:'flex',alignItems:'center',gap:5,fontSize:12,color:enabled?'#176c44':'#67768f',marginTop:5}}>{ownerOnly?<><LockKeyhole size={13} aria-hidden="true"/>فقط مدیر سامانه</>:enabled?'نمایش دارد':'فعلاً نمایش ندارد'}</span>
     </div>;

@@ -17,23 +17,23 @@ export function SalesBuyerDirectory({agents,members,initialBuyerId='',createActi
  const rows=agents.filter(a=>visible.has(a.id)).sort((a,b)=>a.data.name.localeCompare(b.data.name,'fa'));
  return <section className="sales-buyer-directory" ref={backRef} aria-label="خریداران و نمایندگان">
   {opened?<>
-   <div className="tools"><button type="button" className="btn" onClick={back}>فهرست خریداران و نمایندگان</button>{buyer&&<span className="subtle">پروندهٔ {buyer.data.name}</span>}</div>
+   <div className="tools"><button data-pair-open="sales-buyer-directory:aeea6f3c90d9" type="button" className="btn" onClick={back}>فهرست خریداران و نمایندگان</button>{buyer&&<span className="subtle">پروندهٔ {buyer.data.name}</span>}</div>
    {buyer?renderDossier(buyer):<p role="alert">این پرونده در فهرست فعلی شما نیست؛ فهرست را تازه‌سازی کنید یا به فهرست خریداران برگردید.</p>}
   </>:<>
    <div className="sales-buyer-directory-heading"><div><h3>خریداران و نمایندگان</h3><p className="subtle">هر شخص یک پرونده دارد؛ برای دیدن اطلاعات، تماس‌ها، پیگیری‌ها و حساب، پرونده‌اش را باز کنید.</p></div>{createAction}</div>
-   <form className="sales-buyer-directory-filters" role="search" onSubmit={e=>{e.preventDefault();setFilters({query,kind,status})}}>
+   <form data-pair-open="sales-buyer-directory:8fb62cb25315" className="sales-buyer-directory-filters" role="search" onSubmit={e=>{e.preventDefault();setFilters({query,kind,status})}}>
     <label className="field">جست‌وجوی نام، استان، شهر، تماس یا کارشناس<NumberInput fieldKey="buyerSearch" type="search" placeholder="مثلاً تهران یا نام نماینده" value={query} onChange={e=>setQuery(e.target.value)}/></label>
     <label className="field">نوع خریدار<select value={kind} onChange={e=>setKind(e.target.value)}><option value="">همه انواع</option>{Object.entries(partnerKinds).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
     <label className="field">وضعیت پرونده<select value={status} onChange={e=>setStatus(e.target.value)}><option value="">فعال و غیرفعال</option><option value="active">فعال</option><option value="inactive">غیرفعال</option></select></label>
-    <div className="tools" style={{alignSelf:'end'}}><button type="submit" className="btn primary"><Search size={16} aria-hidden="true"/> جست‌وجو</button><button type="button" className="btn" onClick={()=>{setQuery('');setKind('');setStatus('');setFilters(emptyFilters)}}>پاک کردن</button></div>
+    <div className="tools" style={{alignSelf:'end'}}><button type="submit" className="btn primary"><Search size={16} aria-hidden="true"/> جست‌وجو</button><button data-pair-open="sales-buyer-directory:e90e20c00a8d" type="button" className="btn" onClick={()=>{setQuery('');setKind('');setStatus('');setFilters(emptyFilters)}}>پاک کردن</button></div>
    </form>
    <p role="status">{rows.length.toLocaleString('fa-IR')} پرونده از {agents.length.toLocaleString('fa-IR')}</p>
-   <div className="sales-buyer-directory-list">{rows.map(a=><article className="sales-buyer-directory-card" key={a.id}>
+   <div className="sales-buyer-directory-list">{rows.map(a=><article data-pair-row={JSON.stringify(a.id)} className="sales-buyer-directory-card" key={a.id}>
     <div className="sales-partner-heading"><h4>{a.data.name}</h4><span className="badge">{a.data.active?'فعال':'غیرفعال'}</span></div>
     <p>{partnerKinds[a.data.kind||'representative']||'خریدار'}{a.data.province&&' · '+a.data.province}{a.data.city&&' / '+a.data.city}</p>
     {(a.data.contact||a.data.mobile||a.data.phone)&&<p>{a.data.contact} · <bdi>{a.data.mobile||a.data.phone}</bdi></p>}
     <p className="subtle">کارشناس: {owner(a)}</p>
-    <button type="button" className="btn" aria-label={'باز کردن پروندهٔ '+a.data.name} onClick={()=>setOpened(a.id)}>باز کردن پرونده</button>
+    <button data-pair-open="sales-buyer-directory:f735b20d0b0d" data-pair-item={JSON.stringify([a.id])} type="button" className="btn" aria-label={'باز کردن پروندهٔ '+a.data.name} onClick={()=>setOpened(a.id)}>باز کردن پرونده</button>
    </article>)}</div>
    {!rows.length&&<p className="empty">{agents.length?'با این جست‌وجو یا فیلتر، پرونده‌ای پیدا نشد.':'پرونده‌ای در دسترسی شما نیست.'}</p>}
   </>}

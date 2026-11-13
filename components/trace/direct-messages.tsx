@@ -140,14 +140,14 @@ export function DirectMessages(){
    <aside className="inbox-list"><h3>مخاطب‌ها</h3><label className="field">جست‌وجوی مخاطب<input type="search" value={query} onChange={event=>setQuery(event.target.value)}/></label>
     {ordered.map(c=>{
      const items=grouped.get(c.id)||[],unread=items.filter(t=>t.unread).length;
-     return <button type="button" key={c.id} className={'inbox-thread '+(c.id===contactId?'selected ':'')+(unread?'unread':'')} aria-pressed={c.id===contactId} onClick={()=>select(c.id)}><ContactIdentity contact={c}/>{items[0]?.lastMessage&&<span className="direct-chat-preview">{items[0].lastMessage}</span>}{items[0]&&<small>{formatDate(items[0].updated)} · {clock.format(new Date(items[0].updated))}</small>}{unread>0&&<small>{unread.toLocaleString('fa-IR')} گفت‌وگوی خوانده‌نشده</small>}</button>;
+     return <button data-pair-open="direct-messages:397ee31dba32" data-pair-item={JSON.stringify([c.id])} type="button" key={c.id} className={'inbox-thread '+(c.id===contactId?'selected ':'')+(unread?'unread':'')} aria-pressed={c.id===contactId} onClick={()=>select(c.id)}><ContactIdentity contact={c}/>{items[0]?.lastMessage&&<span className="direct-chat-preview">{items[0].lastMessage}</span>}{items[0]&&<small>{formatDate(items[0].updated)} · {clock.format(new Date(items[0].updated))}</small>}{unread>0&&<small>{unread.toLocaleString('fa-IR')} گفت‌وگوی خوانده‌نشده</small>}</button>;
     })}
     {!ordered.length&&<p>{box?'مخاطبی پیدا نشد.':'در حال دریافت مخاطب‌ها…'}</p>}
     {box?.limited&&<small>فهرست شامل ۳۰۰ گفت‌وگوی اخیر است.</small>}
    </aside>
    <section className="inbox-conversation" aria-label="گفت‌وگوی مستقیم">
     {!contact?<p className="empty">برای شروع، یک مخاطب انتخاب کنید.</p>:<>
-     <header><button type="button" className="btn inbox-back" onClick={()=>select('')}>مخاطب‌ها</button><h3><ContactIdentity contact={contact}/></h3></header>
+     <header><button data-pair-open="direct-messages:47b176ac5e26" type="button" className="btn inbox-back" onClick={()=>select('')}>مخاطب‌ها</button><h3><ContactIdentity contact={contact}/></h3></header>
      <div className="inbox-messages" ref={list}>
       {(threads.length>limit||details.some(d=>d.nextOffset!==null))&&<button type="button" className="btn" disabled={busy||loading} onClick={()=>void older()}>پیام‌های قدیمی‌تر</button>}
       {loading&&!timeline.length&&<p role="status">در حال دریافت پیام‌ها…</p>}
@@ -155,7 +155,7 @@ export function DirectMessages(){
       {timeline.map(({m,d},i)=>{
        const own=m.author===d.me,day=formatDate(m.created),read=own?(m.sentRevision!==undefined?d.peerReadRevision>=m.sentRevision:d.peerReadRevision>=d.thread.revision?true:null):null;
        const file=m.mode==='attachment'?d.files.find(f=>m.id==='inbox-upload:'+f.id):null;
-       return <div key={m.id} className={'direct-chat-row'+(own?' own':'')}>{(!i||formatDate(timeline[i-1].m.created)!==day)&&<time className="direct-chat-day">{day}</time>}<article className={'inbox-message'+(own?' own':'')}>{file?<a href={'/api/inbox/files?thread='+encodeURIComponent(d.thread.id)+'&id='+encodeURIComponent(file.id)}>{file.filename}</a>:<p>{m.body}</p>}<small><time dateTime={m.created}>{clock.format(new Date(m.created))}</time>{read!==null&&(read?' · خوانده شده ✓✓':' · خوانده نشده ✓')}</small></article></div>;
+       return <div data-pair-row={JSON.stringify(m.id)} key={m.id} className={'direct-chat-row'+(own?' own':'')}>{(!i||formatDate(timeline[i-1].m.created)!==day)&&<time className="direct-chat-day">{day}</time>}<article className={'inbox-message'+(own?' own':'')}>{file?<a href={'/api/inbox/files?thread='+encodeURIComponent(d.thread.id)+'&id='+encodeURIComponent(file.id)}>{file.filename}</a>:<p>{m.body}</p>}<small><time dateTime={m.created}>{clock.format(new Date(m.created))}</time>{read!==null&&(read?' · خوانده شده ✓✓':' · خوانده نشده ✓')}</small></article></div>;
       })}
      </div>
      {contact.active&&<form className="inbox-compose direct-chat-compose" onSubmit={event=>{event.preventDefault();void send()}}>
