@@ -1,3 +1,7 @@
+## End-of-day review — 2026-11-13
+
+Reviewed 33 commits/153 changed files since documented b0f2815 through 0163d3c. Fixed office delivered-before-confirmation list inconsistency and full-permission administrator QC lookup denial, with reproducing regressions. 33/34 initial suites passed; the workflow-role-access purchase_finance/fulfillment invariant also fails unchanged baseline and remains explicitly open. 300k lightweight multi-year synthetic rows, 30 samples/path and complete 94-table local backup/hash/reopen succeeded; query plans identify missing dedicated JSON indexes. No live database mutation/migration or renewed paused transport walkthrough. See quality-reviews/2026-11-13-end-of-day.md and evidence JSON. Next: reconcile shortage navigation invariant, plan/test JSON indexes, production-sized concurrency/soak and D1/R2 recovery with agreed workload/RTO/RPO.
+
 ## Incoming receipt QC label scan — 2026-11-13
 
 Scope: existing unique batch code and public label preserved; assigned QC scan resolves exact receipt via bounded queries, existing form/snapshot/revision and existing start marker. Lookup is read-only; opening a ready form uses the existing QC-start lock/timestamp. Incomplete warehouse ingress blocks both UI and direct start/result writes, with atomic quarantine quantity guard. Completed QC is read-only; no scan-driven stock movement. No schema/migration/reset-contract change or live business fixtures.

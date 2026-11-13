@@ -1,0 +1,456 @@
+{
+  "reviewTimeUtc": "2026-11-13T05:14:02.112904+00:00",
+  "baseline": "b0f2815031db0ebb2fa2331909c7116d43f8a1c0",
+  "reviewedHead": "0163d3cefbffe8cef82175b34db10639872e3a65",
+  "commits": [
+    "0163d3cefbffe8cef82175b34db10639872e3a65 Open exact incoming QC receipt from existing batch label",
+    "894b22272fdc102c5924d481b1f43b1fe234ea08 Show exact Tehran timestamps and measured service stage intervals",
+    "1aa2b8b48baaeb4b41c20bf0f457435b3cb40083 Fix office reception defaults and incomplete estimate feedback",
+    "9f466c6154a6fac0b7464e7bb7a07747f93857dd Add office device reception permanent QR and technician work history",
+    "f7b46b1e87fdf6b2ed69377555ebec56ac657083 Add scan-first home service agency coordinator workspace",
+    "b312775bfa9d27413141e0e3800133c07cbe0cda Unify driver home around scan routing, own custody and assigned work",
+    "d8ce6a162fd7b3e60a6f56d779bd20faafece0d0 Remove redundant camera test from driver role home",
+    "8e6265c52ea2838eccf2a475800d65926ab6af8d Let assigned drivers scan and confirm package pickup without a mission",
+    "f25e15acbba9a8700321b7027e88ab33887bd565 Add finished-product package labels and scoped scan receipt",
+    "8229282b5526c9782f22bf70486e772662126f0e Open carton repair cases in the explicit home-service workspace",
+    "803ee5570bc6656ed4f489af27f4b6f606bab510 Add multi-case faulty-part carton labels and scoped scan handovers",
+    "8c7cfc026718f50c97a9906a6d19e7fe91c0c318 Add shared reviewed identity dossiers for sales and service representatives",
+    "982aec487dd8ab28cf68d6e18d20b8bdb4e22071 Prevent duplicate active driver receipts for known serials",
+    "4a5f7a7d0af1033368be9851fa10431b6f14c53c Wait for service form data before launching case from receipt",
+    "417821e5d08fd3915f44cd997ab756604d52529f Add independent driver pickup receipts, printable QR and scoped company intake",
+    "4f4c8a25ad9471e784759f70783e4964fc590475 Open driver profile directly without mission entry gate",
+    "1ce7dea7c53071eb64234930642b8b8e361a2059 Add scoped QR and barcode camera scanning to driver workflows",
+    "d840b30121806389d40d38cc8210997d61a73360 Add receipt photo framing and explicit confirmation for sales and services",
+    "a1ed08b2e59ad1461784e94d3a64ebb16b40f362 Use live receipt camera in sales payment form",
+    "faffb81412d30d31dff410120bf7741ff3705037 Open live receipt camera in service deposit form",
+    "9b82ac77e22da476396acac4affc980fed0da4f7 Add representative finance workspace, payment search and audited rejected deletion",
+    "7d6163267bac0f975bcb8c9a8a90e3eec97bc1db Open service deposit form directly from representative home",
+    "4c7e6654ebe57c8633c2254ef6013aac2144dc9e Remove repeated service representative home tracking summary",
+    "65924e2d2bf6d5b38423b0d6c8aaaf9eed8dc0b6 Handle missing agency when shared material catalog is populated",
+    "4915ee680b1899a425bffee88d32560ecf2e705a Handle empty shared service role workspaces without invalid agency alerts",
+    "9148249043afaa799a93f4151811dab8ba1ceb92 Use shared application data for service role workflows",
+    "b5ba209c5848f9492f63b2aa89a00f41e0b9833a Unblock isolated service inventory workflow through warehouse forms",
+    "74ca39f4ed3f4271f328b7468497dcec72770c11 Open manager service settings directly and isolate product quality templates",
+    "56e63d98afe1a941bf0f155f5d0fd3cc12ae2c41 Navigate to selected role before permission refresh remount",
+    "f04219593b76d05cf98676b9e1b762972c6126e0 Connect warehouse and engineering role workflows to isolated service scenario",
+    "bffaf64fc405470edacbc313bf45ed31a9f11780 Show service order summary only through a populated cart toggle",
+    "256493550c792695434b46f21ec9527394088fd9 Improve service representative parts search and ordering experience",
+    "b94f069117a2caa924d827a423b686ab05399a61 Add service representative payment reconciliation and maturity dashboard"
+  ],
+  "files": [
+    "M\tAGENTS.md",
+    "A\tapp/api/after-sales/office/route.ts",
+    "A\tapp/api/after-sales/payments/route.ts",
+    "M\tapp/api/after-sales/print/route.ts",
+    "A\tapp/api/after-sales/return-parcels/label/route.ts",
+    "A\tapp/api/after-sales/return-parcels/route.ts",
+    "M\tapp/api/after-sales/route.ts",
+    "A\tapp/api/finished-packages/route.ts",
+    "M\tapp/api/flow/route.ts",
+    "M\tapp/api/fulfillment/route.ts",
+    "A\tapp/api/incoming-qc/route.ts",
+    "M\tapp/api/material-files/route.ts",
+    "M\tapp/api/material-photos/route.ts",
+    "M\tapp/api/production/route.ts",
+    "M\tapp/api/products/families/route.ts",
+    "M\tapp/api/quality/templates/route.ts",
+    "M\tapp/api/records/route.ts",
+    "A\tapp/api/representative-identity/files/route.ts",
+    "A\tapp/api/representative-identity/route.ts",
+    "M\tapp/api/role-profiles/route.ts",
+    "A\tapp/api/role-profiles/warehouse-setup/route.ts",
+    "M\tapp/api/sales/bank/route.ts",
+    "M\tapp/api/sales/files/route.ts",
+    "M\tapp/api/serials/print/route.ts",
+    "M\tapp/api/session/route.ts",
+    "A\tapp/api/transport/driver-workspace/route.ts",
+    "A\tapp/api/transport/receipts/label/route.ts",
+    "A\tapp/api/transport/receipts/route.ts",
+    "M\tapp/api/transport/route.ts",
+    "M\tapp/api/warehouse/movements/route.ts",
+    "M\tapp/b/[code]/route.ts",
+    "M\tapp/globals.css",
+    "M\tapp/page.tsx",
+    "M\tcomponents/trace/after-sales-hub.tsx",
+    "M\tcomponents/trace/after-sales-panel.tsx",
+    "A\tcomponents/trace/camera-code-scanner.tsx",
+    "M\tcomponents/trace/carton-serials.tsx",
+    "A\tcomponents/trace/driver-dashboard.css",
+    "A\tcomponents/trace/driver-dashboard.tsx",
+    "A\tcomponents/trace/driver-receipts-panel.tsx",
+    "M\tcomponents/trace/fulfillment-panel.tsx",
+    "A\tcomponents/trace/incoming-qc-scanner.tsx",
+    "M\tcomponents/trace/material-flow.tsx",
+    "A\tcomponents/trace/mission-item-scanner.tsx",
+    "A\tcomponents/trace/receipt-attachment.tsx",
+    "A\tcomponents/trace/receipt-photo-editor.tsx",
+    "A\tcomponents/trace/representative-identity-panel.tsx",
+    "M\tcomponents/trace/role-testing-panel.tsx",
+    "M\tcomponents/trace/sales-bank-panel.tsx",
+    "M\tcomponents/trace/sales-panel.tsx",
+    "A\tcomponents/trace/service-expert-dashboard.tsx",
+    "M\tcomponents/trace/service-fields.tsx",
+    "A\tcomponents/trace/service-office-workspace.tsx",
+    "M\tcomponents/trace/service-parts-panel.tsx",
+    "A\tcomponents/trace/service-payment-schedule.tsx",
+    "A\tcomponents/trace/service-payments-panel.tsx",
+    "M\tcomponents/trace/service-representative-dashboard.tsx",
+    "A\tcomponents/trace/service-return-parcels-panel.tsx",
+    "A\tcomponents/trace/service-stage-timeline.tsx",
+    "A\tcomponents/trace/shipping-package-receipt.tsx",
+    "M\tcomponents/trace/transport-panel.tsx",
+    "M\tdocs/CHANGELOG.md",
+    "A\tdocs/ENTERPRISE-QUALITY.md",
+    "A\tdocs/QUALITY-REVIEW-QUEUE.md",
+    "A\tdocs/quality-reviews/2026-11-12-service-payments.md",
+    "A\tdrizzle/0025_service_payment_indexes.sql",
+    "M\tlib/after-sales-contract.ts",
+    "M\tlib/after-sales-labels.ts",
+    "M\tlib/after-sales.ts",
+    "A\tlib/driver-receipt-contract.ts",
+    "A\tlib/driver-receipts.ts",
+    "A\tlib/driver-workspace-contract.ts",
+    "M\tlib/duties.ts",
+    "A\tlib/incoming-qc-contract.ts",
+    "A\tlib/incoming-qc.ts",
+    "M\tlib/mcp/tools.ts",
+    "M\tlib/model.ts",
+    "M\tlib/part-repairs.ts",
+    "A\tlib/profile-execution-context.ts",
+    "M\tlib/profile-review.ts",
+    "M\tlib/profile-work.ts",
+    "A\tlib/receipt-crop.ts",
+    "A\tlib/representative-identity-contract.ts",
+    "A\tlib/representative-identity.ts",
+    "M\tlib/representative-links.ts",
+    "M\tlib/reset-contract.ts",
+    "M\tlib/role-profiles.ts",
+    "M\tlib/sales-bank-contract.ts",
+    "M\tlib/sales-bank.ts",
+    "A\tlib/service-bank-ledger.ts",
+    "M\tlib/service-collection.ts",
+    "M\tlib/service-commercial.ts",
+    "M\tlib/service-consumer-prepare.ts",
+    "M\tlib/service-contracts.ts",
+    "M\tlib/service-dashboard.ts",
+    "A\tlib/service-device-contract.ts",
+    "A\tlib/service-office-access.ts",
+    "A\tlib/service-office.ts",
+    "A\tlib/service-parts-cart.ts",
+    "M\tlib/service-parts.ts",
+    "A\tlib/service-payment-schedule.ts",
+    "A\tlib/service-payment-tasks.ts",
+    "A\tlib/service-payments.ts",
+    "A\tlib/service-profile-scope.ts",
+    "M\tlib/service-report.ts",
+    "A\tlib/service-return-parcel-contract.ts",
+    "A\tlib/service-return-parcels.ts",
+    "M\tlib/service-role-preview.ts",
+    "A\tlib/service-timing.ts",
+    "A\tlib/shipping-packages.ts",
+    "M\tlib/system-reset.ts",
+    "A\tlib/transport-scan-contract.ts",
+    "A\tlib/transport-scan.ts",
+    "M\tlib/transport.ts",
+    "M\tpackage.json",
+    "M\tpnpm-lock.yaml",
+    "M\ttests/after-sales-domain-ui.cjs",
+    "M\ttests/batch-labels.cjs",
+    "A\ttests/driver-dashboard-ui.cjs",
+    "A\ttests/driver-receipts-ui.cjs",
+    "A\ttests/driver-receipts.cjs",
+    "A\ttests/driver-workspace.cjs",
+    "A\ttests/incoming-qc-scan-ui.cjs",
+    "A\ttests/incoming-qc-scan.cjs",
+    "A\ttests/incoming-qc-scanner-ui.cjs",
+    "A\ttests/mission-scan-ui.cjs",
+    "A\ttests/receipt-camera.cjs",
+    "A\ttests/receipt-photo-editor.cjs",
+    "A\ttests/representative-identity-ui.cjs",
+    "A\ttests/representative-identity.cjs",
+    "M\ttests/representative-links.cjs",
+    "M\ttests/role-cartable-ui.cjs",
+    "M\ttests/sales-bank.cjs",
+    "M\ttests/sales-role-navigation-ui.cjs",
+    "M\ttests/service-consumer-assistant.cjs",
+    "M\ttests/service-dashboard.cjs",
+    "A\ttests/service-expert-dashboard-ui.cjs",
+    "A\ttests/service-office-intake-ui.cjs",
+    "A\ttests/service-office-ui.cjs",
+    "A\ttests/service-office.cjs",
+    "A\ttests/service-parts-search-ui.cjs",
+    "M\ttests/service-parts.cjs",
+    "A\ttests/service-payments-ui.cjs",
+    "A\ttests/service-payments.cjs",
+    "A\ttests/service-return-navigation.cjs",
+    "A\ttests/service-return-parcels-ui.cjs",
+    "A\ttests/service-return-parcels.cjs",
+    "M\ttests/service-role-preview.cjs",
+    "A\ttests/service-timing.cjs",
+    "A\ttests/shipping-package-ui.cjs",
+    "A\ttests/shipping-packages.cjs",
+    "A\ttests/transport-scanner.cjs",
+    "M\ttests/transport.cjs"
+  ],
+  "initialTests": [
+    {
+      "name": "incoming-qc-scanner-ui",
+      "exitCode": 0,
+      "ms": 1908
+    },
+    {
+      "name": "incoming-qc-scan-ui",
+      "exitCode": 0,
+      "ms": 2489
+    },
+    {
+      "name": "service-office-ui",
+      "exitCode": 0,
+      "ms": 1028
+    },
+    {
+      "name": "service-office-intake-ui",
+      "exitCode": 0,
+      "ms": 1271
+    },
+    {
+      "name": "service-timing",
+      "exitCode": 0,
+      "ms": 1616
+    },
+    {
+      "name": "incoming-qc-scan",
+      "exitCode": 0,
+      "ms": 6991
+    },
+    {
+      "name": "service-return-parcels-ui",
+      "exitCode": 0,
+      "ms": 1450
+    },
+    {
+      "name": "service-expert-dashboard-ui",
+      "exitCode": 0,
+      "ms": 978
+    },
+    {
+      "name": "service-office",
+      "exitCode": 0,
+      "ms": 16775
+    },
+    {
+      "name": "service-return-parcels",
+      "exitCode": 0,
+      "ms": 12297
+    },
+    {
+      "name": "driver-receipts",
+      "exitCode": 0,
+      "ms": 9676
+    },
+    {
+      "name": "driver-receipts-ui",
+      "exitCode": 0,
+      "ms": 914
+    },
+    {
+      "name": "driver-dashboard-ui",
+      "exitCode": 0,
+      "ms": 969
+    },
+    {
+      "name": "shipping-package-ui",
+      "exitCode": 0,
+      "ms": 1234
+    },
+    {
+      "name": "driver-workspace",
+      "exitCode": 0,
+      "ms": 3778
+    },
+    {
+      "name": "representative-identity-ui",
+      "exitCode": 0,
+      "ms": 1923
+    },
+    {
+      "name": "shipping-packages",
+      "exitCode": 0,
+      "ms": 13484
+    },
+    {
+      "name": "service-payments",
+      "exitCode": 0,
+      "ms": 8688
+    },
+    {
+      "name": "representative-identity",
+      "exitCode": 0,
+      "ms": 13131
+    },
+    {
+      "name": "service-payments-ui",
+      "exitCode": 0,
+      "ms": 1462
+    },
+    {
+      "name": "receipt-photo-editor",
+      "exitCode": 0,
+      "ms": 1255
+    },
+    {
+      "name": "receipt-camera",
+      "exitCode": 0,
+      "ms": 1604
+    },
+    {
+      "name": "receipt-identity-correction",
+      "exitCode": 0,
+      "ms": 4916
+    },
+    {
+      "name": "receipt-completion",
+      "exitCode": 0,
+      "ms": 5386
+    },
+    {
+      "name": "profile-permissions-and-receipt-edit",
+      "exitCode": 0,
+      "ms": 12055
+    },
+    {
+      "name": "sales-bank",
+      "exitCode": 0,
+      "ms": 16987
+    },
+    {
+      "name": "transport",
+      "exitCode": 0,
+      "ms": 10616
+    },
+    {
+      "name": "transport-scanner",
+      "exitCode": 0,
+      "ms": 12287
+    },
+    {
+      "name": "workflow-role-access",
+      "exitCode": 1,
+      "ms": 9505
+    },
+    {
+      "name": "role-cartable-ui",
+      "exitCode": 0,
+      "ms": 1799
+    },
+    {
+      "name": "after-sales-domain-ui",
+      "exitCode": 0,
+      "ms": 2284
+    },
+    {
+      "name": "service-role-preview",
+      "exitCode": 0,
+      "ms": 8241
+    },
+    {
+      "name": "after-sales",
+      "exitCode": 0,
+      "ms": 13052
+    },
+    {
+      "name": "system-reset",
+      "exitCode": 0,
+      "ms": 13072
+    }
+  ],
+  "postFix": {
+    "passed": [
+      "service-office",
+      "incoming-qc-scan",
+      "service-office-ui",
+      "service-office-intake-ui",
+      "incoming-qc-scan-ui",
+      "incoming-qc-scanner-ui",
+      "mcp-integration"
+    ],
+    "scale": [
+      {
+        "name": "incoming-qc-exact",
+        "samples": 30,
+        "p95Ms": 430.4274000000005,
+        "minMs": 263.6723000000002,
+        "maxMs": 535.1916999999994
+      },
+      {
+        "name": "incoming-qc-unknown",
+        "samples": 30,
+        "p95Ms": 658.6464000000014,
+        "minMs": 262.96229999999923,
+        "maxMs": 671.9591
+      },
+      {
+        "name": "office-open",
+        "samples": 30,
+        "p95Ms": 774.3060000000041,
+        "minMs": 506.9507999999987,
+        "maxMs": 838.1483000000007
+      },
+      {
+        "name": "office-serial",
+        "samples": 30,
+        "p95Ms": 830.5377999999982,
+        "minMs": 637.8122000000003,
+        "maxMs": 858.5443000000014
+      }
+    ],
+    "recovery": {
+      "backupMs": 624.8420999999944,
+      "tables": 94,
+      "allLogicalHashesEqual": true,
+      "integrityCheck": "ok",
+      "foreignKeyViolations": 0
+    }
+  },
+  "queryPlans": [
+    {
+      "name": "batch-code",
+      "plan": [
+        {
+          "id": 4,
+          "parent": 0,
+          "notused": 62,
+          "detail": "SEARCH records USING INDEX idx_records_kind (kind=?)"
+        }
+      ]
+    },
+    {
+      "name": "receipt-link",
+      "plan": [
+        {
+          "id": 4,
+          "parent": 0,
+          "notused": 62,
+          "detail": "SEARCH flow_entities USING INDEX idx_flow_agent_created (type=?)"
+        }
+      ]
+    },
+    {
+      "name": "office-serial",
+      "plan": [
+        {
+          "id": 3,
+          "parent": 0,
+          "notused": 62,
+          "detail": "SEARCH flow_entities USING INDEX idx_flow_agent_created (type=?)"
+        }
+      ]
+    }
+  ],
+  "proposedIndexes": [
+    "records: partial batch code expression index",
+    "flow_entities: partial receipt batchId expression index",
+    "flow_entities: office domain/agent/serial and ordered list expression indexes"
+  ],
+  "productionDatabaseModified": false
+}

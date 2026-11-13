@@ -1,3 +1,7 @@
+## 2026-11-13 — End-of-day quality corrections
+
+Keep delivered office repair cases open until final customer confirmation, consistently with QR lookup and duplicate-visit protection. Restore administrator incoming-QC label lookup with full permission sets while preserving non-admin scope restrictions. Add reproducible local multi-year volume/backup checks and a transparent review report including the pre-existing navigation-test failure.
+
 ## 2026-11-13 — Incoming receipt QC by label
 
 Existing batch labels now open the exact incoming receipt QC form from the assigned quality profile or authenticated label link. Receipt completion, assignment, template and current revision are checked server-side; completed scans show the result without repeating QC or stock movements. Existing label content and receipt/QC process remain in place. Added read-only HTTP/MCP resolution and focused integration/UI coverage.

@@ -7,7 +7,7 @@ import {receiptQCWarehouse} from './warehouse-receipt-policy';
 import {incomingQcCode} from './incoming-qc-contract';
 export async function incomingReceiptQuantity(batchId:string,quantity:number){const row:any=await storage().prepare("SELECT COALESCE(SUM(quantity),0) n FROM inventory_balances WHERE item_id=? AND warehouse='quarantine'").bind(batchId).first();return Number.isSafeInteger(quantity)&&quantity>0&&Number(row?.n||0)>=quantity;}
 export async function incomingQcForLabel(u:Session,raw:string,origin:string){
- if(!flowRole(u,'qc')||u.permissions.salesAgentId||u.permissions.serviceAgentId||u.permissions.hospitalCenterId||u.permissions.qmsRoles?.includes('observer'))throw new AccessError('دسترسی کنترل کیفیت ورودی لازم است.',403);
+ if(!flowRole(u,'qc')||!u.isAdmin&&(u.permissions.salesAgentId||u.permissions.serviceAgentId||u.permissions.hospitalCenterId||u.permissions.qmsRoles?.includes('observer')))throw new AccessError('دسترسی کنترل کیفیت ورودی لازم است.',403);
  const code=incomingQcCode(raw,origin);if(!code)throw new AccessError('لیبل بچ معتبر را اسکن کنید؛ کد کالا به‌تنهایی کافی نیست.',400);
  const db=storage(),batches=(await db.prepare("SELECT id,payload FROM records WHERE kind='batch' AND json_extract(payload,'$.code')=? LIMIT 2").bind(code).all()).results as any[];
  if(!batches.length){const retired=await db.prepare("SELECT r.id FROM flow_entities r,json_each(r.data,'$.identityHistory') h WHERE r.type='receipt' AND json_extract(h.value,'$.from.code')=? LIMIT 1").bind(code).first();throw new AccessError(retired?'این لیبل پس از اصلاح رسید باطل شده است؛ لیبل صحیح را دریافت کنید.':'بچ پیدا نشد.',retired?410:404)}
