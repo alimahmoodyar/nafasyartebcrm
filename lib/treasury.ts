@@ -23,7 +23,7 @@ export const treasuryHelp=[
 export const tFail=(m:string,s=400):never=>{throw new AccessError(m,s)};
 export function tText(v:unknown,max=2000){if(typeof v!=='string'||!v.trim()||v.length>max)tFail('متن الزامی یا نامعتبر است.');return (v as string).trim();}
 export function tDay(v:unknown){const s=tText(v,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(s)||!Number.isFinite(Date.parse(s))||new Date(s).toISOString().slice(0,10)!==s)tFail('تاریخ معتبر میلادی لازم است.');return s;}
-export const tToday=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tehran',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+export const tToday=(date=new Date())=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tehran',year:'numeric',month:'2-digit',day:'2-digit'}).format(date);
 export function tMoney(v:unknown,zero=false){try{const n=moneyMicro(v);if(n<BigInt(0)||!zero&&n===BigInt(0))tFail('مبلغ مثبت لازم است.');return moneyText(n);}catch{return tFail('مبلغ عددی معتبر بدون جداکننده لازم است.');}}
 export const tUUID=(v:unknown)=>{if(typeof v!=='string'||!/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(v))tFail('UUID معتبر لازم است.');return v as string;};
 const norm=(v:string)=>v.replace(/[\s\u200c]/g,'').replace(/ي/g,'ی').replace(/ك/g,'ک');
@@ -125,7 +125,7 @@ export async function applyTreasury(u:Session,b:any){
    const a=cd.advances.find((a:any)=>a.id===s.itemId),o=rows.find(o=>o.id===a.orderId&&o.type==='purchase_order');
    if(o?.data.pendingPurchaseAgreement&&!o.data.purchaseConfirmedAt){
     const cases=rows.filter(r=>r.type==='purchase_payable').map(r=>r.id===c.id?{...c,data:cd}:r),evidence=purchaseAdvanceEvidence(o,cases,m.day);
-    if(evidence.satisfied){const agreement=o.data.pendingPurchaseAgreement,start=[agreement.agreedAt.slice(0,10),m.day].sort().at(-1)!,eta=hasDeliveryDays(o.data)?addDeliveryDays(start,o.data.deliveryDays):o.data.promisedEta||o.data.eta;
+    if(evidence.satisfied){const agreement=o.data.pendingPurchaseAgreement,start=[tToday(new Date(agreement.agreedAt)),m.day].sort().at(-1)!,eta=hasDeliveryDays(o.data)?addDeliveryDays(start,o.data.deliveryDays):o.data.promisedEta||o.data.eta;
      put(o,{...o.data,pendingPurchaseAgreement:null,agreedAt:agreement.agreedAt,respondent:agreement.respondent,purchaseConfirmedAt:now,purchaseConfirmedBy:agreement.actor,purchaseConfirmationReference:agreement.reference,deliveryStartedOn:start,eta,promisedEta:eta,advanceEvidence:evidence.sources,history:[...(o.data.history||[]),{stage:'advance_started_delivery',actor:'system:purchase',at:now,paymentId:b.id+':movement',agreement,eta}]});
     }
    }
