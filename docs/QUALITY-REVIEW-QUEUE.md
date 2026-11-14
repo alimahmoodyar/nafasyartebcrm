@@ -321,3 +321,9 @@ Pairing is hidden on the administrator landing page until a role is selected, an
 ## 2026-11-13 — Pairing placement follows the visible page
 
 Observed in the live browser: home retained a prior driver profile cookie and displayed pairing above PersonalHome. Hide pairing on home and the role catalog regardless of restored role state; show it on the matching selected role page and downstream authorized work. Regression covers retained role on home, empty catalog target, wrong role target and valid role/warehouse work. This corrects the incomplete role-presence-only condition.
+
+
+## 2026-11-14 — SMS ordinary-send suffix
+
+- Owner confirmed handset receipt for test 819737821 from line 100045715 with exact terminal `لغو11`. Add the same suffix once to the shared asset OTP sender (UI/HTTP/MCP unchanged). Provider acceptance remains distinct from delivery.
+- Scope: message text only; existing input, authorization, OTP expiry/rate and provider error handling preserved. Procurement form review remains paused at request assignment.
