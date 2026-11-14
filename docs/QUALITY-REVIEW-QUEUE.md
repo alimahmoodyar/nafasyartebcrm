@@ -334,3 +334,7 @@ Observed in the live browser: home retained a prior driver profile cookie and di
 - The old sourcing-multiple-quotes suite was run against unchanged v281 too and fails at its obsolete CEO award expectation (403 vs 400); never broaden permissions to satisfy that stale expectation. Old pre-v279 finance-before-award fixtures also need separate review.
 - Full browser walkthrough is not verified in this change. Private Sites hosting requires sign-in; application capability links alone do not remove that platform boundary. Anonymous companion page awaits owner choice; audience unchanged.
 - Existing unbounded sourcing reads remain debt; new history responses are bounded. Modian state is observed/manual until real integration exists; legal automation remains deferred.
+# Public cargo companion — 2026-11-14
+- Scope: public one-mission handover gateway, existing private shared transport, secure service-access forwarding, configured public SMS origin. CRM audience unchanged; no D1/R2 bindings on companion.
+- Checks: anonymous shell and JavaScript parse; exact endpoint and output allowlist; reject arbitrary target/cross-origin/oversized input; no cookie, identity or private-secret leaks; existing domain token/expiry/reissue/photo/duplicate/stock tests through gateway.
+- Device camera permission and physical-phone capture require handset verification; automated tests do not claim a real camera/receipt or SMS delivery. Record both native deployment IDs and complete tree comparisons before reporting online completion.

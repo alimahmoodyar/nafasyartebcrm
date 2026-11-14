@@ -2657,3 +2657,7 @@ Observed in the live browser: home retained a prior driver profile cookie and di
 - Independent finance negotiation, percentage calculator, payment stages and bounded item/source history; selected approval issues orders without a second managerial budget gate.
 - Actual supplier start timestamp, shared follow-up, freight quote/financial review and existing transport missions. Driver pickup requires photos; external capability page implemented, anonymous publication pending the owner choice because current Sites hosting is private.
 - Actual-count confirmation, QC defaults/conditional explanation and alternate permitted placement without changing material defaults.
+# Public cargo handover — 2026-11-14
+- Separate public, capability-only cargo page; main CRM remains private. No parallel data, financial routes or caller-identity forwarding. SMS links derive from configured published cargo origin; no private-link fallback.
+- Camera/photo crop and explicit receipt use the existing shared transport handler. Bounded uploads, response allowlist, expiry/revocation, required discrepancy notes and duplicate-receipt protection verified.
+- Gateway tests and private-handler integration use synthetic in-memory data. Publication evidence is recorded separately; no real SMS or handset-delivery claim from these tests.

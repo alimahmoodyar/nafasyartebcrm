@@ -1,5 +1,8 @@
 # Nafasyar development rules
 
+## Public cargo companion (owner agreement 2026-11-14)
+Keep the CRM private. Only the dedicated public-cargo companion may be public, limited to one token-authorized mission through a fixed private transport handler. Follow docs/PUBLIC-CARGO.md; never ship service credentials, relay arbitrary targets/caller identity or create parallel cargo data. Verify both published sources independently against their GitHub branches.
+
 ## Paired phone and desktop workflow (owner agreement 2026-11-13)
 
 - Owner approved explicit, optional pairing of two devices signed into the same account using a short-lived QR. Do not broadcast scans, navigation or form contents to every session of that account. Each device retains its own authentication and current server-enforced role/record permissions.
