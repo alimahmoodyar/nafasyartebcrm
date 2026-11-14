@@ -2650,3 +2650,10 @@ Observed in the live browser: home retained a prior driver profile cookie and di
 
 - Owner confirmed handset receipt for test 819737821 from line 100045715 with exact terminal `لغو11`. Add the same suffix once to the shared asset OTP sender (UI/HTTP/MCP unchanged). Provider acceptance remains distinct from delivery.
 - Scope: message text only; existing input, authorization, OTP expiry/rate and provider error handling preserved. Procurement form review remains paused at request assignment.
+
+
+## 2026-11-14 — Procurement approved workflow
+- Complete factory-delivered quotation cost, formal invoice/tax fields, exact less-than-15-percent preference, partial-source splitting and selection reasons.
+- Independent finance negotiation, percentage calculator, payment stages and bounded item/source history; selected approval issues orders without a second managerial budget gate.
+- Actual supplier start timestamp, shared follow-up, freight quote/financial review and existing transport missions. Driver pickup requires photos; external capability page implemented, anonymous publication pending the owner choice because current Sites hosting is private.
+- Actual-count confirmation, QC defaults/conditional explanation and alternate permitted placement without changing material defaults.

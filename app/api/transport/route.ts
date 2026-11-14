@@ -1,3 +1,4 @@
+import {purchaseTransportRequester} from '@/lib/transport';
 import {packageReceiptSelection} from '@/lib/shipping-packages';
 import {transportScanItems,checkTransportScans} from '@/lib/transport-scan';
 import {withServiceRolePreview} from '@/lib/service-role-preview';
@@ -38,9 +39,9 @@ async function get(request:Request){try{const u=await requireAccess();if(request
   }
  }
  const manager=transportManager(u),members=(await storage().prepare("SELECT id,name,permissions FROM app_members WHERE status='active'").all()).results as any[];
- const drivers=manager?members.filter(m=>{const p=storedAccessPermissions(m.permissions);return !p.serviceAgentId&&(p.transportRoles?.includes('driver')||p.flowRoles?.includes('logistics'));}).map(m=>({id:m.id,name:m.name})):[];
+ const drivers=manager||purchaseTransportRequester(u)?members.filter(m=>{const p=storedAccessPermissions(m.permissions);return !p.serviceAgentId&&(p.transportRoles?.includes('driver')||p.flowRoles?.includes('logistics'));}).map(m=>({id:m.id,name:m.name})):[];
  const receivers=!transportDriverPreview(u)&&!isAgent(u)&&!salesRep(u)?members.filter(m=>{const p=storedAccessPermissions(m.permissions);return purchaseReceiver(p)||!p.serviceAgentId&&p.serviceRoles?.some((r:string)=>['intake','inventory','manager'].includes(r));}).map(m=>({id:m.id,name:m.name})):[];
- return json({missions,sources,drivers,receivers,vehicles:manager?await list('transport_vehicle'):[],vehicleReports:manager||transportDriver(u)?missions.flatMap(m=>(m.data.vehicleReports||[]).map((report:any)=>({...report,missionId:m.id,missionCode:m.data.code,vehicleName:m.data.vehicleName}))):[],driverPreview:transportDriverPreview(u),previewMissionId:u.profileReview?.missionId||'',parties:[],agents:manager?(await list('as_agent')).filter(a=>a.data.active).map(a=>({id:a.id,name:a.data.name})):[],me:mid,roles:{manager,driver:transportDriver(u),finance:transportFinance(u),agent:isAgent(u)||salesRep(u)},forms:transportForms,help:transportHelp+'\n'+transportDriverHelp});
+ return json({missions,sources,drivers,receivers,vehicles:manager||purchaseTransportRequester(u)?await list('transport_vehicle'):[],vehicleReports:manager||transportDriver(u)?missions.flatMap(m=>(m.data.vehicleReports||[]).map((report:any)=>({...report,missionId:m.id,missionCode:m.data.code,vehicleName:m.data.vehicleName}))):[],driverPreview:transportDriverPreview(u),previewMissionId:u.profileReview?.missionId||'',parties:[],agents:manager?(await list('as_agent')).filter(a=>a.data.active).map(a=>({id:a.id,name:a.data.name})):[],me:mid,roles:{manager,driver:transportDriver(u),finance:transportFinance(u),agent:isAgent(u)||salesRep(u)},forms:transportForms,help:transportHelp+'\n'+transportDriverHelp});
  }catch(e){return accessResponse(e)||json({error:'دریافت تدارکات انجام نشد.'},503)}}
 async function post(request:Request){try{checkOrigin(request);const u=await requireAccess();if(request.headers.get('X-Transport-Account')&&request.headers.get('X-Transport-Account')!==u.userId)fail('حساب ورود تغییر کرده است؛ پیش‌نویس برای این حساب نیست.',403);if(!transportEntry(u))fail('دسترسی تدارکات ندارید.',403);const b=JSON.parse(new TextDecoder().decode(await boundedBody(request,100000))),mode=req(b.mode),op=req(b.id),db=storage(),now=new Date().toISOString(),mid=await memberId(u);if(!/^[a-f0-9-]{36}$/i.test(op)||!transportActions[mode])fail('شناسه یا عملیات معتبر نیست.');
  if(transportDriverPreview(u)){
@@ -93,7 +94,8 @@ async function post(request:Request){try{checkOrigin(request);const u=await requ
  const selected=serialBased?selectedDevices(d.collectedDeviceIds||[]):null;
  if(selected&&!selected.chosen.length&&selected.pending.length)fail('سریال کارتن‌های دریافت‌شده را علامت بزنید.');
  const n=selected?selected.chosen.length:packs(b.packages);
- if(!selected&&n!==d.packages)fail('تعداد بسته با مأموریت متفاوت است؛ پیش از دریافت با مسئول تدارکات هماهنگ کنید.');
+ if(!selected&&d.kind!=='purchase_order'&&n!==d.packages)fail('تعداد بسته با مأموریت متفاوت است؛ پیش از دریافت با مسئول تدارکات هماهنگ کنید.');
+ if(d.kind==='purchase_order'){const photos=await transportFiles(u,m);if(!photos.some(f=>f.data.purpose==='condition'&&f.data.mime?.startsWith('image/')))fail('حداقل یک عکس بار را پیش از تأیید دریافت ثبت کنید.');if(n!==d.packages&&!txt(b.notes))fail('مغایرت تعداد بسته را توضیح دهید.');d.pickupDiscrepancy=n!==d.packages;d.actualPackages=n;}
  d.condition=req(b.condition);detail={packages:n,day:actual,condition:d.condition};
  if(selected){
   d.collectedDeviceIds=[...(d.collectedDeviceIds||[]),...selected.chosen];

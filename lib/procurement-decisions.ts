@@ -6,7 +6,7 @@ export const procurementDecisionModes=['request_exception','decide_exception','c
 import {exceptionKinds} from './procurement-decision-labels';
 export function blockingException(plan:any,partCode:string){return (plan.data.exceptions||[]).find((x:any)=>x.kind==='unforeseen'&&x.partCode===partCode&&['pending','assigned','development'].includes(x.state));}
 export function purchaseException(plan:any,q:any){return (plan.data.exceptions||[]).find((x:any)=>x.state==='approved'&&!x.usedBy&&['urgent','sole_source','contract'].includes(x.kind)&&x.quoteId===q.id&&x.quoteRevision===q.revision);}
-export function validQuoteCount(quotes:any[],line:any,today:string){return new Set(quotes.filter(q=>!q.data.unavailable&&q.data.round===line.round&&q.data.partCode===line.partCode&&q.data.quantity===line.shortage&&q.data.technical==='pass'&&q.data.validUntil>=today&&!q.data.supplierBlock&&q.data.supplierId).map(q=>q.data.supplierId)).size;}
+export function validQuoteCount(quotes:any[],line:any,today:string){return new Set(quotes.filter(q=>!q.data.unavailable&&q.data.round===line.round&&q.data.partCode===line.partCode&&q.data.quantity>0&&q.data.quantity<=line.shortage&&(q.data.commercialVersion!==3||q.data.costsComplete)&&q.data.technical==='pass'&&q.data.validUntil>=today&&!q.data.supplierBlock&&q.data.supplierId).map(q=>q.data.supplierId)).size;}
 
 /** Decisions never execute arbitrary text or bypass technical, stock or payment guards. */
 export async function applyProcurementDecision(c:any){

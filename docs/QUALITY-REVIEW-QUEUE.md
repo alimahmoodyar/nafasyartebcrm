@@ -327,3 +327,10 @@ Observed in the live browser: home retained a prior driver profile cookie and di
 
 - Owner confirmed handset receipt for test 819737821 from line 100045715 with exact terminal `لغو11`. Add the same suffix once to the shared asset OTP sender (UI/HTTP/MCP unchanged). Provider acceptance remains distinct from delivery.
 - Scope: message text only; existing input, authorization, OTP expiry/rate and provider error handling preserved. Procurement form review remains paused at request assignment.
+
+
+## Procurement approved implementation — 2026-11-14
+- Focused checks: procurement-approved, procurement-decisions, sourcing-delivery, material-flow, material-quality-fields, transport, receipt-camera, receipt-photo-editor; TypeScript.
+- The old sourcing-multiple-quotes suite was run against unchanged v281 too and fails at its obsolete CEO award expectation (403 vs 400); never broaden permissions to satisfy that stale expectation. Old pre-v279 finance-before-award fixtures also need separate review.
+- Full browser walkthrough is not verified in this change. Private Sites hosting requires sign-in; application capability links alone do not remove that platform boundary. Anonymous companion page awaits owner choice; audience unchanged.
+- Existing unbounded sourcing reads remain debt; new history responses are bounded. Modian state is observed/manual until real integration exists; legal automation remains deferred.

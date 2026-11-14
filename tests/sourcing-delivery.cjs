@@ -26,12 +26,12 @@ const stock=(id,wh)=>sql.prepare('SELECT quantity FROM inventory_balances WHERE 
 let batchTail=Promise.resolve();const rawBatch=db.batch.bind(db);db.batch=stmts=>{const next=batchTail.then(()=>rawBatch(stmts));batchTail=next.catch(()=>{});return next};
 const sourcing=load('app/api/sourcing/route.ts'),context=load('lib/mcp/context.ts').mcpActor;
 const current=id=>entities('sourcing_plan').find(p=>p.id===id);
-const actor=role=>({userId:role+'User',email:role+'@test.local',name:role,isAdmin:false,permissions:{read:[],write:[],eventStages:[],supplyRoles:[role],flowRoles:role==='inventory'?['inventory']:[],warehouses:role==='inventory'?['quarantine','raw']:[]}});
+const actor=role=>({userId:role+'User',email:role+'@test.local',name:role,isAdmin:false,permissions:{read:[],write:[],eventStages:[],supplyRoles:[role],flowRoles:role==='inventory'?['inventory']:[],warehouses:role==='inventory'?['quarantine','raw']:[],warehouseResponsibilities:role==='inventory'?[{warehouseId:'warehouse:receipt-fixture',role:'inventory'}]:[]}});
 async function source(mode,b={},status=200,user){const body={id:crypto.randomUUID(),mode,...(b.planId?{revision:current(b.planId).revision}:{}),...b};const go=()=>sourcing.POST(request('/api/sourcing','POST',body));const r=user?await context.run(user,go):await go(),d=await r.json();assert.equal(r.status,status,mode+': '+JSON.stringify(d));return {...d,operationId:body.id};}
 async function detail(id,user){const go=()=>sourcing.GET(request('/api/sourcing?id='+id));const r=user?await context.run(user,go):await go();assert.equal(r.status,200);return r.json();}
 
 (async()=>{
- identity=owner;await auth.session();const now=clockNow,today=()=>load('lib/duties.ts').dayAt(),future='2027-01-31',later='2027-01-01';
+ identity=owner;await auth.session();require('./helpers/receiving-warehouse.cjs')(sql);const now=clockNow,today=()=>load('lib/duties.ts').dayAt(),future='2027-01-31',later='2027-01-01';
  const delivery=load('lib/sourcing-delivery.ts');assert.equal(today(),'2026-11-05');assert.equal(delivery.addDeliveryDays('2026-12-31',1),'2027-01-01');assert.equal(delivery.addDeliveryDays('2028-02-28',1),'2028-02-29');assert.equal(delivery.addDeliveryDays('2026-03-21',0),'2026-03-21');assert.throws(()=>delivery.addDeliveryDays('2026-02-30',1));
  const put=(id,type,data)=>sql.prepare('INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?)').run(id,type,JSON.stringify(data),now,now);
  for(const role of ['inventory','engineering','domestic','foreign','ceo','finance','commerce_manager']){const a=actor(role);sql.prepare("INSERT INTO app_members(id,email,name,unit,status,subject,permissions,revision,created,updated) VALUES(?,?,?,'test','active',?,?,1,?,?)").run(a.userId,a.email,a.name,a.userId,JSON.stringify(a.permissions),now,now);}

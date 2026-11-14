@@ -25,14 +25,14 @@ const stock=(id,wh)=>sql.prepare('SELECT quantity FROM inventory_balances WHERE 
 let batchTail=Promise.resolve();const rawBatch=db.batch.bind(db);db.batch=stmts=>{const next=batchTail.then(()=>rawBatch(stmts));batchTail=next.catch(()=>{});return next};
 const sourcing=load('app/api/sourcing/route.ts'),context=load('lib/mcp/context.ts').mcpActor;
 const current=id=>entities('sourcing_plan').find(p=>p.id===id);
-const actor=role=>({userId:role+'User',email:role+'@test.local',name:role,isAdmin:false,permissions:{read:[],write:[],eventStages:[],supplyRoles:[role],flowRoles:role==='inventory'?['inventory']:[],warehouses:role==='inventory'?['quarantine','raw']:[]}});
+const actor=role=>({userId:role+'User',email:role+'@test.local',name:role,isAdmin:false,permissions:{read:[],write:[],eventStages:[],supplyRoles:[role],flowRoles:role==='inventory'?['inventory']:[],warehouses:role==='inventory'?['quarantine','raw']:[],warehouseResponsibilities:role==='inventory'?[{warehouseId:'warehouse:receipt-fixture',role:'inventory'}]:[]}});
 async function source(mode,b={},status=200,user){const body={id:crypto.randomUUID(),mode,...(b.planId?{revision:current(b.planId).revision}:{}),...b};const go=()=>sourcing.POST(request('/api/sourcing','POST',body));const r=user?await context.run(user,go):await go(),d=await r.json();assert.equal(r.status,status,mode+': '+JSON.stringify(d));return {...d,operationId:body.id};}
 async function detail(id,user){const go=()=>sourcing.GET(request('/api/sourcing?id='+id));const r=user?await context.run(user,go):await go();assert.equal(r.status,200);return r.json();}
 async function reviews(workspace,user,status=200){const go=()=>sourcing.GET(request('/api/sourcing?reviewInbox='+workspace));const r=user?await context.run(user,go):await go();assert.equal(r.status,status);return r.json();}
 
 
 (async()=>{
- identity=owner;await auth.session();const now=new Date().toISOString(),future=new Date(Date.now()+20*86400000).toISOString().slice(0,10);
+ identity=owner;await auth.session();require('./helpers/receiving-warehouse.cjs')(sql);const now=new Date().toISOString(),future=new Date(Date.now()+20*86400000).toISOString().slice(0,10);
  const put=(type,data,id=crypto.randomUUID())=>{sql.prepare('INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?)').run(id,type,JSON.stringify(data),now,now);return id};
  for(const role of ['inventory','engineering','domestic','commerce_manager','ceo','finance']){const a=actor(role);sql.prepare("INSERT INTO app_members(id,email,name,unit,status,subject,permissions,revision,created,updated) VALUES(?,?,?,'test','active',?,?,1,?,?)").run(a.userId,a.email,a.name,a.userId,JSON.stringify(a.permissions),now,now);}
  await op('material',{code:'41',name:'Procurement material',unit:'عدد',specs:'V1',fields:[{key:'visual',label:'Visual',type:'text',unit:'',min:'',max:'',required:true}],revision:0});let material=entities('material')[0];await source('routes',{materialId:material.id,revision:material.revision,routes:['domestic']});material=entities('material')[0];

@@ -21,5 +21,8 @@ export function purchaseDeliveryStatus(order:any,receipts:any[],today:string){
  const receivedOnTime=arrivals.filter(r=>r.data.day<=due).reduce((sum,r)=>sum+effectiveQuantity(r),0);
  const missing=Math.max(0,data.quantity-received);
  const untilDue=(Date.parse(due)-Date.parse(today))/86400000;
- return {due,missing,reminder:data.state!=='closed'&&missing>0&&untilDue<=3,late:untilDue<0&&receivedOnTime<data.quantity};
+ const start=data.deliveryStartedOn,days=hasDeliveryDays(data)?data.deliveryDays:null,elapsed=start?(Date.parse(today)-Date.parse(start))/86400000:0;const midpoint=days!==null&&days>=4&&elapsed>=Math.floor(days/2);const near=untilDue<=Math.min(2,Math.max(0,Math.floor((days??4)/2)));
+ if(data.procurementVersion!==3)return {due,missing,reminderPhase:'legacy',reminder:data.state!=='closed'&&missing>0&&untilDue<=3,late:untilDue<0&&receivedOnTime<data.quantity};
+ const reminderPhase=untilDue<0?'late':near?'near':'mid';
+ return {due,missing,reminderPhase,reminder:data.lastFollowupPhase!==reminderPhase&&data.state!=='closed'&&missing>0&&(near||midpoint),late:untilDue<0&&receivedOnTime<data.quantity};
 }

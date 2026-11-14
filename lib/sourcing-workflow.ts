@@ -23,7 +23,7 @@ export function supplyAssignment(plan:any,step:any,members:any[],policy:any={}){
  if(step.sourceSection==='flow'){const owner=members.find(m=>m.id===step.ownerId&&m.status==='active');return {owner:owner||null,candidates:[],missingOwner:!owner};}
  // Receipt custody is stronger than a general role assignment.
  const selected=step.ownerId||plan.data.workOwners?.[step.role]||policy.owners?.[step.role];
- const owner=candidates.find(m=>m.id===selected)||(!legacy&&!selected&&candidates.length===1?candidates[0]:null);
+ const owner=candidates.find(m=>m.id===selected)||(!selected&&candidates.length===1?candidates[0]:null);
  return {owner:owner||null,candidates:candidates.map(m=>({id:m.id,name:m.name})),missingOwner:!owner};
 }
 

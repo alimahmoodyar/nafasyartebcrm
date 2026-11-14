@@ -43,12 +43,16 @@ const p=await create('product',{code:'FLOW',name:'FlowDevice',group:'سایر ت
  const [r1,r2]=entities('receipt');assert.equal(stock(r1.id,'quarantine'),10000);
  await op('shelve',{receiptId:r1.id,location:'A-1-1-1'},400);
  await op('incoming_qc',{receiptId:r1.id,accepted:'10',rejected:'0',values:{purity:'70'},notes:'bad'},400);
+ await op('incoming_qc',{receiptId:r1.id,accepted:'8',values:{purity:'92'},notes:''},400);
  await op('incoming_qc',{receiptId:r1.id,accepted:'8',rejected:'2',values:{purity:'92'},notes:'2 damaged'});
  await op('incoming_qc',{receiptId:r1.id,accepted:'8',rejected:'2',values:{purity:'92'},notes:'repeat'},409);
- await op('incoming_qc',{receiptId:r2.id,accepted:'10',rejected:'0',values:{purity:'94'},notes:'all checked'});
+ await op('incoming_qc',{receiptId:r2.id,accepted:'10',rejected:'0',values:{purity:'94'},notes:''});
  const shelfId=crypto.randomUUID();await op('shelve',{id:shelfId,receiptId:r1.id,location:'A-1-1-1'});await op('shelve',{id:shelfId,receiptId:r1.id,location:'A-1-1-1'});assert.equal(stock(r1.id,'raw'),8000);assert.equal(stock(r1.id,'quarantine'),2000);
  await op('shelve',{receiptId:r2.id,location:'A-1-1-1'},409);assert.equal(stock(r2.id,'quarantine'),10000);
- await op('shelve',{receiptId:r2.id,location:'A-1-1-2'});
+ const mBefore=sql.prepare('SELECT data,revision FROM flow_entities WHERE id=?').get('material:01');
+ const wRow=sql.prepare('SELECT data FROM flow_entities WHERE id=?').get(receivingFixture.id);const wd=JSON.parse(wRow.data);wd.locations=[...new Set([...(wd.locations||[]),'A-1-1-2'])];sql.prepare('UPDATE flow_entities SET data=? WHERE id=?').run(JSON.stringify(wd),receivingFixture.id);
+ let alt=await flow.POST(request('/api/flow','POST',{id:crypto.randomUUID(),mode:'shelve',receiptId:r2.id,location:'Z-9-9-9',materialRevision:mBefore.revision,placed:true,confirmed:true}));assert.equal(alt.status,400);
+ alt=await flow.POST(request('/api/flow','POST',{id:crypto.randomUUID(),mode:'shelve',receiptId:r2.id,location:'A-1-1-2',materialRevision:mBefore.revision,placed:true,confirmed:true}));assert.equal(alt.status,200,await alt.text());assert.equal(sql.prepare('SELECT data FROM flow_entities WHERE id=?').get('material:01').data,mBefore.data);
  await operate({mode:'move',batchId:r1.id,from:'raw',to:'line',quantity:'1'},400);
  const req=crypto.randomUUID();await op('request',{id:req,materialId:'material:01',quantity:'10',notes:'daily'});
  const expectedIssue=[{batchId:r1.id,location:'A-1-1-1',quantity:'8'},{batchId:r2.id,location:'A-1-1-2',quantity:'2'}];

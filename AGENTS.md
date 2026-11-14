@@ -90,3 +90,12 @@
 - Automatic production/project demand already has its own shortage logic. A manual warehouse purchase request may intentionally request additional stock for another reason; do not silently net its entered amount against stock or change automatic-demand behavior.
 - Show current usable/free stock in the same unit and offer two explicit choices: send the full entered amount (selected by default), or subtract free stock and send the calculated remainder. Only the second explicit choice changes the purchase quantity. Reserved, quarantined or otherwise unavailable stock is not free stock. Show open/incoming purchases as context rather than silently deducting them under a new rule.
 - Preserve original entered amount, chosen treatment, stock calculation basis and final sent amount in the request/audit so downstream procurement uses that final amount without deducting the same stock again. This records the agreed behavior; implementation/publication is not implied by the note itself.
+
+## Procurement form review before implementation (owner instruction 2026-11-13)
+
+- Pause the new employee purchase/service and contractor manufacturing implementation and domestic role split until the owner reviews the forms. Follow docs/PROCUREMENT-FORM-REVIEW.md as a draft review register, not approved field requirements.
+- Review existing and proposed forms one at a time: actor, goal, current UI/server requirements, proposed mandatory/conditional/optional/automatic fields, next step and exceptions. Minimize essential inputs, reuse existing records and prefill trusted data. Explain simplification proposals; do not silently enforce them. Preserve approved stock/payment/access safeguards.
+
+
+## Approved procurement implementation (2026-11-14)
+Owner authorized implementing reviewed finance, quotation, order, transport, receipt/QC and placement and publishing after verification. This supersedes the earlier pause for these scopes; follow the latest approved register. Structured return/replacement remains unapproved. Employee/service manufacturing forms remain a separate checkpoint and are not claimed by this release.
