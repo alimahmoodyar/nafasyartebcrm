@@ -274,3 +274,5 @@ resetHelp.push('راهنماهای عیب‌یابی محصول، تاریخچه
 // Service role preview uses existing training_* tables and training R2 prefix, preserved by both company reset scopes. No new account/person binding, schema or company-data fixture is created.
 
 // employee_purchase_request is operational shared flow_entities JSON; generic backup/deletion and 0016 freeze cover request/history. Related duty_runs, inventory_operations and access_audit use existing reset rules; no new table, FK, file or parallel dataset.
+
+// employee_purchase_request, subcontract_order and subcontract_file are shared operational flow JSON. Both reset scopes back up/delete them, including private R2 manifests via resetFiles; inventory custody and generic 0016 freeze stay atomic. No new table/FK or parallel data source.
