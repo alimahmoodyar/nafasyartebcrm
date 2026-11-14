@@ -32,3 +32,8 @@ test('forwards photo and confirm to same handler; no redirect, HTML or upstream 
  assert.equal((await handle(req(),env,async()=>{throw Error(env.CARGO_BACKEND_SERVICE_TOKEN)})).status,503);
  assert.equal((await handle(req(),env,async()=>Response.json({error:'link expired'},{status:403}))).status,403);
 });
+
+test('contractor shell and same-shipment proxy expose only material custody data',async()=>{
+ const shell=await handle(new Request(origin+'/subcontract/handover'),env),html=await shell.text();assert.equal(shell.status,200);new Script(html.match(/<script nonce="[^"]+">([\s\S]*?)<\/script>/)[1]);assert.ok(!html.includes(env.CARGO_BACKEND_SERVICE_TOKEN));
+ const data={...key,shipmentId:crypto.randomUUID(),mode:'read'},r=await handle(new Request(origin+'/api/subcontract-handover',{method:'POST',headers:{origin,'Content-Type':'application/json'},body:JSON.stringify(data)}),env,async(url)=>{assert.equal(url,BACKEND+'/api/subcontracts/handover');return Response.json({title:'Work',materialName:'Sheet',quantity:2,unit:'kg',supplierName:'Vendor',earnedAmount:'100',externalAccess:{tokenHash:'secret'},items:[{code:'batch',quantity:2,unit:'kg',price:'100'}]});});assert.deepEqual(await r.json(),{title:'Work',materialName:'Sheet',quantity:2,unit:'kg',supplierName:'Vendor',items:[{code:'batch',quantity:2,unit:'kg'}]});
+});
