@@ -1,0 +1,10 @@
+{
+  "name": "nafasyar-public-cargo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test tests/gateway.test.mjs",
+    "validate": "node scripts/validate-artifact.mjs"
+  }
+}
