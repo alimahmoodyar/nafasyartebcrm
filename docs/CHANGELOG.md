@@ -2661,3 +2661,7 @@ Observed in the live browser: home retained a prior driver profile cookie and di
 - Separate public, capability-only cargo page; main CRM remains private. No parallel data, financial routes or caller-identity forwarding. SMS links derive from configured published cargo origin; no private-link fallback.
 - Camera/photo crop and explicit receipt use the existing shared transport handler. Bounded uploads, response allowlist, expiry/revocation, required discrepancy notes and duplicate-receipt protection verified.
 - Gateway tests and private-handler integration use synthetic in-memory data. Publication evidence is recorded separately; no real SMS or handset-delivery claim from these tests.
+
+## Employee purchase intake — 2026-11-14
+- Personnel portal: goods/service intake, catalogue search, conditional urgency/output fields, current-manager review/reduction/return/resubmission, direct manager routing, known-material warehouse queue and new/service procurement queue.
+- Scoped pagination, domain-checked duties, stable retry identity, audit/CAS and matching MCP. No stock or financial posting; downstream automatic fulfilment and contractor manufacturing remain explicitly open in PROCUREMENT-IMPLEMENTATION-AUDIT.md.

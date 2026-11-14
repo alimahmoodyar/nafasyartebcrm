@@ -272,3 +272,5 @@ resetHelp.push('راهنماهای عیب‌یابی محصول، تاریخچه
 // Passkey credentials/challenges are authentication infrastructure preserved with app_members/password_accounts by both business reset scopes. No business-reset freeze applies, like password sessions; account deletion cascades credentials and expired challenges are purged on issuance. Account-version changes invalidate old keys.
 
 // Service role preview uses existing training_* tables and training R2 prefix, preserved by both company reset scopes. No new account/person binding, schema or company-data fixture is created.
+
+// employee_purchase_request is operational shared flow_entities JSON; generic backup/deletion and 0016 freeze cover request/history. Related duty_runs, inventory_operations and access_audit use existing reset rules; no new table, FK, file or parallel dataset.

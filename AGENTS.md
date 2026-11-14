@@ -102,3 +102,6 @@ Keep the CRM private. Only the dedicated public-cargo companion may be public, l
 
 ## Approved procurement implementation (2026-11-14)
 Owner authorized implementing reviewed finance, quotation, order, transport, receipt/QC and placement and publishing after verification. This supersedes the earlier pause for these scopes; follow the latest approved register. Structured return/replacement remains unapproved. Employee/service manufacturing forms remain a separate checkpoint and are not claimed by this release.
+
+## Procurement completion follow-up (2026-11-14)
+The owner explicitly reopened all approved employee purchase/service and contractor workflows and authorized implementation/test/push/deployment without renewed confirmation. Earlier form-review pauses do not block these approved requirements. Keep the per-item implementation audit honest: the current employee intake release is not completion of automatic warehouse fulfilment or contractor manufacturing. Unapproved structured returns remain unapproved.

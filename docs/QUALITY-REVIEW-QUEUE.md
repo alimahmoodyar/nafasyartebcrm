@@ -338,3 +338,7 @@ Observed in the live browser: home retained a prior driver profile cookie and di
 - Scope: public one-mission handover gateway, existing private shared transport, secure service-access forwarding, configured public SMS origin. CRM audience unchanged; no D1/R2 bindings on companion.
 - Checks: anonymous shell and JavaScript parse; exact endpoint and output allowlist; reject arbitrary target/cross-origin/oversized input; no cookie, identity or private-secret leaks; existing domain token/expiry/reissue/photo/duplicate/stock tests through gateway.
 - Device camera permission and physical-phone capture require handset verification; automated tests do not claim a real camera/receipt or SMS delivery. Record both native deployment IDs and complete tree comparisons before reporting online completion.
+
+## Employee purchase intake release
+- Scope: intake and necessity review only; downstream automatic purchase/stock fulfilment and subcontract manufacturing remain open.
+- Tests: internal/external/peer scope, current manager, direct manager route, quantity reduction, conditional date/urgency/service fields, retry and stale revision, no stock/payment posting. Shared operational JSON/reset freeze reused.
