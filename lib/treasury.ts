@@ -7,13 +7,16 @@ import {costRead,costWrite,moneyMicro,moneyText} from './costing';
 import {apView,active,releaseBasis} from './purchase-payables';
 import {trainingContext} from './training-context';
 import {latinDigits} from './persian-date';
+import {purchaseGate,purchaseObligations,syncPurchaseTreasury} from './purchase-treasury';
+import {purchaseAdvanceEvidence} from './sourcing-delivery-payments';
+import {addDeliveryDays,hasDeliveryDays} from './sourcing-delivery';
 import type {Session} from './permissions';
 
-export const treasuryModes=['account','approve_account','destination_account','approve_destination_account','request','approve','ceo_approve','ceo_reject','reject','cancel','execute','statement','match','unmatch','check','check_issue','check_settle','check_cancel','expense','expense_review','advance_return'] as const;
+export const treasuryModes=['account','approve_account','destination_account','approve_destination_account','request','approve','ceo_approve','ceo_reject','purchase_review','reject','cancel','execute','statement','match','unmatch','check','check_issue','check_settle','check_cancel','expense','expense_review','advance_return'] as const;
 export const treasuryHelp=[
  'مدیر مالی درخواست و حساب مقصد را مستقل تأیید می‌کند؛ مدیرعامل مجوز نهایی پرداخت را مستقل صادر می‌کند؛ خزانه‌دار پس از این مجوز اجرای واقعی را با مدرک ثبت می‌کند؛ مدیر حسابداری تطبیق بانکی را مستقل تأیید می‌کند. نقش مرحله‌ای انتخاب‌شده در حساب کاربر لازم است؛ حساب‌های قدیمی با عضویت در سمت و مجوز نوشتن مالی نیز پشتیبانی می‌شوند.',
  'ثبت در این دفتر انتقال بانکی یا سند حسابداری ایجاد نمی‌کند. ارقام و پیش‌بینی هر ارز جداست؛ مانده دفتر با مانده تأییدشده بانک یکسان فرض نمی‌شود.',
- 'خرید از اقساط یا پیش‌پرداخت آزادشده انتخاب می‌شود. هنگام اجرا، اجازه و مانده زنده دوباره کنترل و پرداخت در همان پرونده خرید ثبت می‌شود. حقوق از مسیر پرسنلی موجود پرداخت می‌شود؛ در این دفتر دوباره ثبت نکنید.',
+ 'تعهد خرید خودکار از شرایط مصوب، اقساط و پیش‌پرداخت وارد خزانه می‌شود؛ درخواست جدا نسازید. بررسی شرط، مقصد و مجوز پرداخت فقط در خزانه است. هنگام اجرا، اجازه و مانده زنده دوباره کنترل و پرداخت در همان پرونده خرید ثبت می‌شود. حقوق از مسیر پرسنلی موجود پرداخت می‌شود؛ در این دفتر دوباره ثبت نکنید.',
  'صورتحساب اکسل ستون‌های تاریخ میلادی YYYY-MM-DD، شناسه یکتای تراکنش بانک، مرجع پیگیری، دریافت، پرداخت و شرح دارد. مبلغ بدون جداکننده و به ارز حساب است. نبود مرجع، تطبیق خودکار ندارد. پیشنهاد تطبیق به معنی تأیید نیست.',
  'تنخواه: پرداخت مصوب، هزینه مستند با تأیید مستقل و برگشت مانده واقعی جدا ثبت می‌شوند. چک صادره تا وصول تعهد باز است و مانده درخواست را رزرو می‌کند؛ برگشت یا ابطال بدون وصول مانده بانک را تغییر نمی‌دهد.'
 ];
@@ -24,7 +27,7 @@ export const tToday=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tehran',
 export function tMoney(v:unknown,zero=false){try{const n=moneyMicro(v);if(n<BigInt(0)||!zero&&n===BigInt(0))tFail('مبلغ مثبت لازم است.');return moneyText(n);}catch{return tFail('مبلغ عددی معتبر بدون جداکننده لازم است.');}}
 export const tUUID=(v:unknown)=>{if(typeof v!=='string'||!/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(v))tFail('UUID معتبر لازم است.');return v as string;};
 const norm=(v:string)=>v.replace(/[\s\u200c]/g,'').replace(/ي/g,'ی').replace(/ك/g,'ک');
-const types="'treasury_account','sales_receiving_account','treasury_request','treasury_movement','treasury_statement','treasury_check','treasury_expense','treasury_file','position','purchase_payable','payable_file','purchase_order','receipt','hr_payroll','hr_request','purchase_service'";
+const types="'treasury_account','sales_receiving_account','treasury_request','treasury_movement','treasury_statement','treasury_check','treasury_expense','treasury_file','position','purchase_payable','payable_file','purchase_order','purchase_shipment','receipt','hr_payroll','hr_request','purchase_service'";
 export function treasuryProfileTest<T>(u:Session,work:()=>Promise<T>){
  const role=u.profileReview?.id;
  if(role!=='treasurer'&&role!=='finance-director')tFail('پروفایل آزمایشی خزانه‌دار یا مدیر مالی لازم است.',403);
@@ -55,7 +58,7 @@ export async function treasuryRoles(u:Session,rows:any[]){
  const has=(role:FinancialWorkflowRole)=>u.isAdmin||(u.profileReview?financialWorkflowRole(u.permissions,'',rows,role):!!p&&financialWorkflowRole(p,m.id,rows,role)&&financialWorkflowRole(u.permissions,m.id,rows,role));
  return {read:true,write,treasury:has('treasury'),manager:has('manager'),accountant:has('accountant'),ceo:has('ceo'),memberId:m?.id||'',membersSnapshot:JSON.stringify(members)};
 }
-export function treasuryApprovalBasis(d:any){return JSON.stringify([d.direction,d.category,d.amount,d.currency,d.party,d.destination,d.beneficiaryMemberId||'',d.source||null,d.due,d.referenceDocument,d.approvedBy]);}
+export function treasuryApprovalBasis(d:any){return JSON.stringify([d.direction,d.category,d.amount,d.currency,d.party,d.destination,d.beneficiaryMemberId||'',d.source||null,d.due,d.referenceDocument,d.approvedBy,...(d.purchaseBasis?[d.purchaseBasis]:[])]);}
 export function treasuryPaymentAuthorized(d:any){return d.direction!=='out'||!!d.approvedBy&&!!d.ceoApproval?.actor&&d.ceoApproval.actor!==d.approvedBy&&d.ceoApproval.basis===treasuryApprovalBasis(d);}
 export function treasuryNeedsCeo(d:any){return d.direction==='out'&&['ceo_review','approved','partial'].includes(d.state)&&!treasuryPaymentAuthorized(d);}
 export function scopedTreasuryRows(rows:any[],roles:any,userId:string,admin=false){
@@ -70,10 +73,10 @@ const rowsOf=(rows:any[],type:string)=>rows.filter(r=>r.type===type);
 export const tPaid=(id:string,rows:any[])=>rowsOf(rows,'treasury_movement').filter(r=>r.data.requestId===id&&r.data.kind!=='advance_return').reduce((n,r)=>n+moneyMicro(r.data.amount),BigInt(0));
 export const tReserved=(id:string,rows:any[])=>rowsOf(rows,'treasury_check').filter(r=>r.data.requestId===id&&r.data.state==='issued').reduce((n,r)=>n+moneyMicro(r.data.amount),BigInt(0));
 export function treasurySources(rows:any[]){return rowsOf(rows,'purchase_payable').filter(c=>!c.data.completion).flatMap(c=>{const v=apView(c.data,rows);return [...v.invoices.flatMap((i:any)=>i.queue.filter((q:any)=>q.released&&moneyMicro(q.remaining)>BigInt(0)).map((q:any)=>({key:c.id+':'+i.id+':'+q.id,caseId:c.id,itemId:i.id,installmentId:q.id,kind:'invoice',title:c.data.supplier+' — '+i.reference,amount:q.remaining,due:q.due,party:c.data.supplier,currency:'IRR'}))),...v.advances.filter((a:any)=>a.released&&moneyMicro(a.remaining)>BigInt(0)).map((a:any)=>({key:c.id+':'+a.id,caseId:c.id,itemId:a.id,kind:'advance',title:c.data.supplier+' — پیش‌پرداخت',amount:a.remaining,due:a.due,party:c.data.supplier,currency:'IRR'}))];});}
-export function treasuryView(rows:any[],today=tToday()){
+export function treasuryView(rows:any[],today=tToday(),purchaseRows=rows){
  const movements=rowsOf(rows,'treasury_movement'),statements=rowsOf(rows,'treasury_statement');
  const accounts=rowsOf(rows,'treasury_account').map(r=>{const ledger=movements.filter(m=>m.data.accountId===r.id).reduce((n,m)=>n+(m.data.direction==='in'?BigInt(1):BigInt(-1))*moneyMicro(m.data.amount),moneyMicro(r.data.opening));const imports=statements.filter(s=>s.data.accountId===r.id).sort((a,b)=>b.data.to.localeCompare(a.data.to)||b.created.localeCompare(a.created));return {...r,ledger:moneyText(ledger),latestStatement:imports[0]?{from:imports[0].data.from,to:imports[0].data.to,closing:imports[0].data.closing}:null};});
- const requests=rowsOf(rows,'treasury_request').map(r=>({...r,authorizationPending:treasuryNeedsCeo(r.data),paymentAuthorized:treasuryPaymentAuthorized(r.data),paid:moneyText(tPaid(r.id,rows)),reserved:moneyText(tReserved(r.id,rows)),remaining:moneyText(moneyMicro(r.data.amount)-tPaid(r.id,rows)),overdue:['ceo_review','approved','partial'].includes(r.data.state)&&r.data.due<today}));
+ const requests=rowsOf(rows,'treasury_request').map(r=>({...r,purchaseBlockers:purchaseGate(r,purchaseRows,today).blockers,authorizationPending:treasuryNeedsCeo(r.data),paymentAuthorized:treasuryPaymentAuthorized(r.data),paid:moneyText(tPaid(r.id,rows)),reserved:moneyText(tReserved(r.id,rows)),remaining:moneyText(moneyMicro(r.data.amount)-tPaid(r.id,rows)),overdue:['ceo_review','approved','partial'].includes(r.data.state)&&r.data.due<today}));
  const matched=new Set(statements.flatMap(s=>s.data.rows.filter((b:any)=>b.match).map((b:any)=>b.match.movementId)));
  const bankRows=statements.flatMap(s=>s.data.rows.map((b:any)=>({...b,statementId:s.id,statementRevision:s.revision,accountId:s.data.accountId,currency:s.data.currency,importer:s.data.actor,candidates:b.match?[]:movements.filter(m=>!matched.has(m.id)&&m.data.accountId===s.data.accountId&&m.data.direction===b.direction&&m.data.amount===b.amount&&m.data.day===b.day&&b.reference&&norm(m.data.reference)===norm(b.reference)).map(m=>({id:m.id,title:m.data.party,reference:m.data.reference,amount:m.data.amount,day:m.data.day}))})));
  const forecast=[7,15,30].map(days=>{const to=new Date(Date.parse(today+'T12:00:00Z')+days*86400000).toISOString().slice(0,10),currencies:Record<string,any>={};for(const a of accounts.filter(a=>a.data.state==='active')){const c=currencies[a.data.currency]||{opening:'0',in:'0',out:'0'};c.opening=moneyText(signed(c.opening)+signed(a.ledger));currencies[a.data.currency]=c;}for(const r of requests.filter(r=>['ceo_review','approved','partial'].includes(r.data.state)&&r.data.due<=to)){const c=currencies[r.data.currency]||{opening:'0',in:'0',out:'0'};c[r.data.direction]=moneyText(moneyMicro(c[r.data.direction])+moneyMicro(r.remaining));currencies[r.data.currency]=c;}return {days,currencies:Object.entries(currencies).map(([currency,c])=>({currency,...c,projected:moneyText(signed(c.opening)+moneyMicro(c.in)-moneyMicro(c.out))}))};});
@@ -90,28 +93,44 @@ export async function applyTreasury(u:Session,b:any){
  const requireRole=(role:'write'|'treasury'|'manager'|'accountant'|'ceo')=>{if(!roles[role])tFail('سمت و دسترسی مجاز این مرحله لازم است.',403);};
  const independent=(...actors:string[])=>{if(actors.includes(u.userId))tFail('این مرحله باید توسط فرد دیگری انجام شود.',403);};
  const destinationMode=['destination_account','approve_destination_account'].includes(b.mode);
- const notes=destinationMode&&(b.notes==null||b.notes==='')?'':tText(b.notes,4000),now=new Date().toISOString(),id=old?.id||b.id,stamp={actor:u.userId,at:now,notes,...(test?{testProfile:u.profileReview!.id}:{})};let type=old?.type||'',d:any=old?structuredClone(old.data):{};const extra:any[]=[];
+ const notes=destinationMode&&(b.notes==null||b.notes==='')?'':tText(b.notes,4000),now=new Date().toISOString(),id=old?.id||b.id,stamp={actor:u.userId,at:now,notes,...(test?{testProfile:u.profileReview!.id}:{})};let type=old?.type||'',d:any=old?structuredClone(old.data):{};const extra:any[]=[],posted:any[]=[];
  const get=(rid:string,kind:string)=>{const r=rows.find(r=>r.id===rid&&r.type===kind);if(!r)tFail('مرجع مرتبط یافت نشد.');return r!;};
  const account=(rid:string,currency?:string)=>{const a=get(rid,'treasury_account');if(a.data.state!=='active'||currency&&a.data.currency!==currency)tFail('حساب تأییدشده با ارز منطبق لازم است.');return a;};
  const evidence=(fid:string)=>{const f=get(fid,'treasury_file');if(f.data.caseId!==id)tFail('مدرک همین پرونده لازم است.');return f.id;};
  const realDay=()=>{const day=tDay(b.day);if(day>tToday())tFail('تاریخ وقوع واقعی در آینده نیست.');return day;};
  const insist=(kind:string,...states:string[])=>{if(!old||type!==kind||!states.includes(d.state))tFail('عملیات در وضعیت فعلی مجاز نیست.',409);};
- const paymentPermit=(request:any)=>{if(!treasuryPaymentAuthorized(request.data))tFail('مجوز نهایی مدیرعامل برای این پرداخت لازم است.',403);if(request.data.direction==='out')independent(request.data.ceoApproval.actor);};
+ const paymentPermit=(request:any)=>{if(request.data.source&&!request.data.purchaseBasis)tFail('بازبینی مالی تعهد خرید لازم است.',409);const gate=purchaseGate(request,rows,tToday());if(gate.blockers.length)tFail(gate.blockers.join(' / '),409);if(!treasuryPaymentAuthorized(request.data))tFail('مجوز نهایی مدیرعامل برای این پرداخت لازم است.',403);if(request.data.direction==='out')independent(request.data.ceoApproval.actor);};
  const put=(r:any,data:any)=>extra.push(db.prepare('UPDATE flow_entities SET data=?,revision=revision+1,updated=? WHERE id=?').bind(JSON.stringify(data),now,r.id));
  const movement=(request:any,amount:string,accountId:string,kind='payment',proof?:string)=>{
   const reference=tText(b.reference,200),day=realDay(),a=account(accountId,request.data.currency);if(day<a.data.openingDay)tFail('تاریخ اجرا پیش از مانده اولیه حساب است.');
   if(rowsOf(rows,'treasury_movement').some(m=>norm(m.data.reference)===norm(reference))||rowsOf(rows,'purchase_payable').some(c=>active(c.data.payments).some((p:any)=>norm(p.reference)===norm(reference)))||rows.filter(r=>['hr_payroll','hr_request'].includes(r.type)).some(r=>r.data.payments?.some((p:any)=>norm(p.reference)===norm(reference))))tFail('مرجع پرداخت یا دریافت قبلاً ثبت شده است.',409);
   const data={requestId:request.id,accountId,currency:request.data.currency,direction:kind==='advance_return'?'in':request.data.direction,amount,reference,day,party:request.data.party,kind,fileId:proof||evidence(b.fileId),...stamp};
+  posted.push({id:b.id+':movement',type:'treasury_movement',data});
   extra.push(db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'treasury_movement',?,1,?,?)").bind(b.id+':movement',JSON.stringify(data),now,now));return data;
  };
  const consumeSource=(request:any,amount:string,m:any)=>{
   const s=request.data.source;if(!s)return;
+  const gate=purchaseGate(request,rows,m.day);if(gate.blockers.length)tFail(gate.blockers.join(' / '),409);if(!gate.source||moneyMicro(amount)>moneyMicro(gate.source.amount))tFail('مانده زنده تعهد کافی نیست.',409);
+  if(s.kind==='foreign'){
+   const c=get(s.caseId,'purchase_shipment'),cd=structuredClone(c.data),f=cd.foreign;
+   f.prepayments=[...(f.prepayments||[]),{id:b.id+':movement',day:m.day,amount,currency:d.currency,reference:m.reference,document:{id:m.fileId,kind:'treasury_file'},treasuryRequestId:request.id,...stamp}];if(f.physical==='ordered')f.physical='preparing';put(c,cd);return;
+  }
   const c=get(s.caseId,'purchase_payable');if(c.data.completion)tFail('پرونده خرید بسته شده است.',409);const v=apView(c.data,rows),cd=structuredClone(c.data);
-  if(s.kind==='invoice'){const i=v.invoices.find((i:any)=>i.id===s.itemId),q=i?.queue.find((q:any)=>q.id===s.installmentId);if(!q?.released||moneyMicro(q.remaining)<moneyMicro(amount))tFail('اجازه یا مانده قسط خرید تغییر کرده است.',409);cd.allocations.push({id:b.id+':allocation',invoiceId:i.id,paymentId:b.id+':movement',amount,...stamp});}
-  else{const a=v.advances.find((a:any)=>a.id===s.itemId);if(!a?.released||moneyMicro(a.remaining)<moneyMicro(amount))tFail('اجازه یا مانده پیش‌پرداخت تغییر کرده است.',409);}
+  if(s.kind==='invoice'){const i=v.invoices.find((i:any)=>i.id===s.itemId),q=i?.queue.find((q:any)=>q.id===s.installmentId);if(!q||moneyMicro(q.remaining)<moneyMicro(amount))tFail('اجازه یا مانده قسط خرید تغییر کرده است.',409);cd.allocations.push({id:b.id+':allocation',invoiceId:i.id,paymentId:b.id+':movement',amount,...stamp});}
+  else{const a=v.advances.find((a:any)=>a.id===s.itemId);if(!a||moneyMicro(a.remaining)<moneyMicro(amount))tFail('اجازه یا مانده پیش‌پرداخت تغییر کرده است.',409);}
   cd.payments.push({serviceId:s.kind==='advance'?cd.advances.find((a:any)=>a.id===s.itemId)?.serviceId||'':'',id:b.id+':movement',reference:m.reference,day:m.day,amount,evidence:'treasury_file:'+m.fileId,purpose:request.data.title,advanceId:s.kind==='advance'?s.itemId:'',orderId:s.kind==='advance'?cd.advances.find((a:any)=>a.id===s.itemId).orderId||'':'',treasuryRequestId:request.id,...stamp});
   // New payment/allocation must not silently invalidate the existing invoice approval.
-  if(s.kind==='invoice'){const i=cd.invoices.find((i:any)=>i.id===s.itemId);i.release={...i.release,basis:releaseBasis(cd,i,rows)};}put(c,cd);
+  if(s.kind==='invoice'){const i=cd.invoices.find((i:any)=>i.id===s.itemId);i.release={...i.release,basis:releaseBasis(cd,i,rows)};}
+  if(s.kind==='advance'){
+   const a=cd.advances.find((a:any)=>a.id===s.itemId),o=rows.find(o=>o.id===a.orderId&&o.type==='purchase_order');
+   if(o?.data.pendingPurchaseAgreement&&!o.data.purchaseConfirmedAt){
+    const cases=rows.filter(r=>r.type==='purchase_payable').map(r=>r.id===c.id?{...c,data:cd}:r),evidence=purchaseAdvanceEvidence(o,cases,m.day);
+    if(evidence.satisfied){const agreement=o.data.pendingPurchaseAgreement,start=[agreement.agreedAt.slice(0,10),m.day].sort().at(-1)!,eta=hasDeliveryDays(o.data)?addDeliveryDays(start,o.data.deliveryDays):o.data.promisedEta||o.data.eta;
+     put(o,{...o.data,pendingPurchaseAgreement:null,agreedAt:agreement.agreedAt,respondent:agreement.respondent,purchaseConfirmedAt:now,purchaseConfirmedBy:agreement.actor,purchaseConfirmationReference:agreement.reference,deliveryStartedOn:start,eta,promisedEta:eta,advanceEvidence:evidence.sources,history:[...(o.data.history||[]),{stage:'advance_started_delivery',actor:'system:purchase',at:now,paymentId:b.id+':movement',agreement,eta}]});
+    }
+   }
+  }
+  put(c,cd);
  };
  if(b.mode==='account'){
   requireRole('treasury');if(old)tFail('حساب قابل بازنویسی نیست؛ حساب جدید با تأیید مستقل ثبت کنید.');type='treasury_account';const currency=tText(b.currency,3);if(!['IRR','USD','EUR','AED','CNY','GBP','TRY'].includes(currency)||!['bank','cash'].includes(b.kind))tFail('نوع حساب یا ارز نامعتبر است.');
@@ -135,14 +154,19 @@ export async function applyTreasury(u:Session,b:any){
  }else if(b.mode==='request'){
   requireRole('write');if(old)tFail('درخواست جدید بسازید.');type='treasury_request';if(!['in','out'].includes(b.direction)||!['purchase','expense','advance','foreign','sales','other'].includes(b.category))tFail('جهت یا گروه نامعتبر است.');const currency=tText(b.currency,3);if(!['IRR','USD','EUR','AED','CNY','GBP','TRY'].includes(currency))tFail('ارز نامعتبر است.');
   const source=b.sourceKey?treasurySources(rows).find(s=>s.key===b.sourceKey):null;if(b.sourceKey&&!source)tFail('منبع خرید آزادشده یافت نشد.',409);const amount=tMoney(b.amount);if(source&&(b.direction!=='out'||b.category!=='purchase'||currency!=='IRR'||moneyMicro(amount)>moneyMicro(source.amount)))tFail('مبلغ، ارز یا گروه با منبع خرید منطبق نیست.');
-  if(b.category==='purchase'&&!source)tFail('برای پرداخت خرید منبع آزادشده را انتخاب کنید.');
+  if(b.category==='purchase')tFail('تعهد خرید خودکار از پرونده تأمین وارد خزانه می‌شود؛ همان تعهد را باز کنید.',409);
   if(source&&rowsOf(rows,type).some(r=>r.data.source?.key===source.key&&['review','ceo_review','approved','partial'].includes(r.data.state)))tFail('درخواست باز همین قسط یا پیش‌پرداخت وجود دارد.',409);
   d={title:tText(b.title,200),party:source?.party||tText(b.party,200),destination:tText(b.destination,200),currency,direction:b.direction,category:b.category,amount,due:tDay(b.due),beneficiaryMemberId:b.beneficiaryMemberId||'',source:source||null,referenceDocument:tText(b.referenceDocument,500),state:'review',createdBy:u.userId};
   if(d.beneficiaryMemberId){const members=JSON.parse(roles.membersSnapshot);if(!members.some((m:any)=>m.id===d.beneficiaryMemberId&&m.status==='active'))tFail('کارمند ذی‌نفع فعال نیست.');}
+ }else if(b.mode==='purchase_review'){
+  requireRole('manager');insist('treasury_request','review','ceo_review','approved','partial','paid','rejected','cancelled');if(!d.source)tFail('تعهد خرید لازم است.');independent(d.createdBy);if(tReserved(id,rows)>BigInt(0))tFail('ابتدا چک باز را تعیین تکلیف کنید.');
+  const source=purchaseObligations(rows).find(s=>s.key===d.source.key);if(!source)tFail('تعهد فعال یافت نشد.',409);if(source.blockers.length)tFail(source.blockers.join(' / '),409);
+  d.destination=tText(b.destination||source.destination||d.destination,200);d.amount=moneyText(moneyMicro(source.amount)+tPaid(id,rows));d.due=source.needsDue?tDay(b.due||d.confirmedPurchaseDue):source.due;if(source.needsDue)d.confirmedPurchaseDue=d.due;d.purchaseBasis=source.basis;d.approvedBy=u.userId;d.ceoApproval=null;d.state='ceo_review';d.conditionReview=stamp;
  }else if(['approve','reject','cancel'].includes(b.mode)){
+  if(b.mode==='approve'&&d.source)tFail('بررسی تعهد خرید را از همان فرم خزانه انجام دهید.',409);
   requireRole('manager');insist('treasury_request',...(b.mode==='cancel'?['review','ceo_review','approved','partial']:['review']));independent(d.createdBy);if(tReserved(id,rows)>BigInt(0))tFail('ابتدا چک باز را تعیین تکلیف کنید.');d.state=b.mode==='approve'?(d.direction==='out'?'ceo_review':'approved'):b.mode==='reject'?'rejected':'cancelled';d.approvedBy=b.mode==='approve'?u.userId:d.approvedBy;
  }else if(b.mode==='ceo_approve'||b.mode==='ceo_reject'){
-  requireRole('ceo');insist('treasury_request','ceo_review','approved','partial');if(!treasuryNeedsCeo(d)||!d.approvedBy)tFail('پرداخت در انتظار مجوز مدیرعامل نیست.',409);independent(d.createdBy,d.approvedBy);if(d.beneficiaryMemberId===roles.memberId&&roles.memberId)tFail('مجوز پرداخت به خود مجاز نیست.',403);
+  requireRole('ceo');if(d.source){const gate=purchaseGate(old,rows,tToday());if(gate.blockers.some(x=>x!=='سررسید پرداخت نرسیده است'))tFail(gate.blockers.join(' / '),409);}insist('treasury_request','ceo_review','approved','partial');if(!treasuryNeedsCeo(d)||!d.approvedBy)tFail('پرداخت در انتظار مجوز مدیرعامل نیست.',409);independent(d.createdBy,d.approvedBy);if(d.beneficiaryMemberId===roles.memberId&&roles.memberId)tFail('مجوز پرداخت به خود مجاز نیست.',403);
   if(b.mode==='ceo_reject'){if(tReserved(id,rows)>BigInt(0))tFail('ابتدا چک باز را تعیین تکلیف کنید.');d.state=tPaid(id,rows)>BigInt(0)?'cancelled':'rejected';d.ceoDecision={...stamp,accepted:false};}
   else{d.ceoApproval={...stamp,basis:treasuryApprovalBasis(d)};d.state=tPaid(id,rows)>BigInt(0)?'partial':'approved';}
  }else if(b.mode==='execute'){
@@ -169,6 +193,20 @@ export async function applyTreasury(u:Session,b:any){
   requireRole('manager');insist('treasury_expense','review');independent(d.createdBy);const r=get(d.requestId,'treasury_request'),used=rowsOf(rows,'treasury_expense').filter(e=>e.data.requestId===r.id&&e.data.state==='approved').reduce((n,e)=>n+moneyMicro(e.data.amount),BigInt(0)),returned=rowsOf(rows,'treasury_movement').filter(m=>m.data.requestId===r.id&&m.data.kind==='advance_return').reduce((n,m)=>n+moneyMicro(m.data.amount),BigInt(0));if(b.accepted!==true&&b.accepted!==false)tFail('نتیجه بررسی لازم است.');if(b.accepted&&used+returned+moneyMicro(d.amount)>tPaid(r.id,rows))tFail('هزینه بیشتر از مانده تنخواه است.');if(b.accepted)d.fileId=evidence(b.fileId);d.state=b.accepted?'approved':'rejected';d.reviewedBy=u.userId;
  }else if(b.mode==='advance_return'){
   requireRole('treasury');insist('treasury_request','paid','partial','cancelled');if(d.category!=='advance'||d.direction!=='out')tFail('درخواست تنخواه لازم است.');const used=rowsOf(rows,'treasury_expense').filter(e=>e.data.requestId===id&&['approved','review'].includes(e.data.state)).reduce((n,e)=>n+moneyMicro(e.data.amount),BigInt(0)),returned=rowsOf(rows,'treasury_movement').filter(m=>m.data.requestId===id&&m.data.kind==='advance_return').reduce((n,m)=>n+moneyMicro(m.data.amount),BigInt(0)),amount=tMoney(b.amount);if(used+returned+moneyMicro(amount)>tPaid(id,rows))tFail('برگشت بیشتر از مانده آزاد تنخواه است.');movement(old,amount,b.accountId,'advance_return');
+ }
+ // Unique bank evidence for a purchase is a deterministic system match, not an actor's approval.
+ const requests=rows.filter(r=>r.type==='treasury_request'&&r.data.source),pids=new Set(requests.map(r=>r.id));
+ const bankStatements=b.mode==='statement'?[...rows.filter(r=>r.type==='treasury_statement'),{id,data:d}]:rows.filter(r=>r.type==='treasury_statement');
+ const movements=[...rows.filter(r=>r.type==='treasury_movement'),...posted].filter(m=>pids.has(m.data.requestId));
+ const used=new Set(bankStatements.flatMap(s=>s.data.rows.filter((x:any)=>x.match).map((x:any)=>x.match.movementId)));
+ const compatible=(s:any,x:any,m:any)=>!!x.reference&&s.data.accountId===m.data.accountId&&s.data.currency===m.data.currency&&x.direction===m.data.direction&&x.amount===m.data.amount&&x.day===m.data.day&&norm(x.reference)===norm(m.data.reference);
+ if(b.mode==='statement'||posted.length)for(const s of bankStatements){let changed=false;const sd=structuredClone(s.data);
+  for(const x of sd.rows.filter((x:any)=>!x.match)){
+   const candidates=movements.filter(m=>!used.has(m.id)&&compatible(s,x,m));if(candidates.length!==1)continue;const m=candidates[0];
+   if(bankStatements.flatMap(a=>a.data.rows.filter((z:any)=>!z.match&&compatible(a,z,m))).length!==1)continue;
+   x.match={movementId:m.id,actor:'system:bank',at:now,notes:'تطبیق یکتای حساب، ارز، جهت، مبلغ، تاریخ و مرجع بانکی',automatic:true};used.add(m.id);changed=true;
+  }
+  if(changed){if(s.id===id&&b.mode==='statement')d=sd;else put(s,sd);}
  }
  d.history=[...(d.history||[]),{mode:b.mode,...stamp,fileId:b.fileId||''}];if(d.history.length>2000)tFail('سقف تاریخچه پرونده رسیده است.');
  const snapshot=rows.reduce((n,r)=>n+r.revision,0),scope=treasuryScope();

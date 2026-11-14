@@ -1,3 +1,7 @@
+## 2026-11-15 — Unified procurement and treasury
+
+Automatic source-linked obligations, one treasury payment path for domestic/service/foreign purchasing, source revalidation, atomic partial payment and invoice allocation, deterministic purchase bank matching and agreement/advance delivery trigger. See PURCHASE-TREASURY.md. Focused treasury, procurement, service, settlement and TypeScript checks; browser walkthrough is not claimed. Legacy all-history treasury reads remain scalability debt; new order reconciliation uses bounded keyset batches. No live test payment or SMS sent.
+
 ## SMS ordinary sending 2026-11-13
 
 Provider payload/failure tests and asset-link OTP regression passed. No schema/inventory/financial changes. Owner-selected sender and destination required for live sending; provider acceptance and handset receipt remain separate evidence. Procurement form review and domestic role split remain paused.

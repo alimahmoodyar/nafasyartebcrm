@@ -1,3 +1,4 @@
+import {syncPurchaseTreasury,purchaseGate} from './purchase-treasury';
 import {storedAccessPermissions} from './permissions';
 import {financialWorkflowRole, type FinancialWorkflowRole} from './financial-workflow-roles';
 import {storage} from './storage';
@@ -11,6 +12,7 @@ import {formatDate} from './persian-date';
 import {salesLock} from './sales';
 export async function syncTreasuryTasks(date=new Date()){
  if(trainingContext.getStore())return {generated:0,missingOwners:[]};
+ await syncPurchaseTreasury();
  const db=storage(),rows=await treasuryRows(),today=tToday(),now=date.toISOString(),members=(await db.prepare('SELECT id,subject,status,permissions FROM app_members ORDER BY id').all()).results as any[];
  const owners=(role:FinancialWorkflowRole)=>members.filter(m=>m.status==='active'&&financialWorkflowRole(storedAccessPermissions(m.permissions),m.id,rows,role)).map(m=>m.id);
  const roles={treasury:owners('treasury'),manager:owners('manager'),accountant:owners('accountant'),ceo:owners('ceo')},desired=new Set<string>(),missingOwners=new Set<string>(),existing=(await db.prepare("SELECT * FROM duty_runs WHERE id LIKE 'treasury:%'").all()).results as any[],statements:any[]=[];let generated=0;
@@ -21,7 +23,7 @@ export async function syncTreasuryTasks(date=new Date()){
  }};
  for(const r of rows){if(r.type==='treasury_account'&&r.data.state==='review')job(r,'review','manager','تأیید حساب و مانده اولیه',today);
   if(r.type==='sales_receiving_account'&&r.data.state==='review')job(r,'review','manager','تأیید حساب مقصد فروش',today);
-  if(r.type==='treasury_request'){if(r.data.state==='review')job(r,'review','manager','بررسی درخواست و حساب مقصد',today);if(treasuryNeedsCeo(r.data))job(r,'ceo','ceo','مجوز نهایی پرداخت به خزانه‌دار',r.data.due);if(['approved','partial'].includes(r.data.state)&&treasuryPaymentAuthorized(r.data))job(r,'execute','treasury','پیگیری اجرای دریافت / پرداخت',r.data.due);}
+  if(r.type==='treasury_request'){if(r.data.state==='review')job(r,'review','manager','بررسی درخواست و حساب مقصد',today);if(treasuryNeedsCeo(r.data))job(r,'ceo','ceo','مجوز نهایی پرداخت به خزانه‌دار',r.data.due);if(['approved','partial'].includes(r.data.state)&&treasuryPaymentAuthorized(r.data)&&!purchaseGate(r,rows,today).blockers.length)job(r,'execute','treasury','پیگیری اجرای دریافت / پرداخت',r.data.due);}
   if(r.type==='treasury_check'){if(r.data.state==='review')job(r,'review','manager','بررسی چک',today);if(r.data.state==='issued'&&(r.data.direction==='in'||rows.some(q=>q.id===r.data.requestId&&treasuryPaymentAuthorized(q.data))))job(r,'settle','treasury','پیگیری سررسید و نتیجه واقعی چک',r.data.due);}
   if(r.type==='treasury_expense'&&r.data.state==='review')job(r,'review','manager','بررسی مدرک هزینه تنخواه',today);
   if(r.type==='treasury_statement'&&r.data.rows.some((b:any)=>!b.match))job(r,'reconcile','accountant','تطبیق مستقل صورتحساب',r.data.to);

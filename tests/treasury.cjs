@@ -43,8 +43,13 @@ user=clerk;const expense={requestId:advance,amount:'60',reference:'EXP1',day:'20
 // Purchase source: live allowance and atomic payment/allocation without double recording.
 entity('supplier','supplier',{name:'Supplier'});entity('po','purchase_order',{supplierId:'supplier',route:'domestic',quantity:1000,state:'shipped'});entity('receipt','receipt',{purchaseOrderId:'po',quantity:1000,accepted:1000,rejected:0,state:'stored'});
 const inv={id:'inv',reference:'INVOICE',amount:'100',evidence:'original invoice',recognition:{account:'2101'},lines:[{orderId:'po',receiptIds:['receipt'],quantity:1000,amount:'100'}],schedule:[{id:'installment',due:'2026-10-01',amount:'100',condition:'receipt'}]};const pd={supplierId:'supplier',supplier:'Supplier',route:'domestic',title:'Purchase',invoices:[inv],payments:[],allocations:[],advances:[],issues:[],history:[]};inv.release={basis:load('lib/purchase-payables.ts').releaseBasis(pd,inv,(await domain.treasuryRows()))};entity('ap','purchase_payable',pd);
-user=clerk;view=await get();const source=view.sources.find(s=>s.caseId==='ap');assert.ok(source);const prid=(await action('request',null,request({category:'purchase',sourceKey:source.key}))).id;await action('request',null,request({category:'purchase',sourceKey:source.key}),409);user=manager;await action('approve',prid);await authorize(prid);user=treasurer;const pf=await proof(prid);sql.prepare("UPDATE flow_entities SET revision=revision+1 WHERE id='receipt'").run();await action('execute',prid,{accountId:aid,amount:'100',day:'2026-10-01',reference:'APPAY',fileId:pf},409);assert.equal(by('ap').data.payments.length,0);
-const refresh=by('ap').data;refresh.invoices[0].release.basis=load('lib/purchase-payables.ts').releaseBasis(refresh,refresh.invoices[0],await domain.treasuryRows());sql.prepare("UPDATE flow_entities SET data=?,revision=revision+1 WHERE id='ap'").run(JSON.stringify(refresh));await action('execute',prid,{accountId:aid,amount:'100',day:'2026-10-01',reference:'APPAY',fileId:pf});assert.equal(by('ap').data.payments.length,1);assert.equal(by('ap').data.allocations.length,1);assert.equal(by(prid).data.state,'paid');
+user=manager;view=await get();const prid=view.requests.find(r=>r.data.source?.caseId==='ap').id;
+user=clerk;await action('request',null,request({category:'purchase',sourceKey:'ap:inv:installment'}),409);user=manager;
+await action('purchase_review',prid,{destination:'supplier-bank'});await authorize(prid);user=treasurer;const pf=await proof(prid);
+sql.prepare("UPDATE flow_entities SET data=json_set(data,'$.state','quality'),revision=revision+1 WHERE id='receipt'").run();
+await action('execute',prid,{accountId:aid,amount:'100',day:'2026-10-01',reference:'APPAY',fileId:pf},409);assert.equal(by('ap').data.payments.length,0);
+sql.prepare("UPDATE flow_entities SET data=json_set(data,'$.state','stored'),revision=revision+1 WHERE id='receipt'").run();
+await action('execute',prid,{accountId:aid,amount:'100',day:'2026-10-01',reference:'APPAY',fileId:pf});assert.equal(by('ap').data.payments.length,1);assert.equal(by('ap').data.allocations.length,1);assert.equal(by(prid).data.state,'paid');
 // No leakage to external identities, no stale grants, readonly cannot mutate.
 user=reader;assert.equal((await files.GET(new Request('https://test.local/api/treasury/files?id='+fileId))).status,200);await action('request',null,request(),403);
 user={...treasurer,permissions:{finance:'write',salesAgentId:'rep'}};assert.equal((await api.GET()).status,403);assert.equal((await files.GET(new Request('https://test.local/api/treasury/files?id='+fileId))).status,403);
@@ -133,5 +138,50 @@ for(const [job,role] of [['treasurer','treasury'],['finance_director','manager']
 }
 assert.equal(policyRoles.validatePermissions({roleAssignment:{roles:['ceo']}}).treasuryWorkflowRoles.length,0,'existing CEO assignment is not expanded');
 assert.throws(()=>policyRoles.validatePermissions({roleAssignment:{roles:['production_store_assistant'],warehouses:['raw']}}));
+
+// New approved order -> automatic payable and obligations, no duplicated entry or source payments.
+entity('auto-order','purchase_order',{supplierId:'supplier',supplier:'Supplier',route:'domestic',quantity:1000,state:'issued',paymentWorkflowRequired:true,selectedBy:'buyer',partCode:'PART',deliveryStart:'advance_payment',requiredAdvanceRial:'40',deliveryDays:3,pendingPurchaseAgreement:{agreedAt:'2026-10-01T08:00:00+03:30',actor:'buyer',reference:'AGREEMENT',respondent:'Supplier'},quoteSnapshot:{financial:'pass',paymentStages:[{percent:'100',days:0,condition:'contract advance',amountRial:'120'}]}});
+user=manager;view=await get();let auto=view.requests.find(r=>r.data.source?.caseId==='order-payable:auto-order');assert.ok(auto);
+assert.equal(auto.data.amount,'120');assert.equal(auto.data.state,'review');assert.ok(auto.purchaseBlockers.length);
+await get();assert.equal(sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type='treasury_request' AND json_extract(data,'$.source.caseId')='order-payable:auto-order'").get().n,1);
+await action('purchase_review',auto.id,{destination:'supplier-account',due:'2026-10-01'});await authorize(auto.id);
+user=treasurer;const autoProof=await proof(auto.id);const actual=body('execute',auto.id,{amount:'40',accountId:aid,reference:'AUTO-PAY',day:'2026-10-01',fileId:autoProof});
+await post(actual);await post(actual);assert.equal(by('order-payable:auto-order').data.payments.length,1);assert.equal(by(auto.id).data.state,'partial');
+assert.equal(by('auto-order').data.purchaseConfirmedBy,'buyer');assert.equal(by('auto-order').data.deliveryStartedOn,'2026-10-01');assert.equal(by('auto-order').data.eta,'2026-10-04');
+const originalOrder=by('auto-order').data;
+sql.prepare("UPDATE flow_entities SET data=json_set(data,'$.quoteSnapshot.paymentStages[0].amountRial','130'),revision=revision+1 WHERE id='auto-order'").run();
+await action('execute',auto.id,{amount:'1',accountId:aid,reference:'STALE-PURCHASE',day:'2026-10-01',fileId:autoProof},409);
+sql.prepare("UPDATE flow_entities SET data=?,revision=revision+1 WHERE id='auto-order'").run(JSON.stringify(originalOrder));
+// Unique bank statement matches purchase automatically and ambiguous rows do not.
+const asid=(await action('statement',null,{accountId:aid,from:'2026-10-01',to:'2026-10-01',opening:'1000',closing:'960',filename:'purchase-bank.xlsx',referenceDocument:'bank',rows:[{bankId:'AUTO-BANK',day:'2026-10-01',direction:'out',amount:'40',reference:'AUTO-PAY'}]})).id;
+assert.equal(by(asid).data.rows[0].match.automatic,true);assert.equal(by(asid).data.rows[0].match.actor,'system:bank');
+// Concurrent source mutation rolls back BOTH the bank movement and payable write.
+user=treasurer;const countBefore=by('order-payable:auto-order').data.payments.length;
+beforeBatch=()=>sql.prepare("UPDATE flow_entities SET revision=revision+1 WHERE id='auto-order'").run();
+await action('execute',auto.id,{amount:'1',accountId:aid,reference:'CONCURRENT-SOURCE',day:'2026-10-01',fileId:autoProof},409);
+assert.equal(by('order-payable:auto-order').data.payments.length,countBefore);
+assert.equal(sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type='treasury_movement' AND json_extract(data,'$.reference')='CONCURRENT-SOURCE'").get().n,0);
+// Invoice replaces contract obligations; same advance is allocated exactly once.
+entity('auto-receipt','receipt',{purchaseOrderId:'auto-order',quantity:1000,accepted:1000,rejected:0,state:'stored'});
+const acase=by('order-payable:auto-order').data;acase.invoices.push({id:'auto-invoice',reference:'AUTO-INVOICE',invoiceType:'informal',amount:'120',terms:'contract',recognition:{account:'2101'},schedule:[],lines:[{orderId:'auto-order',quantity:1000,amount:'120',receiptIds:['auto-receipt']}]});
+sql.prepare("UPDATE flow_entities SET data=?,revision=revision+1 WHERE id='order-payable:auto-order'").run(JSON.stringify(acase));
+user=manager;view=await get();const renewed=by('order-payable:auto-order').data;
+assert.ok(renewed.advances[0].closed);assert.equal(renewed.invoices[0].schedule[0].due,'2026-10-01');assert.equal(renewed.allocations.length,1);assert.equal(renewed.allocations[0].amount,'40');
+await get();assert.equal(by('order-payable:auto-order').data.allocations.length,1);
+const invoiceRequest=view.requests.find(r=>r.data.source?.itemId==='auto-invoice');assert.equal(invoiceRequest.data.amount,'80');
+await action('purchase_review',invoiceRequest.id,{destination:'supplier-account'});await authorize(invoiceRequest.id);user=treasurer;
+await action('execute',auto.id,{amount:'1',accountId:aid,reference:'OLD-STAGE',day:'2026-10-01',fileId:autoProof},409);
+const invoiceProof=await proof(invoiceRequest.id);await action('execute',invoiceRequest.id,{amount:'80',accountId:aid,reference:'INVOICE-BALANCE',day:'2026-10-01',fileId:invoiceProof});
+assert.equal(load('lib/purchase-payables.ts').apView(by('order-payable:auto-order').data,await domain.treasuryRows()).liability,'0');
+// Purchase handlers cannot post payments, including via the shared MCP handler.
+const purchasing=load('app/api/purchase-payables/route.ts');user={...clerk,isAdmin:true};
+for(const mode of ['payment','execute_payment_request']){const res=await purchasing.POST(new Request('https://test.local/api/purchase-payables',{method:'POST',headers:{origin:'https://test.local'},body:JSON.stringify({id:crypto.randomUUID(),confirmed:true,mode,caseId:'order-payable:auto-order',revision:by('order-payable:auto-order').revision,notes:'No bypass'})}));assert.equal(res.status,409);}
+// Foreign currency shares treasury execution and posts the same shipment history.
+entity('fx-shipment','purchase_shipment',{route:'foreign',supplierId:'supplier',supplierName:'Supplier',currency:'USD',initial:{lines:[{unitPrice:'10',quantity:'5'}]},foreign:{order:{day:'2026-10-01',reference:'ORDER'},physical:'ordered',prepayments:[]}});
+user=manager;view=await get();const fx=view.requests.find(r=>r.data.source?.caseId==='fx-shipment');assert.equal(fx.data.currency,'USD');assert.equal(fx.data.amount,'50');
+await action('purchase_review',fx.id,{destination:'FX-SUPPLIER',due:'2026-10-01'});await authorize(fx.id);
+user=treasurer;const fxAccount=(await action('account',null,{title:'USD bank',number:'USD-1',kind:'bank',currency:'USD',opening:'100',day:'2026-10-01'})).id;user=manager;await action('approve_account',fxAccount);user=treasurer;const fxProof=await proof(fx.id);
+await action('execute',fx.id,{amount:'10',accountId:aid,reference:'FX-WRONG',day:'2026-10-01',fileId:fxProof},400);
+await action('execute',fx.id,{amount:'10',accountId:fxAccount,reference:'FX-PAID',day:'2026-10-01',fileId:fxProof});assert.equal(by('fx-shipment').data.foreign.prepayments.length,1);assert.equal(by('fx-shipment').data.foreign.physical,'preparing');
 console.log('PASS treasury: position+grant access, independent approval and reconciliation, partial payments, duplicate/reference/retry, balanced statement and suggestions, check reservation/settlement, petty cash ceilings, live purchase allowance and atomic integration, private evidence, stale permission, maintenance freeze and FK-safe reset rollback.');
 })().catch(e=>{console.error(e);process.exit(1)});

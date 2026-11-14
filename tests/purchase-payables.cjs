@@ -14,6 +14,9 @@ const body=(mode,extra={})=>({mode,id:crypto.randomUUID(),confirmed:true,notes:'
 async function post(b,status=200){const r=await api.POST(new Request('https://test.local/api/purchase-payables',{method:'POST',headers:{origin:'https://test.local'},body:JSON.stringify(b)}));const d=await r.json();assert.equal(r.status,status,b.mode+': '+JSON.stringify(d));return d;}
 async function get(){const r=await api.GET();assert.equal(r.status,200);return r.json();}
 let cid;async function current(){return (await get()).cases.find(c=>c.id===cid);}async function action(mode,extra={},status=200){const c=await current();return post(body(mode,{caseId:cid,revision:c.revision,...extra}),status);}
+// Historical records remain readable/allocatable; new payment execution is tested
+// through actual treasury HTTP handlers in treasury.cjs, never through this fixture.
+async function historicalPayment(fields){const row=sql.prepare('SELECT * FROM flow_entities WHERE id=?').get(cid),d=JSON.parse(row.data);d.payments.push({id:crypto.randomUUID(),actor:'historical-import',at:'2026-10-01',...fields});sql.prepare('UPDATE flow_entities SET data=?,revision=revision+1 WHERE id=?').run(JSON.stringify(d),cid);}
 const buyer={userId:'buyer',name:'Buyer',isAdmin:false,permissions:{supplyRoles:['domestic'],finance:'none'}},finance={userId:'finance',name:'Finance',isAdmin:false,permissions:{supplyRoles:['finance'],finance:'write'}};
 (async()=>{
 entity('s','supplier',{name:'Supplier'});entity('s2','supplier',{name:'Other'});
@@ -21,10 +24,10 @@ entity('o1','purchase_order',{supplierId:'s',supplier:'Supplier',route:'domestic
 entity('o2','purchase_order',{supplierId:'s2',supplier:'Other',route:'domestic',partCode:'CMP',unit:'عدد',quantity:10000,state:'shipped'});
 for(const m of [buyer,finance])sql.prepare("INSERT INTO app_members(id,email,name,unit,status,permissions,created,updated) VALUES(?,?,?,?, 'active',?,?,?)").run(m.userId,m.userId+'@test',m.name,'team',JSON.stringify(m.permissions),'2026-10-01','2026-10-01');
 user=buyer;const create=body('create',{supplierId:'s',route:'domestic',title:'Compressors'});cid=(await post(create)).id;await post(create);await post({...create,title:'changed'},409);
-await action('payment',{amount:'100',reference:'PAY1',day:'2026-10-01',purpose:'advance',evidence:'bank'},403);
+await action('payment',{amount:'100',reference:'PAY1',day:'2026-10-01',purpose:'advance',evidence:'bank'},409);
 user=finance;const advance=(await action('advance',{amount:'100',due:'2026-10-01',condition:'contract advance',evidence:'CON1',orderId:'o1'}));let c=await current(),aid=c.data.advances[0].id;
 await action('release_advance',{itemId:aid});c=await current();assert.equal(c.view.advances[0].released,true);
-await action('payment',{amount:'100',reference:'PAY1',day:'2026-10-01',purpose:'advance',evidence:'bank',advanceId:aid,orderId:'o1'});c=await current();const pid=c.data.payments[0].id;assert.equal(c.view.unallocated,'100');assert.equal(c.view.advances[0].remaining,'0');
+await historicalPayment({amount:'100',reference:'PAY1',day:'2026-10-01',purpose:'advance',evidence:'bank',advanceId:aid,orderId:'o1'});c=await current();const pid=c.data.payments[0].id;assert.equal(c.view.unallocated,'100');assert.equal(c.view.advances[0].remaining,'0');
 await action('payment',{amount:'100',reference:'PAY1',day:'2026-10-01',purpose:'duplicate',evidence:'bank'},409);
 user=buyer;const invoice={invoiceType:'informal',amount:'150',reference:'INV1',day:'2026-10-02',purpose:'خرید کمپرسور برای تولید',evidence:'invoice.pdf',terms:'30 days after delivery',lines:[{orderId:'o1',quantity:'10',amount:'150',receiptIds:[]}]};await action('invoice',invoice);c=await current();const iid=c.data.invoices[0].id;
 await action('invoice',invoice,409);await action('invoice',{...invoice,reference:'BAD',lines:[{orderId:'o2',quantity:'10',amount:'150',receiptIds:[]}]},400);
@@ -44,33 +47,17 @@ sql.prepare("UPDATE flow_entities SET revision=revision+1 WHERE id='r1'").run();
 sql.prepare("UPDATE flow_entities SET data=?,revision=revision+1 WHERE id='r1'").run(JSON.stringify({purchaseOrderId:'o1',quantity:9000,accepted:8000,rejected:1000,state:'stored'}));
 await action('release',{itemId:iid},400);await action('dispute',{itemId:iid,amount:'20',evidence:'supplier claim pending'});await action('release',{itemId:iid});c=await current();assert.equal(c.view.liability,'50');assert.equal(c.view.invoices[0].disputed,'20');assert.equal(c.view.invoices[0].queue[1].remaining,'30');assert.equal(c.view.invoices[0].queue[1].held,'20');assert.equal(c.view.invoices[0].released,true);
 await action('clear_dispute',{itemId:iid},400);await action('invoice',{...invoice,itemId:iid},400);
-await action('payment',{amount:'30',reference:'PAY2',day:'2026-10-03',purpose:'partial settlement',evidence:'bank2',orderId:'o1'});c=await current();await action('allocate',{invoiceId:iid,paymentId:c.data.payments[1].id,amount:'30'});c=await current();assert.equal(c.view.liability,'20');assert.equal(c.view.invoices[0].queue[1].remaining,'0');
+await historicalPayment({amount:'30',reference:'PAY2',day:'2026-10-03',purpose:'partial settlement',evidence:'bank2',orderId:'o1'});c=await current();await action('allocate',{invoiceId:iid,paymentId:c.data.payments[1].id,amount:'30'});c=await current();assert.equal(c.view.liability,'20');assert.equal(c.view.invoices[0].queue[1].remaining,'0');
 await action('void',{kind:'payments',itemId:pid},400);await action('unrecognize',{itemId:iid},400);
 const alloc=c.data.allocations[0];await action('void',{kind:'allocations',itemId:alloc.id});c=await current();assert.equal(c.view.unallocated,'100');assert.equal(c.view.liability,'120');
-// Supplier request, finance return, CEO parallel return and one-response approval.
+// Old supplier payment workflow can no longer execute beside treasury.
 entity('o3','purchase_order',{supplierId:'s',supplier:'Supplier',route:'domestic',partCode:'CMP',unit:'عدد',quantity:1000,state:'issued',paymentWorkflowRequired:true});
 await action('advance',{amount:'60',due:'2026-10-01',condition:'contract',evidence:'contract file',orderId:'o3'});
 const managedAdvance=(await current()).data.advances.at(-1).id;
-const ceo={userId:'ceo',name:'CEO',isAdmin:false,permissions:{supplyRoles:['ceo']}};
-user=buyer;
-const requestData={kind:'advance',instrumentId:managedAdvance,amount:'60',account:'supplier account',documentId:fileId};
-await action('request_payment',requestData);const requestId=(await current()).data.paymentRequests[0].id;
-user=finance;await action('review_payment_request',{itemId:requestId,result:'fail'});
-user=buyer;await action('request_payment',{...requestData,itemId:requestId});
-user=finance;await action('review_payment_request',{itemId:requestId,result:'pass'});
-await action('decide_payment_request',{itemId:requestId,result:'pass'},403);
-user=ceo;await action('decide_payment_request',{itemId:requestId,result:'fail',destination:'both'});
-await action('decide_payment_request',{itemId:requestId,result:'pass'},409);
-user=finance;await action('answer_payment_request',{itemId:requestId,role:'finance'});
-user=ceo;await action('decide_payment_request',{itemId:requestId,result:'pass'});
-user=buyer;await action('answer_payment_request',{itemId:requestId,role:'buyer'},409);
-user=finance;await action('revise_approved_payment',{itemId:requestId,amount:'50',account:'verified account'});
-await action('payment',{advanceId:managedAdvance,orderId:'o3',amount:'50',reference:'BYPASS',day:'2026-10-03',purpose:'advance',evidence:'test'},409);
+for(const mode of ['request_payment','review_payment_request','decide_payment_request','revise_approved_payment','execute_payment_request'])await action(mode,{},409);
 const bankFile=crypto.randomUUID(),bankUrl='https://test.local/api/purchase-payables/files?id='+bankFile+'&caseId='+cid+'&filename=receipt.pdf';
-r=await filesApi.POST(new Request(bankUrl,{method:'POST',headers:{origin:'https://test.local'},body:'%PDF bank receipt'}));assert.equal(r.status,200);
-await action('execute_payment_request',{itemId:requestId,amount:'50',reference:'PAY-APPROVED',day:'2026-10-03',documentId:bankFile});
-c=await current();assert.equal(c.data.paymentRequests[0].state,'paid');assert.equal(c.data.paymentRequests[0].financeAdjustment.previousAmount,'60');assert.equal(c.data.payments.at(-1).account,'verified account');
-user=buyer;await action('acknowledge_payment',{itemId:requestId});assert.ok((await current()).data.paymentRequests[0].paymentAcknowledgement);
+r=await filesApi.POST(new Request(bankUrl,{method:'POST',headers:{origin:'https://test.local'},body:'%PDF historical bank receipt'}));assert.equal(r.status,200);
+await historicalPayment({amount:'50',reference:'HISTORICAL-APPROVED',day:'2026-10-03',advanceId:managedAdvance,orderId:'o3',documentId:bankFile});
 const cancelled=JSON.parse(sql.prepare("SELECT data FROM flow_entities WHERE id='o3'").get().data);
 sql.prepare("UPDATE flow_entities SET data=?,revision=revision+1 WHERE id='o3'").run(JSON.stringify({...cancelled,totalRial:'60',pendingSupplierCredit:true,remainderResolution:{receipts:[],accepted:0,remaining:1000}}));
 user=finance;await action('register_supplier_credit',{orderId:'o3'});

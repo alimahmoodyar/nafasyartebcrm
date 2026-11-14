@@ -1,3 +1,4 @@
+import {syncPurchaseTreasury} from '@/lib/purchase-treasury';
 import {splitProcurement} from '@/lib/procurement-split';
 import {procurementOperation,procurementOperationModes} from '@/lib/procurement-operations';
 import {commercialTerms,deltaPercent,paymentStages} from '@/lib/procurement-commercial';
@@ -291,10 +292,11 @@ export async function POST(request:Request){try{checkOrigin(request);const u=awa
  if(o.data.quoteSnapshot?.validUntil<confirmedDay)fail('اعتبار پیشنهاد گذشته است؛ پیش از قطعی‌شدن، پیشنهاد معتبر و انتخاب خرید تازه لازم است.',409);
  const safety=await checkPurchaseTechnical(o.data.materialId,o.data.supplierLinkId,{specs:o.data.materialSpecs,designVersion:o.data.designVersion});const checked=await checkSupplierPurchase(o.data.supplierLinkId,o.data.materialId,o.data.route,o.data.quantity);for(const e of [...Object.values(safety),...Object.values(checked)])guard('EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)',e.id,e.revision);
  if(checked.material.data.unit!==o.data.unit)fail('واحد سفارش تغییر کرده؛ انتخاب تازه لازم است.',409);
- const advance=purchaseAdvanceEvidence(o,await supplyEntities('purchase_payable'),confirmedDay);if(!advance.satisfied)fail('پیش‌پرداخت لازم هنوز با سند پرداخت واقعیِ همین سفارش ثبت نشده است.',409);
+ const advance=purchaseAdvanceEvidence(o,await supplyEntities('purchase_payable'),confirmedDay);
  for(const source of advance.sources)guard("EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND type='purchase_payable' AND revision=?)",source.caseId,source.revision);
  const agreedAt=o.data.procurementVersion===3?req(b.agreedAt,40):now;if(!Number.isFinite(Date.parse(agreedAt))||Date.parse(agreedAt)>Date.now()+60000||Date.parse(agreedAt)<Date.parse(o.created))fail('تاریخ و ساعت توافق شروع معتبر نیست.');const deliveryStartedOn=dayAt(new Date(agreedAt)),eta=hasDeliveryDays(o.data)?addDeliveryDays(deliveryStartedOn,o.data.deliveryDays):o.data.promisedEta||o.data.eta,reference=req(b.reference,500),notes=text(b.notes||'',4000);if(o.data.procurementVersion===3)req(b.respondent,200);
- put(o.id,'purchase_order',{...o.data,agreedAt,respondent:text(b.respondent||'',200),purchaseConfirmedAt:now,purchaseConfirmedBy:u.userId,purchaseConfirmationReference:reference,deliveryStartedOn,eta,promisedEta:eta,advanceEvidence:advance.sources,history:[...o.data.history,{stage:'purchase_confirmed',actor:u.userId,at:now,reference,notes,eta}]},o);
+ if(!advance.satisfied)put(o.id,'purchase_order',{...o.data,pendingPurchaseAgreement:{agreedAt,respondent:text(b.respondent||'',200),actor:u.userId,at:now,reference,notes},history:[...o.data.history,{stage:'agreement_waiting_advance',actor:u.userId,at:now,reference,notes}]},o);
+ else put(o.id,'purchase_order',{...o.data,agreedAt,respondent:text(b.respondent||'',200),purchaseConfirmedAt:now,purchaseConfirmedBy:u.userId,purchaseConfirmationReference:reference,deliveryStartedOn,eta,promisedEta:eta,advanceEvidence:advance.sources,history:[...o.data.history,{stage:'purchase_confirmed',actor:u.userId,at:now,reference,notes,eta}]},o);
  }else if(mode==='close_delivery_alert'){
  const o=await get(req(b.orderId),'purchase_order');
  const arrivals=(await supplyEntities('receipt')).filter(r=>r.data.purchaseOrderId===o.id),status=purchaseDeliveryStatus(o,arrivals,dayAt());
@@ -386,5 +388,6 @@ export async function POST(request:Request){try{checkOrigin(request);const u=awa
  let tasksUpdated=false;
  // Follow-up tasks are a projection; safe retry through the scheduler if notification generation fails.
  if(plan)try{const fresh:any=await db.prepare('SELECT * FROM flow_entities WHERE id=?').bind(plan.id).first(),p=decode(fresh),q=await supplyEntities('sourcing_quote'),o=await supplyEntities('purchase_order');const tasks=await followupStatements(p,nextWork(p,q,o,await coverage(p),await supplyEntities('receipt')),now);if(tasks.length){const operation=crypto.randomUUID();await db.batch([db.prepare("INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,'sourcing_followup','{}','workflow',?,CASE WHEN EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?) THEN 1 ELSE 0 END)").bind(operation,now,p.id,p.revision),...tasks]);}tasksUpdated=true;}catch(e){console.error('Sourcing follow-up projection deferred');}
- return json({saved:true,planId:plan?.id||null,...(assignment?{assignment:{...assignment,tasksUpdated}}:{})});
+ let treasuryPending=false;try{await syncPurchaseTreasury();}catch{treasuryPending=true;}
+ return json({saved:true,treasuryPending,planId:plan?.id||null,...(assignment?{assignment:{...assignment,tasksUpdated}}:{})});
  }catch(e){return accessResponse(e)||Response.json({error:/constraint|SQLITE|D1/i.test(String(e))?'اطلاعات یا موجودی هم‌زمان تغییر کرده؛ تازه‌سازی کنید. هیچ عملیات ناقصی ثبت نشد.':e instanceof Error?e.message:'ثبت پرونده انجام نشد.'},{status:409})}}

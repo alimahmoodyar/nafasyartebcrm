@@ -29,6 +29,7 @@ export async function foreignApply(u:any,b:any){
  const roles=foreignRoles(u);if(!roles.read)foreignFail('دسترسی ندارید.',403);const id=uuid(b.id),mode=req(b.mode,40);if(b.confirmed!==true||!foreignModes.includes(mode as any))foreignFail('عملیات و تأیید صریح لازم است.');
  if(['register','permit','actual','amend'].includes(mode)){const s=await foreignBy(u,req(b.caseId));if(s.type!=='purchase_shipment')foreignFail('محموله لازم است.');return applyShipment(u,{...b,shipmentId:s.id});}
  const db=storage(),now=new Date().toISOString(),notes=req(b.notes,3000),signature=JSON.stringify(b),prior:any=await db.prepare('SELECT actor,payload FROM inventory_operations WHERE id=?').bind(id).first();if(prior){if(prior.actor!==u.userId||prior.payload!==signature)foreignFail('شناسه عملیات قبلاً استفاده شده است.',409);return {saved:true,repeated:true};}
+ if(mode==='prepayment')foreignFail('ثبت پرداخت خرید خارجی فقط از تعهد خودکار خزانه انجام می‌شود.',409);
  const checks:any[]=[],writes:any[]=[],members=await leadMembers(),need=(role:keyof ReturnType<typeof foreignRoles>)=>{if(!roles[role])foreignFail('مجوز این مرحله را ندارید.',403);};
  const guard=(q:string,...p:any[])=>checks.push(db.prepare('UPDATE inventory_operations SET guard=CASE WHEN '+q+' THEN guard ELSE 0 END WHERE id=?').bind(...p,id));const version=(e:any)=>guard('EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)',e.id,e.revision);
  const get=async(eid:string,type:string)=>{const e=await supplierEntity(eid,type);version(e);return e;};

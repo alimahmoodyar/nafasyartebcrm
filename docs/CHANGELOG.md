@@ -1,3 +1,7 @@
+## 2026-11-15 — Unified procurement and treasury
+
+Automatic source-linked obligations, one treasury payment path for domestic/service/foreign purchasing, source revalidation, atomic partial payment and invoice allocation, deterministic purchase bank matching and agreement/advance delivery trigger. See PURCHASE-TREASURY.md. Focused treasury, procurement, service, settlement and TypeScript checks; browser walkthrough is not claimed. Legacy all-history treasury reads remain scalability debt; new order reconciliation uses bounded keyset batches. No live test payment or SMS sent.
+
 ## 2026-11-13 — Ordinary SMS.ir OTP sending
 
 Owner-selected line-based sending replaces template-only verification. Requires SMSIR_API_KEY and SMSIR_LINE_NUMBER; accepts only one validated mobile/code, fixed provider endpoint and positive message ID. Asset-link authentication/rate controls remain. Live configuration and delivery are confirmed separately from synthetic tests.
