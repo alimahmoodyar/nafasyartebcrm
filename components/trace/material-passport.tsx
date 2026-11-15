@@ -1,0 +1,4 @@
+'use client';
+import {useState} from 'react';
+import {MaterialAttachments} from './material-attachments';
+export function MaterialPassport({material}:{material:any}){const [open,setOpen]=useState(false);if(!material)return null;const d=material.data||material;return <><button type="button" className="btn" onClick={()=>setOpen(true)}>مشاهده شناسنامه کالا</button>{open&&<div className="modal" role="dialog" aria-modal="true" aria-label="شناسنامه کالا"><section className="review-card"><div className="tools"><h3>{d.name} · {d.code}</h3><button type="button" className="btn" onClick={()=>setOpen(false)}>بستن شناسنامه</button></div><p>واحد: {d.unit}</p><p>{d.specifications||d.specs||'مشخصات تکمیلی ثبت نشده است.'}</p><MaterialAttachments materialId={material.id} write={false}/></section></div>}</>;}

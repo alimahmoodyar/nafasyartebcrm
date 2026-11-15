@@ -1,3 +1,4 @@
+import {currentCustomPrice} from '@/lib/custom-cost-analysis';
 import {productionInstallments} from '@/lib/custom-production-contract';
 import {drainAccountingQueue} from '@/lib/accounting';
 import {deferDispatchBalance} from '@/lib/sales-dispatch-terms';
@@ -218,7 +219,7 @@ async function post(request:Request){try{
   }else{
    if(order.data.deliveryMode==='consignment'||agent!.data.kind==='branch')fail('سفارش شعبه امانی فاکتور فروش قطعی ندارد؛ از تأیید ارسال امانی استفاده کنید.');
    state(order,['sales_approved']);if(order.data.lines.some((l:any)=>l.productionMode==='project')&&!order.data.productionTerms)fail('ابتدا برنامه پرداخت تولید سفارشی را تعیین کنید.');if(!own().data.active)fail('نمایندگی غیرفعال است.');const a=account(),exposure=rial(a.balance)+rial(order.data.amount),limit=rial(order.data.securedPolicy?salesSecuredCredit(rows,own().id,today,order.id).ceiling:agent!.data.creditLimit);const exception=order.data.securedPolicy?rial(a.overdue)>BigInt(0):exposure>limit||rial(a.overdue)>BigInt(0);if(order.data.securedPolicy&&(!canHold(order.data,order.id)||exception&&!order.data.overdueApprovedBy))fail('شرایط مالی یا سقف ضمانت تغییر کرده است؛ سفارش نیاز به بررسی دارد.',409);if(!order.data.securedPolicy&&exception&&(b.creditException!==true||!txt(b.exceptionReason||'',2000)))fail('سقف اعتبار یا بدهی معوق مانع تأیید است؛ تصمیم استثنای مستند مالی لازم است.');
-   const reference=req(b.reference,300);if(rows.some(r=>r.type==='sales_invoice'&&r.data.reference===reference))fail('شماره فاکتور تکراری است.');const dispatchPaymentDays=order.data.dispatchPaymentDays;
+   const priceIntakes=(await db.prepare("SELECT data FROM flow_entities WHERE type='build_intake' AND json_extract(data,'$.orderId')=?").bind(order.id).all()).results.map((r:any)=>JSON.parse(r.data));if(priceIntakes.some((d:any)=>d.reviewedPricing&&!currentCustomPrice(d,order)))fail('قیمت مشخصات سفارشی پیش از فاکتور باید تأیید شود.');const reference=req(b.reference,300);if(rows.some(r=>r.type==='sales_invoice'&&r.data.reference===reference))fail('شماره فاکتور تکراری است.');const dispatchPaymentDays=order.data.dispatchPaymentDays;
    const plan=order.data.productionTerms?productionInstallments(order.data.amount,order.data.productionTerms.stages):order.data.salesTerms||dispatchPaymentDays!==undefined
     ?termsPlan(order.data.amount,order.data.salesTerms||{cashBps:0,days:dispatchPaymentDays},today)
     :installments(b.installments,order.data.amount);

@@ -1,3 +1,7 @@
+## 2026-11-15 — Reviewed custom operations forms
+
+Implemented shared semi passport/BOM/functional-template/usage forms, treasury exact-day USD and existing-wins XLSX import, source-backed two-model order cost analysis, manager base confirmation and CEO order-specific net pricing. Same-version Word/invoice/customer/factory gates, manager release and independent actual production start. Own-worker immutable daily reports with cross-project/routine daily-time guards; explicit unknown warehouse linkage and conservative inventory view. Factory record projections, existing HTTP/MCP handlers, reset catalogs and reviewed responsive form graphics. See CUSTOM-OPERATIONS-RELEASE.fa.md for tested scope and explicit limitations.
+
 ## 2026-11-15 — Routine and general Word proformas
 
 Extended the existing manager template catalog to routine products and a shared multi-product template. Stored-order price/discount/payment facts drive scoped sales output; product template takes precedence for one product and published general fallback serves multiple products. Explicit quote validity, order revision guards, immutable issued files, no financial/inventory side effects. Custom-production checks and existing private file/reset handling retained. See SALES-WORD-TEMPLATES.fa.md.

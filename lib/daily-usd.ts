@@ -1,0 +1,6 @@
+import {parseCalendarDay,latinDigits} from './persian-date';
+export function usdRate(value:unknown){const s=latinDigits(String(value??'')).replace(/[,٬\s]/g,'');if(!/^[1-9]\d{0,14}$/.test(s))throw Error('نرخ دلار باید ریال صحیح مثبت باشد.');return BigInt(s).toString();}
+export function previewUsdRows(input:unknown,existing:any[],today:string){
+ if(!Array.isArray(input)||input.length>1000)throw Error('فایل حداکثر ۱۰۰۰ ردیف داشته باشد.');const parsed=input.map((r:any,i:number)=>{try{const day=parseCalendarDay(r.day);if(!day||day>today)throw Error('تاریخ نامعتبر یا آینده است.');return {row:i+2,day,rate:usdRate(r.rate),error:''};}catch(e){return {row:i+2,day:'',rate:'',error:(e as Error).message};}}),counts=new Map<string,Set<string>>();for(const r of parsed)if(!r.error){const set=counts.get(r.day)||new Set();set.add(r.rate);counts.set(r.day,set);}
+ const seen=new Set<string>();return parsed.map(r=>{if(r.error)return {...r,state:'error'};if(counts.get(r.day)!.size>1)return {...r,state:'error',error:'نرخ‌های متفاوت برای یک تاریخ در فایل ثبت شده است.'};const old=existing.find(x=>x.data.day===r.day);if(old)return {...r,state:'existing',rate:old.data.rate};if(seen.has(r.day))return {...r,state:'duplicate'};seen.add(r.day);return {...r,state:'new'};});
+}

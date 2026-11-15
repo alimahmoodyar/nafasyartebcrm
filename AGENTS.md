@@ -1,3 +1,7 @@
+# Reviewed custom operations execution (2026-11-15)
+
+Latest owner authorized implementing reviewed forms and their approved workflow with the shown graphics. Follow docs/process-design/CUSTOM-OPERATIONS-EXECUTION.fa.md. Supersedes older finalize-by-sales-staff and no-price-proposal assumptions: sales manager sends to factory after price/customer/bank checks; no factory admission approval. Production gets no financial data server-side. Do not implement unreviewed shipping/installation forms.
+
 # Nafasyar development rules
 
 ## Custom production execution authorization (2026-11-15)

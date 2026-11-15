@@ -1,0 +1,18 @@
+import {leadMembers,leadMemberGuard} from '@/lib/sales-leads';
+import {requireAccess,checkOrigin,AccessError,accessResponse} from '@/lib/authorization';
+import {storage} from '@/lib/storage';
+import {treasuryRoles,treasuryRows} from '@/lib/treasury';
+import {dayAt} from '@/lib/duties';
+import {usdRate,previewUsdRows} from '@/lib/daily-usd';
+import {boundedBody} from '@/lib/firmware-storage';
+const json=(d:any)=>Response.json(d,{headers:{'Cache-Control':'private, no-store',Vary:'Cookie, Authorization'}});
+async function access(){const u=await requireAccess(),r=await treasuryRoles(u,await treasuryRows());if(!r.treasury)throw new AccessError('ثبت نرخ روز با خزانه‌دار است.',403);return u;}
+async function rates(){return (await storage().prepare("SELECT id,revision,data FROM flow_entities WHERE type='daily_usd_rate' ORDER BY id DESC").all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}));}
+export async function GET(){try{await access();return json({today:dayAt(),rates:await rates()});}catch(e){return accessResponse(e)||Response.json({error:(e as Error).message},{status:400});}}
+export async function POST(r:Request){try{checkOrigin(r);const u=await access(),b:any=JSON.parse(new TextDecoder().decode(await boundedBody(r,400000))),db=storage(),today=dayAt(),old=await rates(),members=await leadMembers();if(b.mode==='preview')return json({rows:previewUsdRows(b.rows,old,today)});
+ if(b.confirmed!==true||typeof b.id!=='string'||!/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(b.id))throw Error('شناسه و تأیید ثبت لازم است.');const signature=JSON.stringify(b),prior:any=await db.prepare('SELECT actor,payload FROM inventory_operations WHERE id=?').bind(b.id).first();if(prior){if(prior.actor!==u.userId||prior.payload!==signature)throw new AccessError('شناسه تکراری متفاوت است.',409);return json({saved:true,repeated:true});}const now=new Date().toISOString(),writes:any[]=[];
+ if(b.mode==='today'){const rate=usdRate(b.rate),row=old.find(x=>x.data.day===today);if((row?.revision||0)!==b.revision)throw new AccessError('نرخ روز تغییر کرده است؛ دوباره بخوانید.',409);writes.push(db.prepare('UPDATE inventory_operations SET guard=CASE WHEN COALESCE((SELECT revision FROM flow_entities WHERE id=?),0)=? THEN guard ELSE 0 END WHERE id=?').bind('usd:'+today,b.revision,b.id));const data={day:today,rate,history:[...(row?.data.history||[]),...(row?[{rate:row.data.rate,revision:row.revision}]:[])]};writes.push(row?db.prepare('UPDATE flow_entities SET data=?,revision=revision+1,updated=? WHERE id=?').bind(JSON.stringify(data),now,row.id):db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'daily_usd_rate',?,1,?,?)").bind('usd:'+today,JSON.stringify(data),now,now));
+ }else if(b.mode==='import'){const rows=previewUsdRows(b.rows,old,today);for(const row of rows.filter(x=>x.state==='new'))writes.push(db.prepare("INSERT OR IGNORE INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'daily_usd_rate',?,1,?,?)").bind('usd:'+row.day,JSON.stringify({day:row.day,rate:row.rate,history:[]}),now,now));
+ }else throw Error('عملیات نامعتبر است.');
+ await db.batch([db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(b.id,'daily_usd_'+b.mode,signature,u.userId,now),leadMemberGuard(db,b.id,members),...writes,db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,'usd:'+today,'daily_usd_'+b.mode,JSON.stringify({rows:writes.length}),now)]);return json({saved:true,rates:await rates()});
+ }catch(e){return accessResponse(e)||Response.json({error:(e as Error).message},{status:400});}}
