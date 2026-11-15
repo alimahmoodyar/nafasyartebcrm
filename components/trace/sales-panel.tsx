@@ -1,4 +1,5 @@
 'use client';
+import {WordProformaPreview} from './word-template-panel';
 import {productionInstallments} from '@/lib/custom-production-contract';
 
 import {ShippingPackageReceipt} from './shipping-package-receipt';
@@ -337,7 +338,7 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
   </p>
   <p>تاریخ ثبت {date(o.created)} · جمع خرید {money(o.data.amount)} · تخفیف {money(o.data.discount)}</p>
   <p>مهلت توافق‌شدهٔ پرداخت {n(o.data.termDays)} روز{o.data.dispatchPaymentDays!==undefined&&' از خروج هر محموله'}</p>
-  <p>تاریخ اعلام‌شده برای تحویل {o.data.promisedDay?date(o.data.promisedDay):'هنوز اعلام نشده'}</p>
+  <p>تاریخ اعلام‌شده برای تحویل {o.data.promisedDay?date(o.data.promisedDay):'هنوز اعلام نشده'}</p>{staff&&!o.data.productionTerms&&!orderStopped&&o.data.deliveryMode!=='consignment'&&<WordProformaPreview key={o.id+':'+o.revision} orderId={o.id}/>}
   {invoice?.data.dispatchPaymentDays!==undefined&&<div className="sales-table">
    <table><caption>سررسید پرداخت به تفکیک ارسال</caption>
     <thead><tr><th>خروج کالا</th><th>سررسید</th><th>مبلغ</th><th>مانده</th></tr></thead>

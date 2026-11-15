@@ -53,5 +53,6 @@ module.exports=async function(t){
  // Due dates attach once to actual stage occurrence, not invoice issue or scan.
  const stage=load('lib/production-payment-stage.ts'),invoiceId=entity('order-a').data.invoiceId,initial=entity(invoiceId).data.installments;assert(initial.find(p=>p.productionStage==='production').stageAt);assert.equal(initial.find(p=>p.productionStage==='delivery').due,'');
  const stageOp=crypto.randomUUID();sql.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').run(stageOp,'test','{}',admin.userId,now);await t.db.batch(await stage.productionStageStatements(t.db,stageOp,'order-a','delivery',now,'2026-11-01'));assert.equal(entity(invoiceId).data.installments.find(p=>p.productionStage==='delivery').due,'2026-11-11');assert.equal((await stage.productionStageStatements(t.db,stageOp,'order-a','delivery',now,'2026-11-02')).length,0);
+ await require('./routine-word-scenarios.cjs')(t);
  console.log('PASS custom production: base and special through actual bank matching to atomic project/BOM/material demands; partial/pending/reversed receipts, CEO duration, decimal units, retries, privacy, shared quantities, invoice schedules and Word token/escaping validation.');
 };

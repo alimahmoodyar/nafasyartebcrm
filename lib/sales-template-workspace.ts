@@ -15,7 +15,7 @@ export const salesTemplateWorkspaceStatuses={active:'در حال اجرا',sched
 export const salesTemplateWorkspaceTypes={fixed:'الگوی ثابت',promotion:'پروموشن'};
 export type SalesTemplateWorkspaceFilters={kind:string;product:string;search:string;type:string;status:string};
 export type SalesTemplateKind=keyof typeof salesTemplateKinds;
-export type SalesTemplateProduct={id:string;name:string;code:string;model:string;status:string};
+export type SalesTemplateProduct={id:string;name:string;code:string;model:string;status:string;productionMode?:string};
 export type SalesTemplateDiagnostic={code:string;message:string};
 export type SalesTemplatePriceSource='cost_approved'|'sales_template'|'sales_price'|null;
 export type SalesTemplateProductPrice={productId:string;name:string;code:string;model:string;unitPrice:string|null;unitNet:string|null};
@@ -65,7 +65,7 @@ export async function readSalesTemplateWorkspace(actor:Session,raw:Partial<Sales
   // Neither the floor nor internal cost/profit data enters the response.
   db.prepare("SELECT id,json_extract(data,'$.productId') productId,json_extract(data,'$.kind') kind,json_extract(data,'$.calculation.unitPrice') unitPrice,json_extract(data,'$.calculation.minimumNet') minimumNet FROM flow_entities WHERE type='pricing_approval'").all(),
  ]);
- const products:SalesTemplateProduct[]=productRows.results.map((row:any)=>{const data=JSON.parse(row.payload);return {id:row.id,name:data.name||data.model||data.code||'کالای ثبت‌شده',code:data.code||'',model:data.model||'',status:data.status||''};}),byId=new Map(products.map(product=>[product.id,product]));
+ const products:SalesTemplateProduct[]=productRows.results.map((row:any)=>{const data=JSON.parse(row.payload);return {id:row.id,name:data.name||data.model||data.code||'کالای ثبت‌شده',code:data.code||'',model:data.model||'',status:data.status||'',productionMode:data.productionMode||''};}),byId=new Map(products.map(product=>[product.id,product]));
  if(filters.product&&!byId.has(filters.product))salesFail('محصول فیلتر پیدا نشد.',404);
  const templateRows=rows.filter(row=>row.type==='sales_template'&&Object.hasOwn(salesTemplateKinds,row.data.kind));
  const allTemplates:SalesTemplateSummary[]=templateRows.map((row):SalesTemplateSummary=>{

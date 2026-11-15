@@ -1,3 +1,7 @@
+## 2026-11-15 — Routine and general Word proformas
+
+Extended the existing manager template catalog to routine products and a shared multi-product template. Stored-order price/discount/payment facts drive scoped sales output; product template takes precedence for one product and published general fallback serves multiple products. Explicit quote validity, order revision guards, immutable issued files, no financial/inventory side effects. Custom-production checks and existing private file/reset handling retained. See SALES-WORD-TEMPLATES.fa.md.
+
 ## 2026-11-15 — Custom product configuration and production release
 
 Published base/alternative BOM configuration in the existing product workspace; special customer specifications return from engineering without redundant final approval. Calendar lead time, quote validity and version-bound CEO duration reductions; DOCX upload/token checks, private versioned output and browser print/save PDF. Finance-defined cumulative payment stages reuse existing bank matching and invoice allocations, with server-side production/dispatch gates and physical-delivery due activation. Atomic project/BOM/material-demand generation, exact source snapshots, public-history redaction and UI/HTTP/MCP handlers. See CUSTOM-PRODUCTION.fa.md. Automated base/special-to-production and relevant regressions; no live synthetic order/payment, SMS or reset.
