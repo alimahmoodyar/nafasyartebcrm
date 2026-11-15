@@ -1,3 +1,7 @@
+## 2026-11-15 — Custom product configuration and production release
+
+Published base/alternative BOM configuration in the existing product workspace; special customer specifications return from engineering without redundant final approval. Calendar lead time, quote validity and version-bound CEO duration reductions; DOCX upload/token checks, private versioned output and browser print/save PDF. Finance-defined cumulative payment stages reuse existing bank matching and invoice allocations, with server-side production/dispatch gates and physical-delivery due activation. Atomic project/BOM/material-demand generation, exact source snapshots, public-history redaction and UI/HTTP/MCP handlers. See CUSTOM-PRODUCTION.fa.md. Automated base/special-to-production and relevant regressions; no live synthetic order/payment, SMS or reset.
+
 ## 2026-11-15 — Economic events and purchase accounting core
 
 Shared source-linked accounting: versioned tested rules, three detail slots, immutable balanced journals, opening/manual/reversal, periods and trial/ledger; provisional purchases, source-safe invoice amendments, weighted material/WIP/semi/finished/COGS propagation, supplier return and alternative replacement representations, original treasury cash authority, UI/HTTP/MCP parity. See ACCOUNTING-PURCHASE-CORE.fa.md. No live synthetic transactions or SMS. Activation of rules/opening remains a financial director decision.

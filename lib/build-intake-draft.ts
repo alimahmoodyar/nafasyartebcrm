@@ -22,14 +22,14 @@ export async function hydrateBuildIntakeForm(user:Session,form:OperationForm):Pr
   const current=catalog.intakes.find((r:any)=>r.id===args.intakeId);
   if(current&&args.revision===undefined){
    args.revision=current.revision;
-   if(args.mode==='save')for(const key of ['title','orderId','contractId','due','items','fileIds','notes'])if(args[key]===undefined)args[key]=clone(current.data[key]??(key==='items'||key==='fileIds'?[]:''));
+   if(args.mode==='save')for(const key of ['title','orderId','contractId','due','items','fileIds','notes','requestedDays','specialRequest','specialDescription'])if(args[key]===undefined)args[key]=clone(current.data[key]??(key==='items'||key==='fileIds'?[]:''));
   }
   if(args.mode!=='save'){
-   for(const [key,node] of Object.entries(properties) as [string,any][])node.uiHidden=!['mode','intakeId','notes','revision','id'].includes(key);
+   for(const [key,node] of Object.entries(properties) as [string,any][])node.uiHidden=!['mode','intakeId','notes','revision','id','resolutions','durationDays','channel','acceptedAt','validUntil'].includes(key);
    return {...form,args,schema:{...schema,properties},previewError:args.intakeId&&!current?'پرونده سفارش ساخت در دسترسی شما نیست.':undefined};
   }
   args.revision??=0;args.items=Array.isArray(args.items)?args.items:[];
-  args.items=args.items.map((item:any)=>Object.fromEntries(['id','lineIndex','productId','quantity','templateId','values'].filter(key=>Object.hasOwn(item||{},key)).map(key=>[key,item[key]])));
+  args.items=args.items.map((item:any)=>Object.fromEntries(['id','lineIndex','productId','quantity','templateId','values','selections'].filter(key=>Object.hasOwn(item||{},key)).map(key=>[key,item[key]])));
   if(!args.intakeId&&properties.intakeId)properties.intakeId.uiHidden=true;
   const order=orders.find((o:any)=>o.id===args.orderId),lines=(order?.items||[]).filter((i:any)=>i.productionMode==='project');
   const contracts=catalog.contracts.filter((c:any)=>order&&(c.agentId===order.agentId||!c.agentId&&norm(c.party)===norm(order.customer)));
@@ -59,7 +59,7 @@ export async function hydrateBuildIntakeForm(user:Session,form:OperationForm):Pr
   const prefixItems=args.items.map((item:any)=>itemSchema(item));
   properties.items={...properties.items,items:itemSchema({}),prefixItems,readOnly:identityLocked};
   for(const key of ['notes','fileIds'])if(properties[key])properties[key].uiHidden=false;
-  schema.required=[...new Set([...(schema.required||[]),'title','orderId','due','items'])];
+  schema.required=[...new Set([...(schema.required||[]).filter((k:string)=>k!=='due'),'title','orderId','items'])];
   const invalid=args.orderId&&!order||args.contractId&&!contracts.some((c:any)=>c.id===args.contractId)||args.items.some((i:any)=>i.productId&&!lines.some((l:any)=>l.productId===i.productId&&l.lineIndex===i.lineIndex)||i.templateId&&!catalog.templates.some((t:any)=>t.id===i.templateId&&t.productId===i.productId));
   const missingTemplate=args.items.some((i:any)=>i.productId&&!catalog.templates.some((t:any)=>t.productId===i.productId));
   return {...form,args,schema:{...schema,properties},preview:undefined,previewError:invalid?'سفارش، قرارداد، محصول و فرم مشخصات باید از گزینه‌های مجاز همین پرونده انتخاب شوند.':missingTemplate?'برای این محصول هنوز فرم عمومی مصوب مشخصات سفارش منتشر نشده است.':undefined};

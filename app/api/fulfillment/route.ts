@@ -1,3 +1,6 @@
+import {productionStageStatements} from '@/lib/production-payment-stage';
+import {customSource} from '@/lib/custom-production';
+import {customPaymentProgress} from '@/lib/custom-production-contract';
 import {drainAccountingQueue} from '@/lib/accounting';
 import {syncTransportTasks} from '@/lib/transport';
 import {assignedPackageDriver,packageReceiptSelection,splitShippingPackages} from '@/lib/shipping-packages';
@@ -159,6 +162,7 @@ async function post(request:Request){try{
  if(primary.data.salesOrderId){
   const order=await get(primary.data.salesOrderId,'sales_order');
   if(order.data.securedPolicy&&(order.data.state!=='approved'||!order.data.invoiceId))fail('ابتدا مالی فاکتور سفارش را صادر کند.',409);
+  if(order.data.productionTerms){const source=await customSource(order.id),progress=customPaymentProgress(order,source.rows);if(!progress.stages.find(p=>p.stage==='dispatch')?.ready)fail('شرط مالی پیش از ارسال کامل نشده است؛ وصول بانکی تخصیص‌یافته به همین سفارش لازم است.',409);for(const r of source.rows.filter(r=>r.data.agentId===order.data.agentId))guard('EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?)',r.id,r.revision);}
  }
  const related=b.includeOrder===true&&primary.data.salesOrderId?(await list('sale')).filter(line=>line.id!==primary.id&&line.data.salesOrderId===primary.data.salesOrderId&&line.data.state==='reserved'):[];
  const sales=[primary,...related];
@@ -189,6 +193,7 @@ async function post(request:Request){try{
  }
  if(primary.data.salesOrderId&&shipped.length){
   const order=await get(primary.data.salesOrderId,'sales_order');
+  statements.push(...await productionStageStatements(db,id,order.id,'dispatch',now));
   if(order.data.dispatchPaymentDays!==undefined){
    const invoice=await get(needed(order.data.invoiceId),'sales_invoice');
    if(invoice.data.orderId!==order.id)fail('فاکتور به سفارش ارسال مرتبط نیست.',409);

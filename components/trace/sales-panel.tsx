@@ -1,4 +1,6 @@
 'use client';
+import {productionInstallments} from '@/lib/custom-production-contract';
+
 import {ShippingPackageReceipt} from './shipping-package-receipt';
 import {RepresentativeIdentityPanel} from './representative-identity-panel';
 import {ReceiptAttachment} from './receipt-attachment';
@@ -98,6 +100,7 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
   setDraft(null);setQuote(null);setFile(null);setError('');
   setView(directView==='new_order'?'orders':directView);
   if(directView==='new_order')begin('order',{agentId:data.agents.find((a:any)=>a.canOperate!==false)?.id||''});
+  if(directView==='new_payment'&&targetId.split(':')[2]){const parts=targetId.split(':');const orderId=decodeURIComponent(parts.slice(3).join(':'));begin('payment',{agentId:decodeURIComponent(parts[2]),cashOrderId:orderId,method:'bank'});}
  },[directView,targetId]);
  const agents=(data?.agents||[]).filter((a:any)=>(!selected||a.id===selected)&&(!province||a.data.province===province)),agentIds=new Set(agents.map((a:any)=>a.id));
  const acs=(data?.accounts||[]).filter((a:any)=>agentIds.has(a.agentId));const records=(kind:string)=>(data?.[kind]||[]).filter((r:any)=>agentIds.has(r.data.agentId)&&(kind!=='orders'||!targetId.startsWith('order:')||r.id===targetId.slice(6)));const agentName=(id:string)=>data?.agents.find((a:any)=>a.id===id)?.data.name||'—';const productName=(id:string)=>data?.products?.find((p:any)=>p.id===id)?.name||id;
@@ -121,7 +124,7 @@ export function SalesPanel({demo,onNavigate,targetId=''}:{targetId?:string;demo:
   }
   if(b.mode==='agent'){const domains=data.canLinkServiceDomains||[];const canLink=domains.includes(b.serviceDomain||b.linkedServiceAgents?.[0]?.domain||domains[0]||'home')&&(!b.serviceRepresentation?(b.linkedServiceAgents||[]).every((a:any)=>domains.includes(a.domain)):true);b=representativeLinkPayload(b,'sales',canLink);}
   if(b.mode==='order'&&!quote){setQuote(await send('/api/sales/quote',{agentId:b.agentId,items:b.items,salesTerms:b.salesTerms,referrerId:b.referrerId}));setBusy(false);return;}
-  if(b.mode==='order')b.quoteHash=quote.quoteHash;if(b.mode==='allocate')b.allocations=data.allocationPlans.find((p:any)=>p.creditId===b.creditId)?.allocations;if(b.mode==='invoice'){const o=data.orders.find((o:any)=>o.id===b.orderId);if(o?.data.salesTerms||o?.data.dispatchPaymentDays!==undefined)b.installments=termsPlan(o.data.amount,o.data.salesTerms||{cashBps:0,days:o.data.dispatchPaymentDays},data.today);}
+  if(b.mode==='order')b.quoteHash=quote.quoteHash;if(b.mode==='allocate')b.allocations=data.allocationPlans.find((p:any)=>p.creditId===b.creditId)?.allocations;if(b.mode==='invoice'){const o=data.orders.find((o:any)=>o.id===b.orderId);if(o?.data.productionTerms)b.installments=productionInstallments(o.data.amount,o.data.productionTerms.stages);else if(o?.data.salesTerms||o?.data.dispatchPaymentDays!==undefined)b.installments=termsPlan(o.data.amount,o.data.salesTerms||{cashBps:0,days:o.data.dispatchPaymentDays},data.today);}
   if(b.mode==='receipt'&&!data.roles.agent&&!b.receiptFileId){if(!file)throw Error('مستند دریافت این محموله را انتخاب کنید.');const fd=new FormData();fd.set('file',file);const q=new URLSearchParams({mission:b.missionId,purpose:b.result==='complete'?'receipt':'condition',requestId:fileRequestId,revision:String(b.revision)}),r=await fetch('/api/transport/files?'+q,{method:'POST',body:fd}),d=await r.json() as any;if(!r.ok)throw Error(d.error);b.receiptFileId=d.id;b.revision=d.revision;setDraft((v:any)=>({...v,receiptFileId:d.id,revision:d.revision}));}
   if(b.mode!=='receipt'&&b.mode!=='agent'&&file&&!b.fileId){const fd=new FormData();fd.set('metadata',JSON.stringify({id:fileRequestId,agentId:b.agentId,title:b.title||'رسید پرداخت',confirmed:true}));fd.set('file',file);const r=await fetch('/api/sales/files',{method:'POST',body:fd}),d=await r.json() as any;if(!r.ok)throw Error(d.error);b.fileId=d.id;setDraft((v:any)=>({...v,fileId:d.id}));}
   let result:any;
