@@ -12,4 +12,4 @@ export function factoryProject(row:any){
  return {id:row.id,type:row.type,revision:row.revision,created:row.created,updated:row.updated,data};
 }
 
-export function factoryRecord(d:any){const keys=['id','code','name','model','group','partCode','partName','unit','kind','status','expiry','quantity','productionMode','series','brand','batchCode','materialId','productId','created','warehouseId'];return Object.fromEntries(keys.filter(k=>d[k]!==undefined).map(k=>[k,d[k]]));}
+export function factoryRecord(d:any){const keys=['id','code','name','model','group','partCode','part','partName','unit','kind','status','expiry','quantity','productionMode','series','brand','batchCode','materialId','productId','created','warehouseId'];return Object.fromEntries(keys.filter(k=>d[k]!==undefined).map(k=>[k,d[k]]));}
