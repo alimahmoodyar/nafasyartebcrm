@@ -1,5 +1,5 @@
-import {asciiDigits} from '@/lib/batch-number';
 'use client';
+import {asciiDigits} from '@/lib/batch-number';
 import {useEffect,useState} from 'react';
 import {SemiFinishedBomPanel} from './semi-finished-bom-panel';
 import {MaterialSelect} from './material-select';

@@ -1,5 +1,5 @@
 // Operational projections are independent of finance/cost permissions.
-const forbidden=/price|cost|amount|margin|profit|payment|paid|discount|budget|expense|commitment|installment|cashbps|currency|exchange|fxrate|unitnet|minimumNet|productionTerms|salesTerms|financial|contractAmount|signature|wage|fee|rial|usd|^value$|^rate$|^shares$|^closes$/i;
+const forbidden=/price|cost|amount|margin|profit|payment|paid|discount|budget|expense|commitment|installment|cashbps|currency|exchange|fxrate|unitnet|minimumNet|productionTerms|salesTerms|financial|contractAmount|signature|wage|fee|^rial$|^usd$|^totalRial$|^netRial$|^grossRial$|^taxRial$|^value$|^rate$|^shares$|^closes$/i;
 export function factorySafe(value:any):any{
  if(Array.isArray(value))return value.map(factorySafe);
  if(!value||typeof value!=='object')return value;

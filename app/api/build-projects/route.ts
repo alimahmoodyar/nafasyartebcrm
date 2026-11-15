@@ -1,3 +1,4 @@
+import {productionDayMinutes,productionDayGuard} from '@/lib/production-day-time';
 import {factoryProject,factorySafe,factoryRecord} from '@/lib/factory-privacy';
 import {projectAvailability} from '@/lib/project-availability';
 import {drainAccountingQueue} from '@/lib/accounting';
@@ -89,7 +90,7 @@ export async function POST(request:Request){try{checkOrigin(request);const u=awa
  if(b.mode==='scrap')entry(l.batchId,'nonconforming',q);
  p.movements.push({id:b.id,operationId:b.id,unitId:r.unitId,lotId:l.id,batchId:l.batchId,quantity:q,kind:b.mode,...stamp});p.units.find((x:any)=>x.id===r.unitId).quality=null;
  }else if(b.mode==='time'){
- if(!roles.production&&!roles.engineering&&!roles.finance)fail('دسترسی ثبت زمان لازم است.',403);const x=unit(),m=member(txt(b.memberId,200));if(!Number.isSafeInteger(b.minutes)||b.minutes<1||b.minutes>1440)fail('دقیقه معتبر لازم است.');const date=day(b.day),sum=s.entities.filter((r:any)=>r.type==='build_project').reduce((n:number,r:any)=>n+r.data.times.filter((t:any)=>!t.voided&&t.memberId===m.id&&t.day===date).reduce((a:number,t:any)=>a+t.minutes,0),0);if(sum+b.minutes>1440)fail('جمع زمان فرد در روز بیشتر از ۲۴ ساعت است.');p.times.push({id:b.id,unitId:x.id,memberId:m.id,day:date,minutes:b.minutes,approved:null,rate:null,...stamp});
+ if(!roles.production&&!roles.engineering&&!roles.finance)fail('دسترسی ثبت زمان لازم است.',403);const x=unit(),m=member(txt(b.memberId,200));if(!Number.isSafeInteger(b.minutes)||b.minutes<1||b.minutes>1440)fail('دقیقه معتبر لازم است.');const date=day(b.day),sum=await productionDayMinutes(db,m.id,date);if(sum+b.minutes>1440)fail('جمع زمان فرد در روز بیشتر از ۲۴ ساعت است.');stmts.push(productionDayGuard(db,b.id,m.id,date,b.minutes));p.times.push({id:b.id,unitId:x.id,memberId:m.id,day:date,minutes:b.minutes,approved:null,rate:null,...stamp});
  }else if(b.mode==='approve_time'){need('finance');const t=find('times');t.rate=amount(b.rate);t.approved=stamp;}
  else if(b.mode==='expense'){
  need('finance');const reference=txt(b.reference,500);if(s.entities.filter((r:any)=>r.type==='build_project').some((r:any)=>r.data.expenses.some((e:any)=>!e.voided&&e.reference===reference)))fail('مرجع هزینه قبلاً به پروژه تخصیص یافته است؛ از ثبت دوباره جلوگیری کنید.',409);

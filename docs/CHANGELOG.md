@@ -1,3 +1,7 @@
+## 2026-11-15 — End-of-day integrity follow-up
+
+Preserve material/serial identities while redacting financial fields; immutable Persian-code retry signatures. Invoice pricing ignores unused drafts but blocks active/unformed configured orders, retaining legacy unconfigured flow. Conservative stock availability separates other-job claims and historical consumption. One atomic SQL day limit covers routine/custom/legacy project time; paginated scoped daily queries replace company-history snapshots. Invalid FX preview gets HTTP400. Updated stale test fixtures without weakening business controls; detailed 71/74 review and recovery evidence recorded in quality-reviews/2026-11-15-end-of-day.md.
+
 ## 2026-11-15 — Reviewed custom operations forms
 
 Implemented shared semi passport/BOM/functional-template/usage forms, treasury exact-day USD and existing-wins XLSX import, source-backed two-model order cost analysis, manager base confirmation and CEO order-specific net pricing. Same-version Word/invoice/customer/factory gates, manager release and independent actual production start. Own-worker immutable daily reports with cross-project/routine daily-time guards; explicit unknown warehouse linkage and conservative inventory view. Factory record projections, existing HTTP/MCP handlers, reset catalogs and reviewed responsive form graphics. See CUSTOM-OPERATIONS-RELEASE.fa.md for tested scope and explicit limitations.

@@ -48,8 +48,8 @@ for(const [id,u] of users){
  check(nav.canOpenSection(u,'hospital'),['ceo','sales_manager','service_manager'].includes(id),'hospital supervisory navigation',id);
  check(nav.canOpenSection(u,'costing'),['finance','finance_director','accounting_head','warehouse_finance'].includes(id),'costing exact role',id);
  check(nav.canOpenSection(u,'pricing'),['finance','finance_director','accounting_head','warehouse_finance','ceo'].includes(id),'pricing exact role',id);
- check(nav.canOpenSection(u,'finance-control'),['finance','finance_director','accounting_head','purchase_finance'].includes(id),'control exact role',id);
- check(nav.canOpenSection(u,'guarantees'),['treasurer','finance_director'].includes(id),'guarantees exact role',id);
+ check(nav.canOpenSection(u,'finance-control'),['finance','finance_director','accounting_head','purchase_finance','warehouse_finance'].includes(id),'control exact role',id);
+ if(id==='warehouse_finance'){const a=load('lib/accounting-contract.ts').accountingRoles(u);check(a.read,true,'accounting read-only',id);check(a.write,false,'no accounting write',id);check(a.configure,false,'no accounting configuration',id);check(load('lib/financial-access.ts').financialAccess(u,'control'),false,'no legacy control reports',id);}check(nav.canOpenSection(u,'guarantees'),['treasurer','finance_director'].includes(id),'guarantees exact role',id);
  check(nav.canOpenSection(u,'treasury'),['treasurer','finance_director','accounting_head','ceo_payment','purchase_finance'].includes(id),'treasury exact role',id);
  check(auth.can(u,'product','write'),has(expected.productWrite,id),'productWrite',id);check(auth.can(u,'firmware','write'),has(expected.firmwareWrite,id),'firmwareWrite',id);
  for(const [role,key] of [['treasury','treasury'],['manager','financialManager'],['accountant','accountant'],['ceo','ceoPayment']])check(finance.financialWorkflowRole(u.permissions,id,[],role),has(expected[key],id),'financial:'+role,id);
@@ -74,7 +74,7 @@ if(qa&&!qa.design)assert.equal(qms.qvisible({type:'qms_record',data:{private:tru
  check(nav.canOpenSection(u,'routine-production'),['production','production_worker','production_store_assistant','engineering','qc','ceo'].includes(id),'routine production navigation',id);
  check(nav.canOpenSection(u,'assets'),['custodian','asset_disposal_approver'].includes(id),'assets navigation',id);
  check(nav.canOpenSection(u,'personnel'),!['sales_agent','service_agent'].includes(id),'personnel navigation',id);
- check(nav.canOpenSection(u,'guarantees'),['treasurer','finance_director'].includes(id),'guarantees navigation',id);
+ if(id==='warehouse_finance'){const a=load('lib/accounting-contract.ts').accountingRoles(u);check(a.read,true,'accounting read-only',id);check(a.write,false,'no accounting write',id);check(a.configure,false,'no accounting configuration',id);check(load('lib/financial-access.ts').financialAccess(u,'control'),false,'no legacy control reports',id);}check(nav.canOpenSection(u,'guarantees'),['treasurer','finance_director'].includes(id),'guarantees navigation',id);
  check(nav.canOpenSection(u,'users'),false,'admin users',id);check(nav.canOpenSection(u,'llm'),false,'admin LLM',id);check(nav.canOpenSection(u,'system-reset'),false,'admin reset',id);
 }
 // Supervisory reading spans both domains, while operations remain explicitly scoped.
