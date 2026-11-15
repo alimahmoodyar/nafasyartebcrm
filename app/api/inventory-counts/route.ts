@@ -1,3 +1,4 @@
+import {drainAccountingQueue} from '@/lib/accounting';
 import {batchScanCode} from '@/lib/batch-qr';
 import {requireAccess,checkOrigin,accessResponse,AccessError} from '@/lib/authorization';
 import {financialAccess} from '@/lib/financial-access';
@@ -45,5 +46,6 @@ export async function POST(request:Request){try{
   }else fail('عملیات انبارگردانی معتبر نیست.');
   if(d.kind==='annual'&&d.ceoApproval&&d.financeApproval)d.state='completed';d.history.push({mode:b.mode,...stamp});save(row.id,'inventory_count',d,row.revision);
  }
- await db.batch([db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(b.id,kind,signature,u.userId,now),...guards,...stmts,db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,target,'inventory_count_'+b.mode,signature,now)]);await syncInventoryCounts();return json({saved:true,id:target});
+ await db.batch([db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(b.id,kind,signature,u.userId,now),...guards,...stmts,db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,target,'inventory_count_'+b.mode,signature,now)]);
+ await drainAccountingQueue().catch(()=>{});await syncInventoryCounts();return json({saved:true,id:target});
  }catch(e){return accessResponse(e)||Response.json({error:'ثبت انبارگردانی انجام نشد؛ موجودی یا پرونده تغییر کرده است.'},{status:409})}}

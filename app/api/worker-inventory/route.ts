@@ -1,3 +1,4 @@
+import {drainAccountingQueue} from '@/lib/accounting';
 import {reservedBatchCodes} from '@/lib/batch-code-reservations';
 import {batchScanCode} from '@/lib/batch-qr';
 import {syncWorkerCounts} from '@/lib/inventory-counts';
@@ -103,5 +104,6 @@ export async function POST(request:Request){try{
  for(const [key,delta] of entries){const [itemId,wh]=JSON.parse(key);if(!delta)continue;if(balance(itemId,wh)+delta<0)fail('موجودی کافی نیست؛ هیچ تغییری ثبت نشد.',409);stmts.push(db.prepare('INSERT INTO inventory_balances(id,item_id,warehouse,quantity) VALUES(?,?,?,0) ON CONFLICT(item_id,warehouse) DO NOTHING').bind(itemId+'@'+wh,itemId,wh),db.prepare('UPDATE inventory_balances SET quantity=quantity+? WHERE item_id=? AND warehouse=?').bind(delta,itemId,wh),db.prepare('INSERT INTO inventory_entries(id,operation_id,item_id,warehouse,delta) VALUES(?,?,?,?,?)').bind(crypto.randomUUID(),b.id,itemId,wh,delta));}
  for(const [id,w] of writes){const old=s.entities.find((e:any)=>e.id===id);stmts.push(old?db.prepare('UPDATE flow_entities SET data=?,revision=revision+1,updated=? WHERE id=? AND revision=?').bind(JSON.stringify(w.data),now,id,old.revision):db.prepare('INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?)').bind(id,w.type,JSON.stringify(w.data),now,now));}
  await db.batch([db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(b.id,'worker_'+b.mode,signature,u.userId,now),...checks,...await supplyLock(db,b.id),...stmts,...holdChecks(db,b.id,touched),db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,b.outputId||b.jobId||b.positionId||b.id,'worker_'+b.mode,signature,now)]);
+ await drainAccountingQueue().catch(()=>{});
  return json({saved:true,pending});
  }catch(e){return accessResponse(e)||Response.json({error:'ثبت انجام نشد؛ نسخه یا موجودی تغییر کرده است.'},{status:409});}}

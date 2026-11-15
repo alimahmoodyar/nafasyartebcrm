@@ -14,6 +14,8 @@ export function purchaseObligations(rows:any[]){
  }
  for(const c of rows.filter(r=>r.type==='purchase_payable'&&!r.data.completion)){
   const v=apView(c.data,rows);
+  for(const a of c.data.adjustments||[]){const paid=(a.movements||[]).reduce((n:bigint,m:any)=>n+moneyMicro(m.amount),BigInt(0)),remaining=moneyMicro(a.amount)-paid;if(remaining<=BigInt(0)||!a.approved)continue;const kind=a.kind==='claim'?'refund':'adjustment',source={key:c.id+':adjustment:'+a.id,caseId:c.id,itemId:a.id,kind,title:c.data.supplier+' — '+(kind==='refund'?'برگشت وجه خرید':'مابه‌التفاوت جایگزین')};result.push({...source,source,party:c.data.supplier,currency:'IRR',direction:kind==='refund'?'in':'out',amount:moneyText(remaining),due:a.due,needsDue:!a.due,condition:'تعیین تکلیف مصوب برگشت یا تعویض',destination:c.data.destination||'',referenceDocument:a.reference,createdBy:a.approved.actor,basis:JSON.stringify({supplierId:c.data.supplierId,adjustment:{...a,movements:undefined}}),blockers:[]});}
+
   const add=(i:any,q:any,kind:string,blockers:string[])=>{
    if(i.paymentHold)blockers.push('مالی پرداخت این تعهد را متوقف کرده است');
    const source={key:kind==='advance'?c.id+':'+i.id:c.id+':'+i.id+':'+q.id,caseId:c.id,itemId:i.id,...(kind==='invoice'?{installmentId:q.id}:{}),kind,title:c.data.supplier+' — '+(kind==='advance'?'پیش‌پرداخت':i.reference)};
@@ -65,7 +67,7 @@ export async function syncPurchaseTreasury(){
    const writes:any[]=[],now=new Date().toISOString();
    for(const s of purchaseObligations([c,...related])){
     if(existing.some(r=>r.data.source.key===s.key))continue;
-    const id=crypto.randomUUID(),data={title:s.title,party:s.party,destination:s.destination||existing.find(r=>r.data.destination)?.data.destination||'',currency:'IRR',direction:'out',category:'purchase',amount:s.amount,due:s.due,source:s.source,referenceDocument:s.referenceDocument,state:'review',createdBy:s.createdBy,automaticPurchase:true,history:[{mode:'purchase_sync',actor:'system:purchase',at:now,notes:'تعهد از پرونده خرید؛ بدون ورود مجدد اطلاعات'}]};
+    const id=crypto.randomUUID(),data={title:s.title,party:s.party,destination:s.destination||existing.find(r=>r.data.destination)?.data.destination||'',currency:'IRR',direction:s.direction||'out',category:'purchase',amount:s.amount,due:s.due,source:s.source,referenceDocument:s.referenceDocument,state:'review',createdBy:s.createdBy,automaticPurchase:true,history:[{mode:'purchase_sync',actor:'system:purchase',at:now,notes:'تعهد از پرونده خرید؛ بدون ورود مجدد اطلاعات'}]};
     writes.push(db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'treasury_request',?,1,?,?)").bind(id,JSON.stringify(data),now,now),db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),'system:purchase',id,'purchase_treasury_created',JSON.stringify(data),now));
    }
    if(writes.length){const op=crypto.randomUUID();await db.batch([db.prepare("INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,'purchase_treasury_sync',?,'system:purchase',?,CASE WHEN EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=?) AND (SELECT COUNT(*) FROM flow_entities WHERE type='treasury_request' AND json_extract(data,'$.source.caseId')=?)=? THEN 1 ELSE 0 END)").bind(op,JSON.stringify({caseId:c.id}),now,c.id,c.revision,c.id,existing.length),...writes]);}

@@ -5,7 +5,7 @@ import type {Kind} from "./model";
 export const modules: Kind[] = ["product", "batch", "device", "event", "service", "action", "distribution", "firmware"];
 const productionModules:Kind[]=["batch", "device", "event", "service", "action"];
 export const stages = ["مصرف قطعه", "مونتاژ", "آزمون نهایی", "بسته‌بندی", "تحویل"];
-export const manualFinancialDomains = ['costing','control','transport'] as const;
+export const manualFinancialDomains = ['costing','control','transport','accounting'] as const;
 // A navigation mask only; each program still needs its independent domain grant.
 // Administrator settings and shared personal programs cannot be delegated here.
 export const manualBusinessPrograms = ['pricing','sales-bank','treasury','assets','activation-code','qms','routine-production','build-intake','build-projects','costing','hospital','sales','transport','after-sales','sourcing','fulfillment','flow','overview','analytics','serials','product','device','batch','event','inventory','service','action','distribution','firmware','guarantees','finance-control'] as const;
@@ -130,10 +130,10 @@ export const jobRoles:JobRole[]=[
 jobRoles.push(
  job('product_manager','مسئول تعریف محصول و BOM پایه','انبار و تولید','تعریف و ویرایش شناسنامه محصول، BOM پایه و فرم آزمون محصول؛ بدون عملیات انبار یا تأیید طراحی',{read:['product'],write:['product']}),
  job('treasurer','خزانه‌دار','مالی','اجرای پرداخت دارای مجوز مدیرعامل، چک، تنخواه و پیگیری ضمانت‌نامه',{finance:'read',treasuryWorkflowRoles:['treasury']}),
- job('finance_director','مدیر مالی','مالی','بررسی مستقل درخواست، حساب و ضمانت‌نامه؛ بدون اجرای پرداخت',{finance:'read',financialRead:[...manualFinancialDomains],financialWrite:['control','transport'],treasuryWorkflowRoles:['manager']}),
- job('accounting_head','رئیس حسابداری','مالی','تطبیق مستقل صورتحساب و کنترل حسابداری',{finance:'read',financialRead:['costing','control'],financialWrite:['control'],treasuryWorkflowRoles:['accountant']}),
+ job('finance_director','مدیر مالی','مالی','بررسی مستقل درخواست، حساب و ضمانت‌نامه؛ بدون اجرای پرداخت',{finance:'read',financialRead:[...manualFinancialDomains],financialWrite:['control','transport','accounting'],treasuryWorkflowRoles:['manager']}),
+ job('accounting_head','رئیس حسابداری','مالی','تطبیق مستقل صورتحساب و کنترل حسابداری',{finance:'read',financialRead:['costing','control','accounting'],financialWrite:['control','accounting'],treasuryWorkflowRoles:['accountant']}),
  job('ceo_payment','مجوز نهایی پرداخت مدیرعامل','مدیریت','صدور مستقل مجوز نهایی پرداخت به خزانه‌دار؛ بدون اجرای پرداخت',{finance:'read',treasuryWorkflowRoles:['ceo']}),
- job('warehouse_finance','کارشناس انبار مالی','مالی','مشاهده موجودی و هزینه‌ها؛ بدون جابه‌جایی کالا',{finance:'read',financialRead:['costing'],read:['batch']}),
+ job('warehouse_finance','کارشناس انبار مالی','مالی','مشاهده موجودی و هزینه‌ها؛ بدون جابه‌جایی کالا',{finance:'read',financialRead:['costing','accounting'],read:['batch']}),
  job('warehouse_supervisor','مسئول انبار','انبار و تولید','دریافت، جانمایی و تحویل در انبارهای تعیین‌شده',{...presets['انبار'],supplyRoles:['inventory']},'warehouses'),
  job('production_store_assistant','کمک‌انباردار تولید','انبار و تولید','عملیات انبار خط تولید در محدوده انتخاب‌شده',presets['انبار'],'warehouses'),
  job('home_sales','کارشناس فروش خانگی','فروش','ثبت پیش‌فاکتور و فروش و پیگیری خریداران تخصیص‌یافته؛ تولید روتین به درخواست تولید فروش نیاز ندارد',{...presets['کارشناس فروش'],read:[]}),

@@ -1,3 +1,4 @@
+import {drainAccountingQueue} from '@/lib/accounting';
 import {productionAssetUsage} from '@/lib/asset-production';
 import {reservedBatchCodes} from '@/lib/batch-code-reservations';
 import {lineMaterialDemand} from '@/lib/line-demand';
@@ -113,5 +114,6 @@ export async function POST(request:Request){try{checkOrigin(request);const u=awa
  // A consistent domain snapshot prevents duplicate allocation, stock consumption and simultaneous receipts.
  guard('(SELECT COALESCE(SUM(revision),0) FROM flow_entities)=?',s.entities.reduce((n:number,e:any)=>n+e.revision,0));guard('(SELECT COUNT(*) FROM flow_entities)=?',s.entities.length);guard('(SELECT COUNT(*) FROM inventory_entries)=?',s.entries.length);
  const writes=[...changes.values()].map(e=>s.entities.some((x:any)=>x.id===e.id)?db.prepare('UPDATE flow_entities SET data=?,revision=revision+1,updated=? WHERE id=?').bind(JSON.stringify(e.data),now,e.id):db.prepare('INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?)').bind(e.id,e.type,JSON.stringify(e.data),now,now));
- await db.batch([db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(b.id,'routine_'+b.mode,signature,u.userId,now),...guards,...writes,...stmts,...holdChecks(db,b.id,touched),...await supplyLock(db,b.id),db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,b.jobId||b.lotId||b.id,'routine_'+b.mode,signature,now)]);return json({saved:true,id:b.id});
+ await db.batch([db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(b.id,'routine_'+b.mode,signature,u.userId,now),...guards,...writes,...stmts,...holdChecks(db,b.id,touched),...await supplyLock(db,b.id),db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,b.jobId||b.lotId||b.id,'routine_'+b.mode,signature,now)]);
+ await drainAccountingQueue().catch(()=>{});return json({saved:true,id:b.id});
  }catch(e){return accessResponse(e)||Response.json({error:'ثبت انجام نشد؛ موجودی، نسخه و مقادیر را بررسی و تازه‌سازی کنید.'},{status:409});}}

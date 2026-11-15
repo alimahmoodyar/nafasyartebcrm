@@ -1,3 +1,4 @@
+import {drainAccountingQueue} from '@/lib/accounting';
 import {syncTransportTasks} from '@/lib/transport';
 import {assignedPackageDriver,packageReceiptSelection,splitShippingPackages} from '@/lib/shipping-packages';
 import {withServiceRolePreview} from '@/lib/service-role-preview';
@@ -240,6 +241,7 @@ async function post(request:Request){try{
  }
  const formStatements=await captureForm(id,'fulfillment.'+mode,b,u);
  await db.batch([db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(id,'fulfillment_'+mode,signature,u.userId,now),...checks,...await annualCountMovementStatements(db,id,b,countMovements),...statements,...formStatements,db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,id,'fulfillment_'+mode,signature,now)]);
+ await drainAccountingQueue().catch(()=>{});
  let followup=true;try{if(mode==='pickup_package')await syncTransportTasks();await syncSalesTasks();await scanSalesMonitor({reports:false,source:'event'});}catch{followup=false;}return json({saved:true,followupPending:!followup});
  }catch(e){return accessResponse(e)||Response.json({error:/constraint|SQLITE|D1|Database/i.test(String(e))?'موجودی یا وضعیت هم‌زمان تغییر کرده است؛ هیچ تغییری ثبت نشد. تازه‌سازی کنید.':'ثبت انجام نشد؛ ورودی‌ها را بررسی کنید.'},{status:409})}}
 

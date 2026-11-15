@@ -1,3 +1,4 @@
+import {drainAccountingQueue} from '@/lib/accounting';
 import {requireAccess,checkOrigin,accessResponse} from '@/lib/authorization';
 import {boundedBody} from '@/lib/firmware-storage';
 import {treasuryRows,scopedTreasuryRows,treasuryRoles,treasuryView,treasuryHelp,applyTreasury,treasuryProfileTest} from '@/lib/treasury';
@@ -16,7 +17,7 @@ export async function GET(request?:Request){try{
 export async function POST(request:Request){try{
  checkOrigin(request);const u=await requireAccess(),b=JSON.parse(new TextDecoder().decode(await boundedBody(request,800000)));
  if(b.roleTest===true)return json(await treasuryProfileTest(u,()=>applyTreasury(u,b)));
- const result=await applyTreasury(u,b);let tasksPending=false;
+ const result=await applyTreasury(u,b);await drainAccountingQueue().catch(()=>{});let tasksPending=false;
  try{await syncTreasuryTasks();}catch{tasksPending=true;}
  return json({...result,tasksPending});
 }catch(e){return accessResponse(e)||Response.json({error:'ثبت تأیید نشد؛ اطلاعات و نسخه را تازه کنید.'},{status:409});}}

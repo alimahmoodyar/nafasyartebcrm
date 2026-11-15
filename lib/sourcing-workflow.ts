@@ -36,7 +36,7 @@ export function orderFinancialSummary(order:any,cases:any[]){
   const d=c.data,valid=(xs:any[]=[])=>xs.filter(x=>!x.voided),payments=valid(d.payments),invoices=valid(d.invoices),allocations=valid(d.allocations);
   for(const p of payments){
    const linked=p.orderId||valid(d.advances).find((a:any)=>a.id===p.advanceId)?.orderId;
-   if(linked===order.id){const n=moneyMicro(p.amount);paid+=n;references.add(p.reference);const used=allocations.filter((a:any)=>a.paymentId===p.id).reduce((n:bigint,a:any)=>n+moneyMicro(a.amount),BigInt(0));unallocated+=n>used?n-used:BigInt(0);}
+   if(linked===order.id){const n=moneyMicro(p.amount);paid+=n;references.add(p.reference);const used=allocations.filter((a:any)=>a.paymentId===p.id).reduce((n:bigint,a:any)=>n+moneyMicro(a.amount),BigInt(0))+(d.recoveredAdvances||[]).filter((r:any)=>r.paymentId===p.id).reduce((n:bigint,r:any)=>n+moneyMicro(r.amount),BigInt(0));unallocated+=n>used?n-used:BigInt(0);}
   }
   for(const i of invoices){
    const lines=i.lines||[],total=lines.reduce((n:bigint,l:any)=>n+moneyMicro(l.amount),BigInt(0));

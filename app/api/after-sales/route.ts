@@ -1,3 +1,4 @@
+import {drainAccountingQueue} from '@/lib/accounting';
 import {serviceWorkPerformer} from '@/lib/service-office';
 import {isUnassignedServiceProfile} from '@/lib/service-profile-scope';
 import {trainingContext} from '@/lib/training-context';
@@ -171,6 +172,7 @@ async function post(request:Request){try{
  if(d.state!==previousState)d.stageSince=now;history(txt(b.notes));put(c.id,'as_case',d,c);
  }
  await db.batch([db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(id,'after_sales_'+mode,signature,u.userId,now),...checks,...await annualCountMovementStatements(db,id,b,countMovements),...stmts,...holdChecks(db,id,touched),db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,target,'after_sales_'+mode,signature,now)]);
+ await drainAccountingQueue().catch(()=>{});
  try{await syncServiceTasks()}catch{console.error('Service task projection deferred');}
  return json({saved:true,id:target,automaticAccount});
  }catch(e){return accessResponse(e)||json({error:/constraint|SQLITE|D1/i.test(String(e))?'موجودی یا پرونده هم‌زمان تغییر کرده؛ هیچ عملیات ناقصی ثبت نشد.':e instanceof Error?e.message:'ثبت خدمات انجام نشد.'},409)}}

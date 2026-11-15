@@ -1,3 +1,4 @@
+import {drainAccountingQueue} from '@/lib/accounting';
 import {deferDispatchBalance} from '@/lib/sales-dispatch-terms';
 import {withRepresentativeSample} from '@/lib/representative-sample';
 import {returnTaskStatements} from '@/lib/sales-return-tasks';
@@ -361,6 +362,7 @@ async function post(request:Request){try{
   for(const [ci,c] of credits.entries()){const plan=allocationPlan(rows,agent.id,c.id,today);plan.allocations.forEach((l,i)=>put(id+':auto:'+ci+':'+i,'sales_allocation',{agentId:agent.id,creditId:c.id,...l,policy:plan.policy,by:u.userId}));plan.recoveries.forEach((r,i)=>put(id+':recovery:'+ci+':'+i,'sales_check_recovery',{agentId:agent.id,creditId:c.id,...r,by:u.userId}));}
  }
  await db.batch([db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(id,'sales_'+mode,signature,u.userId,now),...checks,...stmts,db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,target,'sales_'+mode,signature,now)]);
+ await drainAccountingQueue().catch(()=>{});
  let followupPending=false;if(!trainingContext.getStore()?.salesBankTest)try{await syncSalesTasks();if(b.leadId)await syncLeadTasks();await scanSalesMonitor({reports:false,source:'event'});}catch{followupPending=true;}return json({saved:true,id:target,followupPending,automaticAccount,...(bankPaymentState?{bankPaymentState}:{})});
  }catch(e){return accessResponse(e)||json({error:/constraint|SQLITE|D1/i.test(String(e))?'اطلاعات هم‌زمان تغییر کرده است؛ فهرست را تازه و نتیجه را بررسی کنید.':'ثبت انجام نشد؛ ورودی‌ها را بررسی کنید.'},409)}}
 

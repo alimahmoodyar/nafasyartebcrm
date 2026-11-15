@@ -1,3 +1,7 @@
+## 2026-11-15 — Economic events and purchase accounting core
+
+Shared source-linked accounting: versioned tested rules, three detail slots, immutable balanced journals, opening/manual/reversal, periods and trial/ledger; provisional purchases, source-safe invoice amendments, weighted material/WIP/semi/finished/COGS propagation, supplier return and alternative replacement representations, original treasury cash authority, UI/HTTP/MCP parity. See ACCOUNTING-PURCHASE-CORE.fa.md. No live synthetic transactions or SMS. Activation of rules/opening remains a financial director decision.
+
 ## 2026-11-15 — Unified procurement and treasury
 
 Automatic source-linked obligations, one treasury payment path for domestic/service/foreign purchasing, source revalidation, atomic partial payment and invoice allocation, deterministic purchase bank matching and agreement/advance delivery trigger. See PURCHASE-TREASURY.md. Focused treasury, procurement, service, settlement and TypeScript checks; browser walkthrough is not claimed. Legacy all-history treasury reads remain scalability debt; new order reconciliation uses bounded keyset batches. No live test payment or SMS sent.

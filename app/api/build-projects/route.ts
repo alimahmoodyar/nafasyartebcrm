@@ -1,3 +1,4 @@
+import {drainAccountingQueue} from '@/lib/accounting';
 import {annualCountMovementStatements,assertWarehouseNotCounting,type CountMovement} from '@/lib/stocktake-lock';
 import {productionPositions} from '@/lib/production-positions';
 import {projectMaterialSupply,isOpenSupply} from '@/lib/sourcing-workflow';
@@ -122,5 +123,6 @@ export async function POST(request:Request){try{checkOrigin(request);const u=awa
  if(b.mode==='close'){for(const r of s.records)guard('EXISTS(SELECT 1 FROM records WHERE id=? AND payload=?)',r.id,r.payload);}
  const write=old?db.prepare('UPDATE flow_entities SET data=?,revision=revision+1,updated=? WHERE id=?').bind(JSON.stringify(p),now,id):db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'build_project',?,1,?,?)").bind(id,JSON.stringify(p),now,now);
  // Parent first for project sourcing holds; movements and holds share one transaction.
- await db.batch([db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(b.id,'project_'+b.mode,signature,u.userId,now),...guards,write,...await annualCountMovementStatements(db,b.id,b,countMovements),...stmts,...holdChecks(db,b.id,touched),...await supplyLock(db,b.id),db.prepare('INSERT INTO access_audit(id,actor,target,action,before,after,at) VALUES(?,?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,id,'project_'+b.mode,old?JSON.stringify(old.data):null,JSON.stringify(p),now)]);return json({saved:true,id});
+ await db.batch([db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(b.id,'project_'+b.mode,signature,u.userId,now),...guards,write,...await annualCountMovementStatements(db,b.id,b,countMovements),...stmts,...holdChecks(db,b.id,touched),...await supplyLock(db,b.id),db.prepare('INSERT INTO access_audit(id,actor,target,action,before,after,at) VALUES(?,?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,id,'project_'+b.mode,old?JSON.stringify(old.data):null,JSON.stringify(p),now)]);
+ await drainAccountingQueue().catch(()=>{});return json({saved:true,id});
  }catch(e){return accessResponse(e)||Response.json({error:'ثبت انجام نشد؛ موجودی، نسخه و اطلاعات را تازه‌سازی کنید.'},{status:409});}}

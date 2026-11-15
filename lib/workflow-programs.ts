@@ -28,7 +28,7 @@ export const roleWorkflowPrograms:Record<string,string[]>={
  viewer:['overview','analytics','product','batch','device','event','service','action','distribution','firmware'],
  product_manager:['product'],
  treasurer:['treasury','guarantees','sales-bank'],finance_director:['after-sales','build-projects','treasury','guarantees','costing','pricing','finance-control','transport'],
- accounting_head:['build-projects','treasury','costing','pricing','finance-control'],ceo_payment:['treasury'],warehouse_finance:['build-projects','costing','pricing','inventory'],
+ accounting_head:['build-projects','treasury','costing','pricing','finance-control'],ceo_payment:['treasury'],warehouse_finance:['finance-control','build-projects','costing','pricing','inventory'],
  sales_agent:['sales','fulfillment','transport'],service_agent:['after-sales','hospital'],
  service_manager:['after-sales','hospital','transport'],service_support:['after-sales','activation-code','hospital','transport'],
  service_intake:['after-sales','activation-code','hospital','transport'],service_technician:['build-projects','after-sales','activation-code','hospital','transport'],

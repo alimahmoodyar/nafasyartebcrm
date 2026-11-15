@@ -19,11 +19,12 @@ type GrantKey = 'treasuryWorkflowRoles'|'assetRoles'|'qmsRoles'|'personnelRoles'
 const treasuryRoles = {treasury:'خزانه‌دار؛ اجرای پرداخت مجاز و ثبت چک، تنخواه و ضمانت‌نامه',manager:'مدیر مالی؛ بررسی مالی مستقل و بررسی ضمانت‌نامه',accountant:'رئیس حسابداری؛ تطبیق صورتحساب و کنترل حسابداری',ceo:'مدیرعامل؛ صدور مجوز نهایی پرداخت'};
 const flowRoles = {inventory:'انبار؛ دریافت، جانمایی و تحویل مواد',qc:'کنترل کیفیت؛ بررسی ورودی و نتیجه آزمون',production:'تولید؛ مصرف مواد، مونتاژ و بسته‌بندی',procurement:'تأمین؛ پیگیری خرید مواد',sales:'فروش؛ تحویل محصول و پیگیری ارسال',logistics:'تدارکات؛ پیگیری گردش و حمل مواد'};
 const financialDomains = [
+ {id:'accounting',title:'دفتر حسابداری',description:'مشاهده اسناد و گزارش دفتر؛ ثبت، امکان سند دستی و رسیدگی را می‌دهد. تنظیم کدینگ و قواعد فقط با نقش مدیر مالی است.'},
  {id:'costing',title:'بهای تمام‌شده',description:'مشاهده بهای مواد و هزینه ساخت؛ این دسترسی، پیشنهاد قیمت و سود و اطلاعات مالی پروژه‌های ساخت را نیز قابل مشاهده می‌کند.'},
  {id:'control',title:'کنترل مالی',description:'مشاهده کنترل‌های مالی و مستندات همان بخش؛ ثبت، اجازه بارگذاری و ثبت بررسی مالی را نیز می‌دهد.'},
  {id:'transport',title:'مالی حمل‌ونقل',description:'مشاهده مأموریت‌ها، هزینه‌های حمل و مدارک هزینه؛ ثبت و بررسی، اجازه تأیید یا رد هزینه‌ها را نیز می‌دهد. ثبت اولیه هزینه با راننده مأموریت است.'},
 ] as const;
-const financialPrograms:Record<typeof financialDomains[number]['id'],string[]>={costing:['costing','pricing'],control:['finance-control'],transport:['transport']};
+const financialPrograms:Record<typeof financialDomains[number]['id'],string[]>={costing:['costing','pricing'],control:['finance-control'],accounting:['finance-control'],transport:['transport']};
 const traceHelp:Record<Kind,string> = {
  product:'شناسنامه محصول، مشخصات پایه و BOM؛ اختیار تأیید تغییر مهندسی جداگانه است.',
  batch:'مشخصات بچ قطعات و مدارک ورودی؛ این مشاهده، آیکون انبارها و موجودی را نیز نمایش می‌دهد.',

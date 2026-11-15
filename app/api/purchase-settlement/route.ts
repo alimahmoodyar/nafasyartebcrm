@@ -1,3 +1,4 @@
+import {drainAccountingQueue} from '@/lib/accounting';
 import {storedAccessPermissions} from '@/lib/permissions';
 import {checkOrigin,accessResponse} from '@/lib/authorization';
 import {storage} from '@/lib/storage';
@@ -54,7 +55,7 @@ export async function POST(request:Request){try{checkOrigin(request);const u=awa
      for(const l of p.lines){const r=rows.find(x=>x.id===l.receiptId&&x.type==='receipt');version(r);const o=rows.find(x=>x.id===r.data.purchaseOrderId&&x.type==='purchase_order');version(o);
       if(!l.accepted)continue;const priceId='cost-price:'+r.data.batchId,price=rows.find(x=>x.id===priceId&&x.type==='cost_price');guard('COALESCE((SELECT revision FROM flow_entities WHERE id=?),0)=?',priceId,price?.revision||0);
       if(price?.data.settlementId&&price.data.settlementId!==target)fail('قیمت بچ متعلق به تسویه دیگری است.');
-      const value={serviceCosts:l.serviceCosts,batchId:r.data.batchId,partCode:o.data.partCode,unit:o.data.unit,unitCost:l.unitCost,reference:'تسویه '+target+' / فاکتور '+d.invoiceNumber,notes,settlementId:target,settlementRevision:revision+1,history:[...(price?.data.history||[]),{at:now,actor:u.userId,name:u.name,notes,previous:price?{...price.data,history:undefined}:null}]};
+      const value={serviceCosts:l.serviceCosts,batchId:r.data.batchId,partCode:o.data.partCode,unit:o.data.unit,unitCost:l.unitCost,totalValue:l.inventory,valuationQuantity:l.accepted,reference:'تسویه '+target+' / فاکتور '+d.invoiceNumber,notes,settlementId:target,settlementRevision:revision+1,history:[...(price?.data.history||[]),{at:now,actor:u.userId,name:u.name,notes,previous:price?{...price.data,history:undefined}:null}]};
       stmts.push(price?db.prepare('UPDATE flow_entities SET data=?,revision=revision+1,updated=? WHERE id=? AND revision=?').bind(JSON.stringify(value),now,priceId,price.revision):db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'cost_price',?,1,?,?)").bind(priceId,JSON.stringify(value),now,now));
       stmts.push(db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,priceId,'settlement_price',JSON.stringify(value),now));
      }
@@ -73,5 +74,5 @@ export async function POST(request:Request){try{checkOrigin(request);const u=awa
     const tid='settlement:'+id+':'+m.id;stmts.push(db.prepare("INSERT INTO duty_runs(id,template_id,period,assignee,supervisor,due,state,data,revision,created,updated) VALUES(?,?,?, ?,NULL,?,'open',?,1,?,?)").bind(tid,'purchase-settlement:'+target,now.slice(0,10)+'#'+String(revision+1),m.id,new Date(Date.parse(now)+48*3600000).toISOString(),JSON.stringify({title:title+' · '+d.supplier+' / '+d.invoiceNumber,sourceSection:d.state==='submitted'?'costing':'sourcing',sourcePlanId:d.planId,settlementId:target,instructions:'فرم تسویه خرید را باز کنید. ثبت پاسخ متنی جای تأیید پرونده را نمی‌گیرد.',history:[],evidence:'text'}),now,now));}
   }
  }
- await db.batch([db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(id,'settlement_'+b.mode,signature,u.userId,now),...guards,write,...stmts,db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,target,'settlement_'+b.mode,JSON.stringify(d),now)]);return json({saved:true,id:target});
+ await db.batch([db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(id,'settlement_'+b.mode,signature,u.userId,now),...guards,write,...stmts,db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,target,'settlement_'+b.mode,JSON.stringify(d),now)]);await drainAccountingQueue().catch(()=>{});return json({saved:true,id:target});
  }catch(e){return accessResponse(e)||json({error:'ثبت انجام نشد؛ نتیجه را بررسی و اطلاعات را تازه‌سازی کنید.'},409);}}

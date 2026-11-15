@@ -1,4 +1,5 @@
 'use client';
+import {AccountingPanel} from './accounting-panel';
 import {SourcingReviewInbox} from './sourcing-review-inbox';
 import {RefreshButton} from './refresh-button';
 import {NumberInput} from '@/components/trace/number-input';
@@ -42,8 +43,8 @@ function FinancialReports({write,demo}:{write:boolean;demo:boolean}){
  </section>
 }
 
-export function FinanceControl({write,demo,reports=true,purchase=false,targetId=''}:{write:boolean;demo:boolean;reports?:boolean;purchase?:boolean;targetId?:string}){
+export function FinanceControl({write,demo,reports=true,purchase=false,accounting=true,targetId=''}:{write:boolean;demo:boolean;reports?:boolean;purchase?:boolean;accounting?:boolean;targetId?:string}){
  const [tab,setTab]=useState(purchase&&(!reports||targetId.startsWith('sourcing:'))?'purchase':'reports');
- useEffect(()=>{if(purchase&&(targetId.startsWith('sourcing:')||!reports))setTab('purchase');else if(!purchase)setTab('reports')},[targetId,purchase,reports]);
- return <ProgramWorkspace programId="finance-control" title="مالی" direct={!!targetId}><SubprogramNavigation items={[...(purchase?([['purchase','کارتابل مالی خرید']] as [string,string][]):[]),...(reports?([['reports','گزارش‌ها و کنترل مالی']] as [string,string][]):[])]} value={tab} onChange={setTab}/>{tab==='purchase'&&purchase&&!demo&&<SourcingReviewInbox workspace="finance" targetId={targetId}/>}{reports&&<div hidden={tab!=='reports'}><FinancialReports write={write} demo={demo}/></div>}</ProgramWorkspace>;
+ useEffect(()=>{if(purchase&&(targetId.startsWith('sourcing:')||!reports))setTab('purchase');else if(!reports&&accounting)setTab('accounting');else if(!purchase)setTab('reports')},[targetId,purchase,reports,accounting]);
+ return <ProgramWorkspace programId="finance-control" title="مالی" direct={!!targetId}><SubprogramNavigation items={[...(!demo&&accounting?([['accounting','دفتر حسابداری']] as [string,string][]):[]),...(purchase?([['purchase','کارتابل مالی خرید']] as [string,string][]):[]),...(reports?([['reports','گزارش‌ها و کنترل مالی']] as [string,string][]):[])]} value={tab} onChange={setTab}/>{tab==='accounting'&&!demo&&<AccountingPanel/>}{tab==='purchase'&&purchase&&!demo&&<SourcingReviewInbox workspace="finance" targetId={targetId}/>}{reports&&<div hidden={tab!=='reports'}><FinancialReports write={write} demo={demo}/></div>}</ProgramWorkspace>;
 }

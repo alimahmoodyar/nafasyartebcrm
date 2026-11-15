@@ -109,7 +109,7 @@ assert.equal((await guideApi.GET(new Request('https://test.local/api/tasks/guide
 assert.equal((await guideApi.GET(new Request('https://test.local/api/tasks/guide'))).status,400);
 user=manager;
 // Both resets remove all treasury operational data, preserve roles, roll back safely.
-const reset=load('lib/reset-contract.ts');for(const scope of ['operations','full']){sql.exec('BEGIN');for(const t of Object.keys(reset.resetTables))sql.exec('DELETE FROM '+t+' WHERE '+reset.resetWhere(t,scope));assert.equal(sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type LIKE 'treasury_%'").get().n,0);assert.equal(sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type='position'").get().n,4);sql.exec('ROLLBACK');}assert.ok(by(aid));
+const reset=load('lib/reset-contract.ts');for(const scope of ['operations','full']){sql.exec('BEGIN');sql.exec('UPDATE reset_control SET internal=1');for(const t of Object.keys(reset.resetTables))sql.exec('DELETE FROM '+t+' WHERE '+reset.resetWhere(t,scope));assert.equal(sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type LIKE 'treasury_%'").get().n,0);assert.equal(sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type='position'").get().n,4);sql.exec('ROLLBACK');}assert.ok(by(aid));
 user=clerk;sql.exec("UPDATE reset_control SET phase='maintenance'");await action('request',null,request(),409);sql.exec("UPDATE reset_control SET phase='testing'");
 assert.ok(sql.prepare("SELECT COUNT(*) n FROM access_audit WHERE action LIKE 'treasury_%'").get().n>10);
 assert.equal(sql.prepare('SELECT state FROM duty_runs WHERE id LIKE ?').get('treasury:'+rid+':execute:%').state,'completed');

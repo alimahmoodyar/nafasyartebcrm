@@ -17,7 +17,27 @@ export const costingHelp=[
  'تولید در جریان ساخت شامل هزینه‌های ثبت‌شده دستگاه‌های تحویل‌نشده است؛ مواد آماده‌سازی‌شده ولی مصرف‌نشده همچنان موجودی خط محسوب می‌شوند. هزینه اداری و فروش جداست.'
 ];
 const parse=(v:any)=>typeof v==='string'?JSON.parse(v):v;
-export function calculateCosts(src:any){
+export function calculateCosts(src:any,derived=false):any{
+ if(!derived){
+  const entities=src.entities.map((e:any)=>({...e,data:parse(e.data)})),records=src.records.map((r:any)=>({...r,data:parse(r.payload)}));
+  const lots=entities.filter((e:any)=>e.type==='routine_lot'&&e.data.cost),jobs=new Map(entities.filter((e:any)=>e.type==='routine_job').map((e:any)=>[e.id,e.data]));
+  if(lots.length){
+   let current=entities,previous='';
+   for(let pass=0;pass<32;pass++){
+    const result=calculateCosts({...src,entities:current},true),replacements=new Map<string,any>(),unknown=new Set<string>();
+    for(const lot of lots){const ids=new Set((lot.data.movements||[]).map((m:any)=>m.operationId)),consumed=result.unassigned.filter((c:any)=>ids.has(c.operationId));
+     const batches=records.filter((r:any)=>r.kind==='batch'&&(r.data.routineLotId===lot.id||(jobs.get(r.data.routineJobId) as any)?.lotId===lot.id));
+     const quantity=batches.reduce((n:number,r:any)=>n+Math.round(Number(r.data.quantity)*1000),0);if(!quantity||quantity!==lot.data.received*1000||consumed.some((c:any)=>c.cost===null)){for(const b of batches)unknown.add(b.id);continue;}
+     const total=consumed.reduce((n:bigint,c:any)=>n+moneyMicro(c.cost),BigInt(0))+moneyMicro(lot.data.cost.labor)+moneyMicro(lot.data.cost.overhead);let assigned=BigInt(0);
+     batches.forEach((b:any,i:number)=>{const q=Math.round(Number(b.data.quantity)*1000),value=i===batches.length-1?total-assigned:total*BigInt(q)/BigInt(quantity);assigned+=value;const old=entities.find((e:any)=>e.type==='cost_price'&&e.data.batchId===b.id);replacements.set(b.id,{...(old||{id:'derived:'+b.id,type:'cost_price'}),data:{...old?.data,batchId:b.id,routineLotId:lot.id,unitCost:moneyText(value*BigInt(1000)/BigInt(q)),totalValue:moneyText(value),valuationQuantity:q,approvedUnitCost:lot.data.cost.unitCost,derivedFromCurrentMaterials:true}});});
+    }
+    const signature=JSON.stringify([...replacements].map(([id,e])=>[id,e.data.totalValue,e.data.unitCost]).concat([...unknown].map(id=>[id,'unknown'])));
+    const next=current.filter((e:any)=>e.type!=='cost_price'||!replacements.has(e.data.batchId)&&!unknown.has(e.data.batchId)).concat([...replacements.values()]);
+    if(signature===previous){const final=calculateCosts({...src,entities:next},true);if(unknown.size)final.warnings.push('بهای جاری برخی بچ‌های ساخت داخل به علت تبار یا قیمت ناقص نامشخص است.');return final;}previous=signature;current=next;
+   }
+   throw Error('چرخه یا عمق نامعتبر در محاسبه بهای نیمه‌ساخته؛ بررسی مالی لازم است.');
+  }
+ }
  const entities=src.entities.map((r:any)=>({...r,data:parse(r.data)})),records=src.records.map((r:any)=>({...r,data:parse(r.payload)}));
  const batches=new Map<string,any>(records.filter((r:any)=>r.kind==='batch').map((r:any)=>[r.id,r]));
  const products=records.filter((r:any)=>r.kind==='product');const devices=records.filter((r:any)=>r.kind==='device');
@@ -32,7 +52,7 @@ export function calculateCosts(src:any){
   const entries=entriesByOp.get(op.id)||[],body=parse(op.payload);const groups=new Map<string,{delta:number;entries:any[]}>();
   for(const e of entries){const b=batches.get(e.item_id);if(!b||!(['raw','semi','line'].includes(e.warehouse)||e.warehouse.startsWith('worker:')||e.warehouse.startsWith('project:')||e.warehouse.startsWith('warehouse_transit:')))continue;const key=b.data.partCode+'|'+b.data.unit;const g=groups.get(key)||{delta:0,entries:[]};g.delta+=e.delta;g.entries.push(e);groups.set(key,g);}
   for(const [key,g] of groups){if(!g.delta)continue;const p=pool.get(key)||{q:0,v:BigInt(0)};const before=p.q>0&&p.v!==null?p.v*BigInt(1000)/BigInt(p.q):null;
-   if(g.delta>0){let value:bigint|null=BigInt(0);for(const e of g.entries){if(e.delta<=0)continue;const price=prices.get(e.item_id);if(!price){value=null;warnings.add('قیمت بچ ثبت نشده: '+e.item_id);break;}value+=moneyMicro(price.data.unitCost)*BigInt(e.delta)/BigInt(1000);}
+   if(g.delta>0){let value:bigint|null=BigInt(0);for(const e of g.entries){if(e.delta<=0)continue;const price=prices.get(e.item_id);if(!price){value=null;warnings.add('قیمت بچ ثبت نشده: '+e.item_id);break;}value+=price.data.totalValue!==undefined&&Number.isSafeInteger(price.data.valuationQuantity)&&price.data.valuationQuantity>0?moneyMicro(price.data.totalValue)*BigInt(e.delta)/BigInt(price.data.valuationQuantity):moneyMicro(price.data.unitCost)*BigInt(e.delta)/BigInt(1000);}
     p.v=p.v===null||value===null?null:p.v+value;p.q+=g.delta;
    }else{const q=-g.delta;let cost=before===null||p.q<q?null:before*BigInt(q)/BigInt(1000);if(p.q<q)warnings.add('توالی موجودی ناقص برای '+key);p.q-=q;p.v=p.v===null||cost===null?null:p.v-cost;if(p.q===0)p.v=BigInt(0);
     let did=body.deviceId||'';if(!did&&body.orderId)did=src.orders.find((o:any)=>o.id===body.orderId)?.device_id||'';

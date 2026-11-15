@@ -4,7 +4,7 @@ const sql=new DatabaseSync(':memory:');sql.exec('PRAGMA foreign_keys=ON');for(co
 const db={prepare(q){let args=[];return{bind(...a){args=a;return this},async first(){return sql.prepare(q).get(...args)||null},async all(){return {results:sql.prepare(q).all(...args)}},async run(){return {meta:{changes:sql.prepare(q).run(...args).changes}}}}},async batch(stmts){sql.exec('BEGIN');try{for(const s of stmts)await s.run();sql.exec('COMMIT');}catch(e){sql.exec('ROLLBACK');console.error('DB rollback',e.message);throw e;}}};
 let user={userId:'owner',name:'Owner',isAdmin:true,permissions:{finance:'write'}};
 class AccessError extends Error{constructor(m,s){super(m);this.status=s;}}
-const auth={AccessError,requireAccess:async()=>user,checkOrigin:r=>{if(r.headers.get('origin')!=='https://test.local')throw new AccessError('origin',403);},accessResponse:e=>e instanceof AccessError?Response.json({error:e.message},{status:e.status}):null};
+const auth={AccessError,requireAccess:async()=>user,checkOrigin:r=>{if(r.headers.get('origin')!=='https://test.local')throw new AccessError('origin',403);},accessResponse:e=>{if(e instanceof AccessError)return Response.json({error:e.message},{status:e.status});if(e.message!=='RESET_MAINTENANCE')console.error('Unexpected fixture error',e);return null}};
 const objects=new Map();const bucket={async put(k,v){objects.set(k,new Uint8Array(v));},async get(k){const v=objects.get(k);return v?{arrayBuffer:async()=>v.buffer.slice(v.byteOffset,v.byteOffset+v.byteLength)}:null;},async delete(k){objects.delete(k);}};
 const cache={};function load(file){file=path.resolve(root,file);if(cache[file])return cache[file];const exports={};cache[file]=exports;vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports,require:n=>{if(n==='cloudflare:workers')return {env:{DB:db,BUCKET:bucket}};const p=n.startsWith('@/')?path.resolve(root,n.slice(2)+'.ts'):n.startsWith('.')?path.resolve(path.dirname(file),n+'.ts'):'';if(p.replace(/\\/g,'/').endsWith('/lib/storage.ts'))return {storage:()=>db};if(p.replace(/\\/g,'/').endsWith('/lib/authorization.ts'))return auth;if(p.replace(/\\/g,'/').endsWith('/lib/firmware-storage.ts'))return {firmwareBucket:()=>bucket,boundedBody:async(r,max)=>{const v=new Uint8Array(await r.arrayBuffer());if(v.length>max)throw new AccessError('large',413);return v;}};if(p.replace(/\\/g,'/').endsWith('/lib/sourcing.ts'))return {hasSupply:(u,r)=>u.isAdmin||u.permissions.supplyRoles?.includes(r),day:v=>{assert.match(v,/^\d{4}-\d{2}-\d{2}$/);return v;}};if(p.replace(/\\/g,'/').endsWith('/lib/firmware.ts'))return {sha256:async v=>require('node:crypto').createHash('sha256').update(new Uint8Array(v)).digest('hex')};if(p)return load(p);return require(n)},Response,Request,URL,Error,Date,Intl,Map,Set,TextEncoder,TextDecoder,Uint8Array,crypto:globalThis.crypto,structuredClone,console},{filename:file});return exports;}
 
@@ -61,18 +61,20 @@ await historicalPayment({amount:'50',reference:'HISTORICAL-APPROVED',day:'2026-1
 const cancelled=JSON.parse(sql.prepare("SELECT data FROM flow_entities WHERE id='o3'").get().data);
 sql.prepare("UPDATE flow_entities SET data=?,revision=revision+1 WHERE id='o3'").run(JSON.stringify({...cancelled,totalRial:'60',pendingSupplierCredit:true,remainderResolution:{receipts:[],accepted:0,remaining:1000}}));
 user=finance;await action('register_supplier_credit',{orderId:'o3'});
-const credit=(await current()).data.supplierCredits[0];assert.equal(credit.amount,'50');assert.equal(JSON.parse(sql.prepare("SELECT data FROM flow_entities WHERE id='o3'").get().data).state,'closed');
-await action('refund_supplier_credit',{itemId:credit.id,amount:'20',day:'2026-10-03',reference:'REFUND-20',documentId:bankFile});
-await action('refund_supplier_credit',{itemId:credit.id,amount:'31',day:'2026-10-03',reference:'OVER',documentId:bankFile},409);
+const credit=(await current()).data.adjustments[0];assert.equal(credit.amount,'50');assert.equal(JSON.parse(sql.prepare("SELECT data FROM flow_entities WHERE id='o3'").get().data).state,'closed');
+await action('refund_supplier_credit',{itemId:credit.id,amount:'20',day:'2026-10-03',reference:'REFUND-20',documentId:bankFile},404);
+await action('refund_supplier_credit',{itemId:credit.id,amount:'31',day:'2026-10-03',reference:'OVER',documentId:bankFile},404);
 entity('o4','purchase_order',{supplierId:'s',supplier:'Supplier',route:'domestic',partCode:'CMP',unit:'عدد',quantity:1000,state:'shipped',totalRial:'30'});
 entity('r4','receipt',{purchaseOrderId:'o4',quantity:1000,accepted:1000,rejected:0,state:'stored'});
 user=buyer;await action('invoice',{...invoice,amount:'30',reference:'INV4',lines:[{orderId:'o4',quantity:'1',amount:'30',receiptIds:['r4']}]});
 const targetInvoice=(await current()).data.invoices.at(-1).id;
 user=finance;await action('recognize',{itemId:targetInvoice,account:'2101',basis:'confirmed invoice'});await action('schedule',{itemId:targetInvoice,schedule:[{amount:'30',due:'2026-10-03',condition:'QC accepted'}]});await action('release',{itemId:targetInvoice});
-await action('offset_supplier_credit',{itemId:credit.id,destinationCaseId:cid,invoiceId:targetInvoice,amount:'30'});
-c=await current();assert.equal(c.view.invoices.find(i=>i.id===targetInvoice).remaining,'0');assert.equal(c.data.supplierCredits[0].movements.length,2);
+await action('offset_purchase_claim',{itemId:credit.id,destinationCaseId:cid,invoiceId:targetInvoice,amount:'30'});
+c=await current();assert.equal(c.view.invoices.find(i=>i.id===targetInvoice).remaining,'0');assert.equal(c.data.adjustments[0].movements.length,1);assert.equal(c.data.adjustments[0].movements[0].kind,'offset');assert.equal(c.view.payments.find(p=>p.advanceId===managedAdvance).available,'0');assert.equal(c.data.supplierCredits,undefined);
 await load('lib/purchase-order-closures.ts').syncPurchaseOrderClosures();
 assert.equal(JSON.parse(sql.prepare("SELECT data FROM flow_entities WHERE id='o4'").get().data).state,'closed');
+// A direct treasury invoice allocation cannot be detached from its cash source.
+const direct=JSON.parse(sql.prepare('SELECT data FROM flow_entities WHERE id=?').get(cid).data);direct.payments.push({id:'direct-movement',day:'2026-10-03',treasuryRequestId:'source-treasury',amount:'1',reference:'Direct bank settlement'});direct.allocations.push({id:'direct-allocation',invoiceId:iid,paymentId:'direct-movement',amount:'1'});sql.prepare('UPDATE flow_entities SET data=?,revision=revision+1 WHERE id=?').run(JSON.stringify(direct),cid);await action('void',{kind:'allocations',itemId:'direct-allocation'},409);assert.equal(JSON.parse(sql.prepare('SELECT data FROM flow_entities WHERE id=?').get(cid).data).allocations.find(a=>a.id==='direct-allocation').voided,undefined);
 // Permissions and route isolation.
 user={userId:'other',permissions:{supplyRoles:['foreign']}};assert.equal((await get()).cases.length,0);assert.equal((await filesApi.GET(new Request('https://test.local/api/purchase-payables/files?id='+fileId))).status,404);
 await post(body('hold',{caseId:cid,revision:c.revision,itemId:iid}),404);
@@ -81,7 +83,7 @@ user={userId:'read',permissions:{finance:'read'}};assert.equal((await api.GET())
 user=finance;
 // Idempotent atomic transaction and freeze / reset rollback.
 const a=body('hold',{caseId:cid,revision:(await current()).revision,itemId:iid});await post(a);await post(a);assert.equal(sql.prepare('SELECT COUNT(*) n FROM inventory_operations WHERE id=?').get(a.id).n,1);
-const reset=load('lib/reset-contract.ts');for(const scope of ['operations','full']){sql.exec('BEGIN');for(const t of Object.keys(reset.resetTables))sql.exec('DELETE FROM '+t+' WHERE '+reset.resetWhere(t,scope));assert.equal(sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type IN ('purchase_payable','payable_file')").get().n,0);sql.exec('ROLLBACK');}
+const reset=load('lib/reset-contract.ts');for(const scope of ['operations','full']){sql.exec('BEGIN');sql.exec("UPDATE reset_control SET internal=1");for(const t of Object.keys(reset.resetTables))sql.exec('DELETE FROM '+t+' WHERE '+reset.resetWhere(t,scope));assert.equal(sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type IN ('purchase_payable','payable_file')").get().n,0);sql.exec('ROLLBACK');}
 sql.exec("UPDATE reset_control SET phase='maintenance'");await action('hold',{itemId:iid},409);sql.exec("UPDATE reset_control SET phase='testing'");
 assert.equal(sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type='cost_price'").get().n,0);
 assert.equal(sql.prepare('SELECT COUNT(*) n FROM inventory_entries').get().n,0);

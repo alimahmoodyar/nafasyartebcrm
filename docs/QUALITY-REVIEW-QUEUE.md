@@ -1,3 +1,7 @@
+## 2026-11-15 — Accounting core and purchase valuation review
+
+Focused SQLite/real-handler tests cover source outbox, micro-rial conservation, receipt/invoice/advance/partial treasury, consumed-price changes, chained semi production, supplier custody/GRNI/VAT/direct and credit-new-invoice replacements, duplicate/race/revocation/typed-detail gates and reset rollback. Existing cost/production/receiving/QC/financial-control/MCP regressions checked. Local browser component fixture checked; no live multirole workflow claim. Full all-file Git/source and actual live-version parity must be verified in release evidence. Remaining roadmap: broader financial modules/statutory outputs, legacy broad workspace loader scalability, production-size concurrent load and recovery; unknown fact/tax/cost allocation cases stay explicit finance exceptions, never guessed postings.
+
 ## 2026-11-15 — Unified procurement and treasury
 
 Automatic source-linked obligations, one treasury payment path for domestic/service/foreign purchasing, source revalidation, atomic partial payment and invoice allocation, deterministic purchase bank matching and agreement/advance delivery trigger. See PURCHASE-TREASURY.md. Focused treasury, procurement, service, settlement and TypeScript checks; browser walkthrough is not claimed. Legacy all-history treasury reads remain scalability debt; new order reconciliation uses bounded keyset batches. No live test payment or SMS sent.

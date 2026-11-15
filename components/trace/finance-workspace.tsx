@@ -1,4 +1,5 @@
  'use client';
+import {AccountingPanel} from './accounting-panel';
 import {useEffect,useState} from 'react';
 import type {Session} from '@/lib/permissions';
 import {financeEntries,parseFinanceTarget} from '@/lib/finance-workspace';
@@ -21,6 +22,7 @@ export function FinanceWorkspace({user,targetId=''}:{user:Session;targetId?:stri
  useEffect(()=>{const next=parseFinanceTarget(targetId);setView(next?.key||'');setTarget(next?.target||'')},[targetId]);
  if(!user.isAdmin)return <p role="alert">دسترسی به ماژول مدیریت مالی ندارید.</p>;
  return <ProgramWorkspace programId="finance-hub" title="مالی" direct={!!targetId}><section className="panel inside" dir="rtl"><h2>مالی</h2><SubprogramNavigation items={financeEntries.map(([key,title])=>[key,title])} value={view} onChange={key=>{setTarget('');setView(key)}}/>
+ {view==='accounting'&&<AccountingPanel/>}
  {view==='treasury'&&<TreasuryPanel targetId={target}/>}
  {view==='guarantees'&&<GuaranteesPanel targetId={target}/>}
  {view==='sales-bank'&&<SalesBankPanel/>}

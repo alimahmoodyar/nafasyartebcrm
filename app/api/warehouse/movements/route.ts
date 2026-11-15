@@ -1,3 +1,4 @@
+import {drainAccountingQueue} from '@/lib/accounting';
 import {withServiceRolePreview} from '@/lib/service-role-preview';
 import {annualCountMovementStatements,assertWarehouseNotCounting,type CountMovement} from '@/lib/stocktake-lock';
 import {warehouseDisplayName} from '@/lib/warehouse-tree';
@@ -58,6 +59,7 @@ async function post(request:Request){try{
  }else fail('نوع عملیات معتبر نیست.');
  const forms=await captureForm(id,'warehouse.'+b.mode,b,u);
  await db.batch([db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(id,'warehouse_'+b.mode,signature,u.userId,now),...checks,...await annualCountMovementStatements(db,id,b,countMovements),...stmts,...holdChecks(db,id,touched),...forms,db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,b.transferId||id,'warehouse_'+b.mode,signature,now)]);
+ await drainAccountingQueue().catch(()=>{});
  return json({saved:true});
  }catch(e){return accessResponse(e)||Response.json({error:'موجودی یا وضعیت تغییر کرده است؛ هیچ تغییری ثبت نشد. تازه‌سازی کنید.'},{status:409});}}
 
