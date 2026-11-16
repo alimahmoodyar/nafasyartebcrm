@@ -1,3 +1,7 @@
+## 2026-11-16 — Custodian role profile
+
+Add the custodian review profile and existing assets/cartable/scanner links. Respect effective profile grants without creating an employee; retain actor and ordinary membership revocation. Share custodian task stages, bounded current SQL queue, visible limits and legacy-clearance deep links. Seventeen final focused suites and TypeScript passed; final build/source/live verification is recorded with the release. See quality-reviews/2026-11-16-custodian-profile.md.
+
 ## 2026-11-16 — Close three remaining nightly checks
 
 Remove implicit domestic-buyer authority from the common commerce-management role; explicit route grants remain authoritative. Reject preliminary financial approval of an incomplete RFQ round while retaining selected/split-order exception controls. Migrate old sourcing scenarios to commerce selection, three qualified offers or exact-version CEO exception, selected finance work and historical clarification compatibility. Add real-role HTTP/MCP denial and no-write rollback checks. See quality-reviews/2026-11-16-three-open.md for results and release provenance.

@@ -32,8 +32,8 @@ export async function GET(request:Request){try{
  const templateSync=await syncReceiptTemplates(admin);if(templateSync.needsTaskSync)await syncMaterialTasks();await syncInventoryCounts();
  const buyerChoices=await profileScopeChoices(profile.id);
  const position=profileSession(admin,profile.id,(await storage().prepare("SELECT id,data FROM flow_entities WHERE type='material_warehouse'").all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)})),buyerId);
- const {work}=await runServiceRolePreview(position,()=>profileWork(position));
- return json({profile:visibleProfile(profile),work,activeProfile:active?.id||'',buyerId,buyerChoices,unverified:[],personalPreview:false});
+ const {work,workHasMore}=await runServiceRolePreview(position,()=>profileWork(position));
+ return json({profile:visibleProfile(profile),work,workHasMore:!!workHasMore,activeProfile:active?.id||'',buyerId,buyerChoices,unverified:[],personalPreview:false});
  }catch(e){return accessResponse(e)||Response.json({error:'دریافت پروفایل نقش انجام نشد.'},{status:500,headers:{'Cache-Control':'no-store'}})}}
 
 export async function POST(request:Request){try{

@@ -1,3 +1,7 @@
+## 2026-11-16 — Custodian profile connection
+
+Owner authorized profile/catalog mapping, existing asset workspace and cartable, tests/push/publication. Tested admin without an employee, role switch isolation, real custodian revocation, exact receiver and audit identity, current/shared obligations, clearance routing, bounded queue, UI and MCP. 17 final related suites passed; one old warehouse UI harness failure reproduced on v294 and corrected without warehouse runtime changes. No migration/live writes/SMS/browser claim. Final source build and actual-deployment parity remain release gates.
+
 ## 2026-11-16 — Follow-up on the three open nightly checks
 
 Owner explicitly authorized investigation, fixes, testing, push and publication. Exact baseline: Sites v293 f92d786c5c656bc1573b72eb7fa7b69a0e4d60e3 / GitHub fd9a7b27f9dfb43051b00e5b1d9ac8b118c1c746, tree 06905a56f019ff8ab3ac3c82e9e8f030361b82bb. Remove inferred domestic buyer access; keep explicit general/scoped grants and independent management authority. Restore incomplete-round financial rejection. Old tests now exercise the current supplier-selection/financial order and separately preserve legacy clarification controls. Final verification is in quality-reviews/2026-11-16-three-open.md; the prior 71/74 entry remains historical. Existing scale, hardware and remote-recovery limits remain separate from closing these tests.

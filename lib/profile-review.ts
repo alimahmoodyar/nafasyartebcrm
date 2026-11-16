@@ -9,6 +9,7 @@ export const representativeSampleId=(userId:string)=>'role-sample-representative
 export function profileReviewSelection(raw:string){const [storedProfileId,buyerId='',extra]=raw.split('~');if(extra!==undefined)throw Error('invalid preview scope');return {profileId:storedProfileId==='home-service'&&buyerId?'home-service-representative':storedProfileId,buyerId:buyerId==='training-service-agent-1'?'':buyerId};}
 export const profileReviewCookie='__Host-nafasyar-profile-review';
 export const profileJobRoles:Record<string,string[]>={
+ custodian:['custodian'],
  'central-store':['inventory','service_inventory'],'line-store':['production_store_assistant'],'line-manager':['production'],
  'warehouse-worker':[],'production-worker':[],'packaging-worker':[],'repair-worker':[],
  quality:['qc'],technical:['engineering','product_manager'],'finance-director':['finance_director','purchase_finance'],

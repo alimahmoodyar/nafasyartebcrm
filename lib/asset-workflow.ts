@@ -12,8 +12,8 @@ export const afail=(s:string,status=400):never=>{throw new AccessError(s,status)
 const req=(v:any,n=300)=>taskRequired(v,n),num=(v:any)=>{const n=Number(v);if(!Number.isFinite(n)||n<0||n>1e12)afail('عدد نامعتبر است.');return n;};
 export async function assetRow(id:string){const r:any=await storage().prepare("SELECT * FROM flow_entities WHERE id=? AND type GLOB 'asset_*'").bind(id).first();return r?{...r,data:JSON.parse(r.data)}:null;}
 export async function assetIdentity(u:Session){const ms=await assetMembers(),m=ms.find(x=>x.subject===u.userId||x.id===u.userId.replace(/^local:/,'')),p=u.permissions,external=!!(p.salesAgentId||p.serviceAgentId||p.salesRoles?.includes('agent')||p.serviceRoles?.includes('agent'));
- if(p.hospitalCenterId||!u.isAdmin&&(!m||m.status!=='active'))afail('حساب فعال لازم است.',403);
- const persisted=m?storedAccessPermissions(m.permissions):p;const policy=await assetRow('asset-disposal-policy');const delegated=!external&&!!policy?.data.roleId&&p.roleAssignment?.roles?.includes(policy.data.roleId);
+ const profileCustodian=u.profileReview?.id==='custodian'&&p.assetRoles?.includes('custodian');if(p.hospitalCenterId||!u.isAdmin&&(!m||m.status!=='active')&&!profileCustodian)afail('حساب فعال لازم است.',403);
+ const persisted=u.profileReview?p:m?storedAccessPermissions(m.permissions):p;const policy=await assetRow('asset-disposal-policy');const delegated=!external&&!!policy?.data.roleId&&p.roleAssignment?.roles?.includes(policy.data.roleId);
  return {hr:!external&&(u.isAdmin||p.personnelRoles?.includes('hr')),members:ms,id:m?.id||'',external,custodian:!external&&(u.isAdmin||persisted.assetRoles?.includes('custodian')),ceo:!external&&(u.isAdmin||p.supplyRoles?.includes('ceo')),disposal:!external&&(u.isAdmin||p.supplyRoles?.includes('ceo')||persisted.assetRoles?.includes('disposal')||delegated),finance:!external&&(u.isAdmin||p.supplyRoles?.includes('finance')),technical:!external&&(u.isAdmin||p.supplyRoles?.includes('engineering')||p.serviceRoles?.includes('technician')),admin:u.isAdmin,salesId:p.salesAgentId||'',serviceId:p.serviceAgentId||''};
 }
 type Actor=Awaited<ReturnType<typeof assetIdentity>>;

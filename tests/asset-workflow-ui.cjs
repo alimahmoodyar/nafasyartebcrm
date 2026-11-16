@@ -18,5 +18,11 @@ reply={ok:true,json:async()=>({accountId:'actor',records:[{id,revision:3,data:{n
 nodes(t).find(x=>x.type==='button'&&text(x)==='تحویل گرفتم').props.onClick();t=tree();assert.match(text(t),/تأیید نهایی/);assert.equal(nodes(t).find(x=>x.type==='input'&&x.props.value===qr).props.value,qr);assert.equal(calls.filter(x=>x.method==='POST').length,0);
 // The explicit form submit preserves UUID, exact revision and scan; it never chooses an arbitrary holder.
 nodes(t).find(x=>x.type==='input'&&x.props.maxLength===4000).props.onChange({target:{value:'Actual received condition'}});t=tree();postReply={ok:true,json:async()=>({saved:true,id})};await nodes(t).find(x=>x.type==='form'&&text(x).includes('تأیید نهایی و ثبت')).props.onSubmit({preventDefault(){}});const call=calls.find(x=>x.method==='POST'),body=JSON.parse(call.body);assert.equal(call.url,'/api/assets/workflow');assert.equal(body.mode,'accept_transfer');assert.equal(body.recordId,id);assert.equal(body.revision,3);assert.equal(body.scan,qr);assert.equal(body.confirmed,true);assert.ok(body.id);
-assert.ok(calls.every(x=>!x.url.includes('token=')));console.log('PASS asset UI: scoped exact record, pending-custody explanation, printable label, no write on scan/open, explicit recipient confirmation and exact UUID/revision/QR payload');
+assert.ok(calls.every(x=>!x.url.includes('token=')));
+// A clearance cartable deep link must open the existing legacy form, not the asset-item API.
+const {AssetsPanel}=load('components/trace/assets-panel.tsx');slots=[];cursor=0;effects=[];
+let routed=AssetsPanel({targetId:'asset-legacy:clearance-1'});
+assert.equal(nodes(routed).find(x=>typeof x.type==='function'&&x.type.name==='LegacyAssetsPanel').props.targetId,'clearance-1');
+slots=[];cursor=0;effects=[];routed=AssetsPanel({targetId:id});assert.equal(routed.props.initialId,id);
+console.log('PASS asset UI: scoped exact record, pending-custody explanation, printable label, no write on scan/open, explicit recipient confirmation, exact UUID/revision/QR payload and existing clearance deep-link form');
 })().catch(e=>{console.error(e);process.exitCode=1});

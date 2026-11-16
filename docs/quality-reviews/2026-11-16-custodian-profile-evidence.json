@@ -1,0 +1,368 @@
+{
+  "baseline": {
+    "siteVersion": 294,
+    "source": "41a1bc7eea03dc7ebad033eb616721c1e1a78f61",
+    "github": "9aa4339d07f4b1ae1a3f7972baefa32b95d505d3"
+  },
+  "initial": {
+    "began": "2026-11-16T07:57:13.559Z",
+    "ended": "2026-11-16T07:58:06.429Z",
+    "concurrency": 3,
+    "total": 17,
+    "passed": 16,
+    "failed": [
+      {
+        "name": "warehouse-profile-ui",
+        "command": "node tests/warehouse-profile-ui.cjs",
+        "status": "failed",
+        "exitCode": 1,
+        "signal": null,
+        "elapsedMs": 3071,
+        "log": "warehouse-profile-ui.log"
+      }
+    ],
+    "results": [
+      {
+        "name": "custodian-profile",
+        "command": "node tests/custodian-profile.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 10402,
+        "log": "custodian-profile.log"
+      },
+      {
+        "name": "assets",
+        "command": "node tests/assets.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 10595,
+        "log": "assets.log"
+      },
+      {
+        "name": "asset-workflow",
+        "command": "node tests/asset-workflow.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 10941,
+        "log": "asset-workflow.log"
+      },
+      {
+        "name": "asset-workflow-ui",
+        "command": "node tests/asset-workflow-ui.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 1219,
+        "log": "asset-workflow-ui.log"
+      },
+      {
+        "name": "asset-links",
+        "command": "node tests/asset-links.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 12711,
+        "log": "asset-links.log"
+      },
+      {
+        "name": "asset-production",
+        "command": "node tests/asset-production.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 12473,
+        "log": "asset-production.log"
+      },
+      {
+        "name": "profile-permissions-and-receipt-edit",
+        "command": "node tests/profile-permissions-and-receipt-edit.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 13950,
+        "log": "profile-permissions-and-receipt-edit.log"
+      },
+      {
+        "name": "warehouse-profile-ui",
+        "command": "node tests/warehouse-profile-ui.cjs",
+        "status": "failed",
+        "exitCode": 1,
+        "signal": null,
+        "elapsedMs": 3071,
+        "log": "warehouse-profile-ui.log"
+      },
+      {
+        "name": "role-access-audit",
+        "command": "node tests/role-access-audit.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 4633,
+        "log": "role-access-audit.log"
+      },
+      {
+        "name": "role-composition",
+        "command": "node tests/role-composition.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 4840,
+        "log": "role-composition.log"
+      },
+      {
+        "name": "warehouse-profile-roles",
+        "command": "node tests/warehouse-profile-roles.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 14509,
+        "log": "warehouse-profile-roles.log"
+      },
+      {
+        "name": "workflow-label-policy",
+        "command": "node tests/workflow-label-policy.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 673,
+        "log": "workflow-label-policy.log"
+      },
+      {
+        "name": "personnel-integrity",
+        "command": "node tests/personnel-integrity.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 1611,
+        "log": "personnel-integrity.log"
+      },
+      {
+        "name": "manual-permissions",
+        "command": "node tests/manual-permissions.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 14766,
+        "log": "manual-permissions.log"
+      },
+      {
+        "name": "profile-receipt-actions-ui",
+        "command": "node tests/profile-receipt-actions-ui.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 1888,
+        "log": "profile-receipt-actions-ui.log"
+      },
+      {
+        "name": "mcp-integration",
+        "command": "node tests/mcp-integration.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 12900,
+        "log": "mcp-integration.log"
+      },
+      {
+        "name": "workflow-role-access",
+        "command": "node tests/workflow-role-access.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 11912,
+        "log": "workflow-role-access.log"
+      }
+    ]
+  },
+  "final": {
+    "total": 17,
+    "passed": 17,
+    "failed": [],
+    "results": [
+      {
+        "name": "custodian-profile",
+        "command": "node tests/custodian-profile.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 10402,
+        "log": "custodian-profile.log"
+      },
+      {
+        "name": "assets",
+        "command": "node tests/assets.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 10595,
+        "log": "assets.log"
+      },
+      {
+        "name": "asset-workflow",
+        "command": "node tests/asset-workflow.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 10941,
+        "log": "asset-workflow.log"
+      },
+      {
+        "name": "asset-workflow-ui",
+        "command": "node tests/asset-workflow-ui.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 1219,
+        "log": "asset-workflow-ui.log"
+      },
+      {
+        "name": "asset-links",
+        "command": "node tests/asset-links.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 12711,
+        "log": "asset-links.log"
+      },
+      {
+        "name": "asset-production",
+        "command": "node tests/asset-production.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 12473,
+        "log": "asset-production.log"
+      },
+      {
+        "name": "profile-permissions-and-receipt-edit",
+        "command": "node tests/profile-permissions-and-receipt-edit.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 13950,
+        "log": "profile-permissions-and-receipt-edit.log"
+      },
+      {
+        "name": "warehouse-profile-ui",
+        "command": "node tests/warehouse-profile-ui.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 2041,
+        "log": "warehouse-profile-ui.final.log"
+      },
+      {
+        "name": "role-access-audit",
+        "command": "node tests/role-access-audit.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 4633,
+        "log": "role-access-audit.log"
+      },
+      {
+        "name": "role-composition",
+        "command": "node tests/role-composition.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 4840,
+        "log": "role-composition.log"
+      },
+      {
+        "name": "warehouse-profile-roles",
+        "command": "node tests/warehouse-profile-roles.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 14509,
+        "log": "warehouse-profile-roles.log"
+      },
+      {
+        "name": "workflow-label-policy",
+        "command": "node tests/workflow-label-policy.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 673,
+        "log": "workflow-label-policy.log"
+      },
+      {
+        "name": "personnel-integrity",
+        "command": "node tests/personnel-integrity.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 1611,
+        "log": "personnel-integrity.log"
+      },
+      {
+        "name": "manual-permissions",
+        "command": "node tests/manual-permissions.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 14766,
+        "log": "manual-permissions.log"
+      },
+      {
+        "name": "profile-receipt-actions-ui",
+        "command": "node tests/profile-receipt-actions-ui.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 1888,
+        "log": "profile-receipt-actions-ui.log"
+      },
+      {
+        "name": "mcp-integration",
+        "command": "node tests/mcp-integration.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 12900,
+        "log": "mcp-integration.log"
+      },
+      {
+        "name": "workflow-role-access",
+        "command": "node tests/workflow-role-access.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 11912,
+        "log": "workflow-role-access.log"
+      }
+    ]
+  },
+  "warehouseUiBaseline": {
+    "source": "41a1bc7eea03dc7ebad033eb616721c1e1a78f61",
+    "command": "node tests/warehouse-profile-ui.cjs",
+    "exitCode": 1,
+    "error": "Missing selector انبار دریافت"
+  },
+  "warehouseUiFinal": {
+    "command": "node tests/warehouse-profile-ui.cjs",
+    "exitCode": 0,
+    "details": "Rendered actual receipt-entry component and current optional qualified-inspector checkboxes; no warehouse runtime change"
+  },
+  "typecheck": {
+    "command": "node node_modules/typescript/bin/tsc --noEmit --incremental false",
+    "exitCode": 0
+  },
+  "build": {
+    "command": "node C:/Users/surface/.codex/plugins/cache/openai-curated-remote/sites/1.1.6/scripts/build-site.mjs",
+    "exitCode": 0
+  },
+  "releaseGates": [
+    "Official final-source build in packaging helper",
+    "Full tracked-path/mode/blob pre-push comparison",
+    "Native successful deployment and source of that exact version",
+    "Full GitHub/prepared/actually-online comparison"
+  ],
+  "noLiveDataOrSmsChanges": true,
+  "noMigration": true,
+  "noBrowserOrHardwareClaims": true
+}

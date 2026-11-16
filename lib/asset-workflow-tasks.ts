@@ -4,18 +4,29 @@ import {assetMembers,assetInternal} from './assets';
 import {storedAccessPermissions} from './permissions';
 import {dayAt} from './duties';
 export function assetServiceDue(d:any){const p=d.servicePlan;return !!p&&(!!p.nextDay&&p.nextDay<=dayAt()||p.hours>0&&(d.meters?.hours||0)-p.baselineHours>=p.hours||p.cycles>0&&(d.meters?.cycles||0)-p.baselineCycles>=p.cycles);}
+/** Same custodian obligations for the assigned cartable and administrator role review. */
+export function assetCustodianSteps(d:any,revision=0){
+ const steps:{stage:string;title:string}[]=[],add=(stage:string,title:string)=>steps.push({stage,title});
+ if(d.lifecycle==='disposed')return steps;
+ if(d.pending&&(d.pending.state==='awaiting_approval'||d.pending.kind!=='employee'))add('transfer:'+d.pending.id+':'+d.pending.state,d.pending.state==='awaiting_approval'?'مجوز انتقال اموال':'پیگیری تحویل اموال');
+ if(d.signatureRequired&&!d.signedReceiptId)add('signature:'+d.custodyId,'رسید امضاشده تحویل اموال');
+ if(d.annualDue&&d.annualDue<=dayAt())add('presence:'+d.custodyId+':'+d.annualDue,'تأیید دوره‌ای اموال امانی');
+ if(d.returnDue&&d.returnDue<=dayAt()&&!d.continuous)add('return:'+d.custodyId,'پیگیری برگشت اموال امانی');
+ if(d.issue?.state==='open'&&!d.technicalId)add('fault:'+(d.issue.id||d.issue.at||revision),'بررسی خرابی / خطر اموال');
+ if(assetServiceDue(d))add('service:'+d.servicePlan.baseAt,'سرویس سررسیدشده اموال');
+ if(d.service?.state==='awaiting_review'&&!d.technicalId)add('review:'+d.service.id,'تأیید فنی پایان سرویس');
+ return steps;
+}
 // Stable tasks are derived from each current record. Revocation retires old ownership on the next tick.
 export async function syncAssetWorkflowTasks(){const db=storage(),policy:any=await db.prepare("SELECT data FROM flow_entities WHERE id='asset-disposal-policy'").first(),delegatedRole=policy?JSON.parse(policy.data).roleId:'',members=await assetMembers(),keepers=members.filter(assetInternal).filter(m=>storedAccessPermissions(m.permissions).assetRoles?.includes('custodian')).map(m=>m.id),now=new Date().toISOString();let after='';
  while(true){const rows=(await db.prepare("SELECT id,data,revision FROM flow_entities WHERE type='asset_item' AND id>? ORDER BY id LIMIT 100").bind(after).all()).results as any[];if(!rows.length)break;
   for(const r of rows){const d=JSON.parse(r.data),wanted:{member:string;stage:string;title:string}[]=[],add=(ids:string[],stage:string,title:string)=>ids.forEach(member=>wanted.push({member,stage,title}));
    if(d.lifecycle!=='disposed'){
-    if(d.pending){const p=d.pending;add(p.state==='awaiting_approval'?keepers:p.kind==='employee'?[p.holderId]:keepers,'transfer:'+p.id+':'+p.state,p.state==='awaiting_approval'?'مجوز انتقال اموال':'پیگیری تحویل اموال');}
-    if(d.signatureRequired&&!d.signedReceiptId)add(keepers,'signature:'+d.custodyId,'رسید امضاشده تحویل اموال');
-    if(d.annualDue&&d.annualDue<=dayAt())add(keepers,'presence:'+d.custodyId+':'+d.annualDue,'تأیید دوره‌ای اموال امانی');
-    if(d.returnDue&&d.returnDue<=dayAt()&&!d.continuous)add(keepers,'return:'+d.custodyId,'پیگیری برگشت اموال امانی');
-    if(d.issue?.state==='open')add(d.technicalId?[d.technicalId]:keepers,'fault:'+(d.issue.id||d.issue.at||r.revision),'بررسی خرابی / خطر اموال');
-    if(assetServiceDue(d))add([...new Set([...keepers,d.servicePlan.executorId].filter(Boolean))],'service:'+d.servicePlan.baseAt,'سرویس سررسیدشده اموال');
-    if(d.service?.state==='awaiting_review')add(d.technicalId?[d.technicalId]:keepers,'review:'+d.service.id,'تأیید فنی پایان سرویس');
+    for(const step of assetCustodianSteps(d,r.revision))add(keepers,step.stage,step.title);
+    if(d.pending?.state==='awaiting_receipt'&&d.pending.kind==='employee')add([d.pending.holderId],'transfer:'+d.pending.id+':'+d.pending.state,'پیگیری تحویل اموال');
+    if(d.issue?.state==='open'&&d.technicalId)add([d.technicalId],'fault:'+(d.issue.id||d.issue.at||r.revision),'بررسی خرابی / خطر اموال');
+    if(assetServiceDue(d)&&d.servicePlan.executorId&&!keepers.includes(d.servicePlan.executorId))add([d.servicePlan.executorId],'service:'+d.servicePlan.baseAt,'سرویس سررسیدشده اموال');
+    if(d.service?.state==='awaiting_review'&&d.technicalId)add([d.technicalId],'review:'+d.service.id,'تأیید فنی پایان سرویس');
     if(d.disposal?.state==='pending')add(members.filter(assetInternal).filter(m=>{const p=storedAccessPermissions(m.permissions);return p.assetRoles?.includes('disposal')||p.supplyRoles?.includes('ceo')||!!delegatedRole&&p.roleAssignment?.roles?.includes(delegatedRole)}).map(m=>m.id),'disposal:'+d.disposal.id,'تصمیم خروج اموال');
    }
    if(d.financeFollowup?.state==='open')add(members.filter(assetInternal).filter(m=>storedAccessPermissions(m.permissions).supplyRoles?.includes('finance')).map(m=>m.id),'finance:'+d.disposal.id,'ثبت اثر مالی خروج اموال');
