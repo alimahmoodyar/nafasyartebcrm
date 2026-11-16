@@ -1,0 +1,1001 @@
+{
+  "checkedAt": "2026-11-16T22:27:28.357Z",
+  "timezone": "Asia/Tehran",
+  "previousGeneralReview": "fd9a7b27f9dfb43051b00e5b1d9ac8b118c1c746",
+  "lastPublishedGithub": "a79ac6260d459b92fe6ab0daf1a0b48762171ad7",
+  "lastVerifiedOnline": {
+    "checkedAt": "2026-11-16T22:04:07.052Z",
+    "deployment": {
+      "id": "appgdep_6afb7ba2defc8191a9cb791846dcc8a3",
+      "project_id": "appgprj_6aa64b063bc88191b32b9526dc49f4fd",
+      "title": "نفس‌یار | رهگیری تولید و کیفیت",
+      "version_id": "appgprj_6aa64b063bc88191b32b9526dc49f4fd~appgver_5f5062f970488191b1b804ba54b4dc0d",
+      "type": "publish",
+      "status": "succeeded",
+      "url": "https://nafasyar-trace.dr-aliebrahimi1368.chatgpt.site",
+      "has_mcp": true,
+      "screenshot_asset_pointer": null,
+      "provider_deployment_id": "site---6aa64b063bc88191b32b9526dc49f4fd",
+      "failure_message": null,
+      "env_set_revision": 8,
+      "updated_at": "2026-11-16T21:54:58.311295+00:00"
+    },
+    "version": {
+      "id": "appgprj_6aa64b063bc88191b32b9526dc49f4fd~appgver_5f5062f970488191b1b804ba54b4dc0d",
+      "version_number": 306,
+      "source": {
+        "commit_sha": "ef4f2b7d74f1f7249e4807f13e13ee232b5ef427"
+      },
+      "deployment_id": "appgdep_6afb7ba2defc8191a9cb791846dcc8a3",
+      "archiveHash": "sha256:5160c6d8422798cd1cf431ac4ef83d8dc77e1ffd9af3ac89d84549ec26b3701b"
+    }
+  },
+  "commitsSincePreviousReview": [
+    "a79ac6260d459b92fe6ab0daf1a0b48762171ad7 Connect administrative role home to the existing shared cartable",
+    "6f8e1593cf208e19e2e8e9cd4638fc16e16d4565 Redesign existing direct messages and add private recorded voice with local preview",
+    "d9adc68059be58ab74b4aec684e07672276f82a2 Constrain asset camera and crop panels to each card and keep photo actions visible",
+    "fd00f91c985d859c4f7277da9528c132cf1407bc Restore natural roll page height without inferring square printer media",
+    "21cda8e5e16e2546fea42ebfec2922f23cf6b18e Add saved label printer calibration and immutable two-party asset transfer photographs",
+    "c05480105bf5011c3a5c408ee14b34fefcb5c768 Derive personnel unit and title from current assigned roles after onboarding",
+    "6bdc185579ad711f352522380db494e4f81c004d Print asset labels as exact-size lossless PDFs without browser headers",
+    "cf000bc75d87de93987ba97d153387620b6922f7 Make personnel work arrangement selectable while preserving legacy values",
+    "186144f4c2230fb1e8a5d9d77e196026ddc268c1 Complete photographed asset passports, atomic multi-item registration and bounded label printing",
+    "96c00a67c1c22ff8d03d42b4113a32b7bd06be5a Complete HR personnel-first onboarding, private documents, term contracts and family declarations",
+    "b0b41e6468dce70b33419154f810507b593d6f4c Unify custodian home with scoped person custody and accepted handover history",
+    "fd775652c09f09a5d56d9fa0f3502867ff4454b3 Implement asset passport, private documents and QR-first print templates",
+    "becae643e6666306608583343751138fd63ff871 Remove duplicate scan launchers and shorten labels",
+    "76b6297636f07b6d000d590dc2c17ac464c4a4d5 Connect custodian role profile to shared assets and work inbox",
+    "9aa4339d07f4b1ae1a3f7972baefa32b95d505d3 Fix scoped procurement access and close remaining nightly checks"
+  ],
+  "releasedFilesSincePreviousReview": [
+    "M\tapp/api/assets/files/route.ts",
+    "A\tapp/api/assets/people/route.ts",
+    "A\tapp/api/assets/photos/route.ts",
+    "M\tapp/api/assets/print/route.ts",
+    "A\tapp/api/assets/registration/print/route.ts",
+    "A\tapp/api/assets/registration/route.ts",
+    "M\tapp/api/inbox/files/route.ts",
+    "M\tapp/api/inbox/route.ts",
+    "M\tapp/api/label-templates/route.ts",
+    "M\tapp/api/personnel/files/route.ts",
+    "M\tapp/api/personnel/route.ts",
+    "M\tapp/api/role-profiles/route.ts",
+    "M\tapp/api/sourcing/route.ts",
+    "M\tapp/api/tasks/route.ts",
+    "M\tapp/api/users/route.ts",
+    "M\tapp/globals.css",
+    "M\tapp/page.tsx",
+    "A\tcomponents/trace/asset-attachments.tsx",
+    "A\tcomponents/trace/asset-photo-gallery.tsx",
+    "A\tcomponents/trace/asset-registration-fields.tsx",
+    "A\tcomponents/trace/asset-registration-panel.tsx",
+    "A\tcomponents/trace/asset-transfer-photos.tsx",
+    "M\tcomponents/trace/asset-workspace.tsx",
+    "M\tcomponents/trace/assets-panel.tsx",
+    "A\tcomponents/trace/custodian-home.tsx",
+    "M\tcomponents/trace/direct-messages.tsx",
+    "M\tcomponents/trace/driver-dashboard.tsx",
+    "M\tcomponents/trace/member-contact-form.tsx",
+    "A\tcomponents/trace/personnel-admin-panel.tsx",
+    "A\tcomponents/trace/personnel-family-panel.tsx",
+    "M\tcomponents/trace/personnel-panel.tsx",
+    "M\tcomponents/trace/personnel.css",
+    "M\tcomponents/trace/receipt-attachment.tsx",
+    "M\tcomponents/trace/receipt-photo-editor.tsx",
+    "M\tcomponents/trace/role-testing-panel.tsx",
+    "M\tcomponents/trace/service-expert-dashboard.tsx",
+    "M\tcomponents/trace/tasks-panel.tsx",
+    "M\tcomponents/trace/users-panel.tsx",
+    "A\tcomponents/trace/voice-message-recorder.tsx",
+    "M\tcomponents/trace/workflow-scan-button.tsx",
+    "M\tcomponents/trace/workflow-scanner.tsx",
+    "M\tdocs/CHANGELOG.md",
+    "M\tdocs/QUALITY-REVIEW-QUEUE.md",
+    "M\tdocs/WORKFLOW-LABEL-POLICY.md",
+    "A\tdocs/process-design/ASSET-GALLERY-BULK-REVIEW.fa.md",
+    "A\tdocs/process-design/ASSET-PASSPORT-REVIEW.fa.md",
+    "A\tdocs/process-design/CUSTODIAN-UNIFIED-HOME.fa.md",
+    "A\tdocs/process-design/DIRECT-MESSAGES-REVIEW.fa.md",
+    "A\tdocs/process-design/HR-ADMINISTRATION.fa.md",
+    "A\tdocs/quality-reviews/2026-11-16-asset-gallery-registration-evidence.json",
+    "A\tdocs/quality-reviews/2026-11-16-asset-gallery-registration.md",
+    "A\tdocs/quality-reviews/2026-11-16-asset-passport-evidence.json",
+    "A\tdocs/quality-reviews/2026-11-16-asset-passport.md",
+    "A\tdocs/quality-reviews/2026-11-16-custodian-profile-evidence.json",
+    "A\tdocs/quality-reviews/2026-11-16-custodian-profile.md",
+    "A\tdocs/quality-reviews/2026-11-16-custodian-unified-evidence.json",
+    "A\tdocs/quality-reviews/2026-11-16-custodian-unified.md",
+    "A\tdocs/quality-reviews/2026-11-16-hr-administration-evidence.json",
+    "A\tdocs/quality-reviews/2026-11-16-hr-administration.md",
+    "A\tdocs/quality-reviews/2026-11-16-scan-entry-evidence.json",
+    "A\tdocs/quality-reviews/2026-11-16-scan-entry.md",
+    "A\tdocs/quality-reviews/2026-11-16-three-open-evidence.json",
+    "A\tdocs/quality-reviews/2026-11-16-three-open.md",
+    "M\tdocs/sourcing-multiple-quotes.md",
+    "A\tlib/asset-categories.ts",
+    "A\tlib/asset-documents.ts",
+    "M\tlib/asset-links.ts",
+    "A\tlib/asset-person.ts",
+    "A\tlib/asset-print-layout.ts",
+    "A\tlib/asset-print-pdf.ts",
+    "A\tlib/asset-print.ts",
+    "A\tlib/asset-profile-work.ts",
+    "A\tlib/asset-registration.ts",
+    "A\tlib/asset-transfer-photos.ts",
+    "M\tlib/asset-workflow-tasks.ts",
+    "M\tlib/asset-workflow.ts",
+    "M\tlib/assets-contract.ts",
+    "M\tlib/assets.ts",
+    "M\tlib/duties.ts",
+    "A\tlib/inbox-voice.ts",
+    "M\tlib/label-roll.ts",
+    "M\tlib/label-templates.ts",
+    "M\tlib/mcp/tools.ts",
+    "M\tlib/member-contact.ts",
+    "M\tlib/personnel-contract.ts",
+    "A\tlib/personnel-employment.ts",
+    "A\tlib/personnel-family.ts",
+    "M\tlib/personnel-portal.ts",
+    "M\tlib/personnel-positions.ts",
+    "M\tlib/personnel-profile.ts",
+    "M\tlib/personnel-tasks.ts",
+    "M\tlib/personnel.ts",
+    "M\tlib/profile-review.ts",
+    "M\tlib/profile-work.ts",
+    "M\tlib/reset-contract.ts",
+    "M\tlib/role-profiles.ts",
+    "M\tlib/sourcing.ts",
+    "A\tpublic/brand/chat-wallpaper.svg",
+    "A\ttests/asset-camera-layout-browser.cjs",
+    "M\ttests/asset-links.cjs",
+    "A\ttests/asset-passport-ui.cjs",
+    "A\ttests/asset-passport.cjs",
+    "A\ttests/asset-photo-fixture.cjs",
+    "A\ttests/asset-print-browser.cjs",
+    "A\ttests/asset-print-pdf-browser.cjs",
+    "A\ttests/asset-print-pdf-decode.cjs",
+    "M\ttests/asset-production.cjs",
+    "A\ttests/asset-registration-ui.cjs",
+    "A\ttests/asset-registration.cjs",
+    "A\ttests/asset-transfer-photos-ui.cjs",
+    "A\ttests/asset-transfer-photos.cjs",
+    "M\ttests/asset-workflow-ui.cjs",
+    "M\ttests/asset-workflow.cjs",
+    "M\ttests/assets.cjs",
+    "M\ttests/batch-labels.cjs",
+    "A\ttests/custodian-home-ui.cjs",
+    "A\ttests/custodian-person.cjs",
+    "A\ttests/custodian-profile.cjs",
+    "A\ttests/direct-chat-browser.cjs",
+    "M\ttests/driver-dashboard-ui.cjs",
+    "A\ttests/fixtures/inbox-voice.webm.base64.txt",
+    "A\ttests/inbox-voice.cjs",
+    "M\ttests/member-contact.cjs",
+    "A\ttests/personnel-admin-profile.cjs",
+    "A\ttests/personnel-admin-ui.cjs",
+    "A\ttests/personnel-employment.cjs",
+    "M\ttests/personnel-leave-route.cjs",
+    "M\ttests/personnel-positions.cjs",
+    "M\ttests/personnel-profile.cjs",
+    "A\ttests/personnel-test-fixture.cjs",
+    "M\ttests/personnel-ui.cjs",
+    "M\ttests/personnel-worker.cjs",
+    "M\ttests/role-cartable-ui.cjs",
+    "M\ttests/service-expert-dashboard-ui.cjs",
+    "M\ttests/sourcing-integrity.cjs",
+    "M\ttests/sourcing-multiple-quotes.cjs",
+    "A\ttests/voice-message-recorder-ui.cjs",
+    "M\ttests/warehouse-profile-ui.cjs",
+    "M\ttests/workflow-label-policy.cjs",
+    "M\ttests/workflow-scanner-ui.cjs"
+  ],
+  "pendingReviewedFiles": [
+    "app/page.tsx",
+    "components/trace/process-history.tsx",
+    "components/trace/tasks-panel.tsx",
+    "docs/CHANGELOG.md",
+    "docs/QUALITY-REVIEW-QUEUE.md",
+    "tests/manual-permissions.cjs",
+    "tests/role-cartable-ui.cjs",
+    "tests/task-program-access-ui.cjs",
+    "components/trace/cartable-frame.tsx",
+    "components/trace/cartable.css",
+    "components/trace/role-task-tools.tsx",
+    "docs/process-design/COMMON-CARTABLE.fa.md",
+    "lib/cartable-view.ts",
+    "tests/cartable-browser.cjs"
+  ],
+  "validation": {
+    "suites": 47,
+    "results": [
+      {
+        "suite": "role-cartable-ui",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 1024,
+        "initialPassed": true,
+        "rerun": {
+          "suite": "role-cartable-ui",
+          "passed": true,
+          "reason": "Additional direct tool deep-link tests after fixing capability-loading race."
+        },
+        "logHash": "1c1017b2e8cf24d80a11404f87d0af8a8d77af9c45a0c0e8bf6038daafbde2b4"
+      },
+      {
+        "suite": "task-program-access-ui",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 1003,
+        "initialPassed": true,
+        "rerun": {
+          "suite": "task-program-access-ui",
+          "passed": true,
+          "reason": "Final lazy profile tools and capability visibility checks."
+        },
+        "logHash": "8766ff5b7aba6749212f4a2aedb0dde925a16938b21d85c47bbfc8df8e960ec4"
+      },
+      {
+        "suite": "duties",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 12808,
+        "initialPassed": true,
+        "logHash": "9ae0a3413ef628d494c0ec2fddb311bca8e7ee6266a969f101c695018f4a3ec4"
+      },
+      {
+        "suite": "personnel-admin-ui",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 760,
+        "initialPassed": true,
+        "logHash": "e9776c652bda4c0741d7506155003fe2f1e8c9a15d9ced36fa637a418cbdd985"
+      },
+      {
+        "suite": "personnel-admin-profile",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 3732,
+        "initialPassed": true,
+        "logHash": "6af824ddcc078433a76f4783b3f01ddfdf2524c8b52419d62c6d7195732c42e5"
+      },
+      {
+        "suite": "personnel-integrity",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 929,
+        "initialPassed": true,
+        "logHash": "4f20bec55893e41121c43bf5f29ab672f0aca4c89ce1f84c3097bd13c81d788b"
+      },
+      {
+        "suite": "custodian-profile",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 8838,
+        "initialPassed": true,
+        "logHash": "d3bbf9717542d3e5b646353dd443a21aff0b62273a2aebca3835aa6027b87919"
+      },
+      {
+        "suite": "custodian-person",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 13571,
+        "initialPassed": true,
+        "logHash": "9aacee32f8f11ef8ea438a07129df3bdcaa76386aa3484aeb205097de413cc23"
+      },
+      {
+        "suite": "custodian-home-ui",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 916,
+        "initialPassed": true,
+        "logHash": "a6f0b5fe009e9d4f824a672d5b1ee9a2df66bc96204b0b81f675ad6a59114de7"
+      },
+      {
+        "suite": "asset-workflow-ui",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 1191,
+        "initialPassed": true,
+        "logHash": "66953ddc8f41ad395abfd31c7676ac64dbe9e552bd7d03fb046c755db3082178"
+      },
+      {
+        "suite": "asset-registration",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 12045,
+        "initialPassed": true,
+        "logHash": "ccb561d68321ee645da8c9ca4e7036c9acc45cd6c8e3d49712178a450ac99c4a"
+      },
+      {
+        "suite": "asset-registration-ui",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 996,
+        "initialPassed": true,
+        "logHash": "4c6ea5b2e17149832635fed247e148af2e2443ae98b9d11c37795de1aa602a3d"
+      },
+      {
+        "suite": "receipt-camera",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 744,
+        "initialPassed": true,
+        "logHash": "2f6be2b74f967fe0e14e4414a39528e2606daf994d2ba0bbc84c358fde4a56cb"
+      },
+      {
+        "suite": "receipt-photo-editor",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 613,
+        "initialPassed": true,
+        "logHash": "38e2e941ac0a2c5280d7a59f930e4ab1073256909b0753e3b79af178a896bb37"
+      },
+      {
+        "suite": "inbox",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 8511,
+        "initialPassed": true,
+        "logHash": "840e5448fddfc44fad22e120ccc8537e4f85edb841d5ee953543e5d4bbe9d9e2"
+      },
+      {
+        "suite": "inbox-voice",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 9230,
+        "initialPassed": true,
+        "logHash": "23305830abb20f4075a7cd7df7713c656d70e0ab5f7134bff1fa1f6d042daea7"
+      },
+      {
+        "suite": "voice-message-recorder-ui",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 664,
+        "initialPassed": true,
+        "logHash": "2c1ebc3ef34e8b93803d36ca32e0fa091f6af455449156937517f002975f462b"
+      },
+      {
+        "suite": "manual-permissions",
+        "passed": true,
+        "exitCode": 1,
+        "durationMs": 8398,
+        "initialPassed": false,
+        "rerun": {
+          "suite": "manual-permissions",
+          "passed": true,
+          "reason": "Completed isolated personnel fixture supplied to HTTP/MCP account creation; independent fixture for second password account. Product onboarding rule unchanged.",
+          "evidence": "Manual permissions passed: 78 role/scope conversions, HTTP/MCP isolation and intact foreign keys."
+        },
+        "logHash": "3a6afd962f1f8f9840ae4b68056add78e806ace1bf008fbbe2372b83379fd1ac"
+      },
+      {
+        "suite": "profile-permissions-and-receipt-edit",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 9735,
+        "initialPassed": true,
+        "logHash": "2558823a5d3daa8c40269fe335ab05eaa0966d073ae06f79a03b8fd5df39ab96"
+      },
+      {
+        "suite": "sourcing-integrity",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 9358,
+        "initialPassed": true,
+        "logHash": "5b0256a82505999897c639bc215aa6c954fad42042966228291347c18fbf5cee"
+      },
+      {
+        "suite": "sourcing-multiple-quotes",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 13488,
+        "initialPassed": true,
+        "logHash": "5cf15b7d880cc5ace516f9ee165d7a4e89ef6e0609bec41e25d11e489f0edb04"
+      },
+      {
+        "suite": "asset-transfer-photos",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 8679,
+        "initialPassed": true,
+        "logHash": "5a6a0d6702d0d050617516a6750b9100287e3495fc03cb1d99dea50625ca7c7c"
+      },
+      {
+        "suite": "asset-transfer-photos-ui",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 631,
+        "initialPassed": true,
+        "logHash": "a20a7187a9b9be6b2e2384a9377a649231beac8490d7f087f2857e47ed043235"
+      },
+      {
+        "suite": "asset-passport",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 9165,
+        "initialPassed": true,
+        "logHash": "49bdabef6894fb94d2da41393fbdd395eef3581bf84212e419304d3a3fa186a6"
+      },
+      {
+        "suite": "asset-passport-ui",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 597,
+        "initialPassed": true,
+        "logHash": "baf67013be6974438ca34ace2291cabf99e5c2ddad96a844b6f3339ab828862b"
+      },
+      {
+        "suite": "assets",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 8492,
+        "initialPassed": true,
+        "logHash": "690b8d7e8f9707dc43ea12577de2c5f9720d63e6ca06592d401d10ddc94680e2"
+      },
+      {
+        "suite": "asset-workflow",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 11059,
+        "initialPassed": true,
+        "logHash": "ab2cec1896843d28f8da8bbe1794d2c73858115966b04166ca24ef1b334e6822"
+      },
+      {
+        "suite": "asset-production",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 11117,
+        "initialPassed": true,
+        "logHash": "5669c12f0785d3b0c20f139f04a0299a161a9a948271b13b2d95bc99af90a76a"
+      },
+      {
+        "suite": "asset-links",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 11563,
+        "initialPassed": true,
+        "logHash": "6f41eb377558a88cd8d7dbc4c8cdd01c134ceebf5faabf3312dd02dc8de356dc"
+      },
+      {
+        "suite": "member-contact",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 10931,
+        "initialPassed": true,
+        "logHash": "1454054770713902d3be645e33b25391e1fa8111ccefe28221e0fe124ba47f84"
+      },
+      {
+        "suite": "personnel-profile",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 10271,
+        "initialPassed": true,
+        "logHash": "52bc87877b116e724af6b5b92112df9a562a078aae74d5d229e097d24379c1d3"
+      },
+      {
+        "suite": "personnel-employment",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 10343,
+        "initialPassed": true,
+        "logHash": "ce2cfff8f567462d8ec7ce8aca05a6af7f7950fae593f70acb776a466ad1ecc4"
+      },
+      {
+        "suite": "personnel-positions",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 1413,
+        "initialPassed": true,
+        "logHash": "2a64a57b7b0b49a6e93b0d3998b0a12fc556663bc5784a616bb42f2e4093fdaa"
+      },
+      {
+        "suite": "personnel-ui",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 4877,
+        "initialPassed": true,
+        "logHash": "1160b9ebe0e5c0e512d065cb3fb3267d1b08a3252b16d056403795edda02f37a"
+      },
+      {
+        "suite": "personnel-worker",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 10972,
+        "initialPassed": true,
+        "logHash": "4cb9858ab6e4917d4e776a82185b02716b32f4e669299d47a0c4e9c32999df27"
+      },
+      {
+        "suite": "personnel-leave-route",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 12314,
+        "initialPassed": true,
+        "logHash": "c27c156e09bb9d00e9852bd8abcb9ff555b51bd76db89da691a8b0cfcb63bca4"
+      },
+      {
+        "suite": "workflow-label-policy",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 347,
+        "initialPassed": true,
+        "logHash": "d662eedffa94143fe4517a628f7aa5663268a74020311fb433d1a0c57ffac5f3"
+      },
+      {
+        "suite": "workflow-scanner-ui",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 731,
+        "initialPassed": true,
+        "logHash": "aa1125274a136df66229bc98102e3b8a07a592a541e8c5949967cf2bae1c5100"
+      },
+      {
+        "suite": "driver-dashboard-ui",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 674,
+        "initialPassed": true,
+        "logHash": "112794d2daca8d9d680e3fdd6b4b2ccfc8ccbf48f83a92f2ba29d40795ad83da"
+      },
+      {
+        "suite": "service-expert-dashboard-ui",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 662,
+        "initialPassed": true,
+        "logHash": "0e2cebd31de375976fa614eafc40ddb959b900d203c7191e0567c1ac6cc7cf15"
+      },
+      {
+        "suite": "warehouse-profile-ui",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 2561,
+        "initialPassed": true,
+        "logHash": "b57ed510c97f3112db81c5a54b8c052438afb69aab1786f253c675564ff750a8"
+      },
+      {
+        "suite": "asset-camera-layout-browser",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 10270,
+        "initialPassed": true,
+        "logHash": "5ef8d06154101d6c75e64059d19902447f371a5a4e2e2167d74279a02f9a148e"
+      },
+      {
+        "suite": "asset-print-pdf-browser",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 13576,
+        "initialPassed": true,
+        "logHash": "5546659d236b6cf859e9f8e91161f84d1a9f6827acbb5ca106b71aad4e960d7c"
+      },
+      {
+        "suite": "asset-print-pdf-decode",
+        "passed": true,
+        "exitCode": 1,
+        "durationMs": 7160,
+        "initialPassed": false,
+        "rerun": {
+          "suite": "asset-print-pdf-decode",
+          "passed": true,
+          "reason": "Runner requires ASSET_PDF_QA_DIR; rerun pointed to the current browser-generated PDF directory read from its log.",
+          "evidence": "PASS 13 independent QR decodes from actual PDF pages."
+        },
+        "logHash": "213f82ae48cc2e7cd2aeb9061abe8e2372af00846b1fd602e0cb95626bacc161"
+      },
+      {
+        "suite": "direct-chat-browser",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 8585,
+        "initialPassed": true,
+        "logHash": "dc487d24d55fc1895bf605e8a72231849e6e3f44009ec9996732754ecdf3cd0c"
+      },
+      {
+        "suite": "night-review-scale",
+        "passed": true,
+        "exitCode": 0,
+        "durationMs": 27569,
+        "initialPassed": true,
+        "logHash": "ff22c1fcc09033eac79e54bf5c5f820428090bf1439acdb0e6236dd3e554621d"
+      }
+    ],
+    "cartableBrowser": {
+      "passed": true,
+      "cases": [
+        {
+          "passed": true,
+          "width": 1412,
+          "layouts": [
+            {
+              "role": "custodian",
+              "width": 1412,
+              "main": {
+                "x": 15,
+                "y": 15,
+                "width": 1162,
+                "height": 947.34375,
+                "top": 15,
+                "right": 1177,
+                "bottom": 962.34375,
+                "left": 15
+              }
+            },
+            {
+              "role": "personnel-hr",
+              "width": 1412,
+              "main": {
+                "x": 15,
+                "y": 15,
+                "width": 1162,
+                "height": 947.34375,
+                "top": 15,
+                "right": 1177,
+                "bottom": 962.34375,
+                "left": 15
+              }
+            },
+            {
+              "role": "central-store",
+              "width": 1412,
+              "main": {
+                "x": 15,
+                "y": 15,
+                "width": 1162,
+                "height": 947.34375,
+                "top": 15,
+                "right": 1177,
+                "bottom": 962.34375,
+                "left": 15
+              }
+            },
+            {
+              "role": "quality",
+              "width": 1412,
+              "main": {
+                "x": 15,
+                "y": 15,
+                "width": 1162,
+                "height": 947.34375,
+                "top": 15,
+                "right": 1177,
+                "bottom": 962.34375,
+                "left": 15
+              }
+            },
+            {
+              "role": "production",
+              "width": 1412,
+              "main": {
+                "x": 15,
+                "y": 15,
+                "width": 1162,
+                "height": 947.34375,
+                "top": 15,
+                "right": 1177,
+                "bottom": 962.34375,
+                "left": 15
+              }
+            },
+            {
+              "role": "hospital-sales",
+              "width": 1412,
+              "main": {
+                "x": 15,
+                "y": 15,
+                "width": 1162,
+                "height": 947.34375,
+                "top": 15,
+                "right": 1177,
+                "bottom": 962.34375,
+                "left": 15
+              }
+            }
+          ],
+          "readCalls": 52,
+          "postCount": 0
+        },
+        {
+          "passed": true,
+          "width": 792,
+          "layouts": [
+            {
+              "role": "custodian",
+              "width": 792,
+              "main": {
+                "x": 14,
+                "y": 14,
+                "width": 749,
+                "height": 1130.640625,
+                "top": 14,
+                "right": 763,
+                "bottom": 1144.640625,
+                "left": 14
+              }
+            },
+            {
+              "role": "personnel-hr",
+              "width": 792,
+              "main": {
+                "x": 14,
+                "y": 14,
+                "width": 749,
+                "height": 1130.640625,
+                "top": 14,
+                "right": 763,
+                "bottom": 1144.640625,
+                "left": 14
+              }
+            },
+            {
+              "role": "central-store",
+              "width": 792,
+              "main": {
+                "x": 14,
+                "y": 14,
+                "width": 749,
+                "height": 1130.640625,
+                "top": 14,
+                "right": 763,
+                "bottom": 1144.640625,
+                "left": 14
+              }
+            },
+            {
+              "role": "quality",
+              "width": 792,
+              "main": {
+                "x": 14,
+                "y": 14,
+                "width": 749,
+                "height": 1130.640625,
+                "top": 14,
+                "right": 763,
+                "bottom": 1144.640625,
+                "left": 14
+              }
+            },
+            {
+              "role": "production",
+              "width": 792,
+              "main": {
+                "x": 14,
+                "y": 14,
+                "width": 749,
+                "height": 1130.640625,
+                "top": 14,
+                "right": 763,
+                "bottom": 1144.640625,
+                "left": 14
+              }
+            },
+            {
+              "role": "hospital-sales",
+              "width": 792,
+              "main": {
+                "x": 14,
+                "y": 14,
+                "width": 749,
+                "height": 1130.640625,
+                "top": 14,
+                "right": 763,
+                "bottom": 1144.640625,
+                "left": 14
+              }
+            }
+          ],
+          "readCalls": 52,
+          "postCount": 0
+        },
+        {
+          "passed": true,
+          "width": 500,
+          "layouts": [
+            {
+              "role": "custodian",
+              "width": 500,
+              "main": {
+                "x": 14,
+                "y": 14,
+                "width": 457,
+                "height": 1177.03125,
+                "top": 14,
+                "right": 471,
+                "bottom": 1191.03125,
+                "left": 14
+              }
+            },
+            {
+              "role": "personnel-hr",
+              "width": 500,
+              "main": {
+                "x": 14,
+                "y": 14,
+                "width": 457,
+                "height": 1177.03125,
+                "top": 14,
+                "right": 471,
+                "bottom": 1191.03125,
+                "left": 14
+              }
+            },
+            {
+              "role": "central-store",
+              "width": 500,
+              "main": {
+                "x": 14,
+                "y": 14,
+                "width": 457,
+                "height": 1177.03125,
+                "top": 14,
+                "right": 471,
+                "bottom": 1191.03125,
+                "left": 14
+              }
+            },
+            {
+              "role": "quality",
+              "width": 500,
+              "main": {
+                "x": 14,
+                "y": 14,
+                "width": 457,
+                "height": 1177.03125,
+                "top": 14,
+                "right": 471,
+                "bottom": 1191.03125,
+                "left": 14
+              }
+            },
+            {
+              "role": "production",
+              "width": 500,
+              "main": {
+                "x": 14,
+                "y": 14,
+                "width": 457,
+                "height": 1177.03125,
+                "top": 14,
+                "right": 471,
+                "bottom": 1191.03125,
+                "left": 14
+              }
+            },
+            {
+              "role": "hospital-sales",
+              "width": 500,
+              "main": {
+                "x": 14,
+                "y": 14,
+                "width": 457,
+                "height": 1177.03125,
+                "top": 14,
+                "right": 471,
+                "bottom": 1191.03125,
+                "left": 14
+              }
+            }
+          ],
+          "readCalls": 52,
+          "postCount": 0
+        }
+      ],
+      "widths": [
+        1412,
+        792,
+        500
+      ],
+      "roles": [
+        "custodian",
+        "personnel-hr",
+        "central-store",
+        "quality",
+        "production",
+        "hospital-sales"
+      ],
+      "lazyProfileRead": true,
+      "staleProfileResponseDenied": true,
+      "productionCalls": 0
+    },
+    "qrDecodes": 13,
+    "metrics": {
+      "metrics": [
+        {
+          "name": "incoming-qc-exact",
+          "samples": 30,
+          "p95Ms": 0.5202000000008411,
+          "minMs": 0.2944999999999709,
+          "maxMs": 2.9922999999998865
+        },
+        {
+          "name": "incoming-qc-unknown",
+          "samples": 30,
+          "p95Ms": 0.19200000000091677,
+          "minMs": 0.08879999999953725,
+          "maxMs": 0.9212999999999738
+        },
+        {
+          "name": "office-open",
+          "samples": 30,
+          "p95Ms": 6.5098999999991065,
+          "minMs": 4.984099999999671,
+          "maxMs": 6.526900000000751
+        },
+        {
+          "name": "office-serial",
+          "samples": 30,
+          "p95Ms": 0.4896000000007916,
+          "minMs": 0.22379999999975553,
+          "maxMs": 0.529500000000553
+        }
+      ],
+      "recoveryTables": 101,
+      "backupMs": 651.1890999999996,
+      "plans": [
+        {
+          "name": "batch-code",
+          "plan": [
+            {
+              "id": 4,
+              "parent": 0,
+              "notused": 61,
+              "detail": "SEARCH records USING INDEX idx_records_kind_code (kind=? AND <expr>=?)"
+            }
+          ]
+        },
+        {
+          "name": "receipt-link",
+          "plan": [
+            {
+              "id": 4,
+              "parent": 0,
+              "notused": 62,
+              "detail": "SEARCH flow_entities USING INDEX idx_flow_agent_created (type=?)"
+            }
+          ]
+        },
+        {
+          "name": "office-serial",
+          "plan": [
+            {
+              "id": 3,
+              "parent": 0,
+              "notused": 62,
+              "detail": "SEARCH flow_entities USING INDEX idx_flow_agent_created (type=?)"
+            }
+          ]
+        }
+      ]
+    },
+    "reruns": [
+      {
+        "suite": "manual-permissions",
+        "passed": true,
+        "reason": "Completed isolated personnel fixture supplied to HTTP/MCP account creation; independent fixture for second password account. Product onboarding rule unchanged.",
+        "evidence": "Manual permissions passed: 78 role/scope conversions, HTTP/MCP isolation and intact foreign keys."
+      },
+      {
+        "suite": "asset-print-pdf-decode",
+        "passed": true,
+        "reason": "Runner requires ASSET_PDF_QA_DIR; rerun pointed to the current browser-generated PDF directory read from its log.",
+        "evidence": "PASS 13 independent QR decodes from actual PDF pages."
+      },
+      {
+        "suite": "role-cartable-ui",
+        "passed": true,
+        "reason": "Additional direct tool deep-link tests after fixing capability-loading race."
+      },
+      {
+        "suite": "task-program-access-ui",
+        "passed": true,
+        "reason": "Final lazy profile tools and capability visibility checks."
+      }
+    ]
+  },
+  "limitations": [
+    "No physical printer/camera/microphone or personal server verification",
+    "SQLite local synthetic scale/recovery is not hosted D1 plus R2 recovery, load SLA or concurrent-user capacity",
+    "Pre-existing broad history API reads and large client chunks remain performance debt",
+    "No production business data, SMS, payment, stock or reset operations were performed"
+  ],
+  "publication": "Exact new GitHub, prepared source and actually deployed source are verified separately in the release audit after saving this report."
+}

@@ -1,4 +1,5 @@
 'use client';
+import {CartableRows} from './cartable-frame';
 import {useEffect,useState} from 'react';
 import {materialProcesses,type ProcessRow} from '@/lib/process-history';
 import {formatDateTime} from '@/lib/persian-date';
@@ -17,7 +18,7 @@ const fields:Record<string,[keyof Row,string][]>={
  quality:[['material','کالا'],['batches','بچ'],['actor','بازرس']],
  placement:[['material','کالا'],['batches','بچ'],['place','انبار یا قفسه']],
 };
-export function ProcessHistory({waiting,revision,onOpen}:{waiting:boolean;revision:unknown;onOpen:(row:Row)=>void}){
+export function ProcessHistory({waiting,revision,onOpen,cartable=false}:{waiting:boolean;revision:unknown;onOpen:(row:Row)=>void;cartable?:boolean}){
  const [rows,setRows]=useState<Row[]>([]),[error,setError]=useState(''),[loading,setLoading]=useState(true);
  const [dateBasis,setDateBasis]=useState('sent');
  const [process,setProcess]=useState(''),[query,setQuery]=useState(''),[start,setStart]=useState(''),[end,setEnd]=useState(''),[status,setStatus]=useState(''),[extra,setExtra]=useState<Record<string,string>>({}),[page,setPage]=useState(0);
@@ -63,7 +64,7 @@ export function ProcessHistory({waiting,revision,onOpen}:{waiting:boolean;revisi
  const textField=(label:string,value:string,change:(value:string)=>void)=><label className="field" key={label}>{label}<input value={value} onChange={e=>{change(e.target.value);setPage(0)}}/></label>;
  const shownPage=Math.min(page,Math.max(0,Math.ceil(filtered.length/25)-1));
  return <section className="process-history">
-  <div className="formgrid" lang="fa" translate="no">
+  <details className="cartable-history-filters" open={cartable?undefined:true}><summary>فیلترها و جست‌وجوی سوابق</summary><div className="formgrid" lang="fa" translate="no">
    <label className="field">نوع فرایند<select value={process} onChange={e=>{setProcess(e.target.value);setExtra({});setStatus('');setPage(0)}}><option value="">همهٔ فرایندها</option>{types.map(key=><option key={key} value={key}>{title(key)}</option>)}</select></label>
    {textField('جست‌وجوی عنوان، کالا، بچ یا شماره پرونده',query,setQuery)}
    {process==='issue'&&!waiting&&<label className="field">مبنای تاریخ<select value={dateBasis} onChange={e=>{setDateBasis(e.target.value);setPage(0)}}><option value="sent">ارسال از انبار</option><option value="received">تأیید دریافت در خط</option></select></label>}
@@ -71,20 +72,20 @@ export function ProcessHistory({waiting,revision,onOpen}:{waiting:boolean;revisi
    <SolarDate required={false} label="تا تاریخ" value={end} onChange={v=>{setEnd(v);setPage(0)}}/>
    <label className="field">وضعیت<select value={status} onChange={e=>{setStatus(e.target.value);setPage(0)}}><option value="">همهٔ وضعیت‌ها</option>{statuses.map(s=><option key={s}>{s}</option>)}</select></label>
    {(fields[process]||[]).map(([key,label])=>textField(label,extra[key]||'',v=>setExtra(old=>({...old,[key]:v}))))}
-  </div>
+  </div></details>
   {error&&<p role="alert" className="notice error">{error}</p>}
   {invalid&&<p role="alert">تاریخ پایان باید برابر یا بعد از تاریخ شروع باشد.</p>}
   {loading?<p role="status">در حال دریافت سوابق…</p>:<>
    <div className="tools"><span>{num(filtered.length)} نتیجه</span><button className="btn" type="button" disabled={!filtered.length} onClick={()=>void download()}>خروجی اکسل</button></div>
    {totals.size>0&&<details open><summary>جمع تحویل به تفکیک کالا</summary>{[...totals.values()].map(r=><p key={JSON.stringify([r.material,r.unit])}>{r.material} · ارسال {num(r.sent)} {r.unit} · تأیید دریافت {num(r.received)} {r.unit}</p>)}</details>}
-   {filtered.slice(shownPage*25,(shownPage+1)*25).map(row=><article data-pair-row={JSON.stringify(row.id)} className="flow-card" key={row.id}>
+   {cartable?<CartableRows heading={waiting?'در انتظار دیگران':'سوابق کارها'} searchable={false} dateLabel="تاریخ رویداد" markOverdue={false} emptyMessage="موردی با این فیلترها ثبت نشده است." rows={filtered.map(row=>({id:row.id,title:row.title,subtitle:[row.reference,row.material,row.batches,row.place,row.actor,row.supplier,row.order].filter(Boolean).join(' · '),context:title(row.process),instructions:[row.status,row.receivedAt?'تأیید دریافت خط: '+formatDateTime(row.receivedAt):'',row.quantity!=null?'مقدار '+num(row.quantity)+' '+(row.unit||'')+(row.received!=null?' · دریافت خط '+num(row.received):''):''].filter(Boolean).join(' · '),due:row.date,review:false,kind:'task' as const,source:row,canOpen:!!(row.task||row.section)}))} onOpen={row=>onOpen(row.source)}/>:filtered.slice(shownPage*25,(shownPage+1)*25).map(row=><article data-pair-row={JSON.stringify(row.id)} className="flow-card" key={row.id}>
     <h3>{row.title}</h3><p><span lang="fa" translate="no">{title(row.process)}</span> · {formatDateTime(row.date)} · {row.status}</p>
     {row.receivedAt&&<p>تأیید دریافت خط · {formatDateTime(row.receivedAt)}</p>}
     <p>{[row.reference,row.batches,row.place,row.actor,row.supplier,row.order].filter(Boolean).join(' · ')}</p>
     {row.quantity!=null&&<p>مقدار {num(row.quantity)} {row.unit}{row.process==='issue'&&row.received!=null&&' · دریافت خط '+num(row.received)}</p>}
     {(row.task||row.section)&&<button data-pair-open="process-history:3a71b0869e32" type="button" className="btn" onClick={()=>onOpen(row)}>مشاهدهٔ پرونده</button>}
    </article>)}
-   {filtered.length>25&&<div className="tools"><button data-pair-open="process-history:fe4499ea9511" type="button" className="btn" disabled={!shownPage} onClick={()=>setPage(shownPage-1)}>صفحهٔ قبل</button><button data-pair-open="process-history:a61c8fcff1b8" type="button" className="btn" disabled={(shownPage+1)*25>=filtered.length} onClick={()=>setPage(shownPage+1)}>صفحهٔ بعد</button></div>}
+   {!cartable&&filtered.length>25&&<div className="tools"><button data-pair-open="process-history:fe4499ea9511" type="button" className="btn" disabled={!shownPage} onClick={()=>setPage(shownPage-1)}>صفحهٔ قبل</button><button data-pair-open="process-history:a61c8fcff1b8" type="button" className="btn" disabled={(shownPage+1)*25>=filtered.length} onClick={()=>setPage(shownPage+1)}>صفحهٔ بعد</button></div>}
   </>}
  </section>;
 }

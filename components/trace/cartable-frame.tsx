@@ -1,0 +1,30 @@
+'use client';
+import {useState,type ReactNode} from 'react';
+import {Inbox,LayoutDashboard,MessagesSquare,RefreshCw,Search,ArrowUpLeft,ClipboardCheck,ClockAlert,CalendarDays,ChevronLeft} from 'lucide-react';
+import {formatDateTime} from '@/lib/persian-date';
+import {filterCartableRows,type CartableRow} from '@/lib/cartable-view';
+import './cartable.css';
+type Props={roleTitle:string;tab:string;onTab:(tab:string)=>void;onProfile:()=>void;onRefresh:()=>void;busy:boolean;count:number;toolTitle?:string;children:ReactNode};
+export function CartableFrame({roleTitle,tab,onTab,onProfile,onRefresh,busy,count,toolTitle,children}:Props){
+ return <div className="cartable-shell" dir="rtl"><aside className="cartable-rail"><div className="cartable-brand"><img src="/brand/nafasyar-icon.svg" alt="نفس‌یار"/><div><strong>هم‌نفس</strong><small>سامانه جامع نفس‌یار</small></div></div><div className="cartable-role"><Inbox size={25}/><div><strong>{roleTitle}</strong><small>جایگاه فعال شما</small></div></div><nav aria-label="پروفایل و کارتابل"><button type="button" onClick={onProfile}><LayoutDashboard size={19}/><span>پروفایل {roleTitle}</span><ChevronLeft size={16}/></button><button type="button" aria-current={!toolTitle?'page':undefined} onClick={()=>onTab('mine')}><Inbox size={19}/><span>کارتابل</span><b>{count.toLocaleString('fa-IR')}</b></button></nav><p>ابزارهای تخصصی هر نقش در پروفایل همان نقش در دسترس‌اند.</p></aside><div className="cartable-main"><div className="cartable-breadcrumb"><button type="button" onClick={onProfile}>پروفایل من</button><span>/</span><strong>{toolTitle||'کارتابل'}</strong></div><header className="cartable-heading"><div><p className="cartable-eyebrow">همهٔ پیگیری‌ها، در یک نگاه</p><h2>{toolTitle||'کارتابل من'}<span>{roleTitle}</span></h2><p>{toolTitle?'ابزار مربوط به نقش شما':'کار را باز کنید؛ ادامهٔ فرایند در فرم مربوط به خودش انجام می‌شود.'}</p></div><div className="cartable-header-actions">{!toolTitle&&<button type="button" className="cartable-messages" aria-pressed={tab==='inbox'} onClick={()=>onTab(tab==='inbox'?'mine':'inbox')}><MessagesSquare size={20}/>{tab==='inbox'?'بازگشت به کارها':'پیام‌ها'}</button>}<button type="button" className="cartable-refresh" aria-label="تازه‌سازی کارتابل" disabled={busy} onClick={onRefresh}><RefreshCw size={19}/></button></div></header><section className="cartable-surface">{!toolTitle&&tab!=='inbox'&&<nav className="cartable-tabs" aria-label="وضعیت کارها">{[['mine','اقدام با من'],['waiting','در انتظار دیگران'],['history','سوابق']].map(([key,title])=><button type="button" key={key} aria-pressed={tab===key} onClick={()=>onTab(key)}>{title}{key==='mine'&&<b>{count.toLocaleString('fa-IR')}</b>}</button>)}</nav>}{children}</section></div></div>;
+}
+type RowsProps={rows:CartableRow[];onOpen:(row:CartableRow)=>void;limited?:boolean;emptyMessage?:string;heading?:string;searchable?:boolean;dateLabel?:string;markOverdue?:boolean};
+export function CartableRows({rows,onOpen,limited=false,emptyMessage='کاری در انتظار اقدام شما نیست.',heading='کارهای منتظر اقدام شما',searchable=true,dateLabel='موعد',markOverdue=true}:RowsProps){
+ const [query,setQuery]=useState(''),[page,setPage]=useState(0),filtered=filterCartableRows(rows,query),current=Math.min(page,Math.max(0,Math.ceil(filtered.length/25)-1));
+ return <>
+ <div className="cartable-list-tools"><div><strong>{heading}</strong><span>{filtered.length.toLocaleString('fa-IR')} مورد{limited?' در فهرست دریافت‌شده':''}</span></div>{searchable&&<label className="cartable-search"><Search size={19}/><input aria-label="جست‌وجو در کارها" type="search" placeholder="جست‌وجو در کارها…" value={query} onChange={e=>{setQuery(e.target.value);setPage(0)}}/></label>}</div>
+ {limited&&<p className="cartable-hint">این فهرست محدود به کارهای دریافت‌شده است؛ پس از انجام کارها و تازه‌سازی، موارد بعدی نمایش داده می‌شوند.</p>}
+ <div className="cartable-row-head" aria-hidden="true"><span>موضوع و فرایند</span><span>مرتبط با</span><span>{dateLabel}</span><span/></div>
+ <div className="cartable-list">{filtered.slice(current*25,(current+1)*25).map(row=>{
+  const date=Date.parse(row.due),late=markOverdue&&Number.isFinite(date)&&date<Date.now();
+  return <article className="cartable-row" data-pair-row={JSON.stringify(row.id)} key={row.id}>
+   <div className="cartable-row-main"><span className={'cartable-row-icon'+(late?' late':'')}><ClipboardCheck size={23}/></span><div><span className="cartable-row-kind">{row.review?'منتظر بررسی شما':row.kind==='position'?'کار فرایندی':'پیگیری کار'}</span><h3>{row.title}</h3>{row.subtitle&&<p>{row.subtitle}</p>}{row.instructions&&<small>{row.instructions}</small>}</div></div>
+   <span className="cartable-row-context">{row.context}</span>
+   <span className={'cartable-row-due'+(late?' late':'')}>{Number.isFinite(date)?<>{late?<ClockAlert size={16}/>:<CalendarDays size={16}/>}<span>{late?'از موعد گذشته · ':''}{formatDateTime(row.due)}</span></>:'—'}</span>
+   {row.canOpen!==false?<button data-pair-open="cartable:open-work" type="button" className="cartable-open" onClick={()=>onOpen(row)}>باز کردن کار<ArrowUpLeft size={17}/></button>:<span/>}
+  </article>
+ })}{!filtered.length&&<p className="cartable-empty">{query?'کاری مطابق این جست‌وجو پیدا نشد.':emptyMessage}</p>}</div>
+ {filtered.length>25&&<div className="cartable-pagination"><button type="button" disabled={!current} onClick={()=>setPage(current-1)}>صفحه قبل</button><span>صفحه {(current+1).toLocaleString('fa-IR')}</span><button type="button" disabled={(current+1)*25>=filtered.length} onClick={()=>setPage(current+1)}>صفحه بعد</button></div>}
+ <footer className="cartable-footer">با انجام کار در فرم مربوط، وضعیت این فهرست به‌روز می‌شود.</footer>
+ </>;
+}

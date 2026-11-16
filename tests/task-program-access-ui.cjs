@@ -1,41 +1,25 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),ts=require('typescript'),React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
-const source=ts.transpileModule(fs.readFileSync(path.resolve(__dirname,'../components/trace/tasks-panel.tsx'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
-function render(data,tab='mine'){
- let state=0,mounts=0;const effects=[],values=[data,tab,null,'',false,'',[],false,'','all'],exports={};
- const children=({children})=>React.createElement('div',null,children),empty=()=>null;
- vm.runInNewContext(source,{exports,require:n=>{
-  if(n==='react')return {...React,useState:initial=>[state<values.length?values[state++]:initial,()=>{}],useEffect:fn=>effects.push(fn)};
-  if(n==='lucide-react')return {Settings2:empty};
-  if(n==='react/jsx-runtime')return require(n);
-  if(n==='./program-workspace')return {ProgramWorkspace:({direct,children})=>React.createElement('div',{'data-direct':String(direct)},children),IconActions:children,IconDisclosure:children,SubprogramNavigation:({items,inline})=>React.createElement('nav',{'data-inline':String(inline)},items.map(([id,title])=>React.createElement('button',{key:id,'data-program':id},title)))};
-  if(n==='./purchase-services-panel')return {PurchaseServicesPanel:()=>{mounts++;return React.createElement('section',null,'Service workspace')}};
-  if(n==='./receipt-observations-panel')return {ReceiptObservationsPanel:empty};
-  if(n==='./refresh-button')return {RefreshButton:empty};
-  if(n==='@/lib/sourcing-review-contract')return {sourcingReviewDestination:empty};
-  if(n==='./inbox-panel')return {InboxWorkflowPanel:()=>React.createElement('div',{'data-workflow':''})};
-  if(n==='./direct-messages')return {DirectMessages:()=>React.createElement('div',{'data-direct-messages':''})};if(n==='./workflow-guide')return {WorkflowGuide:empty};
-  if(n==='./solar-date')return {SolarDate:empty};if(n==='@/components/trace/number-input')return {NumberInput:empty};
-  if(n==='@/lib/persian-date')return {formatDateTime:s=>s};if(n==='@/lib/serials')return {tehranDay:()=> '2026-10-12'};
-  if(n.startsWith('@/components/ui/'))return new Proxy({},{get:()=>children});throw Error(n);
- },Date,Intl,console},{filename:'tasks-panel.tsx'});
- const html=renderToStaticMarkup(React.createElement(exports.TasksPanel,{demo:false,onNavigate:()=>{}}));return {html,mounts};
-}
-const base={memberId:'me',isAdmin:false,tasks:[],notifications:[],definitions:[],ownPositions:[]};
-for(const capability of [false,undefined]){const r=render({...base,canPurchaseServices:capability},'purchase-services');assert.ok(!r.html.includes('data-program="purchase-services"'));assert.equal(r.mounts,0);for(const key of ['inbox','mine','review','history'])assert.ok(r.html.includes('data-program="'+key+'"'));assert.ok(!r.html.includes('data-program="management"'));}
-let r=render({...base,canPurchaseServices:true},'purchase-services');assert.ok(r.html.includes('data-program="purchase-services"'));assert.equal(r.mounts,1);
-r=render({...base,isAdmin:true,canPurchaseServices:true});for(const key of ['purchase-services','management','definitions'])assert.ok(r.html.includes('data-program="'+key+'"'));
-r=render(null,'purchase-services');assert.equal(r.mounts,0);assert.ok(!r.html.includes('data-program="purchase-services"'));
-r=render(base);
-assert.match(r.html,/<summary[^>]*>ابزارهای کارتابل<\/summary>/);
-assert.ok(r.html.includes('به‌روزرسانی یادآوری‌های سامانه'));
-assert.ok(r.html.includes('data-direct="true"'));
-assert.equal((r.html.match(/data-inline="true"/g)||[]).length,2);
-r=render(base,'inbox');
-assert.equal((r.html.match(/data-inline="true"/g)||[]).length,1);
-assert.ok(!r.html.includes('data-program="mine"'));
-assert.ok(r.html.includes('data-direct-messages'));
-assert.match(r.html,/<div hidden=""[^>]*><div data-workflow/);
-r=render(base,'inbox-workflow');
-assert.ok(!r.html.includes('data-direct-messages'));
-assert.match(r.html,/<div><div data-workflow/);
-console.log('PASS task UI: irrelevant/loading icons hidden, stale selection cannot mount service workspace, allowed receiver/purchase navigation and administrator tools preserved.');
+const root=path.resolve(__dirname,'..'),transpile=file=>ts.transpileModule(fs.readFileSync(path.join(root,file),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
+let values=[],cursor=0,mounts=0;const empty=()=>null,children=({children})=>React.createElement('div',null,children),react={...React,useState:initial=>{const i=cursor++;return [i<values.length?values[i]:typeof initial==='function'?initial():initial,()=>{}]},useEffect(){}};
+function load(file){const exports={};vm.runInNewContext(transpile(file),{exports,require:n=>{
+ if(n==='react')return react;if(n==='react/jsx-runtime')return require(n);if(n==='lucide-react')return new Proxy({},{get:()=>empty});if(n.endsWith('.css'))return {};
+ if(n==='@/lib/cartable-view')return contract;if(n==='@/lib/persian-date')return {formatDateTime:s=>s};if(n==='@/lib/serials')return {tehranDay:()=> '2026-11-17'};
+ if(n==='./cartable-frame')return frame;
+ if(n==='./program-workspace')return {ProgramWorkspace:children,IconActions:children,IconDisclosure:children};
+ if(n==='./purchase-services-panel')return {PurchaseServicesPanel:()=>{mounts++;return React.createElement('section',null,'Service workspace')}};
+ if(n==='./inbox-panel')return {InboxWorkflowPanel:()=>React.createElement('div',{'data-workflow':''})};
+ if(n==='./direct-messages')return {DirectMessages:()=>React.createElement('div',{'data-direct-messages':''})};
+ if(n.startsWith('@/components/ui/'))return new Proxy({},{get:()=>children});if(n.startsWith('./')||n.startsWith('@/'))return new Proxy({},{get:()=>empty});throw Error(n);
+ },Date,Intl,console});return exports;}
+const contract=load('lib/cartable-view.ts'),frame=load('components/trace/cartable-frame.tsx'),{TasksPanel}=load('components/trace/tasks-panel.tsx'),{RoleTaskTools}=load('components/trace/role-task-tools.tsx');
+const task=(id,assignee,state='open',supervisor='boss')=>({id,assignee,supervisor,state,due:'2026-11-18',data:{title:'بررسی صندلی '+id,sourceId:'AM-000123',positionName:'اموال‌دار',instructions:'کنترل مدارک'}}),base={accountId:'fixture',memberId:'me',isAdmin:false,tasks:[],notifications:[],definitions:[],ownPositions:[],positionWork:[]};
+const source={...base,positionWork:[{id:'p1',title:'جانمایی کالا',sourceId:'lot-1',section:'warehouse',target:'receipt-1'}],tasks:[task('mine','me'),task('sent','me','submitted'),task('review','other','submitted','me'),task('other','other'),task('done','me','completed')]};
+const rows=contract.cartableRows(source);assert.deepEqual(Array.from(rows,r=>r.id),['position:p1','task:mine','task:review']);assert.equal(contract.cartableRows({...source,memberId:''}).length,1,'Unassigned administrator sees the actual position queue, never a fictitious personal task assignment');assert.equal(contract.filterCartableRows(rows,'صندلي AM-۰۰۰۱۲۳').length,2);assert.equal(contract.filterCartableRows(rows,'جانمایی lot-1').length,1);assert.equal(contract.cartableTarget('role-tools:definitions'),'definitions');for(const target of ['role-tools:__proto__','role-tools:constructor','untrusted'])assert.equal(contract.cartableTarget(target),'mine');
+function render(data,tab='mine'){cursor=0;mounts=0;values=[data,tab,null,'',false,'',[],false,'','all'];return {html:renderToStaticMarkup(React.createElement(TasksPanel,{demo:false,onNavigate(){}})),mounts};}
+for(const role of ['اموال‌دار','مسئول اداری','مسئول انبار مرکزی','کنترل کیفیت','مسئول تولید','کارشناس فروش بیمارستانی']){const {html}=render({...source,profileReview:{id:role,title:role}});assert.ok(html.includes('cartable-shell'));assert.ok(html.includes('aria-label="وضعیت کارها"'));for(const title of ['اقدام با من','در انتظار دیگران','سوابق'])assert.ok(html.includes(title));for(const title of ['سمت‌ها و برنامه وظایف','تحویل خرید و خدمات','ابزارهای کارتابل','چاپ لیبل'])assert.ok(!html.includes(title));assert.equal((html.match(/class="cartable-open"/g)||[]).length,3,'One action per actual work row');assert.ok(!html.includes('task:sent'));assert.ok(!html.includes('task:other'));}
+for(const capability of [false,undefined])assert.equal(render({...base,canPurchaseServices:capability},'purchase-services').mounts,0);assert.equal(render({...base,canPurchaseServices:true},'purchase-services').mounts,1);assert.equal(render(null,'purchase-services').mounts,0);
+let html=render(base,'inbox').html;assert.ok(html.includes('data-direct-messages'));assert.ok(!html.includes('aria-label="وضعیت کارها"'));assert.match(html,/<div hidden=""[^>]*><div data-workflow/,'Existing linked-message receiver stays mounted to receive compose events');assert.ok(!render(base,'inbox-workflow').html.includes('hidden=""'));
+assert.ok(!render(base,'definitions').html.includes('افزودن برنامه وظیفه'));assert.ok(render({...base,isAdmin:true},'definitions').html.includes('افزودن برنامه وظیفه'));
+function profile(data){cursor=0;values=[true,data,'',0];return renderToStaticMarkup(React.createElement(RoleTaskTools,{accountId:'fixture',onNavigate(){}}));}
+html=profile(base);assert.ok(html.includes('ابزارهای نقش و پیگیری‌ها'));assert.ok(!html.includes('تحویل خرید و خدمات'));assert.ok(!html.includes('نظارت مدیریتی'));html=profile({...base,isAdmin:true,canPurchaseServices:true});for(const title of ['تحویل خرید و خدمات','نظارت مدیریتی','سمت‌ها و برنامه وظایف'])assert.ok(html.includes(title));assert.equal(profile({...base,requiresServiceScope:true}),'');
+console.log('PASS unified cartable: six role layouts, actual task ownership/review/closed-state filtering, normalized search, strict tool targets, single row action, restricted service mounts, preserved message composition and profile-only permission-scoped tools');
