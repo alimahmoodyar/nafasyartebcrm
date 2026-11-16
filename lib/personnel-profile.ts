@@ -1,6 +1,6 @@
 import {validatePermissions} from './permissions';
 // Base personnel identity is not an employment contract or a grant of HR access.
-export const personnelSetupFields=['code','unit','title','location','employment','managerId','start','leaveMinutes'] as const;
+export const personnelSetupFields=['code','location','employment','managerId','start','leaveMinutes'] as const;
 function objectPermissions(value:unknown):Record<string,any>|null{try{const p=typeof value==='string'?JSON.parse(value):value;return p&&typeof p==='object'&&!Array.isArray(p)?p:null;}catch{return null;}}
 export function personnelStaff(member:any){
  const raw=objectPermissions(member?.permissions);if(member?.status!=='active'||!raw)return false;let p=raw;if(raw.roleAssignment!==undefined){try{p=validatePermissions(raw as any)}catch{return false}};

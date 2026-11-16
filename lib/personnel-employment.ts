@@ -21,7 +21,7 @@ export function employmentChanges(b:any,old:any,rows:any[],now:string,members:an
  if(b.mode==='personnel_create'){
   if(old)fail('برای شخص تازه، پرونده تازه بسازید.',409);
   const memberId='person:'+b.id,name=sreq(b.name,100),details=employeeDetails(b),mobile=contactPatch({mobile:b.mobile}).mobile;
-  const data={memberId,name,code:'P-'+b.id.replace(/-/g,'').toUpperCase(),unit:sreq(b.unit,100),title:sreq(b.title,100),location:sreq(b.location,200),employment:sreq(b.employment,100),managerId:stxt(b.managerId||'',200),start:sday(b.start),end:'',...details,mobile,bankAccount:sreq(b.bankAccount,100),personal:stxt(b.personal||'',2000),leaveMinutes:0,state:'setup',productionEligible:false};
+  const data={memberId,name,code:'P-'+b.id.replace(/-/g,'').toUpperCase(),unit:'',title:'',location:sreq(b.location,200),employment:sreq(b.employment,100),managerId:stxt(b.managerId||'',200),start:sday(b.start),end:'',...details,mobile,bankAccount:sreq(b.bankAccount,100),personal:stxt(b.personal||'',2000),leaveMinutes:0,state:'setup',productionEligible:false};
   requiredPersonnel(data,mobile);if(data.managerId&&(data.managerId===memberId||!members.some(m=>m.id===data.managerId&&m.status==='active')&&!rows.some(r=>r.type==='hr_employee'&&r.data.memberId===data.managerId&&r.data.state!=='disabled')))fail('مدیر مستقیم را از اشخاص ثبت‌شده انتخاب کنید.');
   if(rows.some(r=>r.type==='hr_employee'&&r.data.nationalId===data.nationalId))fail('برای این کد ملی پرونده پرسنلی وجود دارد.',409);
   return [{id:personnelProfileId(memberId),type:'hr_employee',revision:0,data}];
@@ -66,7 +66,7 @@ export function contractAlerts(rows:any[],today=dayAt()){
 }
 
 export function requiredPersonnel(data:any,mobile:string){
- for(const key of ['name','unit','title','location','employment','start','nationalId','birthDate','address','emergencyContact','bankAccount'])if(typeof data[key]!=='string'||!data[key].trim())fail('اطلاعات اجباری پرونده پرسنلی کامل نیست.');
+ for(const key of ['name','location','employment','start','nationalId','birthDate','address','emergencyContact','bankAccount'])if(typeof data[key]!=='string'||!data[key].trim())fail('اطلاعات اجباری پرونده پرسنلی کامل نیست.');
  if(!['single','married'].includes(data.maritalStatus))fail('وضعیت تأهل اجباری است.');
  if(!contactPatch({mobile:mobile||''}).mobile)fail('تلفن همراه پرسنل اجباری است.');employeeDetails(data);
 }

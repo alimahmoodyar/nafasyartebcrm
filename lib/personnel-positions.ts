@@ -31,3 +31,14 @@ export async function personnelPositions(memberId:string){
  const rows=(await storage().prepare("SELECT id,type,data FROM flow_entities WHERE type IN ('position','duty_template')").all()).results;
  return ownPositionProfiles(rows.flatMap((r:any)=>{try{const data=typeof r.data==='string'?JSON.parse(r.data):r.data;return data&&typeof data==='object'&&!Array.isArray(data)?[{...r,data}]:[];}catch{return [];}}),memberId);
 }
+
+
+// Current explicit assignments projected at read time; never copied into HR records.
+export function personnelRolePosition(permissions:unknown){
+ const roles=ownJobResponsibilities(permissions).map(({id,name,group})=>({id,title:name,unit:group}));
+ return {unit:[...new Set(roles.map(r=>r.unit))].join('، '),title:[...new Set(roles.map(r=>r.title))].join('، '),rolePositions:roles};
+}
+export function projectPersonnelRoles(rows:any[],members:any[]){
+ const byId=new Map<string,any>(members.filter(m=>m.status!=='deleted').map(m=>[m.id,m]));
+ return rows.map(r=>r.type==='hr_employee'?{...r,data:{...r.data,...personnelRolePosition(byId.get(r.data.memberId)?.permissions)}}:r);
+}

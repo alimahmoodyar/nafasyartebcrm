@@ -42,3 +42,7 @@ assert.equal(custom[0].tasks[0].instructions,'Approved instructions');
 assert.equal(JSON.stringify(selected).includes('Approved company duties'),false);
 assert.equal(JSON.stringify(custom).includes('Private duties'),false);
 console.log('Personnel position self-scope, role-based responsibilities, malformed permission handling and custom duties passed');
+
+const original=[{id:'employee',type:'hr_employee',data:{memberId:'me',unit:'historical unit',title:'historical title'}},{id:'payroll',type:'hr_payroll',data:{memberId:'me',title:'locked period'}}];const saved=JSON.stringify(original);
+assert.deepEqual(plain(out.projectPersonnelRoles(original,[])[0].data),{memberId:'me',unit:'',title:'',rolePositions:[]});
+const live=out.projectPersonnelRoles(original,[{id:'me',status:'active',permissions:{roleAssignment:{roles:['treasurer','sales','treasurer']}}}]);assert.equal(live[0].data.title,[catalogue.find(r=>r.id==='treasurer').label,catalogue.find(r=>r.id==='sales').label].join('، '));assert.equal(live[1],original[1]);assert.equal(JSON.stringify(original),saved,'role projection preserves all stored records and historical snapshots');assert.equal(out.projectPersonnelRoles(original,[{id:'me',status:'deleted',permissions:{roleAssignment:{roles:['treasurer']}}}])[0].data.title,'');

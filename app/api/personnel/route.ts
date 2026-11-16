@@ -1,7 +1,7 @@
 import {familyAt} from '@/lib/personnel-family';
 import {contractAlerts} from '@/lib/personnel-employment';
 import {productionEligible} from '@/lib/production-people';
-import {personnelPositions,ownJobResponsibilities} from '@/lib/personnel-positions';
+import {projectPersonnelRoles,personnelPositions,ownJobResponsibilities} from '@/lib/personnel-positions';
 import {personnelProfileStatus,ownPersonnelWork,ownDocumentStatus} from '@/lib/personnel-portal';
 import {requireAccess,checkOrigin,accessResponse} from '@/lib/authorization';
 import {boundedBody} from '@/lib/firmware-storage';
@@ -14,7 +14,7 @@ import {ownLeaveSummary} from '@/lib/personnel';
 import {isIsoDay} from '@/lib/persian-date';
 import {personnelContactProjection} from '@/lib/member-contact';
 const headers={'Cache-Control':'private, no-store','Vary':'Cookie, Authorization'};
-export async function GET(request:Request){try{const u=await requireAccess(),members=await leadMembers(),a=await hrActor(u,members),snapshot=await readHrRows(),rows=snapshot.rows,q=new URL(request.url).searchParams,dates=range(q.get('from')||addDay(dayAt(),-30),q.get('to')||dayAt(),93),visible=rows.filter(r=>hrVisible(r,a,rows)),employees=visible.filter(r=>r.type==='hr_employee'),summaries=employees.filter(r=>r.data.memberId===a.id||a.has('hr')||a.has('payroll')||!a.roles.length).map(r=>{try{return {memberId:r.data.memberId,...workSummary(rows,r.data.memberId,dates.start,dates.end)}}catch(e){return {memberId:r.data.memberId,error:(e as Error).message}}});
+export async function GET(request:Request){try{const u=await requireAccess(),members=await leadMembers(),a=await hrActor(u,members),snapshot=await readHrRows(),rows=projectPersonnelRoles(snapshot.rows,members),q=new URL(request.url).searchParams,dates=range(q.get('from')||addDay(dayAt(),-30),q.get('to')||dayAt(),93),visible=rows.filter(r=>hrVisible(r,a,rows)),employees=visible.filter(r=>r.type==='hr_employee'),summaries=employees.filter(r=>r.data.memberId===a.id||a.has('hr')||a.has('payroll')||!a.roles.length).map(r=>{try{return {memberId:r.data.memberId,...workSummary(rows,r.data.memberId,dates.start,dates.end)}}catch(e){return {memberId:r.data.memberId,error:(e as Error).message}}});
  const leaveMonth=q.get('leaveMonth')||dayAt();if(!isIsoDay(leaveMonth))hrFail('ماه تقویم مرخصی معتبر نیست.');
  const leaveSummary=ownLeaveSummary(rows,a.id,dayAt(),leaveMonth);
  const dataWarnings=snapshot.issues.length?['بخشی از داده‌های پرسنلی نامعتبر است؛ سوابق سالم نمایش داده می‌شوند، اما ثبت تغییر تا بررسی مسئول سامانه متوقف است.']:[];
