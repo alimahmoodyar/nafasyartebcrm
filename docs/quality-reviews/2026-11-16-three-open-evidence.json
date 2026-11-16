@@ -1,0 +1,712 @@
+{
+  "baseline": {
+    "siteVersion": 293,
+    "sitesSource": "f92d786c5c656bc1573b72eb7fa7b69a0e4d60e3",
+    "github": "fd9a7b27f9dfb43051b00e5b1d9ac8b118c1c746",
+    "tree": "06905a56f019ff8ab3ac3c82e9e8f030361b82bb"
+  },
+  "reproducedBefore": [
+    {
+      "test": "role-access-audit",
+      "failure": "foreign_commerce_lead: supply:domestic true !== false"
+    },
+    {
+      "test": "sourcing-integrity",
+      "failure": "Expected financial work before supplier selection"
+    },
+    {
+      "test": "sourcing-multiple-quotes",
+      "failure": "Expected ordinary CEO award; runtime returned 403"
+    }
+  ],
+  "fullMatrix": {
+    "began": "2026-11-16T07:03:13.862Z",
+    "ended": "2026-11-16T07:08:33.016Z",
+    "concurrency": 3,
+    "total": 74,
+    "passed": 74,
+    "failed": [],
+    "results": [
+      {
+        "name": "access-control",
+        "command": "node tests/access-control.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 3514,
+        "log": "access-control.log"
+      },
+      {
+        "name": "manual-permissions-ui",
+        "command": "node tests/manual-permissions-ui.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 5450,
+        "log": "manual-permissions-ui.log"
+      },
+      {
+        "name": "role-access-audit",
+        "command": "node tests/role-access-audit.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 3944,
+        "log": "role-access-audit.log"
+      },
+      {
+        "name": "manual-permissions",
+        "command": "node tests/manual-permissions.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 13482,
+        "log": "manual-permissions.log"
+      },
+      {
+        "name": "finance-shortage-ui",
+        "command": "node tests/finance-shortage-ui.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 1313,
+        "log": "finance-shortage-ui.log"
+      },
+      {
+        "name": "accounting",
+        "command": "node tests/accounting.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 4034,
+        "log": "accounting.log"
+      },
+      {
+        "name": "workflow-role-access",
+        "command": "node tests/workflow-role-access.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 13784,
+        "log": "workflow-role-access.log"
+      },
+      {
+        "name": "finance-shortage-access",
+        "command": "node tests/finance-shortage-access.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 14246,
+        "log": "finance-shortage-access.log"
+      },
+      {
+        "name": "accounting-purchase",
+        "command": "node tests/accounting-purchase.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 5913,
+        "log": "accounting-purchase.log"
+      },
+      {
+        "name": "accounting-uninvoiced",
+        "command": "node tests/accounting-uninvoiced.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 5621,
+        "log": "accounting-uninvoiced.log"
+      },
+      {
+        "name": "accounting-routine",
+        "command": "node tests/accounting-routine.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 1249,
+        "log": "accounting-routine.log"
+      },
+      {
+        "name": "accounting-interleavings",
+        "command": "node tests/accounting-interleavings.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 5706,
+        "log": "accounting-interleavings.log"
+      },
+      {
+        "name": "costing",
+        "command": "node tests/costing.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 3387,
+        "log": "costing.log"
+      },
+      {
+        "name": "accounting-replacement-invoice",
+        "command": "node tests/accounting-replacement-invoice.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 6508,
+        "log": "accounting-replacement-invoice.log"
+      },
+      {
+        "name": "finance-workspace",
+        "command": "node tests/finance-workspace.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 1872,
+        "log": "finance-workspace.log"
+      },
+      {
+        "name": "treasury",
+        "command": "node tests/treasury.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 7980,
+        "log": "treasury.log"
+      },
+      {
+        "name": "finance-control",
+        "command": "node tests/finance-control.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 5177,
+        "log": "finance-control.log"
+      },
+      {
+        "name": "purchase-adjustments",
+        "command": "node tests/purchase-adjustments.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 5741,
+        "log": "purchase-adjustments.log"
+      },
+      {
+        "name": "purchase-payables",
+        "command": "node tests/purchase-payables.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 6260,
+        "log": "purchase-payables.log"
+      },
+      {
+        "name": "purchase-settlement",
+        "command": "node tests/purchase-settlement.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 4549,
+        "log": "purchase-settlement.log"
+      },
+      {
+        "name": "purchase-returns",
+        "command": "node tests/purchase-returns.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 4363,
+        "log": "purchase-returns.log"
+      },
+      {
+        "name": "purchase-services",
+        "command": "node tests/purchase-services.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 5531,
+        "log": "purchase-services.log"
+      },
+      {
+        "name": "purchase-shipments",
+        "command": "node tests/purchase-shipments.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 14276,
+        "log": "purchase-shipments.log"
+      },
+      {
+        "name": "purchase-invoice",
+        "command": "node tests/purchase-invoice.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 14994,
+        "log": "purchase-invoice.log"
+      },
+      {
+        "name": "sourcing-integrity",
+        "command": "node tests/sourcing-integrity.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 15267,
+        "log": "sourcing-integrity.log"
+      },
+      {
+        "name": "procurement-approved",
+        "command": "node tests/procurement-approved.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 14643,
+        "log": "procurement-approved.log"
+      },
+      {
+        "name": "procurement-completion",
+        "command": "node tests/procurement-completion.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 15025,
+        "log": "procurement-completion.log"
+      },
+      {
+        "name": "procurement-decisions",
+        "command": "node tests/procurement-decisions.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 15017,
+        "log": "procurement-decisions.log"
+      },
+      {
+        "name": "sourcing-multiple-quotes",
+        "command": "node tests/sourcing-multiple-quotes.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 16185,
+        "log": "sourcing-multiple-quotes.log"
+      },
+      {
+        "name": "domestic-sourcing",
+        "command": "node tests/domestic-sourcing.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 15703,
+        "log": "domestic-sourcing.log"
+      },
+      {
+        "name": "foreign-purchases",
+        "command": "node tests/foreign-purchases.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 16761,
+        "log": "foreign-purchases.log"
+      },
+      {
+        "name": "employee-purchases",
+        "command": "node tests/employee-purchases.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 18187,
+        "log": "employee-purchases.log"
+      },
+      {
+        "name": "direct-purchase-stock",
+        "command": "node tests/direct-purchase-stock.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 19014,
+        "log": "direct-purchase-stock.log"
+      },
+      {
+        "name": "material-flow",
+        "command": "node tests/material-flow.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 21002,
+        "log": "material-flow.log"
+      },
+      {
+        "name": "material-warehouses",
+        "command": "node tests/material-warehouses.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 19345,
+        "log": "material-warehouses.log"
+      },
+      {
+        "name": "warehouse-movements",
+        "command": "node tests/warehouse-movements.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 20569,
+        "log": "warehouse-movements.log"
+      },
+      {
+        "name": "warehouse-dispatch",
+        "command": "node tests/warehouse-dispatch.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 19975,
+        "log": "warehouse-dispatch.log"
+      },
+      {
+        "name": "receipt-completion",
+        "command": "node tests/receipt-completion.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 10585,
+        "log": "receipt-completion.log"
+      },
+      {
+        "name": "incoming-qc-scan",
+        "command": "node tests/incoming-qc-scan.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 7848,
+        "log": "incoming-qc-scan.log"
+      },
+      {
+        "name": "warehouse-receipt-policy",
+        "command": "node tests/warehouse-receipt-policy.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 19676,
+        "log": "warehouse-receipt-policy.log"
+      },
+      {
+        "name": "project-execution",
+        "command": "node tests/project-execution.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 8726,
+        "log": "project-execution.log"
+      },
+      {
+        "name": "material-quality-fields",
+        "command": "node tests/material-quality-fields.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 21208,
+        "log": "material-quality-fields.log"
+      },
+      {
+        "name": "technical-catalog-access",
+        "command": "node tests/technical-catalog-access.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 22218,
+        "log": "technical-catalog-access.log"
+      },
+      {
+        "name": "routine-production",
+        "command": "node tests/routine-production.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 21308,
+        "log": "routine-production.log"
+      },
+      {
+        "name": "worker-inventory",
+        "command": "node tests/worker-inventory.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 10718,
+        "log": "worker-inventory.log"
+      },
+      {
+        "name": "routine-planning",
+        "command": "node tests/routine-planning.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 22328,
+        "log": "routine-planning.log"
+      },
+      {
+        "name": "build-projects",
+        "command": "node tests/build-projects.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 9252,
+        "log": "build-projects.log"
+      },
+      {
+        "name": "production-people",
+        "command": "node tests/production-people.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 21782,
+        "log": "production-people.log"
+      },
+      {
+        "name": "work-study-minutes",
+        "command": "node tests/work-study-minutes.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 21822,
+        "log": "work-study-minutes.log"
+      },
+      {
+        "name": "build-intake",
+        "command": "node tests/build-intake.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 26488,
+        "log": "build-intake.log"
+      },
+      {
+        "name": "reviewed-custom-ui",
+        "command": "node tests/reviewed-custom-ui.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 1802,
+        "log": "reviewed-custom-ui.log"
+      },
+      {
+        "name": "custom-production",
+        "command": "node tests/custom-production.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 24917,
+        "log": "custom-production.log"
+      },
+      {
+        "name": "reviewed-custom-operations",
+        "command": "node tests/reviewed-custom-operations.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 34147,
+        "log": "reviewed-custom-operations.log"
+      },
+      {
+        "name": "pricing",
+        "command": "node tests/pricing.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 24947,
+        "log": "pricing.log"
+      },
+      {
+        "name": "sales",
+        "command": "node tests/sales.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 31442,
+        "log": "sales.log"
+      },
+      {
+        "name": "service-payments",
+        "command": "node tests/service-payments.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 8120,
+        "log": "service-payments.log"
+      },
+      {
+        "name": "sales-bank",
+        "command": "node tests/sales-bank.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 33025,
+        "log": "sales-bank.log"
+      },
+      {
+        "name": "sales-secured-credit",
+        "command": "node tests/sales-secured-credit.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 25305,
+        "log": "sales-secured-credit.log"
+      },
+      {
+        "name": "system-reset",
+        "command": "node tests/system-reset.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 24671,
+        "log": "system-reset.log"
+      },
+      {
+        "name": "mcp-integration",
+        "command": "node tests/mcp-integration.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 22673,
+        "log": "mcp-integration.log"
+      },
+      {
+        "name": "personnel-integrity",
+        "command": "node tests/personnel-integrity.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 2097,
+        "log": "personnel-integrity.log"
+      },
+      {
+        "name": "profile-permissions-and-receipt-edit",
+        "command": "node tests/profile-permissions-and-receipt-edit.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 20504,
+        "log": "profile-permissions-and-receipt-edit.log"
+      },
+      {
+        "name": "asset-links",
+        "command": "node tests/asset-links.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 14385,
+        "log": "asset-links.log"
+      },
+      {
+        "name": "asset-workflow",
+        "command": "node tests/asset-workflow.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 14736,
+        "log": "asset-workflow.log"
+      },
+      {
+        "name": "word-template-ui",
+        "command": "node tests/word-template-ui.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 887,
+        "log": "word-template-ui.log"
+      },
+      {
+        "name": "build-intake-ui",
+        "command": "node tests/build-intake-ui.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 1551,
+        "log": "build-intake-ui.log"
+      },
+      {
+        "name": "qms",
+        "command": "node tests/qms.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 14203,
+        "log": "qms.log"
+      },
+      {
+        "name": "quality",
+        "command": "node tests/quality.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 3910,
+        "log": "quality.log"
+      },
+      {
+        "name": "daily-production-plans-ui",
+        "command": "node tests/daily-production-plans-ui.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 1508,
+        "log": "daily-production-plans-ui.log"
+      },
+      {
+        "name": "workflow-label-policy",
+        "command": "node tests/workflow-label-policy.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 414,
+        "log": "workflow-label-policy.log"
+      },
+      {
+        "name": "inventory-counts",
+        "command": "node tests/inventory-counts.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 4595,
+        "log": "inventory-counts.log"
+      },
+      {
+        "name": "role-composition",
+        "command": "node tests/role-composition.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 5276,
+        "log": "role-composition.log"
+      },
+      {
+        "name": "driver-workspace",
+        "command": "node tests/driver-workspace.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 5090,
+        "log": "driver-workspace.log"
+      },
+      {
+        "name": "transport-unified",
+        "command": "node tests/transport-unified.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 9617,
+        "log": "transport-unified.log"
+      }
+    ]
+  },
+  "typecheck": {
+    "command": "node node_modules/typescript/bin/tsc --noEmit",
+    "exitCode": 0
+  },
+  "build": {
+    "command": "node C:/Users/surface/.codex/plugins/cache/openai-curated-remote/sites/1.1.6/scripts/build-site.mjs",
+    "exitCode": 0
+  },
+  "limits": [
+    "No browser walkthrough",
+    "No live business-data writes, SMS or reset",
+    "No new migration",
+    "No load/recovery/SLA claim from this regression run"
+  ]
+}

@@ -15,7 +15,9 @@ import {dayAt,taskRequired,taskText,validDay,notice} from './duties';
 import {scaled} from './production';
 import {supplyRoles} from './sourcing-labels';
 export {supplyRoles,supplyStates} from './sourcing-labels';
-export const hasSupply=(u:Session,r:string)=>u.isAdmin||!!accessPermissions(u.permissions).supplyRoles?.includes(r)||r==='domestic'&&!!accessPermissions(u.permissions).supplyRoles?.includes('commerce_manager');
+// Management authority does not implicitly grant the domestic buyer role.
+// The general commerce role explicitly carries both routes; scoped leads keep theirs.
+export const hasSupply=(u:Session,r:string)=>u.isAdmin||!!accessPermissions(u.permissions).supplyRoles?.includes(r);
 export function productionRequestAccess(u:Session){
  const p=accessPermissions(u.permissions),inside=!p.salesAgentId&&!p.serviceAgentId&&!p.hospitalCenterId;
  const internal=inside&&(u.isAdmin||!!p.supplyRoles?.some(r=>['production_planning','engineering'].includes(r))||!!p.flowRoles?.includes('production'));

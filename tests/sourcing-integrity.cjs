@@ -35,7 +35,7 @@ const receivingFixture=require('./helpers/receiving-warehouse.cjs')(sql);
 (async()=>{
  identity=owner;await auth.session();const now=new Date().toISOString(),future=new Date(Date.now()+20*86400000).toISOString().slice(0,10);
  const put=(type,data,id=crypto.randomUUID())=>{sql.prepare('INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?)').run(id,type,JSON.stringify(data),now,now);return id};
- for(const role of ['inventory','engineering','domestic','ceo','finance']){const a=actor(role);sql.prepare("INSERT INTO app_members(id,email,name,unit,status,subject,permissions,revision,created,updated) VALUES(?,?,?,'test','active',?,?,1,?,?)").run(a.userId,a.email,a.name,a.userId,JSON.stringify(a.permissions),now,now);}
+ for(const role of ['inventory','engineering','domestic','commerce_manager','ceo','finance']){const a=actor(role);sql.prepare("INSERT INTO app_members(id,email,name,unit,status,subject,permissions,revision,created,updated) VALUES(?,?,?,'test','active',?,?,1,?,?)").run(a.userId,a.email,a.name,a.userId,JSON.stringify(a.permissions),now,now);}
  sql.prepare("UPDATE app_members SET permissions=? WHERE id='inventoryUser'").run(JSON.stringify({...actor('inventory').permissions,warehouseResponsibilities:[{warehouseId:receivingFixture.id,role:'inventory'}]}));
  await op('material',{code:'41',name:'Integrity material',unit:'عدد',specs:'V1',fields:[{key:'visual',label:'Visual',type:'text',unit:'',min:'',max:'',required:true}],revision:0});let material=entities('material')[0];await source('routes',{materialId:material.id,revision:material.revision,routes:['domestic']});material=entities('material')[0];
  const workflow=load('lib/sourcing-workflow.ts');
@@ -44,6 +44,16 @@ const receivingFixture=require('./helpers/receiving-warehouse.cjs')(sql);
  for(const name of ['request_material_supply','resubmit_direct_material_supply']){const t=catalog.tools.find(t=>t.name===name);assert.ok(t.inputSchema.properties.needPriority);assert.ok(t.inputSchema.required.includes('needPriority'));}
  await source('direct_request',{confirmed:true,materialId:material.id,materialRevision:material.revision,quantity:'1',needPriority:'normal'});
  const q={planId:pid,partCode:'41',route:'domestic',supplierLinkId:'',supplier:'free text',quoteId:'',quoteRevision:0,unavailable:false,unitPrice:'10',currency:'IRR',fxRate:'1',fxDate:now.slice(0,10),fxSource:'test',extrasRial:'0',costNotes:'included',eta:future,validUntil:future,paymentTerms:'cash',specs:'V1',reference:'Q-1',notes:'test quote'};
+ // Real job-role grants, through the same HTTP handler used by MCP.
+ const permissions=load('lib/permissions.ts');
+ const scopedLead=id=>({...actor(id),permissions:permissions.validatePermissions({roleAssignment:{roles:[id]}})});
+ const beforeDenied=current(pid),operationCount=sql.prepare('SELECT COUNT(*) n FROM inventory_operations').get().n;
+ const progress={planId:pid,partCode:'41',status:'searching',nextFollowup:future,confirmed:true,notes:'Searching registered domestic suppliers for this demand'};
+ await source('procurement_progress',progress,403,scopedLead('foreign_commerce_lead'));
+ await assert.rejects(()=>catalog.executeTool('record_domestic_procurement_progress',{id:crypto.randomUUID(),revision:current(pid).revision,...progress},base,{user:scopedLead('foreign_commerce_lead'),scope:'read_write',tokenId:null}),/مجوز/);
+ assert.equal(current(pid).revision,beforeDenied.revision);
+ assert.equal(sql.prepare('SELECT COUNT(*) n FROM inventory_operations').get().n,operationCount,'Denied route cannot log a business operation');
+ await source('procurement_progress',progress,200,scopedLead('domestic_commerce_lead'));
  await source('quote',q,400,actor('domestic'));assert.equal(entities('sourcing_quote').length,0);
  const sid=put('supplier',{name:'Registered supplier',route:'domestic',active:true}),link=put('supplier_material',{supplierId:sid,materialId:material.id,status:'approved',specs:'V1',unit:'عدد',supplierRevision:1,reviewDue:future,requiredDocumentIds:[]});
  await source('refresh_suppliers',{planId:pid,notes:'registered source'},200,actor('engineering'));
@@ -63,9 +73,22 @@ const receivingFixture=require('./helpers/receiving-warehouse.cjs')(sql);
  // Existing open tasks migrate their link while retaining evidence and history.
  const technicalTask=sql.prepare("SELECT * FROM duty_runs WHERE assignee='engineeringUser' AND state='open' AND json_extract(data,'$.sourcePlanId')=? AND json_extract(data,'$.workflowRole')='engineering'").get(pid),oldTask=JSON.parse(technicalTask.data);oldTask.sourceSection='sourcing';delete oldTask.sourceId;oldTask.answer='existing evidence';sql.prepare('UPDATE duty_runs SET data=? WHERE id=?').run(JSON.stringify(oldTask),technicalTask.id);await source('followup',{planId:pid,notes:'refresh task destination'});const routed=JSON.parse(sql.prepare('SELECT data FROM duty_runs WHERE id=?').get(technicalTask.id).data);assert.equal(routed.sourceSection,'qms');assert.equal(routed.sourceId,'sourcing:'+pid);assert.equal(routed.answer,'existing evidence');
  await source('technical',{planId:pid,quoteId:qid,quoteRevision:quote().revision,result:'pass',notes:'technical checked'},200,actor('engineering'));
- assert.ok(!(await detail(pid)).work.some(w=>w.key.startsWith('technical:')));assert.ok((await detail(pid,actor('finance'))).work.some(w=>w.key.startsWith('financial:')&&w.canAct));
+ assert.ok(!(await detail(pid)).work.some(w=>w.key.startsWith('technical:')));
+ assert.ok(!(await detail(pid,actor('finance'))).work.some(w=>w.key.startsWith('financial:')),'Ordinary finance work starts after supply selection');
+ assert.ok((await detail(pid,actor('commerce_manager'))).work.some(w=>w.key.startsWith('award:')&&w.canAct));
+ const awardBody=()=>({planId:pid,partCode:'41',quoteId:qid,notes:'Choose the qualified contracted supplier'});
+ await source('award',awardBody(),403,actor('ceo'));
+ await source('award',awardBody(),403,actor('domestic'));
+ await source('award',awardBody(),409,actor('commerce_manager'));
+ const exception=(await source('request_exception',{planId:pid,partCode:'41',quoteId:qid,quoteRevision:quote().revision,kind:'sole_source',title:'Single registered source',evidence:'Approved supplier record and specification',notes:'Only one qualified source for this integrity scenario',confirmed:true},200,actor('domestic'))).operationId;
+ await source('decide_exception',{planId:pid,exceptionId:exception,decision:'approve',notes:'Exact current quotation verified',confirmed:true},403,actor('finance'));
+ await source('decide_exception',{planId:pid,exceptionId:exception,decision:'approve',notes:'Exact current quotation verified',confirmed:true},200,actor('ceo'));
+ const oid=(await source('award',awardBody(),200,actor('commerce_manager'))).operationId;
+ assert.equal(entities('purchase_order').find(o=>o.id===oid).data.state,'awaiting_funding');
+ assert.ok((await detail(pid,actor('finance'))).work.some(w=>w.key.startsWith('financial:')&&w.canAct));
+ await source('issue_order',{planId:pid,orderId:oid,reference:'Cannot bypass financial review'},409,actor('finance'));
  assert.ok(!(await reviews('engineering',actor('engineering'))).items.some(x=>x.id===qid));const financialItem=(await reviews('finance',actor('finance'))).items.find(x=>x.id===qid);assert.equal(financialItem.mode,'financial_review');assert.equal(financialItem.totalRial,'100');assert.equal(financialItem.quoteRevision,quote().revision);assert.ok(sql.prepare("SELECT 1 FROM duty_runs WHERE state='open' AND json_extract(data,'$.sourcePlanId')=? AND json_extract(data,'$.sourceSection')='finance-control'").get(pid));const reportsApi=load('app/api/finance/route.ts');assert.equal((await context.run(actor('finance'),()=>reportsApi.GET(request('/api/finance?cadence=daily&period='+now.slice(0,10))))).status,403,'Purchase finance does not gain general financial reports');
- await source('award',{planId:pid,partCode:'41',quoteId:qid,notes:'choose supplier'},400,actor('ceo'));
+ await source('award',awardBody(),409,actor('commerce_manager'));
  await source('financial_review',{planId:pid,quoteId:qid,quoteRevision:quote().revision,result:'fail',notes:'Clarify supplier price'},200,actor('finance'));
  assert.ok((await detail(pid,actor('domestic'))).work.some(w=>w.key==='financial_return:'+qid&&w.canAct));
  assert.ok(!(await reviews('finance',actor('finance'))).items.some(x=>x.id===qid));
@@ -75,18 +98,22 @@ const receivingFixture=require('./helpers/receiving-warehouse.cjs')(sql);
  assert.ok(!(await detail(pid,actor('domestic'))).work.some(w=>w.key==='financial_return:'+qid));
  assert.ok((await reviews('finance',actor('finance'))).items.some(x=>x.id===qid));
  await source('financial_review',{planId:pid,quoteId:qid,quoteRevision:quote().revision,result:'pass',notes:'financial checked'},200,actor('finance'));
- const returnBody=()=>({planId:pid,quoteId:qid,quoteRevision:quote().revision,confirmed:true,notes:'Explain commercial terms'});
+ // A historical, already reviewed quotation without an active PO retains its CEO clarification path.
+ // This fixture is separate from the current selected-order financial flow above.
+ const legacyReviewPid=(await source('direct_request',{confirmed:true,reference:'LEGACY-REVIEW',materialId:material.id,materialRevision:material.revision,quantity:'1',needPriority:'normal'})).planId;
+ const legacyReviewQid=put('sourcing_quote',{...quote().data,planId:legacyReviewPid,round:current(legacyReviewPid).data.lines[0].round,quantity:1000,totalRial:'10',financial:'pass',technical:'pass'});
+ const legacyQuote=()=>entities('sourcing_quote').find(q=>q.id===legacyReviewQid);
+ const returnBody=()=>({planId:legacyReviewPid,quoteId:legacyReviewQid,quoteRevision:legacyQuote().revision,confirmed:true,notes:'Explain historical commercial terms'});
  await source('return_quote_review',{...returnBody(),destination:'both'},403,actor('domestic'));
  await source('return_quote_review',{...returnBody(),destination:'both'},200,actor('ceo'));
- assert.ok((await reviews('finance',actor('finance'))).items.some(x=>x.mode==='answer_quote_review'&&x.quoteId===qid));
- assert.ok((await detail(pid,actor('domestic'))).work.some(w=>w.key==='ceo_return:'+qid+':domestic'));
- await source('award',{planId:pid,partCode:'41',quoteId:qid,notes:'No response yet'},409,actor('ceo'));
+ assert.ok((await reviews('finance',actor('finance'))).items.some(x=>x.mode==='answer_quote_review'&&x.quoteId===legacyReviewQid));
+ assert.ok((await detail(legacyReviewPid,actor('domestic'))).work.some(w=>w.key==='ceo_return:'+legacyReviewQid+':domestic'));
  await source('answer_quote_review',{...returnBody(),role:'finance'},403,actor('domestic'));
  await source('answer_quote_review',{...returnBody(),role:'domestic'},200,actor('domestic'));
- assert.ok((await reviews('finance',actor('finance'))).items.some(x=>x.mode==='answer_quote_review'&&x.quoteId===qid));
- const oid=(await source('award',{planId:pid,partCode:'41',quoteId:qid,notes:'choose qualified supplier'},200,actor('ceo'))).operationId;
- assert.ok(!(await reviews('finance',actor('finance'))).items.some(x=>x.mode==='answer_quote_review'&&x.quoteId===qid));
+ assert.ok((await reviews('finance',actor('finance'))).items.some(x=>x.mode==='answer_quote_review'&&x.quoteId===legacyReviewQid));
+ await source('answer_quote_review',{...returnBody(),role:'finance'},200,actor('finance'));
  await source('answer_quote_review',{...returnBody(),role:'finance'},409,actor('finance'));
+ assert.ok(!(await reviews('finance',actor('finance'))).items.some(x=>x.mode==='answer_quote_review'&&x.quoteId===legacyReviewQid));
  await source('finance',{planId:pid,status:'approved',budgetRial:'1000',availableOn:now.slice(0,10),notes:'approved funds'},200,actor('finance'));
  await source('issue_order',{planId:pid,orderId:oid,reference:'funding'},200,actor('finance'));
  await source('track',{planId:pid,orderId:oid,stage:'paid',eta:future,reference:'pretend paid',notes:'report'},400,actor('finance'));
@@ -143,5 +170,5 @@ const receivingFixture=require('./helpers/receiving-warehouse.cjs')(sql);
  sql.prepare("UPDATE app_members SET status='inactive' WHERE id='secondBuyer'").run();d=await detail(taskPlan);assert.equal(d.work.find(w=>w.role==='domestic').missingOwner,true,'inactive assignment never remains actionable');
  const reset=load('lib/reset-contract.ts');for(const scope of ['operations','full']){sql.exec('BEGIN');for(const table of Object.keys(reset.resetTables))sql.exec('DELETE FROM '+table+' WHERE '+reset.resetWhere(table,scope));assert.equal(sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type IN ('sourcing_plan','purchase_order','build_project','purchase_payable')").get().n,0);assert.equal(sql.prepare('SELECT COUNT(*) n FROM sourcing_holds').get().n,0);sql.exec('ROLLBACK');assert.ok(current(project1.planId));}
  sql.exec("UPDATE reset_control SET phase='maintenance'");await source('direct_request',{confirmed:true,reference:'TEST',needBy:'',materialId:material.id,materialRevision:material.revision,quantity:'1',needPriority:'normal',notes:'freeze test'},423);sql.exec("UPDATE reset_control SET phase='testing'");
- console.log('PASS sourcing integrity: source-isolated project requests and hold handoff; strict supplier identity/legacy repair; partial rejection resolution with unchanged inventory/demand; financial document-derived paid status/redaction; single eligible owner/claim/reassignment; open status and MCP priority/write parity; maintenance rollback.');
+ console.log('PASS sourcing integrity: scoped real commerce roles through HTTP/MCP; supply selection before financial queue with exact-quote sole-source authorization; historical CEO clarification compatibility; source-isolated project requests and hold handoff; strict supplier identity/legacy repair; partial rejection resolution with unchanged inventory/demand; financial document-derived paid status/redaction; single eligible owner/claim/reassignment; MCP priority/write parity; maintenance rollback.');
 })().catch(e=>{console.error(e);process.exit(1)});

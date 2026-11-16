@@ -1,3 +1,7 @@
+## 2026-11-16 — Close three remaining nightly checks
+
+Remove implicit domestic-buyer authority from the common commerce-management role; explicit route grants remain authoritative. Reject preliminary financial approval of an incomplete RFQ round while retaining selected/split-order exception controls. Migrate old sourcing scenarios to commerce selection, three qualified offers or exact-version CEO exception, selected finance work and historical clarification compatibility. Add real-role HTTP/MCP denial and no-write rollback checks. See quality-reviews/2026-11-16-three-open.md for results and release provenance.
+
 ## 2026-11-15 — End-of-day integrity follow-up
 
 Preserve material/serial identities while redacting financial fields; immutable Persian-code retry signatures. Invoice pricing ignores unused drafts but blocks active/unformed configured orders, retaining legacy unconfigured flow. Conservative stock availability separates other-job claims and historical consumption. One atomic SQL day limit covers routine/custom/legacy project time; paginated scoped daily queries replace company-history snapshots. Invalid FX preview gets HTTP400. Updated stale test fixtures without weakening business controls; detailed 71/74 review and recovery evidence recorded in quality-reviews/2026-11-15-end-of-day.md.
