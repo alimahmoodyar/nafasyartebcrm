@@ -1,6 +1,6 @@
 import {storedAccessPermissions} from './permissions';
 import {storage} from './storage';
-import {AccessError} from './authorization';
+import {AccessError,requireProfileAdmin} from './authorization';
 import {trainingContext} from './training-context';
 import {personnelStaff} from './personnel-profile';
 import type {Session} from './permissions';
@@ -32,10 +32,11 @@ async function context(actor:Session){
  const db=storage(),members=(await db.prepare('SELECT id,name,status,subject,permissions FROM app_members ORDER BY id').all()).results as any[],identities=(await db.prepare('SELECT id,subject FROM app_identity ORDER BY id').all()).results as any[];
  const own=members.find(m=>m.subject===actor.userId||m.id===(actor.userId.startsWith('local:')?actor.userId.slice(6):actor.userId));
  const admin=actor.isAdmin&&identities.some(i=>i.id==='owner'&&i.subject===actor.userId||i.id==='local_admin'&&i.subject===own?.id&&own?.status==='active');
+ const review=actor.profileReview?.id==='personnel-hr';if(review)await requireProfileAdmin();
  if(actor.isAdmin&&!admin)fail('هویت مدیر تغییر کرده است؛ دوباره وارد شوید.',403);
- if(!admin&&own?.status!=='active')fail('حساب فعال لازم است.',403);
+ if(!admin&&!review&&own?.status!=='active')fail('حساب فعال لازم است.',403);
  let p:any;try{p=storedAccessPermissions(own?.permissions||'{}')}catch{p={}}
- const hr=personnelStaff(own)&&Array.isArray(p.personnelRoles)&&p.personnelRoles.includes('hr');
+ const hr=review||personnelStaff(own)&&Array.isArray(p.personnelRoles)&&p.personnelRoles.includes('hr');
  return {db,members,identities,own,admin,hr};
 }
 function target(c:Awaited<ReturnType<typeof context>>,memberId?:string){

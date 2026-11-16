@@ -1,3 +1,4 @@
+import {requiredPersonnel} from '@/lib/personnel-employment';
 import {materialWarehouses,warehouseProfilePermissions,warehouseResponsibilityGuards} from '@/lib/material-warehouses';
 import {syncMaterialTasks} from '@/lib/material-tasks';
 import {storedAccessPermissions} from '@/lib/permissions';
@@ -6,7 +7,7 @@ import {env} from "cloudflare:workers";
 import {storage} from "@/lib/storage";
 import {requireAdmin, checkOrigin, accessResponse, AccessError} from "@/lib/authorization";
 import {validatePermissions} from "@/lib/permissions";
-import {personnelProfileStatements} from "@/lib/personnel-profile";
+import {personnelStaff,personnelProfileStatements} from "@/lib/personnel-profile";
 import {contactPatch,memberContactsForAccounts,memberContactAdminContext,memberContactGuards,contactRevisionGuard,memberContactWrite} from '@/lib/member-contact';
 
 function present(row: any) {return {...row,canDelete:!row.protected,email:row.username?"":row.email, userId: row.subject, permissions: storedAccessPermissions(row.permissions)};}
@@ -49,28 +50,32 @@ export async function GET() {
     const result=await storage().prepare("SELECT m.*,a.username FROM app_members m LEFT JOIN password_accounts a ON a.member_id=m.id WHERE m.status!='deleted' ORDER BY m.created DESC").all();
     const warehouses=await materialWarehouses();
     const contacts=await memberContactsForAccounts(result.results.map((row:any)=>row.id));
+    const personnelCandidates=(await storage().prepare("SELECT e.id,e.revision,e.data FROM flow_entities e WHERE e.type='hr_employee' AND NOT EXISTS(SELECT 1 FROM app_members m WHERE m.id=json_extract(e.data,'$.memberId')) ORDER BY e.created,e.id").all()).results.map((r:any)=>{const d=JSON.parse(r.data);return {id:r.id,revision:r.revision,name:d.name,unit:d.unit,code:d.code,mobile:d.mobile||'',ready:d.state==='active'&&!!d.identityCompleteAt}});
     const members=await Promise.all(result.results.map(async (row:any)=>{const c=contacts.find(c=>c.memberId===row.id)!;return present({...row,permissions:JSON.stringify(warehouseProfilePermissions(row,warehouses)),mobile:c.mobile,contactEmail:c.contactEmail,contactRevision:c.revision,protected:await protectedAccount(row,actor)})}));
-    return Response.json({members,accountId:actor.userId,warehouses:warehouses.map(w=>({id:w.id,name:w.data.name,active:w.data.active}))},{headers:{'Cache-Control':'no-store'}});
+    return Response.json({members,personnelCandidates,accountId:actor.userId,warehouses:warehouses.map(w=>({id:w.id,name:w.data.name,active:w.data.active}))},{headers:{'Cache-Control':'no-store'}});
   } catch(error) {return failure(error);}
 }
 export async function POST(request: Request) {
   let localAccount = false;
   try {
-    checkOrigin(request); const actor = await requireAdmin(); checkAccount(request,actor); const body=await request.json() as any;localAccount=!!body.username;const login=localAccount?username(body.username):null;const passwordHash=localAccount?await hashPassword(password(body.password)):null;const data = payload({...body,unit:localAccount?'کارکنان':body.unit,email:localAccount?crypto.randomUUID()+"@local.invalid":body.email});
+    checkOrigin(request); const actor = await requireAdmin(); checkAccount(request,actor); const body=await request.json() as any;localAccount=!!body.username;const login=localAccount?username(body.username):null;const passwordHash=localAccount?await hashPassword(password(body.password)):null;contactPatch(body);const internalNew=personnelStaff({status:'active',permissions:JSON.stringify(validatePermissions(body.permissions))});let personnel:any=null;
+    if(internalNew){if(typeof body.personnelId!=='string')throw new AccessError('ابتدا پرونده شخص را در مسئول اداری تکمیل و سپس همین پرونده را انتخاب کنید.',400);const found:any=await storage().prepare("SELECT * FROM flow_entities WHERE id=? AND type='hr_employee'").bind(body.personnelId).first();if(!found)throw new AccessError('پرونده پرسنلی یافت نشد.',404);personnel={...found,data:JSON.parse(found.data)};const d=personnel.data;if(d.state!=='active'||!d.identityCompleteAt)throw new AccessError('پرونده پرسنلی هنوز تکمیل نشده است.',409);requiredPersonnel(d,d.mobile);for(const category of ['national_card','birth_certificate','spouse_page','children_page'])if(!await storage().prepare("SELECT id FROM flow_entities WHERE type='hr_file' AND json_extract(data,'$.caseId')=? AND json_extract(data,'$.category')=?").bind(personnel.id,category).first())throw new AccessError('مدارک هویتی پرونده کامل نیست.',409);if(await storage().prepare('SELECT id FROM app_members WHERE id=?').bind(d.memberId).first())throw new AccessError('برای این شخص قبلاً حساب ساخته شده است.',409);}
+    const data = payload({...body,...(personnel?{name:personnel.data.name,unit:personnel.data.unit}:{}),unit:personnel?personnel.data.unit:localAccount?'کارکنان':body.unit,email:localAccount?crypto.randomUUID()+"@local.invalid":body.email});
     await checkServiceAgent(data.permissions);
-    const contact=contactPatch(body),scope=await memberContactAdminContext(actor);
-    const id = crypto.randomUUID(), now = new Date().toISOString(),operationId=crypto.randomUUID();
+    const contact=contactPatch(personnel?{mobile:personnel.data.mobile,contactEmail:body.contactEmail||''}:body),scope=await memberContactAdminContext(actor);
+    const id = personnel?.data.memberId||crypto.randomUUID(), now = new Date().toISOString(),operationId=crypto.randomUUID();
     const warehouseGuards=await warehouseResponsibilityGuards(data.permissions,operationId);
     const row = {id, ...data, subject: null, username:login||undefined, revision: 1, created: now, updated: now};
     const db = storage();
     await db.batch([
       db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(operationId,'create_member',JSON.stringify({memberId:id}),actor.userId,now),
       ...warehouseGuards,
+      ...(personnel?[db.prepare("UPDATE inventory_operations SET guard=CASE WHEN EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND type='hr_employee' AND revision=?) THEN guard ELSE 0 END WHERE id=?").bind(personnel.id,personnel.revision,operationId)]:[]),
       ...memberContactGuards(db,operationId,scope),
       db.prepare("INSERT INTO app_members (id,email,name,unit,status,permissions,revision,created,updated) VALUES(?,?,?,?,?,?,1,?,?)").bind(id, data.email, data.name, data.unit, data.status, data.permissions, now, now),
       ...(login?[db.prepare("INSERT INTO password_accounts(member_id,username,password_hash,version) VALUES(?,?,?,1)").bind(id,login,passwordHash)]:[]),
       db.prepare("INSERT INTO access_audit (id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)").bind(crypto.randomUUID(), actor.userId, id, "create_member", JSON.stringify(row), now),
-      ...personnelProfileStatements(db,row,actor,now),
+      ...(personnel?[db.prepare("UPDATE flow_entities SET data=?,revision=revision+1,updated=? WHERE id=? AND revision=?").bind(JSON.stringify({...personnel.data,accountLinkedAt:now,history:[...(personnel.data.history||[]),{at:now,actor:actor.userId,name:actor.name,mode:'account_link',notes:'ساخت حساب برای پرونده موجود؛ دسترسی توسط مدیر سامانه تعیین شد.',state:personnel.data.state}]}),now,personnel.id,personnel.revision)]:personnelProfileStatements(db,row,actor,now)),
       contactRevisionGuard(db,operationId,id,0),memberContactWrite(db,id,contact,now),
       db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),actor.userId,id,'member_contact_create',JSON.stringify({memberId:id,...contact,revision:1}),now),
     ]);

@@ -1,0 +1,79 @@
+{
+  "scope": "HR existing portal, personnel-first account linking, documents, fixed contracts/reminders, family declarations and small asset-label print unblock",
+  "suiteCount": 17,
+  "sourceSuites": [
+    {
+      "name": "personnel-admin-ui",
+      "code": 0
+    },
+    {
+      "name": "personnel-admin-profile",
+      "code": 0
+    },
+    {
+      "name": "personnel-ui",
+      "code": 0
+    },
+    {
+      "name": "personnel-employment",
+      "code": 0
+    },
+    {
+      "name": "personnel",
+      "code": 0
+    },
+    {
+      "name": "personnel-positions",
+      "code": 0
+    },
+    {
+      "name": "personnel-leave",
+      "code": 0
+    },
+    {
+      "name": "personnel-integrity",
+      "code": 0
+    },
+    {
+      "name": "personnel-profile",
+      "code": 0
+    },
+    {
+      "name": "personnel-leave-route",
+      "code": 0
+    },
+    {
+      "name": "personnel-advance",
+      "code": 0
+    },
+    {
+      "name": "member-contact",
+      "code": 0
+    },
+    {
+      "name": "asset-passport-ui",
+      "code": 0
+    },
+    {
+      "name": "custodian-home-ui",
+      "code": 0
+    },
+    {
+      "name": "custodian-profile",
+      "code": 0
+    },
+    {
+      "name": "asset-passport",
+      "code": 0
+    }
+  ],
+  "bundledWorker": "passed against final application build; role fixture declares actual payroll treasury job separately",
+  "typecheck": "passed",
+  "officialBuild": "passed; final navigation-only rebuild in progress before packaging",
+  "businessDataMutations": false,
+  "smsSent": false,
+  "grantsChanged": false,
+  "browserLiveTest": false,
+  "familyAmountRule": "No new monetary rates or legal eligibility inference; approved dated family facts are payroll basis snapshots under existing rules.",
+  "assetGalleryBulk": "Design/image and requirements recorded only; not implemented by this HR package."
+}

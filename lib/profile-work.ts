@@ -1,3 +1,5 @@
+import {contractAlerts} from './personnel-employment';
+import {hrActor,hrRows} from './personnel';
 import {storage} from './storage';
 import {serviceContractProfileWork} from './service-contract-tasks';
 import {commercialProfileWork} from './service-commercial-tasks';
@@ -35,6 +37,7 @@ export async function handoffShortageWork(user:Session):Promise<ProfileWork[]>{
 /** Position queue from real domain stages, never fabricated assignees. */
 export async function profileWork(user:Session):Promise<{work:ProfileWork[];pendingQuality:number;workHasMore?:boolean}>{
  const profile=roleProfiles.find(p=>p.id===user.profileReview?.id);if(!profile?.operational)return {work:[],pendingQuality:0};
+ if(profile.id==='personnel-hr'){const actor=await hrActor(user);if(!actor.has('hr'))return {work:[],pendingQuality:0};return {work:contractAlerts(await hrRows()).map(a=>({id:a.id,title:'پیگیری قرارداد · '+a.name,section:'personnel',target:a.id,sourceId:a.id,state:a.stage})),pendingQuality:0};}
  if(profile.id==='custodian')return custodianProfileWork(user);
  const db=storage(),rows=(await db.prepare("SELECT id,type,data FROM flow_entities WHERE type IN ('receipt','request','sourcing_plan','sourcing_quote','purchase_order','worker_output','scrap_transfer','scrap_sale_request','build','inventory_count','build_project','handoff','worker_nonconforming','line_return','worker_count_round','receipt_observation','purchase_payable','routine_lot','transport') ORDER BY id").all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}));
  const work:ProfileWork[]=materialProfileWork(profile.id,rows);

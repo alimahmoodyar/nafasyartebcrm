@@ -1,0 +1,27 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),ts=require('typescript'),React=require('react'),{webcrypto}=require('node:crypto');
+const listeners=new Map();const win={addEventListener:(k,fn)=>listeners.set(k,fn),removeEventListener:k=>listeners.delete(k),dispatchEvent:e=>listeners.get(e.type)?.(e),location:{origin:'https://test.local'}};
+const root=path.resolve(__dirname,'..'),cache={},leaves={};let slots=[],cursor=0,effects=[],reply,postReply=null,calls=[];
+const react={...React,useState:init=>{const i=cursor++;if(!(i in slots))slots[i]=typeof init==='function'?init():init;return[slots[i],v=>slots[i]=typeof v==='function'?v(slots[i]):v]},useRef:init=>{const i=cursor++;if(!(i in slots))slots[i]={current:init};return slots[i]},useEffect:(fn,deps)=>{const i=cursor++,old=slots[i];if(!old||deps.some((v,j)=>v!==old[j]))effects.push(fn);slots[i]=deps}};
+function leaf(name){return leaves[name]||(leaves[name]=function TestLeaf(){return null})}
+function load(file){file=path.resolve(root,file);if(cache[file])return cache[file];const exports={};cache[file]=exports;vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText,{exports,require:n=>{if(n==='react')return react;if(n==='react/jsx-runtime')return require(n);if(n==='lucide-react')return new Proxy({},{get:(_,key)=>leaf(key)});if(n.startsWith('./')||n.includes('components/')||n.startsWith('./')&&/(warehouse-(hub|returns-panel|stock-panel)|personal-home|production-panel|material-flow)\.tsx$/.test(file))return new Proxy({},{get:(_,key)=>leaf(key)});if(!n.startsWith('@/')&&!n.startsWith('.'))return require(n);const p=n.startsWith('@/')?path.join(root,n.slice(2)):path.resolve(path.dirname(file),n);return load(fs.existsSync(p+'.ts')?p+'.ts':p+'.tsx')},fetch:async (url,options={})=>{calls.push({url,...options});return options.method?postReply||reply:reply},crypto:webcrypto,URL,URLSearchParams,Date,Intl,JSON,Map,Set,BigInt,console,window:win,Event,CustomEvent,localStorage:{getItem:()=>JSON.stringify(['sales','flow','inventory','batch','fulfillment','personnel']),setItem(){}}},{filename:file});return exports;}
+
+
+
+
+
+
+
+const {PersonnelAdminPanel}=load('components/trace/personnel-admin-panel.tsx');
+const nodes=x=>Array.isArray(x)?x.flatMap(nodes):React.isValidElement(x)?[x,...nodes(x.props.children)]:[],text=x=>Array.isArray(x)?x.map(text).join(''):React.isValidElement(x)?text(x.props.children):x==null?'':String(x);
+const fixture={roles:['hr'],members:[{id:'alice',name:'علی'},{id:'manager',name:'مدیر'}],records:[{id:'employee',type:'hr_employee',revision:1,created:'2026-11-16T07:00:00Z',data:{memberId:'alice',name:'علی',code:'P1',state:'active',unit:'اداری',title:'کارشناس',managerId:'manager',start:'2026-01-01'}},{id:'contract',type:'hr_contract',revision:1,data:{memberId:'alice',title:'قرارداد',contractKind:'fixed',start:'2026-01-01',end:'2026-12-01',state:'draft'}}],contractAlerts:[{id:'contract',memberId:'alice',name:'علی',end:'2026-12-01',days:15}],contacts:[]};
+function tree(){cursor=0;return PersonnelAdminPanel({})}function flush(){const f=effects;effects=[];for(const fn of f)fn()}const idle=()=>new Promise(r=>setImmediate(r));
+function button(t,name){const b=nodes(t).find(n=>n.type==='button'&&text(n).includes(name));assert.ok(b,'Button '+name);return b}
+(async()=>{
+ reply={ok:true,json:async()=>fixture};let t=tree();flush();await idle();t=tree();assert.match(text(t),/مسئول اداری/);button(t,'علی').props.onClick();t=tree();assert.match(text(t),/نهایی‌کردن قرارداد/);assert.ok(!text(t).includes('تغییر دسترسی'));
+ const upload=nodes(t).find(n=>n.props.multiple&&n.props.subject==='کارت ملی'&&n.props.required);assert.ok(upload,'shared camera/crop and multiple upload');
+ button(t,'تکمیل / ویرایش').props.onClick();t=tree();const inputs=nodes(t).filter(n=>n.type==='label'&&text(n).includes('کد ملی'));assert.equal(inputs.length,1);assert.equal(nodes(inputs[0]).find(n=>n.type==='input').props.required,true);
+ button(t,'بستن فرم').props.onClick();t=tree();button(t,'قرارداد جدید').props.onClick();t=tree();assert.match(text(t),/پایان قرارداد/);assert.ok(nodes(t).some(n=>n.props.label==='پایان قرارداد *'));assert.ok(!nodes(t).some(n=>n.type==='select'&&n.props.value==='fixed'));
+ postReply={ok:true,json:async()=>({id:'new-contract'})};const form=nodes(t).find(n=>n.type==='form'&&text(n).includes('ذخیره پیش‌نویس'));form.props.onSubmit({preventDefault(){}});await idle();t=tree();const sent=JSON.parse(calls.find(c=>c.method==='POST').body);assert.equal(sent.mode,'contract_save');assert.equal(sent.memberId,'alice');assert.equal(sent.contractKind,'fixed');assert.equal(sent.confirmed,true);assert.equal(sent.permissions,undefined);
+ slots=[];cursor=0;effects=[];reply={ok:true,json:async()=>({...fixture,roles:[]})};tree();flush();await idle();assert.match(text(tree()),/دسترسی مسئول اداری لازم است/);
+ console.log('PASS HR administration UI: person selection, mandatory identity, multi-file input, fixed-term contract dates, confirmed shared-handler submission and no-role denial');
+})().catch(e=>{console.error(e);process.exitCode=1});

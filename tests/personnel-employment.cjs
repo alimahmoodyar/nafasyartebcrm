@@ -1,0 +1,96 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),ts=require('typescript');
+const {DatabaseSync}=require('node:sqlite');const root=path.resolve(__dirname,'..');const sql=new DatabaseSync(':memory:');sql.exec('PRAGMA foreign_keys=ON');for(const f of fs.readdirSync(path.join(root,'drizzle')).filter(f=>f.endsWith('.sql')).sort())sql.exec(fs.readFileSync(path.join(root,'drizzle',f),'utf8'));
+const db={prepare(q){let args=[];return{bind(...a){args=a;return this},async first(){return sql.prepare(q).get(...args)||null},async all(){return {results:sql.prepare(q).all(...args)}},async run(){return {meta:{changes:sql.prepare(q).run(...args).changes}}}}},async batch(stmts){sql.exec('BEGIN');try{const r=[];for(const s of stmts)r.push(await s.run());sql.exec('COMMIT');return r;}catch(e){sql.exec('ROLLBACK');throw e;}}};
+const objects=new Map();const bucket={async put(k,b){objects.set(k,b.slice(0));return {key:k}},async get(k){const b=objects.get(k);return b?{arrayBuffer:async()=>b.slice(0)}:null},async delete(k){objects.delete(k)}};
+let identity=null;const env={TRACE_OWNER_EMAIL:'owner@example.com',LLM_CONFIG_ENCRYPTION_KEY:require('node:crypto').randomBytes(32).toString('base64'),DB:db,BUCKET:bucket};
+const cache={};function load(file){file=path.resolve(root,file);if(cache[file])return cache[file];const exports={};cache[file]=exports;const source=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+vm.runInNewContext(source,{exports,require:n=>{if(n==='cloudflare:workers')return {env};if(n==='@/app/chatgpt-auth')return {getChatGPTUser:async()=>identity};if(n.startsWith('@/')||n.startsWith('.')){const p=n.startsWith('@/')?path.join(root,n.slice(2)):path.resolve(path.dirname(file),n);return load(p+(path.extname(p)?'':'.ts'));}return require(n)},structuredClone,Response,Request,URL,URLSearchParams,Error,crypto:globalThis.crypto,Date,Intl,Set,Map,FormData,Blob,File,TextEncoder,TextDecoder,Uint8Array,ArrayBuffer,AbortController,ReadableStream,btoa,atob,setTimeout:(f,n)=>setTimeout(f,Math.min(n,10)),clearTimeout,console},{filename:file});return exports;}
+
+const printApi=load('app/api/personnel/print/route.ts');
+const ctx=load('lib/mcp/context.ts').mcpActor,api=load('app/api/personnel/route.ts'),files=load('app/api/personnel/files/route.ts'),domain=load('lib/personnel.ts'),catalog=load('lib/mcp/tools.ts'),tasks=load('app/api/tasks/route.ts'),duties=load('lib/duties.ts');
+let tail=Promise.resolve();const batch=db.batch.bind(db);db.batch=stmts=>{const next=tail.then(()=>batch(stmts));tail=next.catch(()=>{});return next};
+const base='https://test.local',now=new Date().toISOString(),today=duties.dayAt(),day=duties.addDay(today,-10),next=duties.addDay(today,2);
+const req=(url,b,origin=base)=>new Request(base+url,{method:b?'POST':'GET',headers:{origin,'Content-Type':'application/json'},...(b?{body:JSON.stringify(b)}:{})});
+function actor(id,roles=[],extra={}){const u={userId:'local:'+id,email:id+'@test.local',name:id,isAdmin:false,permissions:{read:[],write:[],eventStages:[],personnelRoles:roles,...extra}};sql.prepare("INSERT INTO app_members(id,email,name,unit,status,subject,permissions,created,updated) VALUES(?,?,?,'company','active',?,?,?,?)").run(id,u.email,id,u.userId,JSON.stringify(u.permissions),now,now);return u;}
+const alice=actor('alice'),bob=actor('bob'),manager=actor('manager'),hr=actor('hr',['hr']),payroll=actor('payroll',['payroll']),approver=actor('approver',['approver']),finance=actor('finance',['finance']),treasury=actor('treasury',['treasury']),ceo=actor('ceo',['executive_viewer']),external=actor('external',[],{salesAgentId:'outside',salesRoles:['agent']});
+const row=id=>{const r=sql.prepare('SELECT * FROM flow_entities WHERE id=?').get(id);return r?{...r,data:JSON.parse(r.data)}:null};
+async function get(u,q=''){const r=await ctx.run(u,()=>api.GET(req('/api/personnel'+q)));return {status:r.status,data:await r.json()}}
+async function post(u,b){const r=await ctx.run(u,()=>api.POST(req('/api/personnel',{id:crypto.randomUUID(),confirmed:true,revision:0,notes:'Actual evidence',...b})));return {status:r.status,data:await r.json()}}
+async function ok(u,b){const r=await post(u,b);assert.equal(r.status,200,JSON.stringify({b,r}));return r.data.id;}
+const apply=(u,id,mode,extra={})=>post(u,{recordId:id,revision:row(id).revision,mode,...extra});
+const success=async(u,id,mode,extra={})=>{const r=await apply(u,id,mode,extra);assert.equal(r.status,200,JSON.stringify({mode,r}));return r};
+const seed=(id,type,data)=>sql.prepare('INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?)').run(id,type,JSON.stringify(data),now,now);
+const profile={mode:'employee',code:'A01',memberId:'alice',managerId:'manager',start:day,end:'',title:'Engineer',unit:'Production',location:'Factory',employment:'Full time',leaveMinutes:960,bankAccount:'PRIVATE-BANK',personal:'PRIVATE-PERSONAL'};
+
+(async()=>{
+ const users=load('app/api/users/route.ts'),employment=load('lib/personnel-employment.ts'),taskSync=load('lib/personnel-tasks.ts');
+ const rawPermissions=sql.prepare('SELECT permissions FROM app_members WHERE id=?').get('alice').permissions;
+ const eid=await ok(hr,{...profile,code:undefined,leaveMinutes:undefined,notes:''});
+ assert.match(row(eid).data.code,/^P-[A-F0-9]+$/);const code=row(eid).data.code;
+ await success(hr,eid,'employee',{...profile,leaveMinutes:0,code:'CHANGED',nationalId:'۰۰۱۲۳۴۵۶۷۸',birthDate:'1990-01-01',address:'PRIVATE-ADDRESS',emergencyContact:'PRIVATE-EMERGENCY',notes:''});assert.equal(row(eid).data.code,code);
+ const managerProjection=(await get(manager)).data;assert.ok(!JSON.stringify(managerProjection).includes('PRIVATE-ADDRESS'));assert.ok(!JSON.stringify(managerProjection).includes('PRIVATE-EMERGENCY'));
+ assert.equal((await ctx.run(hr,()=>users.POST(req('/api/users',{id:crypto.randomUUID(),mode:'update',confirmed:true,memberId:'alice',permissions:{personnelRoles:['hr']}})))).status,403);
+ async function upload(u,parent,category='other',fid=crypto.randomUUID(),name='receipt.pdf'){
+ const res=await ctx.run(u,()=>files.POST(new Request(base+'/api/personnel/files?'+new URLSearchParams({id:fid,caseId:parent,filename:name,category,confirmed:'true'}),{method:'POST',headers:{origin:base},body:new TextEncoder().encode('%PDF-1.4 real fixture')})));return {status:res.status,data:await res.json(),id:fid};}
+ const identityFile=await upload(hr,eid,'identity');assert.equal(identityFile.status,200,JSON.stringify(identityFile));
+ assert.equal((await ctx.run(alice,()=>files.GET(req('/api/personnel/files?id='+identityFile.id)))).status,200);
+ for(const u of [bob,manager,payroll,finance,ceo,external])assert.equal((await ctx.run(u,()=>files.GET(req('/api/personnel/files?id='+identityFile.id)))).status,u===external?403:404,u.userId);
+ const spec={mode:'contract_save',memberId:'alice',title:'PRIVATE-CONTRACT',contractKind:'fixed',start:day,end:duties.addDay(today,20),notes:''};
+ assert.equal((await post(alice,spec)).status,403);assert.equal((await post(payroll,spec)).status,403);assert.equal((await post(external,spec)).status,403);
+ assert.equal((await post(hr,{...spec,end:''})).status,400);assert.equal((await post(hr,{...spec,end:duties.addDay(day,-1)})).status,400);
+ const cid=await ok(hr,spec);assert.equal((await get(alice)).data.records.some(r=>r.id===cid),false);
+ assert.equal((await apply(hr,cid,'contract_finalize',{notes:''})).status,400);
+ const unrelated=await upload(hr,cid,'other');assert.equal(unrelated.status,200);assert.equal((await apply(hr,cid,'contract_finalize')).status,400);
+ const signed=await upload(hr,cid,'signed_contract');assert.equal(signed.status,200);assert.equal((await upload(hr,cid,'signed_contract',signed.id)).data.repeated,true);assert.equal((await upload(hr,cid,'identity',signed.id)).status,409);
+ assert.equal((await ctx.run(alice,()=>files.GET(req('/api/personnel/files?id='+signed.id)))).status,404);
+ await success(hr,cid,'contract_finalize',{notes:''});assert.equal(row(cid).data.state,'active');
+ assert.equal((await get(alice)).data.records.some(r=>r.id===cid),true);assert.equal((await get(bob)).data.records.some(r=>r.id===cid),false);assert.equal((await get(manager)).data.records.some(r=>r.id===cid),false);
+ assert.equal((await ctx.run(alice,()=>files.GET(req('/api/personnel/files?id='+signed.id)))).status,200);
+ assert.equal((await upload(hr,cid,'signed_contract')).status,403);
+ assert.equal((await apply(hr,cid,'contract_save',spec)).status,409);
+ assert.equal((await get(hr)).data.contractAlerts.find(a=>a.id===cid).stage,'thirty');assert.equal((await get(alice)).data.contractAlerts.length,0);
+ await taskSync.syncPersonnelTasks();let task=sql.prepare("SELECT * FROM duty_runs WHERE period=? AND assignee='hr'").get(cid);assert.equal(task.state,'open');await duties.taskAccess(task.id,hr);assert.equal((await get(hr)).data.contractAlerts.length,1);const inbox=await ctx.run(hr,()=>tasks.GET(req('/api/tasks')));assert.equal(inbox.status,200);assert.ok(JSON.stringify(await inbox.json()).includes(task.id));assert.equal(JSON.parse(task.data).stage,'contract:thirty');const rev=task.revision;await taskSync.syncPersonnelTasks();assert.equal(sql.prepare('SELECT revision FROM duty_runs WHERE id=?').get(task.id).revision,rev);
+ const permissionsBefore=sql.prepare('SELECT permissions FROM app_members WHERE id=?').get('alice').permissions;assert.equal(permissionsBefore,rawPermissions);
+ const renewal=await ok(hr,{...spec,title:'Renewed',previousId:cid,start:duties.addDay(row(cid).data.end,1),end:duties.addDay(today,100)});assert.equal((await get(hr)).data.contractAlerts.length,1,'draft renewal must not retire expiry');
+ const dup=await ok(hr,{...spec,title:'Competing renewal',previousId:cid,start:duties.addDay(row(cid).data.end,1),end:duties.addDay(today,120)});
+ await upload(hr,renewal,'signed_contract');await upload(hr,dup,'signed_contract');
+ const race=await Promise.all([apply(hr,renewal,'contract_finalize'),apply(hr,dup,'contract_finalize')]);assert.equal(race.filter(r=>r.status===200).length,1,JSON.stringify(race));assert.equal(row(cid).data.state,'renewed');
+ await taskSync.syncPersonnelTasks();assert.equal(sql.prepare('SELECT state FROM duty_runs WHERE id=?').get(task.id).state,'completed');assert.equal((await get(hr)).data.contractAlerts.length,0);
+ assert.equal(sql.prepare('SELECT permissions FROM app_members WHERE id=?').get('alice').permissions,rawPermissions);assert.equal(row(eid).data.state,'active');assert.ok(row(cid).data.history.length>=2);
+ const n=cid+'-date',fixture=(end)=>[{id:n,type:'hr_contract',data:{state:'active',memberId:'alice',end,title:'expiry'}}];
+ for(const [delta,stage] of [[31,null],[30,'thirty'],[8,'thirty'],[7,'seven'],[0,'seven'],[-1,'expired']])assert.equal(employment.contractAlerts(fixture(duties.addDay(today,delta)),today)[0]?.stage||null,stage);
+ assert.equal((await post(hr,{...spec,contractKind:'open',end:''})).status,400);const open=await ok(hr,{...spec,memberId:'alice',start:duties.addDay(today,130),end:duties.addDay(today,160)});
+ const closing=await apply(hr,open,'contract_close',{notes:''});assert.equal(closing.status,400);await success(hr,open,'contract_close',{notes:'No longer required'});
+ assert.equal((await get(alice)).data.records.some(r=>r.id===open),false,'closed unpublished draft stays private');
+ const stale=hr.permissions;sql.prepare('UPDATE app_members SET permissions=? WHERE id=?').run(JSON.stringify({read:[],write:[],eventStages:[]}),'hr');assert.equal((await post(hr,spec)).status,403);assert.equal((await ctx.run(hr,()=>files.GET(req('/api/personnel/files?id='+signed.id)))).status,404);sql.prepare('UPDATE app_members SET permissions=? WHERE id=?').run(JSON.stringify(stale),'hr');
+
+ const topSpec={mode:'personnel_create',name:'Initial director without account',unit:'Company',title:'Director',location:'Office',employment:'Fixed',start:day,nationalId:'0987654321',birthDate:'1980-01-01',maritalStatus:'single',mobile:'09121111111',address:'Office',emergencyContact:'Emergency',bankAccount:'Account'};const top=await ok(hr,topSpec);assert.equal(row(top).data.managerId,'','initial personnel registration cannot depend on creating an earlier staff account');
+ const personSpec={mode:'personnel_create',name:'New personnel',unit:'Office',title:'Clerk',location:'Office',employment:'Fixed',managerId:'manager',start:day,nationalId:'1234567890',birthDate:'1990-01-01',maritalStatus:'single',mobile:'09123269727',address:'PERSON-ADDRESS',emergencyContact:'Emergency 09120000000',bankAccount:'IR-test',notes:''};
+ assert.equal((await post(hr,{...personSpec,maritalStatus:''})).status,400);
+ assert.equal((await post(hr,{...personSpec,birthDate:''})).status,400);
+ const beforeAccounts=sql.prepare('SELECT count(*) AS n FROM app_members').get().n;
+ const createdPerson=await ok(hr,personSpec),person=row(createdPerson);assert.equal(person.type,'hr_employee');assert.equal(person.data.state,'setup');assert.equal(sql.prepare('SELECT count(*) AS n FROM app_members').get().n,beforeAccounts);
+ assert.equal((await apply(hr,createdPerson,'personnel_complete')).status,400);
+ await upload(hr,createdPerson,'national_card');assert.equal((await apply(hr,createdPerson,'personnel_complete')).status,400);
+ await upload(hr,createdPerson,'birth_certificate');await upload(hr,createdPerson,'spouse_page');await upload(hr,createdPerson,'children_page');await success(hr,createdPerson,'personnel_complete');assert.equal(row(createdPerson).data.state,'active');assert.ok(row(createdPerson).data.identityCompleteAt);
+ assert.equal((await post(hr,personSpec)).status,409,'national identity prevents a duplicate person');
+ const admin={userId:'owner',email:'owner@example.com',name:'Owner',isAdmin:true,permissions:load('lib/permissions.ts').allPermissions};sql.prepare("INSERT INTO app_identity(id,subject) VALUES('owner','owner')").run();
+ const accountBody={username:'personnel-first',password:'Actual-test-password-123',name:'MUST NOT OVERRIDE',unit:'Wrong unit',status:'active',permissions:{read:[],write:[],eventStages:[]}};
+ const accountReq=body=>req('/api/users',body);
+ assert.equal((await ctx.run(admin,()=>users.POST(accountReq(accountBody)))).status,400,'staff cannot be created before personnel');
+ const res=await ctx.run(admin,()=>users.POST(accountReq({...accountBody,personnelId:createdPerson}))),account=await res.json();assert.equal(res.status,201,JSON.stringify(account));assert.equal(account.member.id,person.data.memberId);assert.equal(account.member.name,'New personnel');assert.equal(account.member.unit,'Office');assert.equal(account.member.mobile,'09123269727');assert.equal(sql.prepare("SELECT count(*) AS n FROM flow_entities WHERE type='hr_employee' AND json_extract(data,'$.memberId')=?").get(person.data.memberId).n,1);
+ assert.equal((await ctx.run(admin,()=>users.POST(accountReq({...accountBody,username:'duplicate-account',personnelId:createdPerson})))).status,409);
+
+
+ const personUser={userId:'local:'+person.data.memberId,name:'New personnel',email:account.member.email,isAdmin:false,permissions:{read:[],write:[],eventStages:[]}};
+ const birth=await ok(personUser,{mode:'family_start',familyEvent:'birth',eventDate:today,childName:'PRIVATE-CHILD',notes:''});assert.equal((await get(manager)).data.records.some(r=>r.id===birth),false);assert.equal(load('lib/personnel-family.ts').familyAt(await domain.hrRows(),person.data.memberId,today).childrenCount,0);
+ assert.equal((await apply(personUser,birth,'family_submit')).status,400);await upload(personUser,birth,'children_page');await success(personUser,birth,'family_submit');assert.equal(row(birth).data.state,'hr');assert.equal((await apply(personUser,birth,'family_approve')).status,403);assert.equal((await apply(hr,birth,'approve')).status,400);await success(hr,birth,'family_approve',{effective:today});assert.equal(load('lib/personnel-family.ts').familyAt(await domain.hrRows(),person.data.memberId,today).childrenCount,1);assert.equal(load('lib/personnel-family.ts').familyAt(await domain.hrRows(),person.data.memberId,duties.addDay(today,-1)).childrenCount,null);assert.equal((await post(personUser,{mode:'family_start',familyEvent:'birth',eventDate:today,childName:'PRIVATE-CHILD'})).status,409);
+ const divorce=await ok(personUser,{mode:'family_start',familyEvent:'divorce',eventDate:today});await upload(personUser,divorce,'spouse_page');await success(personUser,divorce,'family_submit');await success(hr,divorce,'family_reject',{notes:'Document needs correction'});assert.equal(row(divorce).data.state,'rejected');
+
+ const secondBirth=await ok(personUser,{mode:'family_start',familyEvent:'birth',eventDate:today,childName:'Second child'});await upload(personUser,secondBirth,'children_page');await success(personUser,secondBirth,'family_submit');const locked=crypto.randomUUID();seed(locked,'hr_period',{memberIds:[person.data.memberId],start:today,end:today,state:'closed'});assert.equal((await apply(hr,secondBirth,'family_approve',{effective:today})).status,409);const future=duties.addDay(today,1);assert.equal((await apply(hr,secondBirth,'family_approve',{effective:future,notes:''})).status,400);await success(hr,secondBirth,'family_approve',{effective:future,notes:'Use next open period without rewriting closed payroll'});assert.equal(load('lib/personnel-family.ts').familyAt(await domain.hrRows(),person.data.memberId,today).childrenCount,1);assert.equal(load('lib/personnel-family.ts').familyAt(await domain.hrRows(),person.data.memberId,future).childrenCount,2);
+ // Existing migration freeze is separately covered by reset suites.
+
+ // Account roles and original signed evidence remain unchanged throughout the workflow.
+ assert.equal(sql.prepare('SELECT permissions FROM app_members WHERE id=?').get('alice').permissions,rawPermissions);
+ console.log('personnel-employment: employee code/details, private multi-evidence, HR-only contracts, no permission changes, signed finalization, dates, reminders, renewal race and revocation passed');
+})().catch(e=>{console.error(e);process.exitCode=1});

@@ -1,3 +1,7 @@
+
+## 2026-11-16 — مسئول اداری و پرونده پیش از حساب
+پنل HR در همان پرتال؛ ثبت شخص بدون حساب، اطلاعات هویتی/تأهل/تولد و چهار مدرک اجباری، ساخت حساب مدیر فقط برای پرونده تکمیل‌شده بدون تکرار، قرارداد مدت‌دار با عنوان ثابت، نسخه تمدید و پیگیری ۳۰/۷ روز و انقضا، درخواست مستند خانوادگی با تصمیم مستقل اداری و مبنای تاریخ‌دار حقوق، فایل خصوصی و برابری HTTP/MCP. اختیار دسترسی به اداری اضافه نشده. محدودیت خوانایی چاپ لیبل کوچک حذف شده است. تغییر نرخ یا مبلغ مزایای خانوادگی و ثبت گروهی/گالری جدید اموال اجرا نشده؛ مرزها در HR-ADMINISTRATION.fa.md و ASSET-GALLERY-BULK-REVIEW.fa.md روشن‌اند. گزارش کنترل: docs/quality-reviews/2026-11-16-hr-administration.md.
+
 ## 2026-11-16 — Custodian person follow-up
 
 11 related suites passed plus strengthened mobile receipt/history coverage; stale response and role revocation, pending-vs-received, duplicate/inactive names, bounded pages and day-only history checked. Local real-component render only. Historical data without evidence remains incomplete; no old receipt source is invented. Final native deployment and all-path Git comparison remain release gates.

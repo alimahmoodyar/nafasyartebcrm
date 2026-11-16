@@ -1,3 +1,7 @@
+
+## 2026-11-16 — مسئول اداری و پرونده پیش از حساب
+پنل HR در همان پرتال؛ ثبت شخص بدون حساب، اطلاعات هویتی/تأهل/تولد و چهار مدرک اجباری، ساخت حساب مدیر فقط برای پرونده تکمیل‌شده بدون تکرار، قرارداد مدت‌دار با عنوان ثابت، نسخه تمدید و پیگیری ۳۰/۷ روز و انقضا، درخواست مستند خانوادگی با تصمیم مستقل اداری و مبنای تاریخ‌دار حقوق، فایل خصوصی و برابری HTTP/MCP. اختیار دسترسی به اداری اضافه نشده. محدودیت خوانایی چاپ لیبل کوچک حذف شده است. تغییر نرخ یا مبلغ مزایای خانوادگی و ثبت گروهی/گالری جدید اموال اجرا نشده؛ مرزها در HR-ADMINISTRATION.fa.md و ASSET-GALLERY-BULK-REVIEW.fa.md روشن‌اند. گزارش کنترل: docs/quality-reviews/2026-11-16-hr-administration.md.
+
 ## 2026-11-16 — Unified custodian home and person custody
 
 Direct custodian entry into existing assets; exact staff search, actual current custody and accepted/legacy handover history. Shared read-only work/MCP access, no new grants to ordinary staff. Mobile handover receipt appends an atomic actual source/destination event. Eleven relevant suites and extra mobile-history assertions passed; exact-source build/publication parity required.

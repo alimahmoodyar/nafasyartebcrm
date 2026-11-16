@@ -7,7 +7,7 @@ const root=path.resolve(__dirname,'..');
 const built=path.join(root,'dist','server');
 assert.ok(fs.existsSync(path.join(built,'index.js')),'Run pnpm build before this worker regression test.');
 const {Miniflare}=require(require.resolve('miniflare',{paths:[require.resolve('wrangler/package.json')]}));
-const permissions={read:[],write:[],eventStages:[],personnelRoles:['treasury'],roleAssignment:{roles:['treasurer']}};
+const permissions={read:[],write:[],eventStages:[],personnelRoles:['treasury'],roleAssignment:{roles:['treasurer','personnel_treasury']}};
 const wrapper=`
 import app from './index.js';
 let initialized;
