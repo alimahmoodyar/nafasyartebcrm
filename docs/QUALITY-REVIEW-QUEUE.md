@@ -1,3 +1,7 @@
+## 2026-11-16 — Asset passport completion
+
+14 relevant suites passed, including custodian/revocation, registration races/replay, evidence privacy/custody, upload retry, camera/editor and A3 layout. Synthetic records only. Physical printer/camera confirmation remains hardware-dependent; no such test or enterprise scale SLA claimed. Native publication/source equality is required before completion.
+
 ## 2026-11-16 — Scan entry simplification
 
 Seven focused UI/domain suites passed: no global/role-shell duplicate, role-owned trigger still opens the shared read-only resolver, exact route/old-role response/driver/service/custodian/label controls preserved. No asset form runtime change or live records/SMS. Final typecheck/build and source/live parity are packaging gates.

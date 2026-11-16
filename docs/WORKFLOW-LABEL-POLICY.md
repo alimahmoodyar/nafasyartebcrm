@@ -37,3 +37,7 @@
 ## QR اتصال دستگاه‌ها؛ غیر از لیبل کالا
 
 تولیدکنندهٔ `device-pair-workspace.tsx` از `pairInviteUrl` استفاده می‌کند. این کد لیبل تجاری یا مجوز دامنه نیست؛ دعوت کوتاه‌عمر و یک‌بارمصرف برای دو نشستِ همان حساب و همان نقش است. اسکنر مشترک آن را به جریان اتصال می‌فرستد، نه دریافت انبار. دعوت خراب، مصرف‌شده، منقضی یا متعلق به حساب/نقش دیگر رد می‌شود و هیچ کالا، موجودی، دریافت یا تأییدی ایجاد نمی‌کند. آزمون‌های `device-pair.cjs` و `device-pair-ui.cjs` تولید/مصرف همین پیوند و مرزهای دسترسی را بررسی می‌کنند.
+
+## Asset print layout extension (2026-11-16)
+
+`lib/asset-print.ts` is a second rendering entry for the SAME `assetQrText` identity, invoked by the authenticated asset-print route. QR-first adaptive geometry, roll/A4/A3 and reprints do not create or receive assets. `tests/asset-passport.cjs`, `tests/asset-workflow.cjs` and `tests/custodian-profile.cjs` cover source identity, exact role resolver and read-only scanning.

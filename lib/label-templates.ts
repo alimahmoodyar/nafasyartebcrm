@@ -1,18 +1,19 @@
+import {assetIdentity} from './asset-workflow';
 import {AccessError,can,requireAccess} from './authorization';
 import {storage} from './storage';
 import {rollFields,readRoll,type LabelTemplate} from './label-roll';
 
 export async function labelTemplateAccess(){
- const user=await requireAccess(),p=user.permissions;
+ const user=await requireAccess(),p=user.permissions;const custodian=!!p.assetRoles?.includes('custodian')&&(await assetIdentity(user)).custodian;
  if(!user.isAdmin&&(p.salesAgentId||p.serviceAgentId||p.salesRoles?.includes('agent')||p.serviceRoles?.includes('agent')||p.qmsRoles?.includes('observer')||
-  !(can(user,'device','read')||can(user,'batch','read')||p.flowRoles?.some(r=>r==='inventory'||r==='qc')||p.warehouseResponsibilities?.length)))
+  !custodian&&!(can(user,'device','read')||can(user,'batch','read')||p.flowRoles?.some(r=>r==='inventory'||r==='qc')||p.warehouseResponsibilities?.length)))
   throw new AccessError('دسترسی به قالب‌های چاپ مجاز نیست.',403);
  return user;
 }
 
-export async function listLabelTemplates(){
+export async function listLabelTemplates(includeA3=false){
  const {results}=await storage().prepare("SELECT id,data,revision FROM flow_entities WHERE type='label_template' ORDER BY json_extract(data,'$.name'),id").all<{id:string;data:string;revision:number}>();
- return results.map(({id,data,revision}):LabelTemplate=>({id,revision,...JSON.parse(data)}));
+ return results.map(({id,data,revision}):LabelTemplate=>({id,revision,...JSON.parse(data)})).filter(t=>includeA3||t.sheetSize!=='a3');
 }
 
 export async function saveLabelTemplate(actor:string,body:any){
@@ -27,13 +28,14 @@ export async function saveLabelTemplate(actor:string,body:any){
  }
  const roll=readRoll(params),db=storage();
  if(body.requestId!==undefined&&(typeof body.requestId!=='string'||!/^[a-f\d-]{36}$/i.test(body.requestId)))throw new AccessError('شناسهٔ ذخیرهٔ قالب معتبر نیست.',400);
- const signature=JSON.stringify({id:body.id||null,revision:body.revision,name,roll,layout:body.layout??null});
+ if(body.sheetSize!==undefined&&!['a4','a3'].includes(body.sheetSize))throw new AccessError('اندازه برگه معتبر نیست.',400);
+ const signature=JSON.stringify({...(body.sheetSize?{sheetSize:body.sheetSize}:{}),id:body.id||null,revision:body.revision,name,roll,layout:body.layout??null});
  if(body.requestId){const prior=await db.prepare('SELECT kind,payload,actor FROM inventory_operations WHERE id=?').bind(body.requestId).first<{kind:string;payload:string;actor:string}>();if(prior){if(prior.kind!=='label_template_save'||prior.actor!==actor||prior.payload!==signature)throw new AccessError('شناسهٔ ذخیره برای درخواست دیگری استفاده شده است.',409);const result=await db.prepare("SELECT target,after FROM access_audit WHERE id=? AND actor=? AND action='label_template_save'").bind(body.requestId,actor).first<{target:string;after:string}>();if(!result)throw new AccessError('نتیجهٔ ذخیرهٔ قبلی در دسترس نیست.',409);return {id:result.target,...JSON.parse(result.after),revision:body.revision+1,repeated:true};}}
 
  const previous=body.id?await db.prepare("SELECT data,revision FROM flow_entities WHERE id=? AND type='label_template'").bind(body.id).first<{data:string;revision:number}>():null;
- const layout=body.layout??(previous?JSON.parse(previous.data).layout:undefined)??'roll';if(!['roll','thermal','a4'].includes(layout))throw new AccessError('نوع کاغذ قالب معتبر نیست.',400);const data=JSON.stringify({name,roll,layout});
+ const layout=body.layout??(previous?JSON.parse(previous.data).layout:undefined)??'roll';if(!['roll','thermal','a4'].includes(layout))throw new AccessError('نوع کاغذ قالب معتبر نیست.',400);const sheetSize=body.sheetSize??(previous?JSON.parse(previous.data).sheetSize:undefined);const data=JSON.stringify({name,roll,layout,...(sheetSize?{sheetSize}:{})});
  if(body.revision>0&&previous?.revision!==body.revision)throw new AccessError('قالب تغییر کرده است. فهرست را تازه کنید.',409);
- if(previous?.data===data&&!body.requestId)return {id:body.id,name,roll,layout,revision:previous.revision};
+ if(previous?.data===data&&!body.requestId)return {id:body.id,name,roll,layout,...(sheetSize?{sheetSize}:{}),revision:previous.revision};
  const id=body.id||'label-template:'+crypto.randomUUID(),now=new Date().toISOString(),op=body.requestId||crypto.randomUUID();
  try{
   await db.batch([
@@ -45,5 +47,5 @@ export async function saveLabelTemplate(actor:string,body:any){
   if(/guard|constraint/i.test(String(error)))throw new AccessError('نام قالب تکراری است، فهرست تغییر کرده یا ظرفیت قالب‌ها پر شده است.',409);
   throw error;
  }
- return {id,name,roll,layout,revision:body.revision+1};
+ return {id,name,roll,layout,...(sheetSize?{sheetSize}:{}),revision:body.revision+1};
 }

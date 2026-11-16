@@ -1,3 +1,7 @@
+## 2026-11-16 — Asset passport and adaptive QR printing
+
+Automatic guarded asset codes; reviewed icon categories; private multi-document camera/file evidence; shared named print templates with custodian access and A4/A3; QR-first automatic geometry. Fourteen related suites passed, exact-source typecheck/build and native publication parity required.
+
 ## 2026-11-16 — Remove duplicate scan entry points
 
 Keep shared scan host/listeners while removing its global launcher and the role-shell duplicate. Role-owned scanners remain and primary labels read اسکن. Seven focused suites passed; exact-source build and native publication parity remain required. Asset form review is documentation only.
