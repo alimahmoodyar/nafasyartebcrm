@@ -1,3 +1,4 @@
+import {uploadTransferPhoto,accessTransferPhoto} from './asset-transfer-photos';
 import {accessWorkflowAsset,assetRow,ownsAsset,technicalAsset} from './asset-workflow';
 import {requireAccess,checkOrigin,accessResponse} from './authorization';
 import {boundedBody,firmwareBucket} from './firmware-storage';
@@ -17,8 +18,9 @@ export async function GET(request:Request){try{
   return Response.json({files:rows.slice(0,50).map(x=>{const d=JSON.parse(x.data);return {id:x.id,filename:d.filename,byteSize:d.byteSize,mime:d.mime||'',created:x.created};}),hasMore:rows.length>50},{headers});
  }
  const f=await assetRow(q.get('id')||'');if(!f||f.type!=='asset_file')assetFail('مدرک یافت نشد.',404);
+ if(f.data.purpose==='transfer_photo')await accessTransferPhoto(u,f);else {
  const {r:parent,a}=await accessWorkflowAsset(u,f.data.assetId);
- if(f.data.purpose==='purchase'){if(!a.custodian)assetFail('مدارک خرید فقط در دسترسی اموال‌دار است.',403);}else if(parent.data.custodyId!==f.data.custodyId)assetFail('مدرک مربوط به تحویل پیشین است.',404);
+ if(f.data.purpose==='purchase'){if(!a.custodian)assetFail('مدارک خرید فقط در دسترسی اموال‌دار است.',403);}else if(parent.data.custodyId!==f.data.custodyId)assetFail('مدرک مربوط به تحویل پیشین است.',404);}
  const object=await firmwareBucket().get(f.data.objectKey);if(!object)assetFail('فایل در دسترس نیست.',404);const bytes=await object!.arrayBuffer();
  if(bytes.byteLength!==f.data.byteSize||await sha256(bytes)!==f.data.sha256)assetFail('یکپارچگی فایل تأیید نشد.',503);
  const mime=q.get('view')==='preview'?imageType(new Uint8Array(bytes)):'';
@@ -27,7 +29,8 @@ export async function GET(request:Request){try{
 export async function POST(request:Request){let key='',fileId='';try{
  checkOrigin(request);const u=await requireAccess();if(request.headers.get('x-asset-account')&&request.headers.get('x-asset-account')!==u.userId)assetFail('حساب ورود تغییر کرده است؛ صفحه را تازه کنید.',409);
  const q=new URL(request.url).searchParams;fileId=taskRequired(q.get('id'));const assetId=taskRequired(q.get('assetId')),filename=taskRequired(q.get('filename'),180),purpose=q.get('purpose')||'custody';
- if(!['custody','purchase'].includes(purpose)||q.get('confirmed')!=='true'||! /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(fileId))assetFail('تأیید و شناسه فایل لازم است.');
+ if(!['custody','purchase','transfer_photo'].includes(purpose)||q.get('confirmed')!=='true'||! /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(fileId))assetFail('تأیید و شناسه فایل لازم است.');
+ if(purpose==='transfer_photo')return await uploadTransferPhoto(request,u,q);
  const members=await assetMembers(),{r,a}=await accessWorkflowAsset(u,assetId),rows=await assetRows();
  if(purpose==='purchase'?!a.custodian:!(a.custodian||ownsAsset(r.data,a)||technicalAsset(r.data,a)))assetFail('اجازه پیوست این مدرک را ندارید.',403);
  const bytes=await boundedBody(request,MAX_BATCH_FILE_BYTES);try{validateBatchFile(filename,bytes.length)}catch(e){assetFail((e as Error).message)}const hash=await sha256(bytes.buffer as ArrayBuffer),old=rows.find(x=>x.id===fileId);

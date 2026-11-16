@@ -13,7 +13,18 @@ export const rollFields=[
 export type RollField=typeof rollFields[number][0];
 export type RollLayout=Record<RollField,number>;
 export const labelTemplateManager='/api/label-templates?view=manage';
-export type LabelTemplate={id:string;name:string;revision:number;roll:RollLayout;layout?:'roll'|'thermal'|'a4';sheetSize?:'a4'|'a3'};
+export type AssetPaper={height:number;anchor:'top'|'middle'|'bottom';x:number;y:number};
+export function normalizeAssetPaper(value:any,minimum=0):AssetPaper|null{
+ if(value==null)return null;
+ if(typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(k=>!['height','anchor','x','y'].includes(k))||typeof value.height!=='number'||!Number.isFinite(value.height)||value.height<minimum||value.height<=0||value.height>3000||!['top','middle','bottom'].includes(value.anchor))throw new AccessError('ارتفاع صفحه یا محل شروع چاپ معتبر نیست.',400);
+ const x=value.x??0,y=value.y??0;if([x,y].some(n=>typeof n!=='number'||!Number.isFinite(n)||Math.abs(n)>1000))throw new AccessError('جابه‌جایی چاپ معتبر نیست.',400);
+ return {height:value.height,anchor:value.anchor,x,y};
+}
+export function readAssetPaper(q:URLSearchParams,roll:RollLayout,legacy=false):AssetPaper{
+ const number=(key:string,fallback:number)=>{const raw=q.get(key);if(raw===null)return fallback;if(!/^-?\d+(?:\.\d{1,2})?$/.test(raw))throw new AccessError('اندازه و جابه‌جایی چاپ را با میلی‌متر وارد کنید.',400);return Number(raw);};
+ return normalizeAssetPaper({height:number('paperHeight',legacy?rollPitch(roll):Math.max(roll.rollWidth,rollPitch(roll))),anchor:q.get('rowAnchor')||(legacy?'top':'bottom'),x:number('offsetX',0),y:number('offsetY',0)},roll.height)!;
+}
+export type LabelTemplate={id:string;name:string;revision:number;roll:RollLayout;layout?:'roll'|'thermal'|'a4';sheetSize?:'a4'|'a3';assetPaper?:AssetPaper};
 export const printEsc=(v:unknown)=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
 
 export function readRoll(q:URLSearchParams,size={width:60,height:30}):RollLayout{
@@ -60,7 +71,7 @@ export function labelContentCss(size:{width:number;height:number},design:{width:
 }
 
 export function templatePicker(templates:LabelTemplate[],manageUrl:string,admin:boolean,selected='',canSave=true,includeA3=false){
- return '<label>قالب ذخیره‌شدهٔ چاپ<select id="roll-template" name="template"><option value="">تنظیم دستی</option>'+templates.filter(t=>includeA3||t.sheetSize!=='a3').map(t=>'<option value="'+printEsc(t.id)+'" data-sheet="'+printEsc(t.sheetSize||'a4')+'" data-layout="'+printEsc(t.layout||'roll')+'" data-roll="'+printEsc(JSON.stringify(t.roll))+'"'+(selected===t.id?' selected':'')+'>'+printEsc(t.name)+'</option>').join('')+'</select></label>'+(canSave?'<label>نام قالب جدید<input id="roll-preset-name" type="text" maxlength="80" style="width:240px;max-width:100%" placeholder="مثلاً پرینتر انبار ـ لیبل ۳۲ در ۱۵"></label><button type="button" id="save-roll-preset">ذخیرهٔ تنظیمات فعلی با نام</button><small>قالب برای کاربران دارای دسترسی چاپ قابل انتخاب است. تنظیمات داخل همین صفحه ذخیره می‌شوند؛ انتخاب پرینتر و تنظیمات پنجرهٔ چاپ مرورگر جداست.</small><p id="roll-preset-feedback" role="status" aria-live="polite"></p>':'<small>ذخیرهٔ قالب مشترک را از بخش اطلاعات شرکت انجام دهید.</small>')+(admin?'<a href="'+printEsc(manageUrl)+'" target="_blank" rel="noopener">مدیریت قالب‌های چاپ</a>':'');
+ return '<label>قالب ذخیره‌شدهٔ چاپ<select id="roll-template" name="template"><option value="">تنظیم دستی</option>'+templates.filter(t=>includeA3||t.sheetSize!=='a3').map(t=>'<option value="'+printEsc(t.id)+'" data-sheet="'+printEsc(t.sheetSize||'a4')+'" data-layout="'+printEsc(t.layout||'roll')+'" data-asset-paper="'+printEsc(JSON.stringify(t.assetPaper||null))+'" data-roll="'+printEsc(JSON.stringify(t.roll))+'"'+(selected===t.id?' selected':'')+'>'+printEsc(t.name)+'</option>').join('')+'</select></label>'+(canSave?'<label>نام قالب جدید<input id="roll-preset-name" type="text" maxlength="80" style="width:240px;max-width:100%" placeholder="مثلاً پرینتر انبار ـ لیبل ۳۲ در ۱۵"></label><button type="button" id="save-roll-preset">ذخیرهٔ تنظیمات فعلی با نام</button><small>قالب برای کاربران دارای دسترسی چاپ قابل انتخاب است. تنظیمات داخل همین صفحه ذخیره می‌شوند؛ انتخاب پرینتر و تنظیمات پنجرهٔ چاپ مرورگر جداست.</small><p id="roll-preset-feedback" role="status" aria-live="polite"></p>':'<small>ذخیرهٔ قالب مشترک را از بخش اطلاعات شرکت انجام دهید.</small>')+(admin?'<a href="'+printEsc(manageUrl)+'" target="_blank" rel="noopener">مدیریت قالب‌های چاپ</a>':'');
 }
 
 export const selectRollScript=String.raw`
@@ -69,12 +80,13 @@ preset.addEventListener('change',()=>{
  const data=preset.selectedOptions[0]?.dataset.roll;
  if(!data)return;
  layout.value=preset.selectedOptions[0].dataset.layout||'roll';if(form.elements.namedItem('sheetSize'))form.elements.namedItem('sheetSize').value=preset.selectedOptions[0].dataset.sheet||'a4';
+ const assetPaper=JSON.parse(preset.selectedOptions[0].dataset.assetPaper||'null');if(form.elements.namedItem('paperHeight')){form.elements.namedItem('paperHeight').value=assetPaper?.height||JSON.parse(data).height+JSON.parse(data).gapY;form.elements.namedItem('rowAnchor').value=assetPaper?.anchor||'top';form.elements.namedItem('offsetX').value=assetPaper?.x||0;form.elements.namedItem('offsetY').value=assetPaper?.y||0;}
  updateRoll();
  for(const [key,value] of Object.entries(JSON.parse(data)))form.elements.namedItem(key).value=value;
  form.requestSubmit(document.getElementById('label-preview'));
 });
 layout.addEventListener('change',()=>{preset.value='';});
-for(const key of ['width','height','rollWidth','columns','gapX','gapY','left','top','sheetSize']){
+for(const key of ['width','height','rollWidth','columns','gapX','gapY','left','top','sheetSize','paperHeight','rowAnchor','offsetX','offsetY']){
  form.elements.namedItem(key)?.addEventListener('input',()=>{preset.value='';});
 }
 const savePreset=document.getElementById('save-roll-preset');let pendingPreset=null;
@@ -84,13 +96,13 @@ savePreset?.addEventListener('click',async()=>{
  if(!form.reportValidity())return;
  const read=key=>Number(form.elements.namedItem(key).value),kind=layout.value;
  const roll=kind==='roll'?Object.fromEntries(['width','height','rollWidth','columns','gapX','gapY','left','top'].map(key=>[key,read(key)])):{width:read('width'),height:read('height'),rollWidth:read('width'),columns:1,gapX:0,gapY:0,left:0,top:0};
- const payload={name,revision:0,roll,layout:kind,...(form.elements.namedItem('sheetSize')?{sheetSize:form.elements.namedItem('sheetSize').value}:{}),confirmed:true},key=JSON.stringify(payload);if(pendingPreset?.key!==key)pendingPreset={key,requestId:crypto.randomUUID()};
+ const payload={name,revision:0,roll,layout:kind,...(kind==='roll'&&form.elements.namedItem('paperHeight')?{assetPaper:{height:read('paperHeight'),anchor:form.elements.namedItem('rowAnchor').value,x:read('offsetX'),y:read('offsetY')}}:{}),...(form.elements.namedItem('sheetSize')?{sheetSize:form.elements.namedItem('sheetSize').value}:{}),confirmed:true},key=JSON.stringify(payload);if(pendingPreset?.key!==key)pendingPreset={key,requestId:crypto.randomUUID()};
  savePreset.disabled=true;message.textContent='در حال ذخیرهٔ قالب…';
  try{
   const response=await fetch('/api/label-templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...payload,requestId:pendingPreset.requestId})});
   const data=await response.json();if(!response.ok)throw Error(data.error||'ذخیرهٔ قالب انجام نشد.');
   let option=Array.from(preset.options).find(o=>o.value===data.id);if(!option){option=new Option(data.name,data.id);preset.add(option);}
-  option.textContent=data.name;option.dataset.roll=JSON.stringify(data.roll);option.dataset.layout=data.layout||'roll';option.dataset.sheet=data.sheetSize||'a4';preset.value=data.id;
+  option.textContent=data.name;option.dataset.roll=JSON.stringify(data.roll);option.dataset.layout=data.layout||'roll';option.dataset.sheet=data.sheetSize||'a4';option.dataset.assetPaper=JSON.stringify(data.assetPaper||null);preset.value=data.id;
   pendingPreset=null;nameInput.value='';message.textContent='قالب «'+data.name+'» ذخیره شد و از فهرست قالب‌های چاپ قابل انتخاب است.';
  }catch(error){message.textContent=error.message;}finally{savePreset.disabled=false;}
 });

@@ -1,3 +1,5 @@
+// Handover sender/receiver photographs remain existing asset_file (purpose transfer_photo),
+// bound atomically to asset_event; generic operational backup/reset, R2 manifest and 0016 freeze apply.
 // asset_registration is an immutable operational group; each item remains asset_item. Staged/bound real photos are existing asset_file/R2 with purpose asset_photo. Both reset scopes, blob backups and generic 0016 freeze apply; no new table or label authority.
 // Unified custodian queries add no persistence. Mobile handover appends existing asset_event in the receipt transaction; existing asset_* backup/reset/freeze applies.
 // Asset passport purchase evidence remains asset_file + existing private BUCKET paths; purpose/mime and auto codes extend existing JSON. label_template.sheetSize uses the same catalog/freeze/backup. No new tables or operational reset scope.
