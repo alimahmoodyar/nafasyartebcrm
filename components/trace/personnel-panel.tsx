@@ -30,7 +30,7 @@ const minutes=(n:unknown)=>typeof n==='number'&&Number.isFinite(n)?Math.floor(n/
 const leaveDays=(n:unknown)=>typeof n==='number'&&Number.isFinite(n)?n.toLocaleString('fa-IR',{maximumFractionDigits:3})+' روز کاری':'قابل محاسبه نیست';
 const paidTotal=(payments:unknown)=>{if(!Array.isArray(payments)||payments.some(p=>typeof p?.amount!=='string'||!/^\d{1,18}$/.test(p.amount)))return undefined;return String(payments.reduce((n,p)=>n+BigInt(p.amount),BigInt(0)))};
 const repaymentBalance=(payments:unknown,recovered:unknown)=>{const paid=paidTotal(payments);if(paid===undefined||typeof recovered!=='string'||!/^\d{1,18}$/.test(recovered)||BigInt(recovered)>BigInt(paid))return undefined;return String(BigInt(paid)-BigInt(recovered))};
-export function PersonnelPanel({demo=false,targetId='',initialManagementView}:{demo?:boolean;targetId?:string;initialManagementView?:'hr_payroll'|'advances'}){
+export function PersonnelPanel({demo=false,targetId='',initialManagementView,onNavigate}:{demo?:boolean;targetId?:string;initialManagementView?:'hr_payroll'|'advances';onNavigate?:(section:string)=>void}){
  const [data,setData]=useState<any>(null),[error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[view,setView]=useState(initialManagementView?'management':targetId==='hr-admin:'?'hr_admin':'personal_leave'),[managementView,setManagementView]=useState<string>(initialManagementView||'hr_request'),[selected,setSelected]=useState(''),[mode,setMode]=useState(initialManagementView?'':'request'),[form,setForm]=useState<any>(()=>requestDefaults()),[op,setOp]=useState(''),[evidence,setEvidence]=useState<File|null>(null),[from,setFrom]=useState(''),[to,setTo]=useState(''),[query,setQuery]=useState(''),[owner,setOwner]=useState('all'),[queue,setQueue]=useState(false),[leaveMonth,setLeaveMonth]=useState(()=>localDay()),[leaveMonthLoading,setLeaveMonthLoading]=useState(false);
  const loadSequence=useRef(0),leaveLoadSequence=useRef(0);
  const backRef=useWorkspaceBack(()=>{if(!busy)setSelected('')},!demo&&!!selected);
@@ -55,7 +55,7 @@ export function PersonnelPanel({demo=false,targetId='',initialManagementView}:{d
  const date=(k:string,label:string,required=true)=><SolarDate label={label} value={form[k]||''} required={required} onChange={v=>change(k,v)}/>;
  const check=(k:string,label:string)=><label className="field"><span><Checkbox checked={!!form[k]} onCheckedChange={v=>change(k,v===true)}/> {label}</span></label>;
  if(demo)return <div className="panel inside">پرتال پرسنلی فقط در محیط شرکت در دسترس است.</div>;
- if(view==='hr_admin')return <PersonnelAdminPanel initialTargetId={targetId} onBack={()=>setView('management')}/>;
+ if(view==='hr_admin')return <PersonnelAdminPanel initialTargetId={targetId} onBack={()=>setView('management')} onNavigate={onNavigate}/>;
  if(!data)return <div className="panel inside"><p role={error?'alert':'status'}>{error||'در حال دریافت پرتال…'}</p><RefreshButton retry={!!error} className="btn" onRefresh={()=>load().catch(e=>setError(e.message))} /></div>;
  const self=data.records.find((x:any)=>x.type==='hr_employee'&&x.data.memberId===data.me),balance=data.balances.find((x:any)=>x.memberId===data.me),summary=data.summaries.find((x:any)=>x.memberId===(owner==='all'?data.me:owner)),leaveSummary=data.leaveSummary?.memberId===data.me?data.leaveSummary:undefined;
  const personal=view.startsWith('personal_'),ownRequests=data.records.filter((x:any)=>x.type==='hr_request'&&x.data.memberId===data.me),canManage=data.admin||data.roles.length>0||data.managementInbox?.enabled;

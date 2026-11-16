@@ -73,7 +73,7 @@ export function RoleTestingPanel({targetId='',onNavigate,onProfile,onAccessChang
  if(snapshot&&['home-service-customer-support','home-service-technician'].includes(snapshot.profile.id)&&officeServiceDashboard&&!choosing)return <>{officeServiceDashboard}</>;
  if(snapshot?.profile.id==='home-service'&&!choosing)return <ServiceExpertDashboard accountKey={snapshot.profile.id} onNavigate={onNavigate}/>;
  if(id==='home-service'&&!snapshot&&!error&&!choosing)return <section className="panel inside" role="status">در حال دریافت پنل کارشناس…</section>;
- if(snapshot?.profile.id==='personnel-hr'&&!choosing)return <PersonnelAdminPanel/>;
+ if(snapshot?.profile.id==='personnel-hr'&&!choosing)return <PersonnelAdminPanel onNavigate={onNavigate}/>;
  if(snapshot?.profile.id==='custodian'&&!choosing)return <AssetsPanel onNavigate={onNavigate} onExit={()=>void select(null)}/>;
  if(id==='custodian'&&!snapshot&&!error&&!choosing)return <section className="panel inside" role="status">در حال دریافت پنل اموال‌دار…</section>;
  if(snapshot?.profile.id==='driver'&&!choosing)return <DriverDashboard accountKey={snapshot.profile.id} onNavigate={onNavigate}/>;
