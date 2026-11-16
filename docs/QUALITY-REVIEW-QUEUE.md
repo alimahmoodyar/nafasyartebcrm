@@ -1,3 +1,7 @@
+## 2026-11-16 — Scan entry simplification
+
+Seven focused UI/domain suites passed: no global/role-shell duplicate, role-owned trigger still opens the shared read-only resolver, exact route/old-role response/driver/service/custodian/label controls preserved. No asset form runtime change or live records/SMS. Final typecheck/build and source/live parity are packaging gates.
+
 ## 2026-11-16 — Custodian profile connection
 
 Owner authorized profile/catalog mapping, existing asset workspace and cartable, tests/push/publication. Tested admin without an employee, role switch isolation, real custodian revocation, exact receiver and audit identity, current/shared obligations, clearance routing, bounded queue, UI and MCP. 17 final related suites passed; one old warehouse UI harness failure reproduced on v294 and corrected without warehouse runtime changes. No migration/live writes/SMS/browser claim. Final source build and actual-deployment parity remain release gates.

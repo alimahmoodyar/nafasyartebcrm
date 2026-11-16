@@ -1,0 +1,82 @@
+{
+  "baseline": {
+    "site": 295,
+    "source": "df26140549d88c966bdba5b4027bd13238232481",
+    "github": "76b6297636f07b6d000d590dc2c17ac464c4a4d5"
+  },
+  "matrix": {
+    "began": "2026-11-16T08:20:59.100Z",
+    "ended": "2026-11-16T08:21:10.590Z",
+    "concurrency": 3,
+    "total": 7,
+    "passed": 7,
+    "failed": [],
+    "results": [
+      {
+        "name": "workflow-scanner-ui",
+        "command": "node tests/workflow-scanner-ui.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 949,
+        "log": "workflow-scanner-ui.log"
+      },
+      {
+        "name": "driver-dashboard-ui",
+        "command": "node tests/driver-dashboard-ui.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 986,
+        "log": "driver-dashboard-ui.log"
+      },
+      {
+        "name": "service-expert-dashboard-ui",
+        "command": "node tests/service-expert-dashboard-ui.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 1028,
+        "log": "service-expert-dashboard-ui.log"
+      },
+      {
+        "name": "workflow-label-policy",
+        "command": "node tests/workflow-label-policy.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 423,
+        "log": "workflow-label-policy.log"
+      },
+      {
+        "name": "driver-workspace",
+        "command": "node tests/driver-workspace.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 4804,
+        "log": "driver-workspace.log"
+      },
+      {
+        "name": "workflow-scan",
+        "command": "node tests/workflow-scan.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 6092,
+        "log": "workflow-scan.log"
+      },
+      {
+        "name": "custodian-profile",
+        "command": "node tests/custodian-profile.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 10536,
+        "log": "custodian-profile.log"
+      }
+    ]
+  },
+  "finalTypecheckAndBuild": "Required in packaging before source push",
+  "noBusinessDataChanges": true
+}

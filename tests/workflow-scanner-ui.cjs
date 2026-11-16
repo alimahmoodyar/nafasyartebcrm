@@ -17,6 +17,10 @@ function open(){win.dispatchEvent({type:'nafasyar-workflow-scan',detail:{}});ret
 const idle=()=>new Promise(r=>setImmediate(r));
 (async()=>{
 let t=tree();flush();assert.equal(nodes(t).filter(n=>n.props.autoStart).length,0);
+assert.equal(nodes(t).filter(n=>n.type===leaves.WorkflowScanButton).length,0,'The shared host must not add a global scan button before/inside roles');
+const trigger=load('components/trace/workflow-scan-button.tsx').WorkflowScanButton({});
+assert.equal(text(trigger),'اسکن');trigger.props.onClick();
+assert.ok(nodes(tree()).some(n=>n.props.autoStart),'A role-owned scan button still opens the shared scanner');
 t=open();assert.ok(nodes(t).some(n=>n.props.autoStart));const nav={id:'a',title:'Receive',kind:'navigate',section:'warehouse',target:'exact'};
 reply={ok:true,json:async()=>({kind:'batch',message:'ok',actions:[nav]})};nodes(t).find(n=>n.props.autoStart).props.onScan('batch');await idle();assert.equal(navigated.length,1);assert.equal(navigated[0][1],'exact');assert.equal(nodes(tree()).filter(n=>n.props.autoStart).length,0);
 t=open();reply={ok:true,json:async()=>({kind:'batch',message:'choose',actions:[nav,{...nav,id:'b',title:'QC',target:'qc'}]})};nodes(t).find(n=>n.props.autoStart).props.onScan('batch');await idle();assert.equal(navigated.length,1);t=tree();nodes(t).find(n=>n.type==='button'&&text(n)==='QC').props.onClick();assert.equal(navigated[1][1],'qc');
@@ -24,5 +28,10 @@ t=open();reply={ok:true,json:async()=>({kind:'receipt',message:'ok',actions:[{id
 // A response from a previously selected role must never open a form after role change.
 t=open();let resolve;reply={ok:true,json:()=>new Promise(r=>resolve=r)};nodes(t).find(n=>n.props.autoStart).props.onScan('old');await idle();key='other-role';tree();flush();resolve({kind:'batch',actions:[nav]});await idle();assert.equal(navigated.length,2);assert.equal(nodes(tree()).filter(n=>n.props.autoStart).length,0);
 assert.ok(calls.every(c=>!c.method&&c.url.startsWith('/api/workflow-scan?')));
+// The generic role shell also delegates scanning to each operational panel.
+const {RoleTestingPanel}=load('components/trace/role-testing-panel.tsx');slots=[[],{activeProfile:'custodian',profile:{id:'custodian',title:'اموال‌دار',group:'اداری و اموال',operational:true,links:[{title:'مدیریت اموال، تحویل و پیگیری',section:'assets'}],workflowRoles:[],gaps:[]},work:[],unverified:[],personalPreview:false},'',false,'',null,[],''];cursor=0;effects=[];
+const role=RoleTestingPanel({targetId:'custodian',onNavigate(){},onProfile(){}});
+assert.equal(nodes(role).filter(n=>n.type===leaves.WorkflowScanButton).length,0,'No duplicate scan in the role shell');
+assert.ok(text(role).includes('مدیریت اموال، تحویل و پیگیری'));
 console.log('PASS shared scan UI: camera only after gesture, one route auto-opens, multiple choices, exact receipt linkage, stale-role response ignored, read-only resolution.');
 })().catch(e=>{console.error(e);process.exitCode=1});

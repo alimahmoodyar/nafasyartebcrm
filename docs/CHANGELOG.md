@@ -1,3 +1,7 @@
+## 2026-11-16 — Remove duplicate scan entry points
+
+Keep shared scan host/listeners while removing its global launcher and the role-shell duplicate. Role-owned scanners remain and primary labels read اسکن. Seven focused suites passed; exact-source build and native publication parity remain required. Asset form review is documentation only.
+
 ## 2026-11-16 — Custodian role profile
 
 Add the custodian review profile and existing assets/cartable/scanner links. Respect effective profile grants without creating an employee; retain actor and ordinary membership revocation. Share custodian task stages, bounded current SQL queue, visible limits and legacy-clearance deep links. Seventeen final focused suites and TypeScript passed; final build/source/live verification is recorded with the release. See quality-reviews/2026-11-16-custodian-profile.md.
