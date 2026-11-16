@@ -1,3 +1,6 @@
+// Work arrangement only; hourly payment is determined by payroll rules.
+export const personnelEmploymentTypes:Record<string,string>={'تمام‌وقت':'تمام‌وقت','پاره‌وقت':'پاره‌وقت','کارآموز':'کارآموز'};
+export function personnelEmploymentOptions(current=''):Record<string,string>{return current&&!Object.hasOwn(personnelEmploymentTypes,current)?{[current]:current+' (ثبت قبلی)',...personnelEmploymentTypes}:personnelEmploymentTypes;}
 export const personnelFileCategories:Record<string,string>={spouse_page:'تصویر صفحه همسر شناسنامه',children_page:'تصویر صفحه فرزندان شناسنامه',national_card:'تصویر کارت ملی',birth_certificate:'تصویر شناسنامه',identity:'سایر مدارک هویتی',employment:'مدارک همکاری',education:'مدارک تحصیلی و مهارت',signed_contract:'قرارداد امضاشده',other:'سایر مدارک'};
 import {localDay,solarParts} from './persian-date';
 export const personnelRoles:Record<string,string>={hr:'اداری و منابع انسانی',payroll:'تهیه حقوق‌ودستمزد',approver:'تأیید حقوق و احکام',finance:'تأیید پرداخت پرسنلی',treasury:'ثبت پرداخت پرسنلی',executive_viewer:'گزارش‌خوان مرخصی مدیرعامل',reporter:'گزارش‌خوان اداری مرخصی'};
