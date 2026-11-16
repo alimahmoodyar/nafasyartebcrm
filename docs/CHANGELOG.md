@@ -1,3 +1,7 @@
+## 2026-11-16 — Unified custodian home and person custody
+
+Direct custodian entry into existing assets; exact staff search, actual current custody and accepted/legacy handover history. Shared read-only work/MCP access, no new grants to ordinary staff. Mobile handover receipt appends an atomic actual source/destination event. Eleven relevant suites and extra mobile-history assertions passed; exact-source build/publication parity required.
+
 ## 2026-11-16 — Asset passport and adaptive QR printing
 
 Automatic guarded asset codes; reviewed icon categories; private multi-document camera/file evidence; shared named print templates with custodian access and A4/A3; QR-first automatic geometry. Fourteen related suites passed, exact-source typecheck/build and native publication parity required.

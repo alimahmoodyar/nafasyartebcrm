@@ -32,6 +32,6 @@ assert.ok(calls.every(c=>!c.method&&c.url.startsWith('/api/workflow-scan?')));
 const {RoleTestingPanel}=load('components/trace/role-testing-panel.tsx');slots=[[],{activeProfile:'custodian',profile:{id:'custodian',title:'اموال‌دار',group:'اداری و اموال',operational:true,links:[{title:'مدیریت اموال، تحویل و پیگیری',section:'assets'}],workflowRoles:[],gaps:[]},work:[],unverified:[],personalPreview:false},'',false,'',null,[],''];cursor=0;effects=[];
 const role=RoleTestingPanel({targetId:'custodian',onNavigate(){},onProfile(){}});
 assert.equal(nodes(role).filter(n=>n.type===leaves.WorkflowScanButton).length,0,'No duplicate scan in the role shell');
-assert.ok(text(role).includes('مدیریت اموال، تحویل و پیگیری'));
+assert.ok(nodes(role).some(n=>n.type===leaves.AssetsPanel),'Custodian opens the existing assets directly');assert.ok(!text(role).includes('مدیریت اموال، تحویل و پیگیری'));
 console.log('PASS shared scan UI: camera only after gesture, one route auto-opens, multiple choices, exact receipt linkage, stale-role response ignored, read-only resolution.');
 })().catch(e=>{console.error(e);process.exitCode=1});

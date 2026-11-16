@@ -1,3 +1,7 @@
+## 2026-11-16 — Custodian person follow-up
+
+11 related suites passed plus strengthened mobile receipt/history coverage; stale response and role revocation, pending-vs-received, duplicate/inactive names, bounded pages and day-only history checked. Local real-component render only. Historical data without evidence remains incomplete; no old receipt source is invented. Final native deployment and all-path Git comparison remain release gates.
+
 ## 2026-11-16 — Asset passport completion
 
 14 relevant suites passed, including custodian/revocation, registration races/replay, evidence privacy/custody, upload retry, camera/editor and A3 layout. Synthetic records only. Physical printer/camera confirmation remains hardware-dependent; no such test or enterprise scale SLA claimed. Native publication/source equality is required before completion.

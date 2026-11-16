@@ -1,0 +1,122 @@
+{
+  "baseline": {
+    "version": 297,
+    "source": "cc347eadd8b7a2e658520356297f675ca9c31266",
+    "github": "fd775652c09f09a5d56d9fa0f3502867ff4454b3"
+  },
+  "matrix": {
+    "began": "2026-11-16T10:26:03.296Z",
+    "ended": "2026-11-16T10:26:51.596Z",
+    "concurrency": 3,
+    "total": 11,
+    "passed": 11,
+    "failed": [],
+    "results": [
+      {
+        "name": "custodian-home-ui",
+        "command": "node tests/custodian-home-ui.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 1158,
+        "log": "custodian-home-ui.log"
+      },
+      {
+        "name": "custodian-person",
+        "command": "node tests/custodian-person.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 17160,
+        "log": "custodian-person.log"
+      },
+      {
+        "name": "custodian-profile",
+        "command": "node tests/custodian-profile.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 17356,
+        "log": "custodian-profile.log"
+      },
+      {
+        "name": "asset-workflow-ui",
+        "command": "node tests/asset-workflow-ui.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 1924,
+        "log": "asset-workflow-ui.log"
+      },
+      {
+        "name": "assets",
+        "command": "node tests/assets.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 18279,
+        "log": "assets.log"
+      },
+      {
+        "name": "asset-workflow",
+        "command": "node tests/asset-workflow.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 21728,
+        "log": "asset-workflow.log"
+      },
+      {
+        "name": "asset-passport-ui",
+        "command": "node tests/asset-passport-ui.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 2310,
+        "log": "asset-passport-ui.log"
+      },
+      {
+        "name": "asset-passport",
+        "command": "node tests/asset-passport.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 21980,
+        "log": "asset-passport.log"
+      },
+      {
+        "name": "asset-links",
+        "command": "node tests/asset-links.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 22263,
+        "log": "asset-links.log"
+      },
+      {
+        "name": "workflow-scanner-ui",
+        "command": "node tests/workflow-scanner-ui.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 1867,
+        "log": "workflow-scanner-ui.log"
+      },
+      {
+        "name": "workflow-scan",
+        "command": "node tests/workflow-scan.cjs",
+        "status": "passed",
+        "exitCode": 0,
+        "signal": null,
+        "elapsedMs": 6855,
+        "log": "workflow-scan.log"
+      }
+    ]
+  },
+  "mobileReceiptHistoryAdditionalAssertions": "passed: one event per actually confirmed item, original employee source, contractor destination, outgoing employee history; no event for unscanned item",
+  "typecheck": "passed; repeat exact final source in packaging",
+  "officialBuild": "required during packaging",
+  "runtimeWalkthrough": false,
+  "localCodeRender": true,
+  "noLiveBusinessDataOrSmsChanges": true
+}
