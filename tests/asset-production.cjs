@@ -17,7 +17,7 @@ const assets=load('app/api/assets/route.ts'),afiles=load('app/api/assets/files/r
 const owner={userId:'owner',email:'owner@example.com',name:'owner',isAdmin:true,permissions:load('lib/permissions.ts').allPermissions},keeper=actor('keeper',[],{assetRoles:['custodian']}),alice=actor('alice'),bob=actor('bob'),hr=actor('hr',['hr']),external=actor('external',[],{salesAgentId:'outside',salesRoles:['agent']});
 const entity=id=>{const r=sql.prepare('SELECT * FROM flow_entities WHERE id=?').get(id);return r?{...r,data:JSON.parse(r.data)}:null};
 async function get(u){const r=await ctx.run(u,()=>assets.GET());return {status:r.status,data:await r.json()}}
-async function post(u,b){const r=await ctx.run(u,()=>assets.POST(req('/api/assets',{id:crypto.randomUUID(),confirmed:true,revision:0,notes:'Actual test evidence',...b})));return {status:r.status,data:await r.json()}}
+async function post(u,b){const body={id:crypto.randomUUID(),confirmed:true,revision:0,notes:'Actual test evidence',...b};if(body.mode==='register'&&(u.isAdmin||u.permissions.assetRoles?.includes('custodian'))&&!body.photoFileIds)body.photoFileIds=[require('./asset-photo-fixture.cjs')(sql,u,body.id,objects)];const r=await ctx.run(u,()=>assets.POST(req('/api/assets',body)));return {status:r.status,data:await r.json()}}
 const reg={mode:'register',code:'A-001',name:'قالب تزریق',category:'قالب',brand:'brand',model:'model',serial:'serial',specifications:'steel 2 cavities',condition:'good',location:'انبار شرکت',day:today,reference:'receipt-001'};
 const transfer=(id,revision,kind='employee',extra={})=>({mode:'transfer',recordId:id,revision,holderKind:kind,holderId:'alice',holderName:'Contractor',contractorCode:'C-1',location:'Factory',condition:'good',day:today,reference:'handover-001',...extra});
 

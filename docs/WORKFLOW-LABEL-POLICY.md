@@ -41,3 +41,8 @@
 ## Asset print layout extension (2026-11-16)
 
 `lib/asset-print.ts` is a second rendering entry for the SAME `assetQrText` identity, invoked by the authenticated asset-print route. QR-first adaptive geometry, roll/A4/A3 and reprints do not create or receive assets. `tests/asset-passport.cjs`, `tests/asset-workflow.cjs` and `tests/custodian-profile.cjs` cover source identity, exact role resolver and read-only scanning.
+
+
+## ثبت گروهی عکس‌دار اموال، ۲۰۲۶-۱۱-۱۶
+
+مسیر `/api/assets/registration/print` تنها به renderer موجود `assetPrintHtml` واگذار می‌کند؛ تولیدکننده هویت تازه نیست. هر قلم UUID واقعی جدا دارد و همان `NAFASYAR-ASSET/1:<UUID>` چاپ می‌شود؛ شناسه گروه و شماره عکس جای هویت مال را نمی‌گیرند. هر نسخه لیبل شماره همان عکس/ردیف را برای راهنمای نصب دارد. نقش جاری و وضعیت تحویل در سرور تعیین می‌شود؛ اسکن مستقل هر دو قلم در آزمون `asset-registration.cjs` به کار مجاز همان قلم می‌رسد و هیچ دریافت یا عملیات تازه ثبت نمی‌کند. چاپ کوچک با برازش متن داخل کادر مجاز است؛ محدودیت خوانایی جای مجوز عملیات را نمی‌گیرد.

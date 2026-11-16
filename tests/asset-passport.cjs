@@ -17,7 +17,7 @@ const assets=load('app/api/assets/route.ts'),afiles=load('app/api/assets/files/r
 const owner={userId:'owner',email:'owner@example.com',name:'owner',isAdmin:true,permissions:load('lib/permissions.ts').allPermissions},keeper=actor('keeper',[],{assetRoles:['custodian']}),alice=actor('alice'),bob=actor('bob'),hr=actor('hr',['hr']),external=actor('external',[],{salesAgentId:'outside',salesRoles:['agent']});
 const entity=id=>{const r=sql.prepare('SELECT * FROM flow_entities WHERE id=?').get(id);return r?{...r,data:JSON.parse(r.data)}:null};
 async function get(u){const r=await ctx.run(u,()=>assets.GET());return {status:r.status,data:await r.json()}}
-async function post(u,b){const r=await ctx.run(u,()=>assets.POST(req('/api/assets',{id:crypto.randomUUID(),confirmed:true,revision:0,notes:'Actual test evidence',...b})));return {status:r.status,data:await r.json()}}
+async function post(u,b){const body={id:crypto.randomUUID(),confirmed:true,revision:0,notes:'Actual test evidence',...b};if(body.mode==='register'&&(u.isAdmin||u.permissions.assetRoles?.includes('custodian'))&&!body.photoFileIds)body.photoFileIds=[require('./asset-photo-fixture.cjs')(sql,u,body.id,objects)];const r=await ctx.run(u,()=>assets.POST(req('/api/assets',body)));return {status:r.status,data:await r.json()}}
 const reg={mode:'register',code:'A-001',name:'قالب تزریق',category:'قالب',brand:'brand',model:'model',serial:'serial',specifications:'steel 2 cavities',condition:'good',location:'انبار شرکت',day:today,reference:'receipt-001'};
 const transfer=(id,revision,kind='employee',extra={})=>({mode:'transfer',recordId:id,revision,holderKind:kind,holderId:'alice',holderName:'Contractor',contractorCode:'C-1',location:'Factory',condition:'good',day:today,reference:'handover-001',...extra});
 
@@ -37,8 +37,8 @@ const transfer=(id,revision,kind='employee',extra={})=>({mode:'transfer',recordI
  assert.equal(new Set(ids.map(id=>entity(id).data.code)).size,2);assert.equal(sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type='asset_item'").get().n,3);
  const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl1sAAAAASUVORK5CYII=','base64');
  async function upload(u,id,bytes=png,extra={}){const q=new URLSearchParams({id,assetId:first,revision:'1',filename:'photo.png',purpose:'purchase',confirmed:'true',...extra}),r=await ctx.run(u,()=>afiles.POST(new Request(base+'/api/assets/files?'+q,{method:'POST',headers:{origin:base,'Content-Type':'application/octet-stream'},body:bytes})));return {status:r.status,data:await r.json()};}
- const f1=crypto.randomUUID(),f2=crypto.randomUUID();assert.equal((await upload(keeper,f1)).status,200);assert.equal((await upload(keeper,f2,Buffer.from('%PDF-1.4 synthetic'),{filename:'invoice.pdf'})).status,200);
- assert.equal((await upload(keeper,f1)).data.repeated,true);assert.equal(objects.size,2);
+ const originalPhotoCount=objects.size;const f1=crypto.randomUUID(),f2=crypto.randomUUID();assert.equal((await upload(keeper,f1)).status,200);assert.equal((await upload(keeper,f2,Buffer.from('%PDF-1.4 synthetic'),{filename:'invoice.pdf'})).status,200);
+ assert.equal((await upload(keeper,f1)).data.repeated,true);assert.equal(objects.size,originalPhotoCount+2);
  assert.equal((await upload(alice,crypto.randomUUID())).status,404);assert.equal((await upload(keeper,crypto.randomUUID(),new Uint8Array())).status,400);
  let listed=await callGet(keeper,afiles,'/api/assets/files?assetId='+first);assert.equal(listed.data.files.length,2);assert.ok(listed.data.files.every(f=>!f.objectKey&&!f.actor));
  const thumb=await callGet(keeper,afiles,'/api/assets/files?id='+f1+'&view=preview');assert.equal(thumb.response.headers.get('content-type'),'image/png');
@@ -52,12 +52,12 @@ const transfer=(id,revision,kind='employee',extra={})=>({mode:'transfer',recordI
  const tr=await ctx.run(keeper,()=>templates.POST(req('/api/label-templates',params)));assert.equal(tr.status,200);const saved=await tr.json();assert.equal(saved.sheetSize,'a3');
  assert.equal((await callGet(keeper,print,'/api/assets/print?id='+first+'&template='+saved.id)).status,200);
  const printed=await ctx.run(keeper,()=>print.GET(new Request(base+'/api/assets/print?id='+first+'&template='+saved.id)));const html=await printed.text();assert.match(html,/@page\{size:A3/);assert.match(html,/رول چندستونه/);assert.match(html,/QR بزرگ‌تر/);assert.ok(!html.includes('رول دو ستونه'));
- const invalid=await ctx.run(keeper,()=>print.GET(new Request(base+'/api/assets/print?id='+first+'&width=1&height=1&print=1')));const invalidHtml=await invalid.text();assert.ok(!invalidHtml.includes('QR خوانا جا نمی‌شوند'));assert.ok(invalidHtml.includes('window.print()'));assert.match(invalidHtml,/<article class="label">/);
+ const invalid=await ctx.run(keeper,()=>print.GET(new Request(base+'/api/assets/print?id='+first+'&width=1&height=1&print=1')));const invalidHtml=await invalid.text();assert.ok(!invalidHtml.includes('QR خوانا جا نمی‌شوند'));assert.ok(invalidHtml.includes('window.print()'));assert.match(invalidHtml,/<article class="label"/);
  const small=await ctx.run(keeper,()=>print.GET(new Request(base+'/api/assets/print?id='+first+'&width=30&height=15&print=1')));const smallHtml=await small.text();assert.equal(small.status,200);assert.ok(smallHtml.includes('window.print()'));assert.ok(!smallHtml.includes('QR خوانا جا نمی‌شوند'));
  assert.equal((await callGet(external,print,'/api/assets/print?id='+first)).status,404);
  const fit=load('lib/asset-print-layout.ts').assetPrintLayout;
- for(const size of [[60,40],[30,50],[100,80],[25,25],[18,80]])for(const name of ['صندلی','لپ‌تاپ واحد فروش','نام طولانی '.repeat(8)]){const f=fit(...size,name,'AM-000123');if(f){assert.ok(f.qr>=12&&f.qr<=Math.min(...size)-2+1e-6);if(f.direction==='row'){assert.ok(f.qr+f.textWidth+1<=size[0]-2+1e-6);assert.ok(f.textHeight<=size[1]-2+1e-6)}else assert.ok(f.qr+f.textHeight+1<=size[1]-2+1e-6);}}
- assert.equal(fit(1e8,1e8,'a','b'),null);assert.equal(fit(1,1,'a','b'),null);assert.ok(fit(60,40,'صندلی','AM-000123').qr>=35);
+ for(const size of [[60,40],[30,15],[30,50],[100,80],[25,25],[18,80],[1,1]])for(const name of ['صندلی','لپ‌تاپ واحد فروش','نام طولانی '.repeat(8)]){const f=fit(...size,name,'AM-000123');assert.ok(f);assert.ok(f.qr>0&&f.textWidth>0&&f.textHeight>0);const w=size[0]-2*(f.inset+f.border),h=size[1]-2*(f.inset+f.border);if(f.direction==='row'){assert.ok(f.qr+f.textWidth+f.gap<=w+1e-6);assert.ok(f.textHeight<=h+1e-6)}else{assert.ok(f.qr<=w+1e-6);assert.ok(f.qr+f.textHeight+f.gap<=h+1e-6);}}
+ assert.equal(fit(1e8,1e8,'a','b'),null);assert.ok(fit(1,1,'a','b'));assert.ok(fit(60,40,'صندلی','AM-000123').qr>=35);
  sql.prepare('UPDATE app_members SET permissions=? WHERE id=?').run(JSON.stringify({read:[],write:[],eventStages:[],assetRoles:[]}), 'keeper');
  assert.equal((await callGet(keeper,templates,'/api/label-templates')).status,403,'revoked custodian cannot retain template access');
  assert.equal((await upload(keeper,crypto.randomUUID(),png,{revision:'2'})).status,404);

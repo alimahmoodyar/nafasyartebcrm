@@ -1,0 +1,65 @@
+{
+  "sourceSuites": [
+    "asset-registration",
+    "asset-workflow",
+    "assets",
+    "asset-production",
+    "asset-links",
+    "asset-passport",
+    "asset-passport-ui",
+    "asset-workflow-ui",
+    "custodian-home-ui",
+    "workflow-label-policy",
+    "workflow-scan",
+    "custodian-person",
+    "custodian-profile",
+    "asset-registration-ui",
+    "asset-print-browser",
+    "asset-sms"
+  ],
+  "typecheck": "passed",
+  "officialBuild": "required before publication",
+  "visualQA": {
+    "realComponents": true,
+    "syntheticPhotos": true,
+    "widths": [
+      1440,
+      430
+    ],
+    "physicalPrinterTest": false,
+    "liveBrowserTest": false
+  },
+  "geometry": {
+    "sizes": [
+      [
+        30,
+        15
+      ],
+      [
+        30,
+        15
+      ],
+      [
+        60,
+        40
+      ],
+      [
+        25,
+        25
+      ],
+      [
+        18,
+        80
+      ]
+    ],
+    "columns": 3,
+    "checks": [
+      "QR and text inside physical label",
+      "long Persian name",
+      "text children do not overflow",
+      "font-ready and before-print fitting"
+    ]
+  },
+  "data": "Isolated test SQL/R2 only; no production writes, SMS or grant changes",
+  "publication": "Exact live saved source + successful Sites deployment + all-file parity required"
+}

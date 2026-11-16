@@ -6,4 +6,5 @@ const actual=['lib','app','components'].flatMap(files).filter(f=>/\.(tsx?|jsx?)$
 assert.deepEqual(actual.sort(),producers.sort(),'Every new QR producer needs a role/stage policy and resolver roundtrip test');
 for(const f of producers){const s=fs.readFileSync(path.join(root,f),'utf8');assert.match(s,/pairInviteUrl|assetQrText|batchQrText|qrText|serviceDeviceQr|shippingQr|driverReceiptQr/,'Registered identity constructor: '+f)}
 assert.match(fs.readFileSync(path.join(root,'AGENTS.md'),'utf8'),/WORKFLOW-LABEL-POLICY/);
+assert.match(fs.readFileSync(path.join(root,'app/api/assets/registration/print/route.ts'),'utf8'),/assetPrintHtml/,'Group printing must delegate the existing per-passport identity renderer');
 console.log('PASS label policy: all 10 QR producers registered; business identities and separately scoped expiring pairing invitation and standing development rule.');

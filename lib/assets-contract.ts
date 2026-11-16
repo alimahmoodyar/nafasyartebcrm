@@ -1,5 +1,5 @@
 export const assetRoles:Record<string,string>={custodian:'اموال‌دار',disposal:'تأیید خروج اموال'};
 export const assetHolderKinds:Record<string,string>={stock:'انبار / محل شرکت',employee:'کارمند شرکت',contractor:'پیمانکار'};
 export const assetConditions:Record<string,string>={good:'سالم',repair:'نیازمند تعمیر',damaged:'آسیب‌دیده'};
-export const assetModes=['register','edit','transfer','confirm_annual','request_clearance','approve_clearance','cancel_clearance','install_position'] as const;
+export const assetModes=['register_group','register','edit','transfer','confirm_annual','request_clearance','approve_clearance','cancel_clearance','install_position'] as const;
 export const assetHelp='هر مال هویت ثابت، مسئول فعلی و محل دارد. انتقال داخلی اداری با درخواست تحویل‌دهنده و اسکن و تأیید گیرنده انجام می‌شود؛ قالب، ماشین‌آلات و امانت بیرونی مجوز اموال‌دار می‌خواهد. تحویل اولیه بیرونی نیازمند تأیید و رسید امضاشده است؛ تأیید دوره‌ای موبایلی کافی است مگر امضا درخواست شود. مسئول فنی برنامه و تأیید سرویس و بازگشت از توقف خطر را تعیین می‌کند؛ خروج دائمی با مدیرعامل یا نقش واگذارشده است. تسویه اموال جایگزین تسویه مالی نیست. نامه‌های سالانه قدیمی همچنان از مسیر مدارک قبلی قابل ثبت‌اند.';
