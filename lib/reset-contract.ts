@@ -1,3 +1,4 @@
+// Direct voice messages use existing inbox_thread/message/file/state and BUCKET; existing reset/backup/freeze scopes include these JSON fields and file blobs. No new persistence type.
 // Handover sender/receiver photographs remain existing asset_file (purpose transfer_photo),
 // bound atomically to asset_event; generic operational backup/reset, R2 manifest and 0016 freeze apply.
 // asset_registration is an immutable operational group; each item remains asset_item. Staged/bound real photos are existing asset_file/R2 with purpose asset_photo. Both reset scopes, blob backups and generic 0016 freeze apply; no new table or label authority.
