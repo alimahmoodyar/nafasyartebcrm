@@ -22,7 +22,7 @@ export function normalizeAssetPaper(value:any,minimum=0):AssetPaper|null{
 }
 export function readAssetPaper(q:URLSearchParams,roll:RollLayout,legacy=false):AssetPaper{
  const number=(key:string,fallback:number)=>{const raw=q.get(key);if(raw===null)return fallback;if(!/^-?\d+(?:\.\d{1,2})?$/.test(raw))throw new AccessError('اندازه و جابه‌جایی چاپ را با میلی‌متر وارد کنید.',400);return Number(raw);};
- return normalizeAssetPaper({height:number('paperHeight',legacy?rollPitch(roll):Math.max(roll.rollWidth,rollPitch(roll))),anchor:q.get('rowAnchor')||(legacy?'top':'bottom'),x:number('offsetX',0),y:number('offsetY',0)},roll.height)!;
+ return normalizeAssetPaper({height:number('paperHeight',rollPitch(roll)),anchor:q.get('rowAnchor')||(legacy?'top':'bottom'),x:number('offsetX',0),y:number('offsetY',0)},roll.height)!;
 }
 export type LabelTemplate={id:string;name:string;revision:number;roll:RollLayout;layout?:'roll'|'thermal'|'a4';sheetSize?:'a4'|'a3';assetPaper?:AssetPaper};
 export const printEsc=(v:unknown)=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
