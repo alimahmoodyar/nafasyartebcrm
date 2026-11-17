@@ -35,15 +35,32 @@ const profile={mode:'employee',code:'A01',memberId:'alice',managerId:'manager',s
  const identityFile=await upload(hr,eid,'identity');assert.equal(identityFile.status,200,JSON.stringify(identityFile));
  assert.equal((await ctx.run(alice,()=>files.GET(req('/api/personnel/files?id='+identityFile.id)))).status,200);
  for(const u of [bob,manager,payroll,finance,ceo,external])assert.equal((await ctx.run(u,()=>files.GET(req('/api/personnel/files?id='+identityFile.id)))).status,u===external?403:404,u.userId);
- const spec={mode:'contract_save',memberId:'alice',title:'PRIVATE-CONTRACT',contractKind:'fixed',start:day,end:duties.addDay(today,20),notes:''};
+ const spec={mode:'contract_save',memberId:'alice',title:'PRIVATE-CONTRACT',contractKind:'fixed',start:day,end:duties.addDay(today,20),baseSalary:'120000000',salaryBasis:'monthly',notes:''};
  assert.equal((await post(alice,spec)).status,403);assert.equal((await post(payroll,spec)).status,403);assert.equal((await post(external,spec)).status,403);
  assert.equal((await post(hr,{...spec,end:''})).status,400);assert.equal((await post(hr,{...spec,end:duties.addDay(day,-1)})).status,400);
- const cid=await ok(hr,spec);assert.equal((await get(alice)).data.records.some(r=>r.id===cid),false);
+ // Direct registration is one confirmed HR operation: no file or employee acknowledgment.
+ const futureSpec={...spec,start:duties.addDay(today,130),end:duties.addDay(today,150)};
+ for(const baseSalary of ['',undefined,'0','-1','1.5','1e8','1000000000000000000',120000000])assert.equal((await post(hr,{...futureSpec,baseSalary})).status,400,String(baseSalary));
+ for(const salaryBasis of ['',undefined,'yearly','toString'])assert.equal((await post(hr,{...futureSpec,salaryBasis})).status,400,String(salaryBasis));
+ assert.equal((await post(hr,{...futureSpec,confirmed:false})).status,400);
+ const directBody={...futureSpec,id:crypto.randomUUID(),baseSalary:'۱۲۰٬۰۰۰٬۰۰۰'};
+ const direct=await ok(hr,directBody);assert.equal(row(direct).data.state,'active');assert.equal(row(direct).data.baseSalary,'120000000');assert.equal(row(direct).data.salaryCurrency,'IRR');assert.equal(row(direct).data.registrationBasis,'physical_signed_contract');assert.equal(row(direct).data.finalizedBy,hr.userId);assert.equal(row(direct).data.history.at(-1).actor,hr.userId);assert.equal(row(direct).data.signedFileIds.length,0);assert.ok(row(direct).data.finalizedAt);assert.equal(row(direct).data.acknowledgedAt,undefined);
+ assert.equal((await post(hr,directBody)).data.repeated,true);assert.equal(row(direct).revision,1);assert.equal((await post(hr,{...directBody,baseSalary:'100'})).status,409);
+ assert.equal((await post(hr,{...futureSpec,start:duties.addDay(today,140),end:duties.addDay(today,155)})).status,409);
+ await success(hr,direct,'contract_close',{notes:'Physical contract ended'});assert.equal((await get(alice)).data.records.some(r=>r.id===direct),true,'finalized contract remains in employee history');
+ for(const [i,salaryBasis] of ['daily','hourly'].entries()){const rid=await ok(hr,{...futureSpec,start:duties.addDay(today,170+i*25),end:duties.addDay(today,180+i*25),baseSalary:'٣٬٠٠٠٬٠٠٠',salaryBasis});assert.equal(row(rid).data.baseSalary,'3000000');assert.equal(row(rid).data.salaryBasis,salaryBasis);await success(hr,rid,'contract_close',{notes:'Preserve rate fact'});}
+ // Existing draft with historical evidence retains its identity, files and prior content.
+ const cid=crypto.randomUUID();seed(cid,'hr_contract',{memberId:'alice',title:'PRIVATE-CONTRACT',contractKind:'fixed',start:day,end:spec.end,text:'Historical draft notes',state:'draft',createdBy:hr.userId,history:[{mode:'contract_save',actor:hr.userId,state:'draft',at:now}]});assert.equal((await get(alice)).data.records.some(r=>r.id===cid),false);
  assert.equal((await apply(hr,cid,'contract_finalize',{notes:''})).status,400);
  const unrelated=await upload(hr,cid,'other');assert.equal(unrelated.status,200);assert.equal((await apply(hr,cid,'contract_finalize')).status,400);
  const signed=await upload(hr,cid,'signed_contract');assert.equal(signed.status,200);assert.equal((await upload(hr,cid,'signed_contract',signed.id)).data.repeated,true);assert.equal((await upload(hr,cid,'identity',signed.id)).status,409);
  assert.equal((await ctx.run(alice,()=>files.GET(req('/api/personnel/files?id='+signed.id)))).status,404);
- await success(hr,cid,'contract_finalize',{notes:''});assert.equal(row(cid).data.state,'active');
+ assert.equal((await apply(hr,cid,'contract_finalize',{memberId:'bob',baseSalary:'1',salaryBasis:'daily'})).status,400);
+ assert.equal((await apply(hr,cid,'contract_finalize',{baseSalary:'0',salaryBasis:'monthly'})).status,400);
+ assert.equal((await apply(hr,cid,'contract_finalize',{baseSalary:'1',salaryBasis:'invalid'})).status,400);
+ const finalize={id:crypto.randomUUID(),confirmed:true,recordId:cid,revision:row(cid).revision,mode:'contract_finalize',baseSalary:'120000000',salaryBasis:'monthly',notes:''};
+ assert.equal((await post(hr,{...finalize,revision:0})).status,409);assert.equal((await post(bob,finalize)).status,404);assert.equal((await post(payroll,finalize)).status,404);
+ await catalog.executeTool('personnel_apply',finalize,base,{user:hr,scope:'read_write',tokenId:null});assert.equal(row(cid).data.state,'active');assert.equal(row(cid).data.text,'Historical draft notes');assert.ok(row(cid).data.signedFileIds.includes(signed.id));assert.equal(row(cid).data.baseSalary,'120000000');assert.equal(row(cid).data.finalizedBy,hr.userId);const finalizedRevision=row(cid).revision;assert.match(JSON.stringify(await catalog.executeTool('personnel_apply',finalize,base,{user:hr,scope:'read_write',tokenId:null})),/repeated/);assert.equal(row(cid).revision,finalizedRevision);
  assert.equal((await get(alice)).data.records.some(r=>r.id===cid),true);assert.equal((await get(bob)).data.records.some(r=>r.id===cid),false);assert.equal((await get(manager)).data.records.some(r=>r.id===cid),false);
  assert.equal((await ctx.run(alice,()=>files.GET(req('/api/personnel/files?id='+signed.id)))).status,200);
  assert.equal((await upload(hr,cid,'signed_contract')).status,403);
@@ -51,17 +68,17 @@ const profile={mode:'employee',code:'A01',memberId:'alice',managerId:'manager',s
  assert.equal((await get(hr)).data.contractAlerts.find(a=>a.id===cid).stage,'thirty');assert.equal((await get(alice)).data.contractAlerts.length,0);
  await taskSync.syncPersonnelTasks();let task=sql.prepare("SELECT * FROM duty_runs WHERE period=? AND assignee='hr'").get(cid);assert.equal(task.state,'open');await duties.taskAccess(task.id,hr);assert.equal((await get(hr)).data.contractAlerts.length,1);const inbox=await ctx.run(hr,()=>tasks.GET(req('/api/tasks')));assert.equal(inbox.status,200);assert.ok(JSON.stringify(await inbox.json()).includes(task.id));assert.equal(JSON.parse(task.data).stage,'contract:thirty');const rev=task.revision;await taskSync.syncPersonnelTasks();assert.equal(sql.prepare('SELECT revision FROM duty_runs WHERE id=?').get(task.id).revision,rev);
  const permissionsBefore=sql.prepare('SELECT permissions FROM app_members WHERE id=?').get('alice').permissions;assert.equal(permissionsBefore,rawPermissions);
- const renewal=await ok(hr,{...spec,title:'Renewed',previousId:cid,start:duties.addDay(row(cid).data.end,1),end:duties.addDay(today,100)});assert.equal((await get(hr)).data.contractAlerts.length,1,'draft renewal must not retire expiry');
- const dup=await ok(hr,{...spec,title:'Competing renewal',previousId:cid,start:duties.addDay(row(cid).data.end,1),end:duties.addDay(today,120)});
- await upload(hr,renewal,'signed_contract');await upload(hr,dup,'signed_contract');
- const race=await Promise.all([apply(hr,renewal,'contract_finalize'),apply(hr,dup,'contract_finalize')]);assert.equal(race.filter(r=>r.status===200).length,1,JSON.stringify(race));assert.equal(row(cid).data.state,'renewed');
+ const renewal=crypto.randomUUID(),dup=crypto.randomUUID();for(const id of [renewal,dup])seed(id,'hr_contract',{memberId:'alice',title:'Legacy renewal',contractKind:'fixed',previousId:cid,start:duties.addDay(row(cid).data.end,1),end:duties.addDay(today,100),state:'draft'});
+ assert.equal((await get(hr)).data.contractAlerts.length,1,'pending old draft does not retire expiry');
+ const race=await Promise.all([apply(hr,renewal,'contract_finalize',{baseSalary:'130000000',salaryBasis:'monthly'}),apply(hr,dup,'contract_finalize',{baseSalary:'135000000',salaryBasis:'monthly'})]);assert.equal(race.filter(r=>r.status===200).length,1,JSON.stringify(race));assert.equal(row(cid).data.state,'renewed');const winner=[renewal,dup].find(id=>row(id).data.state==='active');assert.equal(row(winner).data.signedFileIds.length,0,'old renewal draft finalizes without upload');assert.equal(row(cid).data.renewedBy,winner);
+ assert.equal((await post(hr,{...spec,previousId:cid,start:duties.addDay(row(cid).data.end,1),end:duties.addDay(today,120)})).status,409);
  await taskSync.syncPersonnelTasks();assert.equal(sql.prepare('SELECT state FROM duty_runs WHERE id=?').get(task.id).state,'completed');assert.equal((await get(hr)).data.contractAlerts.length,0);
  assert.equal(sql.prepare('SELECT permissions FROM app_members WHERE id=?').get('alice').permissions,rawPermissions);assert.equal(row(eid).data.state,'active');assert.ok(row(cid).data.history.length>=2);
  const n=cid+'-date',fixture=(end)=>[{id:n,type:'hr_contract',data:{state:'active',memberId:'alice',end,title:'expiry'}}];
  for(const [delta,stage] of [[31,null],[30,'thirty'],[8,'thirty'],[7,'seven'],[0,'seven'],[-1,'expired']])assert.equal(employment.contractAlerts(fixture(duties.addDay(today,delta)),today)[0]?.stage||null,stage);
  assert.equal((await post(hr,{...spec,contractKind:'open',end:''})).status,400);const open=await ok(hr,{...spec,memberId:'alice',start:duties.addDay(today,130),end:duties.addDay(today,160)});
  const closing=await apply(hr,open,'contract_close',{notes:''});assert.equal(closing.status,400);await success(hr,open,'contract_close',{notes:'No longer required'});
- assert.equal((await get(alice)).data.records.some(r=>r.id===open),false,'closed unpublished draft stays private');
+ assert.equal((await get(alice)).data.records.some(r=>r.id===open),true,'directly finalized contract history stays visible after closure');const closedDraft=crypto.randomUUID();seed(closedDraft,'hr_contract',{memberId:'alice',state:'draft',start:day,end:spec.end});await success(hr,closedDraft,'contract_close',{notes:'Unsigned legacy draft cancelled'});assert.equal((await get(alice)).data.records.some(r=>r.id===closedDraft),false,'closed unfinalized draft stays private');
  const stale=hr.permissions;sql.prepare('UPDATE app_members SET permissions=? WHERE id=?').run(JSON.stringify({read:[],write:[],eventStages:[]}),'hr');assert.equal((await post(hr,spec)).status,403);assert.equal((await ctx.run(hr,()=>files.GET(req('/api/personnel/files?id='+signed.id)))).status,404);sql.prepare('UPDATE app_members SET permissions=? WHERE id=?').run(JSON.stringify(stale),'hr');
 
  const topSpec={mode:'personnel_create',name:'Initial director without account',location:'Office',employment:'Fixed',start:day,nationalId:'0987654321',birthDate:'1980-01-01',maritalStatus:'single',mobile:'09121111111',address:'Office',emergencyContact:'Emergency',bankAccount:'IR220000000000000000000001'};const top=await ok(hr,topSpec);assert.equal(row(top).data.managerId,'','initial personnel registration cannot depend on creating an earlier staff account');
@@ -69,6 +86,7 @@ const profile={mode:'employee',code:'A01',memberId:'alice',managerId:'manager',s
  assert.equal((await post(hr,{...personSpec,maritalStatus:''})).status,400);
  assert.equal((await post(hr,{...personSpec,birthDate:''})).status,400);
  for(const bankAccount of ['1234','IR220000000000000000000002','DE220000000000000000000001'])assert.equal((await post(hr,{...personSpec,bankAccount})).status,400,'invalid SHEBA rejected by shared server handler');
+ await success(hr,top,'personnel_complete');const topContract=await ok(hr,{...spec,memberId:row(top).data.memberId,baseSalary:'50000000'});assert.equal(row(topContract).data.state,'active');assert.equal(row(topContract).data.finalizedBy,hr.userId);
  const beforeAccounts=sql.prepare('SELECT count(*) AS n FROM app_members').get().n;
  const createdPerson=await ok(hr,personSpec),person=row(createdPerson);assert.equal(person.data.unit,'');assert.equal(person.data.title,'');assert.equal(person.type,'hr_employee');assert.equal(person.data.state,'setup');assert.equal(sql.prepare('SELECT count(*) AS n FROM app_members').get().n,beforeAccounts);
  await success(hr,createdPerson,'personnel_complete');assert.ok(row(createdPerson).data.profileApprovedAt);assert.equal(row(createdPerson).data.identityCompleteAt,undefined);assert.equal((await get(hr)).data.records.find(r=>r.id===createdPerson).data.documentStatus.complete,false);
@@ -131,5 +149,5 @@ const profile={mode:'employee',code:'A01',memberId:'alice',managerId:'manager',s
 
  // Account roles and original signed evidence remain unchanged throughout the workflow.
  assert.equal(sql.prepare('SELECT permissions FROM app_members WHERE id=?').get('alice').permissions,rawPermissions);
- console.log('personnel-employment: employee code/details, private multi-evidence, HR-only contracts, no permission changes, signed finalization, dates, reminders, renewal race and revocation passed');
+ console.log('personnel-employment: employee code/details, private multi-evidence, HR-only contracts, no permission changes, direct signed-paper finalization, salary validation, old drafts, preserved evidence, no-account personnel, MCP, reminders, atomic renewal race and revocation passed');
 })().catch(e=>{console.error(e);process.exitCode=1});

@@ -5,6 +5,7 @@ import {personnelProfileId} from './personnel-profile';
 import {AccessError} from './authorization';
 import {sreq,stxt,sday} from './sales';
 import {dayAt,addDay} from './duties';
+import {contractSalaryBases,normalizeContractSalary,validContractSalary} from './personnel-contract-salary';
 
 export const employmentModes=['personnel_create','personnel_complete','contract_save','contract_finalize','contract_close'] as const;
 export {personnelFileCategories} from './personnel-contract';
@@ -36,27 +37,27 @@ export function employmentChanges(b:any,old:any,rows:any[],now:string,members:an
   return [{...old,data:{...d,state:'active',bankAccount:personnelBankAccount(d.bankAccount,true),profileApprovedAt:d.profileApprovedAt||now,...(personnelDocumentStatus(rows,old.id).complete?{identityCompleteAt:d.identityCompleteAt||now}:{}),setupMissing:[],familyBase:d.familyBase||{maritalStatus:d.maritalStatus,childrenCount:d.childrenCount||0,effective:d.start}}}];
  }
 
- if(b.mode==='contract_save'){
+ if(b.mode==='contract_save'||b.mode==='contract_finalize'){
+  if(b.mode==='contract_finalize'&&!old)fail('پیش‌نویس قرارداد یافت نشد.',404);
   if(old&&(old.type!=='hr_contract'||old.data.state!=='draft'))fail('فقط پیش‌نویس قرارداد قابل ویرایش است.',409);
-  const memberId=sreq(b.memberId),employee=rows.find(r=>r.type==='hr_employee'&&r.data.memberId===memberId&&r.data.state==='active');if(!employee)fail('پرونده پرسنلی فعال لازم است.');
+  const previous=old?.data||{},value=(key:string)=>Object.hasOwn(b,key)?b[key]:previous[key];
+  const memberId=sreq(value('memberId')),employee=rows.find(r=>r.type==='hr_employee'&&r.data.memberId===memberId&&r.data.state==='active');if(!employee)fail('پرونده پرسنلی فعال لازم است.');
   if(old&&old.data.memberId!==memberId)fail('صاحب قرارداد قابل تعویض نیست.');
   if(b.contractKind&&b.contractKind!=='fixed')fail('نوع قرارداد را انتخاب کنید.');
-  const start=sday(b.start),end=sday(b.end);if(end&&end<start)fail('پایان قرارداد نباید قبل از شروع باشد.');
-  const previousId=stxt(b.previousId||'',200);if(previousId){const prev=rows.find(r=>r.id===previousId&&r.type==='hr_contract');if(!prev||prev.data.memberId!==memberId||!['active','renewed'].includes(prev.data.state)||!prev.data.end)fail('قرارداد قبلی برای تمدید معتبر نیست.');if(start!==addDay(prev.data.end,1))fail('تمدید از روز بعد از پایان قرارداد قبلی شروع می‌شود.');}
-  return [{id,type:'hr_contract',revision:old?.revision||0,data:{...(old?.data||{}),memberId,title:'قرارداد پرسنلی',contractKind:'fixed',start,end,previousId,text:stxt(b.text||'',12000),state:'draft'}}];
+  const start=sday(value('start')),end=sday(value('end'));if(end<start)fail('پایان قرارداد نباید قبل از شروع باشد.');
+  const baseSalary=normalizeContractSalary(value('baseSalary')),salaryBasis=value('salaryBasis');
+  if(!validContractSalary(baseSalary))fail('حقوق پایه را به ریال صحیح و مثبت وارد کنید.');
+  if(typeof salaryBasis!=='string'||!Object.hasOwn(contractSalaryBases,salaryBasis))fail('مبنای محاسبه حقوق پایه را انتخاب کنید.');
+  const previousId=stxt(value('previousId')||'',200);
+  const others=rows.filter(r=>r.type==='hr_contract'&&r.id!==id&&r.id!==previousId&&r.data.memberId===memberId&&['active','renewed'].includes(r.data.state));
+  if(others.some(r=>r.data.start<=end&&(r.data.end||'9999-12-31')>=start))fail('قرارداد نهایی‌شده دیگری با این بازه هم‌پوشانی دارد.',409);
+  const changes:any[]=[];
+  if(previousId){const prev=rows.find(r=>r.id===previousId&&r.type==='hr_contract');if(!prev||prev.data.memberId!==memberId||prev.data.state!=='active'||!prev.data.end||start!==addDay(prev.data.end,1))fail('تمدید باید از روز بعد از پایان قرارداد فعال قبلی شروع شود؛ قرارداد قبلی را تازه‌سازی کنید.',409);changes.push({...prev,data:{...prev.data,state:'renewed',renewedBy:id}});}
+  const signedFileIds=[...new Set([...(Array.isArray(previous.signedFileIds)?previous.signedFileIds:[]),...rows.filter(r=>r.type==='hr_file'&&r.data.caseId===id&&r.data.category==='signed_contract').map(r=>r.id)])];
+  changes.push({id,type:'hr_contract',revision:old?.revision||0,data:{...previous,memberId,title:'قرارداد پرسنلی',contractKind:'fixed',start,end,previousId,text:stxt(value('text')||'',12000),baseSalary:BigInt(baseSalary).toString(),salaryBasis,salaryCurrency:'IRR',registrationBasis:'physical_signed_contract',state:'active',finalizedAt:now,signedFileIds}});return changes;
  }
  if(!old||old.type!=='hr_contract')fail('قرارداد یافت نشد.',404);
  const d=old.data;
- if(b.mode==='contract_finalize'){
-  if(d.state!=='draft')fail('قرارداد قبلاً تعیین تکلیف شده است.',409);
-  if(!rows.some(r=>r.type==='hr_employee'&&r.data.memberId===d.memberId&&r.data.state==='active'))fail('پرونده پرسنلی فعال لازم است.');
-  const files=rows.filter(r=>r.type==='hr_file'&&r.data.caseId===old.id&&r.data.category==='signed_contract');if(!files.length)fail('ابتدا تصویر یا فایل قرارداد امضاشده را بارگذاری کنید.');
-  const others=rows.filter(r=>r.type==='hr_contract'&&r.id!==old.id&&r.id!==d.previousId&&r.data.memberId===d.memberId&&['active','renewed'].includes(r.data.state));
-  if(others.some(r=>r.data.start<=(d.end||'9999-12-31')&&(r.data.end||'9999-12-31')>=d.start))fail('قرارداد نهایی‌شده دیگری با این بازه هم‌پوشانی دارد.',409);
-  const changes:any[]=[];
-  if(d.previousId){const prev=rows.find(r=>r.id===d.previousId&&r.type==='hr_contract');if(!prev||prev.data.memberId!==d.memberId||prev.data.state!=='active'||d.start!==addDay(prev.data.end,1))fail('قرارداد قبلی تغییر کرده یا قبلاً تمدید شده است.',409);changes.push({...prev,data:{...prev.data,state:'renewed',renewedBy:old.id}});}
-  changes.push({...old,data:{...d,state:'active',finalizedAt:now,signedFileIds:files.map(r=>r.id)}});return changes;
- }
  if(b.mode==='contract_close'){
   if(!['draft','active'].includes(d.state))fail('قرارداد قابل بستن نیست.',409);
   return [{...old,data:{...d,state:'closed',closeReason:sreq(b.notes,4000),closedAt:now}}];
