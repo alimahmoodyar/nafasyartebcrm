@@ -1,4 +1,5 @@
 'use client';
+import {IranIbanInput} from './iran-iban-input';
 
 import {useEffect,useRef,useState} from 'react';
 import {Dialog,DialogContent,DialogDescription,DialogTitle} from '@/components/ui/dialog';
@@ -44,7 +45,7 @@ export function TreasuryDestinationPanel({test,accountId}:{test:boolean;accountI
    <div className="grid">
     <label className="field">نام بانک<input required maxLength={200} value={form.title} onChange={e=>setForm({...form,title:e.target.value})}/></label>
     <label className="field">شماره حساب<input required maxLength={100} dir="ltr" value={form.number} onChange={e=>setForm({...form,number:latinDigits(e.target.value)})}/></label>
-    <label className="field">شماره شبا<input required maxLength={80} dir="ltr" value={form.iban} onChange={e=>setForm({...form,iban:latinDigits(e.target.value)})}/></label>
+    <IranIbanInput required name="iban" value={form.iban} onChange={value=>setForm(f=>({...f,iban:value}))} disabled={busy}/>
     <label className="field">شماره کارت (اختیاری)<input maxLength={40} dir="ltr" inputMode="numeric" value={form.cardNumber} onChange={e=>setForm({...form,cardNumber:latinDigits(e.target.value)})}/></label>
    </div>
    <button type="submit" className="btn primary" disabled={busy}>ثبت حساب مقصد</button>

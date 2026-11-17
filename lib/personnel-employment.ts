@@ -1,3 +1,4 @@
+import {normalizeIranIban,iranIbanError} from './iran-iban';
 import {personnelDocumentStatus} from './personnel-documents';
 import {contactPatch} from './member-contact';
 import {personnelProfileId} from './personnel-profile';
@@ -8,6 +9,7 @@ import {dayAt,addDay} from './duties';
 export const employmentModes=['personnel_create','personnel_complete','contract_save','contract_finalize','contract_close'] as const;
 export {personnelFileCategories} from './personnel-contract';
 const fail=(message:string,status=400):never=>{throw new AccessError(message,status)};
+export function personnelBankAccount(value:unknown,required=false){const iban=normalizeIranIban(stxt(value||'',100)),error=iranIbanError(iban,required);if(error)fail(error);return iban;}
 export function employeeDetails(body:any,previous:any={}){
  const out:any={};for(const [key,max] of Object.entries({nationalId:10,address:1500,emergencyContact:300}))out[key]=Object.hasOwn(body,key)?stxt(body[key]||'',max):previous[key]||'';
  out.nationalId=out.nationalId.replace(/[۰-۹]/g,(c:string)=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(c)));
@@ -22,7 +24,7 @@ export function employmentChanges(b:any,old:any,rows:any[],now:string,members:an
  if(b.mode==='personnel_create'){
   if(old)fail('برای شخص تازه، پرونده تازه بسازید.',409);
   const memberId='person:'+b.id,name=sreq(b.name,100),details=employeeDetails(b),mobile=contactPatch({mobile:b.mobile}).mobile;
-  const data={memberId,name,code:'P-'+b.id.replace(/-/g,'').toUpperCase(),unit:'',title:'',location:sreq(b.location,200),employment:sreq(b.employment,100),managerId:stxt(b.managerId||'',200),start:sday(b.start),end:'',...details,mobile,bankAccount:sreq(b.bankAccount,100),personal:stxt(b.personal||'',2000),leaveMinutes:0,state:'setup',productionEligible:false};
+  const data={memberId,name,code:'P-'+b.id.replace(/-/g,'').toUpperCase(),unit:'',title:'',location:sreq(b.location,200),employment:sreq(b.employment,100),managerId:stxt(b.managerId||'',200),start:sday(b.start),end:'',...details,mobile,bankAccount:personnelBankAccount(b.bankAccount,true),personal:stxt(b.personal||'',2000),leaveMinutes:0,state:'setup',productionEligible:false};
   requiredPersonnel(data,mobile);if(data.managerId&&(data.managerId===memberId||!members.some(m=>m.id===data.managerId&&m.status==='active')&&!rows.some(r=>r.type==='hr_employee'&&r.data.memberId===data.managerId&&r.data.state!=='disabled')))fail('مدیر مستقیم را از اشخاص ثبت‌شده انتخاب کنید.');
   if(rows.some(r=>r.type==='hr_employee'&&r.data.nationalId===data.nationalId))fail('برای این کد ملی پرونده پرسنلی وجود دارد.',409);
   return [{id:personnelProfileId(memberId),type:'hr_employee',revision:0,data}];
@@ -31,7 +33,7 @@ export function employmentChanges(b:any,old:any,rows:any[],now:string,members:an
   if(!old||old.type!=='hr_employee')fail('پرونده پرسنلی یافت نشد.',404);
   const d=old.data;requiredPersonnel(d,linkedMobile||d.mobile);
   if(d.state==='disabled')fail('پرونده همکاری غیرفعال است.');
-  return [{...old,data:{...d,state:'active',profileApprovedAt:d.profileApprovedAt||now,...(personnelDocumentStatus(rows,old.id).complete?{identityCompleteAt:d.identityCompleteAt||now}:{}),setupMissing:[],familyBase:d.familyBase||{maritalStatus:d.maritalStatus,childrenCount:d.childrenCount||0,effective:d.start}}}];
+  return [{...old,data:{...d,state:'active',bankAccount:personnelBankAccount(d.bankAccount,true),profileApprovedAt:d.profileApprovedAt||now,...(personnelDocumentStatus(rows,old.id).complete?{identityCompleteAt:d.identityCompleteAt||now}:{}),setupMissing:[],familyBase:d.familyBase||{maritalStatus:d.maritalStatus,childrenCount:d.childrenCount||0,effective:d.start}}}];
  }
 
  if(b.mode==='contract_save'){
@@ -67,6 +69,6 @@ export function contractAlerts(rows:any[],today=dayAt()){
 
 export function requiredPersonnel(data:any,mobile:string){
  for(const key of ['name','location','employment','start','nationalId','birthDate','address','emergencyContact','bankAccount'])if(typeof data[key]!=='string'||!data[key].trim())fail('اطلاعات اجباری پرونده پرسنلی کامل نیست.');
- if(!['single','married'].includes(data.maritalStatus))fail('وضعیت تأهل اجباری است.');
+ if(!['single','married'].includes(data.maritalStatus))fail('وضعیت تأهل اجباری است.');personnelBankAccount(data.bankAccount,true);
  if(!contactPatch({mobile:mobile||''}).mobile)fail('تلفن همراه پرسنل اجباری است.');employeeDetails(data);
 }

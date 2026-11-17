@@ -1,3 +1,4 @@
+import {normalizeIranIban,iranIbanError} from './iran-iban';
 import {economicStatements} from './economic-events';
 import {storedAccessPermissions} from './permissions';
 import {financialAccess} from './financial-access';
@@ -142,8 +143,8 @@ export async function applyTreasury(u:Session,b:any){
   requireRole('treasury');if(old)tFail('حساب مقصد قابل بازنویسی نیست.');
   type='sales_receiving_account';
   const number=latinDigits(tText(b.number,100)).replace(/\s/g,''),title=tText(b.title,200);
-  const iban=latinDigits(tText(b.iban,80)).replace(/\s/g,'').toUpperCase().replace(/^(?=\d)/,'IR');
-  if(!/^IR\d{24}$/.test(iban)||BigInt(iban.slice(4)+'1827'+iban.slice(2,4))%BigInt(97)!==BigInt(1))tFail('شماره شبای معتبر وارد کنید.');
+  const iban=normalizeIranIban(tText(b.iban,80));
+  const ibanError=iranIbanError(iban,true);if(ibanError)tFail(ibanError);
   const cardNumber=b.cardNumber==null||b.cardNumber===''?'':latinDigits(tText(b.cardNumber,40)).replace(/[\s-]/g,'');
   if(cardNumber&&!/^\d{16}$/.test(cardNumber))tFail('شماره کارت باید ۱۶ رقم باشد.');
   if(rows.some(a=>(a.type===type||a.type==='treasury_account'&&a.data.kind==='bank'&&a.data.currency==='IRR')&&(a.data.iban===iban||norm(a.data.title)===norm(title)&&norm(a.data.number)===norm(number))))tFail('این حساب یا شبا قبلاً ثبت شده است.',409);

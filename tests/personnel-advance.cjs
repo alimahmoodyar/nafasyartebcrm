@@ -20,7 +20,7 @@ async function ok(u,b){const r=await post(u,b);assert.equal(r.status,200,JSON.st
 const apply=(u,id,mode,extra={})=>post(u,{recordId:id,revision:row(id).revision,mode,...extra});
 const success=async(u,id,mode,extra={})=>{const r=await apply(u,id,mode,extra);assert.equal(r.status,200,JSON.stringify({mode,r}));return r};
 const seed=(id,type,data)=>sql.prepare('INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?)').run(id,type,JSON.stringify(data),now,now);
-const profile={mode:'employee',code:'A01',memberId:'alice',managerId:'manager',start:day,end:'',title:'Engineer',unit:'Production',location:'Factory',employment:'Full time',leaveMinutes:960,bankAccount:'PRIVATE-BANK',personal:'PRIVATE-PERSONAL'};
+const profile={mode:'employee',code:'A01',memberId:'alice',managerId:'manager',start:day,end:'',title:'Engineer',unit:'Production',location:'Factory',employment:'Full time',leaveMinutes:960,bankAccount:'IR220000000000000000000001',personal:'PRIVATE-PERSONAL'};
 (async()=>{
  await ok(hr,profile);await ok(hr,{...profile,memberId:'bob',code:'B01'});
  const input={id:crypto.randomUUID(),mode:'request',kind:'advance',amount:'2000',installments:1,repaymentStart:today,requestMonth:'1900-01',limitAssessment:{status:'approved',limit:'999999'}};
