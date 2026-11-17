@@ -280,6 +280,8 @@ resetHelp.push('راهنماهای عیب‌یابی محصول، تاریخچه
 
 // Staff missions/source requests/reports/location points/files use shared operational flow_entities.
 // Both reset scopes and all-row backup include them; 0016 generic freeze applies.
+// The bounded task-repair cursor staff-mission-task-sweep is workflow_health JSON;
+// it is backed up/reset with operations and never preserves or authorizes a task.
 // resetFiles includes staff_mission_file R2 manifests. No new tables/FKs or catalog exception.
 // Sales calls use existing sales_contact and sales_call_policy records and duty_runs.
 

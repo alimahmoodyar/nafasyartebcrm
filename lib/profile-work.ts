@@ -41,7 +41,7 @@ export async function profileWork(user:Session):Promise<{work:ProfileWork[];pend
  if(profile.id==='personnel-hr'){const actor=await hrActor(user);if(!actor.has('hr'))return {work:[],pendingQuality:0};return {work:contractAlerts(await hrRows()).map(a=>({id:a.id,title:'پیگیری قرارداد · '+a.name,section:'personnel',target:a.id,sourceId:a.id,state:a.stage})),pendingQuality:0};}
  if(profile.id==='custodian')return custodianProfileWork(user);
  const db=storage(),rows=(await db.prepare("SELECT id,type,data FROM flow_entities WHERE type IN ('receipt','request','sourcing_plan','sourcing_quote','purchase_order','worker_output','scrap_transfer','scrap_sale_request','build','inventory_count','build_project','handoff','worker_nonconforming','line_return','worker_count_round','receipt_observation','purchase_payable','routine_lot','transport') ORDER BY id").all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}));
- const work:ProfileWork[]=[...materialProfileWork(profile.id,rows),...await staffMissionProfileWork(user)];
+ const missionWork=await staffMissionProfileWork(user),work:ProfileWork[]=[...materialProfileWork(profile.id,rows),...missionWork.work];
  const serviceRows=(await db.prepare("SELECT * FROM flow_entities WHERE type IN ('as_commercial_request','as_service_work','as_service_catalog_request','as_case','as_order','as_agent','as_service_contract','as_claim','as_shipment')").all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}));
  work.push(...commercialProfileWork(user,serviceRows),...serviceContractProfileWork(user,serviceRows));
  if(profile.id==='central-store'&&user.permissions.serviceRoles?.includes('inventory'))for(const order of serviceRows.filter(r=>r.type==='as_order'&&r.data.domain==='home'&&r.data.state==='approved'&&r.data.lines.some((l:any)=>l.prepared<l.quantity)))work.push({id:order.id+':prepare',title:'آماده‌سازی قطعات نماینده خدمات',section:'after-sales',target:'service-orders:'+order.id,sourceId:order.id,state:order.data.state});
@@ -198,5 +198,5 @@ export async function profileWork(user:Session):Promise<{work:ProfileWork[];pend
   }
  }
  const allowed=work.filter(w=>!w.warehouseId||!['central-store','line-store','quality'].includes(profile.id)||user.profileReview!.warehouseIds.includes(w.warehouseId));
- return {work:allowed,pendingQuality:profile.id==='central-store'?rows.filter(r=>r.type==='receipt'&&['pending_qc','awaiting_qc_template'].includes(r.data.state)&&user.profileReview!.warehouseIds.includes(r.data.warehouseId)).length:0};
+ return {work:allowed,workHasMore:missionWork.hasMore,pendingQuality:profile.id==='central-store'?rows.filter(r=>r.type==='receipt'&&['pending_qc','awaiting_qc_template'].includes(r.data.state)&&user.profileReview!.warehouseIds.includes(r.data.warehouseId)).length:0};
 }

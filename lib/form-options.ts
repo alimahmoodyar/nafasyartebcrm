@@ -1515,3 +1515,366 @@ toolOptions.save_hospital_service_contract={contractStatus:{yes:'دارد',no:'�
 toolOptions.save_material_warehouse={};
 
 toolOptions.estimate_routine_production={method:{quantity:'بر اساس تعداد موردنیاز',people:'بر اساس افراد و زمان'}};
+
+// Exact wire-value captions; these do not change API arguments or business rules.
+toolOptions["routine_production_apply"]={...toolOptions["routine_production_apply"],
+"mode":{...toolOptions["routine_production_apply"]?.["mode"],"product_version":"ثبت نسخه محصول تولیدی"},
+};
+toolOptions["treasury_apply"]={...toolOptions["treasury_apply"],
+"mode":{...toolOptions["treasury_apply"]?.["mode"],"destination_account":"ثبت حساب مقصد","approve_destination_account":"تأیید حساب مقصد"},
+};
+toolOptions["print_batch_labels"]={...toolOptions["print_batch_labels"],
+"location":{...toolOptions["print_batch_labels"]?.["location"],"show":"نمایش","hide":"پنهان"},
+"qrContent":{...toolOptions["print_batch_labels"]?.["qrContent"],"scan":"اسکن","details":"جزئیات پرونده"},
+};
+toolOptions["save_label_template"]={...toolOptions["save_label_template"],
+"layout":{...toolOptions["save_label_template"]?.["layout"],"roll":"رول چندستونه","thermal":"چاپگر حرارتی","a4":"برگه A4"},
+"sheetSize":{...toolOptions["save_label_template"]?.["sheetSize"],"a4":"برگه A4","a3":"برگه A3"},
+};
+toolOptions["print_serials"]={...toolOptions["print_serials"],
+"layout":{...toolOptions["print_serials"]?.["layout"],"roll":"رول چندستونه"},
+};
+toolOptions["create_user"]={...toolOptions["create_user"],
+"permissions.financialRead.*":{...toolOptions["create_user"]?.["permissions.financialRead.*"],"accounting":"حسابداری"},
+"permissions.financialWrite.*":{...toolOptions["create_user"]?.["permissions.financialWrite.*"],"accounting":"حسابداری"},
+"permissions.assetRoles.*":{...toolOptions["create_user"]?.["permissions.assetRoles.*"],"disposal":"تأیید خروج اموال"},
+};
+toolOptions["update_user"]={...toolOptions["update_user"],
+"permissions.financialRead.*":{...toolOptions["update_user"]?.["permissions.financialRead.*"],"accounting":"حسابداری"},
+"permissions.financialWrite.*":{...toolOptions["update_user"]?.["permissions.financialWrite.*"],"accounting":"حسابداری"},
+"permissions.assetRoles.*":{...toolOptions["update_user"]?.["permissions.assetRoles.*"],"disposal":"تأیید خروج اموال"},
+};
+toolOptions["service_contract_apply"]={...toolOptions["service_contract_apply"],
+"mode":{...toolOptions["service_contract_apply"]?.["mode"],"renew":"ثبت تمدید قرارداد","terminate":"ثبت قطع همکاری"},
+};
+toolOptions["service_parts_apply"]={...toolOptions["service_parts_apply"],
+"mode":{...toolOptions["service_parts_apply"]?.["mode"],"catalog_propose":"پیشنهاد قطعات مجاز یک مدل","catalog_decide":"تصمیم مدیرعامل درباره فهرست قطعات","eligibility":"مجوز تعمیر دستگاه‌های نماینده"},
+};
+toolOptions["service_commercial_apply"]={...toolOptions["service_commercial_apply"],
+"mode":{...toolOptions["service_commercial_apply"]?.["mode"],"credit_propose":"پیشنهاد حد اعتبار نماینده","credit_decide":"بررسی حد اعتبار","part_price_propose":"پیشنهاد قیمت قطعه","part_price_decide":"بررسی مالی قیمت قطعه","work_define":"تعریف کار و زمان‌سنجی","labor_publish":"تعیین فی دقیقه و ضریب اجرت"},
+};
+toolOptions["get_service_payments"]={...toolOptions["get_service_payments"],
+"status":{...toolOptions["get_service_payments"]?.["status"],"all":"همه","waiting":"منتظر تطبیق","review":"در حال بررسی","cleared":"تطبیق تأییدشده","rejected":"ردشده","reversed":"برگشت‌خورده"},
+};
+toolOptions["service_payment_apply"]={...toolOptions["service_payment_apply"],
+"mode":{...toolOptions["service_payment_apply"]?.["mode"],"delete":"حذف"},
+};
+toolOptions["get_office_service_devices"]={...toolOptions["get_office_service_devices"],
+"view":{...toolOptions["get_office_service_devices"]?.["view"],"open":"باز","history":"سوابق"},
+};
+toolOptions["get_service_return_parcels"]={...toolOptions["get_service_return_parcels"],
+"workspace":{...toolOptions["get_service_return_parcels"]?.["workspace"],"expert":"کارشناس"},
+"view":{...toolOptions["get_service_return_parcels"]?.["view"],"waiting":"منتظر اقدام","progress":"در جریان","history":"سوابق"},
+};
+toolOptions["service_return_parcel_apply"]={...toolOptions["service_return_parcel_apply"],
+"mode":{...toolOptions["service_return_parcel_apply"]?.["mode"],"destination":"تعریف مقصد","dispatch":"ارسال / اعزام","collect":"ثبت تحویل‌گیری","receive":"ثبت دریافت"},
+"result":{...toolOptions["service_return_parcel_apply"]?.["result"],"complete":"کامل","damage":"آسیب‌دیدگی","shortage":"کسری"},
+};
+toolOptions["get_representative_identity"]={...toolOptions["get_representative_identity"],
+"kind":{...toolOptions["get_representative_identity"]?.["kind"],"sales":"فروش","service":"خدمات"},
+"domain":{...toolOptions["get_representative_identity"]?.["domain"],"home":"تجهیزات خانگی","hospital":"تجهیزات بیمارستانی"},
+};
+toolOptions["representative_identity_apply"]={...toolOptions["representative_identity_apply"],
+"kind":{...toolOptions["representative_identity_apply"]?.["kind"],"sales":"فروش","service":"خدمات"},
+};
+toolOptions["upload_representative_identity_file"]={...toolOptions["upload_representative_identity_file"],
+"kind":{...toolOptions["upload_representative_identity_file"]?.["kind"],"sales":"فروش","service":"خدمات"},
+};
+toolOptions["download_representative_identity_file"]={...toolOptions["download_representative_identity_file"],
+"kind":{...toolOptions["download_representative_identity_file"]?.["kind"],"sales":"فروش","service":"خدمات"},
+};
+toolOptions["get_representative_identity_file"]={...toolOptions["get_representative_identity_file"],
+"kind":{...toolOptions["get_representative_identity_file"]?.["kind"],"sales":"فروش","service":"خدمات"},
+};
+toolOptions["get_driver_receipts"]={...toolOptions["get_driver_receipts"],
+"domain":{...toolOptions["get_driver_receipts"]?.["domain"],"home":"تجهیزات خانگی","hospital":"تجهیزات بیمارستانی"},
+"view":{...toolOptions["get_driver_receipts"]?.["view"],"driver":"راننده","intake":"پذیرش"},
+"bucket":{...toolOptions["get_driver_receipts"]?.["bucket"],"active":"فعال","history":"سوابق","all":"همه"},
+};
+toolOptions["driver_receipt_apply"]={...toolOptions["driver_receipt_apply"],
+"mode":{...toolOptions["driver_receipt_apply"]?.["mode"],"receive":"ثبت دریافت","link_case":"اتصال به پرونده خدمات"},
+"domain":{...toolOptions["driver_receipt_apply"]?.["domain"],"home":"تجهیزات خانگی","hospital":"تجهیزات بیمارستانی"},
+};
+toolOptions["after_sales_apply"]={...toolOptions["after_sales_apply"],
+"mode":{...toolOptions["after_sales_apply"]?.["mode"],"office_intake":"پذیرش دستگاه در دفتر شرکت","worklog":"ثبت اقدام سرویسکار","report_submit":"ارسال گزارش کامل تعمیر","collection_policy":"تنظیم مهلت ارسال و بررسی داغی"},
+};
+toolOptions["print_service_document"]={...toolOptions["print_service_document"],
+"kind":{...toolOptions["print_service_document"]?.["kind"],"device_label":"لیبل دائمی دستگاه"},
+"format":{...toolOptions["print_service_document"]?.["format"],"json":"داده ساخت‌یافته"},
+};
+toolOptions["send_inbox_attachment"]={...toolOptions["send_inbox_attachment"],
+"purpose":{...toolOptions["send_inbox_attachment"]?.["purpose"],"document":"مدرک","voice":"پیام صوتی"},
+};
+toolOptions["create_password_user"]={...toolOptions["create_password_user"],
+"permissions.financialRead.*":{...toolOptions["create_password_user"]?.["permissions.financialRead.*"],"accounting":"حسابداری"},
+"permissions.financialWrite.*":{...toolOptions["create_password_user"]?.["permissions.financialWrite.*"],"accounting":"حسابداری"},
+"permissions.assetRoles.*":{...toolOptions["create_password_user"]?.["permissions.assetRoles.*"],"disposal":"تأیید خروج اموال"},
+};
+toolOptions["update_password_user"]={...toolOptions["update_password_user"],
+"permissions.financialRead.*":{...toolOptions["update_password_user"]?.["permissions.financialRead.*"],"accounting":"حسابداری"},
+"permissions.financialWrite.*":{...toolOptions["update_password_user"]?.["permissions.financialWrite.*"],"accounting":"حسابداری"},
+"permissions.assetRoles.*":{...toolOptions["update_password_user"]?.["permissions.assetRoles.*"],"disposal":"تأیید خروج اموال"},
+};
+toolOptions["estimate_finished_production"]={...toolOptions["estimate_finished_production"],
+"method":{...toolOptions["estimate_finished_production"]?.["method"],"quantity":"بر اساس تعداد موردنیاز","people":"بر اساس افراد و زمان"},
+};
+toolOptions["create_daily_production_plan"]={...toolOptions["create_daily_production_plan"],
+"method":{...toolOptions["create_daily_production_plan"]?.["method"],"quantity":"بر اساس تعداد موردنیاز","people":"بر اساس افراد و زمان"},
+};
+toolOptions["resolve_finished_handoff_shortage"]={...toolOptions["resolve_finished_handoff_shortage"],
+"action":{...toolOptions["resolve_finished_handoff_shortage"]?.["action"],"resend":"ارسال مجدد","escalate_shortage":"ارجاع کسری برای پیگیری","found_device":"ثبت پیدا شدن دستگاه","propose_parts":"پیشنهاد قطعات جایگزین","report_loss":"اعلام مفقودی","confirm_parts":"تأیید قطعات جایگزین","return_parts":"برگشت پیشنهاد قطعات","review_loss":"بررسی مفقودی","approve_loss":"تأیید مفقودی","return_loss":"برگشت بررسی مفقودی"},
+};
+toolOptions["get_driver_workspace"]={...toolOptions["get_driver_workspace"],
+"view":{...toolOptions["get_driver_workspace"]?.["view"],"active":"فعال","work":"کار جاری","history":"سوابق"},
+};
+toolOptions["get_finished_shipping_package"]={...toolOptions["get_finished_shipping_package"],
+"format":{...toolOptions["get_finished_shipping_package"]?.["format"],"json":"داده ساخت‌یافته","print":"نسخه چاپی"},
+};
+toolOptions["sales_apply"]={...toolOptions["sales_apply"],
+"custodyKind":{...toolOptions["sales_apply"]?.["custodyKind"],"demo":"دستگاه نمایشی","equipment":"تجهیزات","other":"سایر"},
+"condition":{...toolOptions["sales_apply"]?.["condition"],"good":"سالم","damaged":"آسیب‌دیده","repair":"نیازمند تعمیر"},
+"checkEvidence":{...toolOptions["sales_apply"]?.["checkEvidence"],"physical":"مدرک فیزیکی","registry":"استعلام ثبت‌شده"},
+"mode":{...toolOptions["sales_apply"]?.["mode"],"custody_issue":"ثبت تحویل امانی","custody_recall":"شروع جمع‌آوری امانت‌ها","custody_cancel_recall":"لغو جمع‌آوری امانت‌ها","custody_return":"ثبت دریافت امانت","order_finance_review":"بررسی مالی سفارش دارای بدهی معوق","check_disposition_request":"درخواست تعیین تکلیف چک","check_disposition_review":"رسیدگی مالی به چک"},
+"checkPurpose":{...toolOptions["sales_apply"]?.["checkPurpose"],"payment":"ثبت پرداخت","collateral":"تضمین"},
+"disposition":{...toolOptions["sales_apply"]?.["disposition"],"return":"برگشت برای اصلاح","collateral":"تضمین"},
+"resolution":{...toolOptions["sales_apply"]?.["resolution"],"refund":"استرداد وجه","replacement":"جایگزینی"},
+};
+toolOptions["apply_sales_return"]={...toolOptions["apply_sales_return"],
+"mode":{...toolOptions["apply_sales_return"]?.["mode"],"waybill":"ثبت بارنامه برگشت","pickup":"تحویل از باربری به خدمات","inspect":"بررسی","handback":"ثبت تحویل دستگاه به نماینده","technical":"ثبت نظر فنی","factory":"ثبت دریافت در کارخانه","line":"ثبت تحویل به خط","repair":"ثبت تعمیر","quality":"ثبت کنترل کیفیت","pack":"بسته‌بندی","settle":"تسویه","refund":"ثبت استرداد وجه","reserve":"رزرو قطعات","dispatch":"ثبت ارسال جایگزین"},
+"method":{...toolOptions["apply_sales_return"]?.["method"],"repair":"نیازمند تعمیر","replace":"جایگزینی"},
+};
+toolOptions["upload_sales_file"]={...toolOptions["upload_sales_file"],
+"serviceDomain":{...toolOptions["upload_sales_file"]?.["serviceDomain"],"home":"تجهیزات خانگی"},
+};
+toolOptions["resolve_purchase_remainder"]={...toolOptions["resolve_purchase_remainder"],
+"resolution":{...toolOptions["resolve_purchase_remainder"]?.["resolution"],"return_refund":"برگشت کالا و استرداد وجه","cancel_remainder":"لغو مانده سفارش"},
+};
+toolOptions["resubmit_direct_material_supply"]={...toolOptions["resubmit_direct_material_supply"],
+"needPriority":{...toolOptions["resubmit_direct_material_supply"]?.["needPriority"],"critical":"بحرانی","urgent":"فوری","normal":"عادی","planned":"برنامه‌ریزی‌شده"},
+"stockTreatment":{...toolOptions["resubmit_direct_material_supply"]?.["stockTreatment"],"full":"کل مقدار واردشده","subtract":"کسر موجودی آزاد"},
+};
+toolOptions["record_domestic_procurement_progress"]={...toolOptions["record_domestic_procurement_progress"],
+"status":{...toolOptions["record_domestic_procurement_progress"]?.["status"],"searching":"در حال جست‌وجو","technical":"فنی"},
+};
+toolOptions["decide_procurement_escalation"]={...toolOptions["decide_procurement_escalation"],
+"decision":{...toolOptions["decide_procurement_escalation"]?.["decision"],"foreign":"بازرگانی خارجی","domestic":"بازرگانی داخلی","design":"طراحی","resume":"ادامه فرایند"},
+};
+toolOptions["request_material_supply"]={...toolOptions["request_material_supply"],
+"needPriority":{...toolOptions["request_material_supply"]?.["needPriority"],"critical":"بحرانی","urgent":"فوری","normal":"عادی","planned":"برنامه‌ریزی‌شده"},
+"stockTreatment":{...toolOptions["request_material_supply"]?.["stockTreatment"],"full":"کل مقدار واردشده","subtract":"کسر موجودی آزاد"},
+};
+toolOptions["save_sourcing_quote"]={...toolOptions["save_sourcing_quote"],
+"transportMethod":{...toolOptions["save_sourcing_quote"]?.["transportMethod"],"seller":"حمل با فروشنده","carrier":"حمل‌کننده","company":"شرکت"},
+"freightStatus":{...toolOptions["save_sourcing_quote"]?.["freightStatus"],"no_charge":"بدون هزینه جداگانه برای شرکت","known":"مبلغ مشخص است","pending":"در انتظار بررسی"},
+"deliveryStart":{...toolOptions["save_sourcing_quote"]?.["deliveryStart"],"confirmation":"تأیید سفارش","advance_payment":"پرداخت پیش‌پرداخت"},
+};
+toolOptions["upload_sourcing_quote_file"]={...toolOptions["upload_sourcing_quote_file"],
+"route":{...toolOptions["upload_sourcing_quote_file"]?.["route"],"domestic":"بازرگانی داخلی","foreign":"بازرگانی خارجی"},
+};
+toolOptions["request_procurement_exception"]={...toolOptions["request_procurement_exception"],
+"kind":{...toolOptions["request_procurement_exception"]?.["kind"],"unforeseen":"مورد پیش‌بینی‌نشده","urgent":"فوری","sole_source":"تأمین‌کننده انحصاری","contract":"قرارداد"},
+};
+toolOptions["decide_procurement_exception"]={...toolOptions["decide_procurement_exception"],
+"decision":{...toolOptions["decide_procurement_exception"]?.["decision"],"approve":"تأیید","reject":"رد با علت","assign":"تعیین مسئول","development":"توسعه"},
+"ownerRole":{...toolOptions["decide_procurement_exception"]?.["ownerRole"],"domestic":"بازرگانی داخلی","foreign":"بازرگانی خارجی","commerce_manager":"مدیر بازرگانی","finance":"مالی","inventory":"انبار","engineering":"تحقیق و توسعه"},
+};
+toolOptions["review_urgent_purchase_finance"]={...toolOptions["review_urgent_purchase_finance"],
+"result":{...toolOptions["review_urgent_purchase_finance"]?.["result"],"pass":"قبول","fail":"رد"},
+};
+toolOptions["sync_rfq_suppliers"]={...toolOptions["sync_rfq_suppliers"],
+"route":{...toolOptions["sync_rfq_suppliers"]?.["route"],"domestic":"بازرگانی داخلی","foreign":"بازرگانی خارجی"},
+};
+toolOptions["return_quote_review"]={...toolOptions["return_quote_review"],
+"destination":{...toolOptions["return_quote_review"]?.["destination"],"finance":"مالی","supply":"تأمین","both":"هر دو واحد"},
+};
+toolOptions["answer_quote_review"]={...toolOptions["answer_quote_review"],
+"role":{...toolOptions["answer_quote_review"]?.["role"],"finance":"مالی","domestic":"بازرگانی داخلی","foreign":"بازرگانی خارجی"},
+};
+toolOptions["propose_order_terms"]={...toolOptions["propose_order_terms"],
+"deliveryStart":{...toolOptions["propose_order_terms"]?.["deliveryStart"],"confirmation":"تأیید سفارش","advance_payment":"پرداخت پیش‌پرداخت"},
+};
+toolOptions["review_order_terms"]={...toolOptions["review_order_terms"],
+"result":{...toolOptions["review_order_terms"]?.["result"],"pass":"قبول","fail":"رد"},
+};
+toolOptions["acknowledge_purchase_receipt"]={...toolOptions["acknowledge_purchase_receipt"],
+"stage":{...toolOptions["acknowledge_purchase_receipt"]?.["stage"],"receipt":"رسید دریافت","quality":"کنترل کیفیت"},
+};
+toolOptions["review_delivery_extension"]={...toolOptions["review_delivery_extension"],
+"result":{...toolOptions["review_delivery_extension"]?.["result"],"pass":"قبول","fail":"رد"},
+};
+toolOptions["approve_order_terms"]={...toolOptions["approve_order_terms"],
+"result":{...toolOptions["approve_order_terms"]?.["result"],"pass":"قبول","fail":"رد"},
+};
+toolOptions["purchase_settlement_apply"]={...toolOptions["purchase_settlement_apply"],
+"data.freightResolution":{...toolOptions["purchase_settlement_apply"]?.["data.freightResolution"],"pending":"در انتظار بررسی","recorded":"ثبت شده","no_charge":"بدون هزینه جداگانه برای شرکت"},
+"data.expenses.*.kind":{...toolOptions["purchase_settlement_apply"]?.["data.expenses.*.kind"],"freight":"هزینه حمل","other":"سایر"},
+};
+toolOptions["request_purchase_payment"]={...toolOptions["request_purchase_payment"],
+"kind":{...toolOptions["request_purchase_payment"]?.["kind"],"advance":"پیش‌پرداخت","invoice":"فاکتور"},
+};
+toolOptions["review_purchase_payment"]={...toolOptions["review_purchase_payment"],
+"result":{...toolOptions["review_purchase_payment"]?.["result"],"pass":"قبول","fail":"رد"},
+};
+toolOptions["decide_purchase_payment"]={...toolOptions["decide_purchase_payment"],
+"result":{...toolOptions["decide_purchase_payment"]?.["result"],"pass":"قبول","fail":"رد"},
+"destination":{...toolOptions["decide_purchase_payment"]?.["destination"],"finance":"مالی","buyer":"خریدار / مسئول خرید","both":"هر دو واحد"},
+};
+toolOptions["answer_purchase_payment"]={...toolOptions["answer_purchase_payment"],
+"role":{...toolOptions["answer_purchase_payment"]?.["role"],"finance":"مالی","buyer":"خریدار / مسئول خرید"},
+};
+toolOptions["purchase_payables_apply"]={...toolOptions["purchase_payables_apply"],
+"mode":{...toolOptions["purchase_payables_apply"]?.["mode"],"connect_supplier_credit":"اتصال بستانکاری تأمین‌کننده","amend_invoice_value":"اصلاح مبلغ فاکتور","offset_purchase_claim":"تهاتر مطالبه خرید"},
+};
+toolOptions["get_staff_missions"]={...toolOptions["get_staff_missions"],
+"sourceType":{...toolOptions["get_staff_missions"]?.["sourceType"],"sales_lead":"سرنخ یا فرصت فروش","as_case":"پرونده اعلام خرابی خدمات","hospital_job":"پرونده خدمات بیمارستانی"},
+"state":{...toolOptions["get_staff_missions"]?.["state"],"draft":"تکمیل برنامه اعزام","review":"بررسی مدیر","approved":"آماده شروع سفر","travelling":"سفر در حال انجام"},
+"queue":{...toolOptions["get_staff_missions"]?.["queue"],"all":"همه مأموریت‌های قابل دسترسی","actionable":"کارهای قابل اقدام"},
+};
+toolOptions["staff_mission_apply"]={...toolOptions["staff_mission_apply"],
+"mode":{...toolOptions["staff_mission_apply"]?.["mode"],"request":"ثبت نیاز به اعزام","plan":"تکمیل برنامه مأموریت","report":"ثبت گزارش بازدید","locate":"ثبت موقعیت رویداد","discrepancy":"اعلام مغایرت برنامه","submit":"ارسال برنامه برای تأیید","approve":"تأیید اعزام","return":"بازگشت برنامه برای اصلاح","start":"اعلام شروع سفر"},
+"sourceType":{...toolOptions["staff_mission_apply"]?.["sourceType"],"sales_lead":"سرنخ یا فرصت فروش","as_case":"پرونده اعلام خرابی خدمات","hospital_job":"پرونده خدمات بیمارستانی"},
+"outcomes.*.state":{...toolOptions["staff_mission_apply"]?.["outcomes.*.state"],"done":"انجام شد","followup":"نیازمند پیگیری","not_done":"انجام نشد"},
+"status":{...toolOptions["staff_mission_apply"]?.["status"],"received":"موقعیت دریافت شد","denied":"اجازه موقعیت‌یابی داده نشده","timeout":"مهلت دریافت موقعیت تمام شد","unavailable":"موقعیت در دسترس نیست"},
+};
+toolOptions["personnel_apply"]={...toolOptions["personnel_apply"],
+"mode":{...toolOptions["personnel_apply"]?.["mode"],"file_approve":"تأیید مدرک","file_reject":"رد مدرک با علت","family_start":"ثبت درخواست تغییر خانوادگی","family_submit":"ارسال تغییر خانوادگی برای بررسی","family_approve":"تأیید تغییر خانوادگی","family_reject":"رد تغییر خانوادگی با علت","personnel_create":"تشکیل پرونده پرسنلی","personnel_complete":"تأیید اطلاعات پرونده پرسنلی","contract_save":"ثبت قرارداد پرسنلی","contract_finalize":"نهایی‌کردن قرارداد","contract_close":"بستن قرارداد با علت"},
+"familyEvent":{...toolOptions["personnel_apply"]?.["familyEvent"],"birth":"تولد فرزند","marriage":"ازدواج","divorce":"جدایی از همسر"},
+"maritalStatus":{...toolOptions["personnel_apply"]?.["maritalStatus"],"single":"مجرد","married":"متأهل"},
+"contractKind":{...toolOptions["personnel_apply"]?.["contractKind"],"fixed":"مدت‌دار"},
+"salaryBasis":{...toolOptions["personnel_apply"]?.["salaryBasis"],"monthly":"ماهانه","daily":"روزانه","hourly":"ساعتی"},
+"kind":{...toolOptions["personnel_apply"]?.["kind"],"family":"تغییر وضعیت خانوادگی"},
+};
+toolOptions["upload_personnel_file"]={...toolOptions["upload_personnel_file"],
+"category":{...toolOptions["upload_personnel_file"]?.["category"],"spouse_page":"تصویر صفحه همسر شناسنامه","children_page":"تصویر صفحه فرزندان شناسنامه","national_card":"تصویر کارت ملی","birth_certificate":"تصویر شناسنامه","education":"مدارک تحصیلی و مهارت","signed_contract":"قرارداد امضاشده","other":"سایر"},
+};
+toolOptions["upload_sales_resource"]={...toolOptions["upload_sales_resource"],
+"category":{...toolOptions["upload_sales_resource"]?.["category"],"catalog":"کاتالوگ","promotion":"محتوای معرفی و تبلیغ","training":"آموزش"},
+"audience":{...toolOptions["upload_sales_resource"]?.["audience"],"all":"همه","representative":"نماینده","reseller":"عامل فروش"},
+};
+toolOptions["record_sales_call"]={...toolOptions["record_sales_call"],
+"callKind":{...toolOptions["record_sales_call"]?.["callKind"],"incoming":"ورودی","partner":"همکار تجاری","outreach":"تماس با مشتری جدید"},
+"result":{...toolOptions["record_sales_call"]?.["result"],"no_answer":"پاسخ نداد","interested":"علاقه‌مند به ادامه مذاکره","quote":"درخواست پیش‌فاکتور","declined":"رد شد","other":"سایر","discussed":"مذاکره انجام شد","agreed":"توافق شد","issue":"صدور","resolved":"برطرف شد"},
+};
+toolOptions["get_person_asset_custody"]={...toolOptions["get_person_asset_custody"],
+"view":{...toolOptions["get_person_asset_custody"]?.["view"],"current":"وضعیت فعلی","history":"سوابق"},
+};
+toolOptions["get_asset_workflow"]={...toolOptions["get_asset_workflow"],
+"view":{...toolOptions["get_asset_workflow"]?.["view"],"mine":"مربوط به من"},
+};
+toolOptions["apply_asset_workflow"]={...toolOptions["apply_asset_workflow"],
+"mode":{...toolOptions["apply_asset_workflow"]?.["mode"],"finance_close":"تعیین تکلیف مالی خروج","attach_photo":"افزودن عکس","attach_receipt":"افزودن رسید","technical_opinion":"ثبت نظر فنی","recover":"ثبت بازیابی مال","passport":"ویرایش شناسنامه مال","group":"تعریف گروه اموال","transfer":"شروع تحویل / برگشت","approve_transfer":"مجوز انتقال","accept_transfer":"تحویل گرفتم","reject_transfer":"رد دریافت با توضیح","cancel_transfer":"لغو انتقال","confirm_presence":"تأیید موجودی نزد من","report_fault":"اعلام خرابی / توقف خطر","service_plan":"برنامه سرویس","service_start":"شروع سرویس / تعمیر","service_report":"ثبت گزارش کار","service_approve":"تأیید فنی و بازگشت به کار","meter":"ثبت کارکرد مال","disposal_request":"درخواست فروش / اسقاط / بررسی مفقودی","disposal_approve":"تصمیم نهایی خروج","delegate_disposal":"واگذاری اختیار خروج","create_link":"ساخت لینک تحویل / تأیید دوره‌ای","revoke_link":"ابطال لینک"},
+"holderKind":{...toolOptions["apply_asset_workflow"]?.["holderKind"],"stock":"انبار / محل شرکت","employee":"کارمند شرکت","contractor":"پیمانکار","sales":"فروش","service":"خدمات"},
+"condition":{...toolOptions["apply_asset_workflow"]?.["condition"],"good":"سالم","repair":"نیازمند تعمیر","damaged":"آسیب‌دیده"},
+"assetKind":{...toolOptions["apply_asset_workflow"]?.["assetKind"],"office":"اموال اداری","mold":"قالب","machine":"ماشین‌آلات"},
+"performerKind":{...toolOptions["apply_asset_workflow"]?.["performerKind"],"employee":"کارمند شرکت","contractor":"پیمانکار"},
+"unit":{...toolOptions["apply_asset_workflow"]?.["unit"],"hours":"ساعت","cycles":"سیکل"},
+"reason":{...toolOptions["apply_asset_workflow"]?.["reason"],"sale":"فروش","scrap":"اسقاط","lost":"مفقودی","stolen":"سرقت"},
+};
+toolOptions["create_asset_confirmation_link"]={...toolOptions["create_asset_confirmation_link"],
+"kind":{...toolOptions["create_asset_confirmation_link"]?.["kind"],"handover":"تحویل","presence":"تأیید وجود مال"},
+};
+toolOptions["print_asset_document"]={...toolOptions["print_asset_document"],
+"kind":{...toolOptions["print_asset_document"]?.["kind"],"label":"لیبل","receipt":"رسید دریافت"},
+"format":{...toolOptions["print_asset_document"]?.["format"],"json":"داده ساخت‌یافته","html":"صفحه قابل چاپ"},
+"layout":{...toolOptions["print_asset_document"]?.["layout"],"thermal":"چاپگر حرارتی","roll":"رول چندستونه","a4":"برگه A4"},
+"sheetSize":{...toolOptions["print_asset_document"]?.["sheetSize"],"a4":"برگه A4","a3":"برگه A3"},
+"rowAnchor":{...toolOptions["print_asset_document"]?.["rowAnchor"],"top":"بالای صفحه","middle":"وسط صفحه","bottom":"پایین صفحه"},
+};
+toolOptions["assets_apply"]={...toolOptions["assets_apply"],
+"mode":{...toolOptions["assets_apply"]?.["mode"],"register_group":"ثبت چند مال مشابه"},
+"assetKind":{...toolOptions["assets_apply"]?.["assetKind"],"office":"اموال اداری","mold":"قالب","machine":"ماشین‌آلات"},
+"items.*.condition":{...toolOptions["assets_apply"]?.["items.*.condition"],"good":"سالم","repair":"نیازمند تعمیر","damaged":"آسیب‌دیده"},
+};
+toolOptions["upload_asset_transfer_photo"]={...toolOptions["upload_asset_transfer_photo"],
+"phase":{...toolOptions["upload_asset_transfer_photo"]?.["phase"],"sender":"تحویل‌دهنده","receiver":"تحویل‌گیرنده"},
+};
+toolOptions["sales_bank_apply"]={...toolOptions["sales_bank_apply"],
+"mode":{...toolOptions["sales_bank_apply"]?.["mode"],"resolve_transfer":"تعیین تکلیف انتقال","receiving_accounts":"حساب‌های دریافت"},
+};
+toolOptions["estimate_hospital_oxygen"]={...toolOptions["estimate_hospital_oxygen"],
+"rows.*.kind":{...toolOptions["estimate_hospital_oxygen"]?.["rows.*.kind"],"ward":"بستری عادی","resuscitation":"احیای اورژانس","emergencyMajor":"درمان عمده یا گچ‌گیری","emergencyRecovery":"ریکاوری پس از بیهوشی","emergencyTreatment":"اتاقک یا اتاق درمان","anaesthesia":"اتاق بیهوشی، در مجموعهٔ عمل","theatre":"اتاق عمل","recovery":"ریکاوری پس از عمل","maternityMother":"اتاق زایمان و ریکاوری، مادر","maternityBaby":"اتاق زایمان و ریکاوری، نوزاد","maternityTheatre":"مجموعهٔ عمل زایمان، بیهوشی","maternityPaediatric":"مجموعهٔ عمل زایمان، پزشک نوزاد","maternityRecovery":"ریکاوری پس از بیهوشی زایمان","maternityWard":"بستری تک‌تخته یا چندتختهٔ زایمان","nursery":"اتاق نوزادان","neonatal":"مراقبت ویژهٔ نوزادان (SCBU)","radiology":"اتاق بیهوشی و اقدام تصویربرداری","critical":"مراقبت ویژه (ICU)","coronary":"مراقبت قلبی (CCU)","highDependency":"مراقبت با وابستگی بالا (HDU)","renal":"کلیه و دیالیز","cpap":"تهویهٔ CPAP","ect":"اتاق درمان با تشنج الکتریکی","ectRecovery":"ریکاوری پس از بیهوشی","acuteTreatment":"اتاق درمان","acuteRecovery":"ریکاوری پس از بیهوشی","dayWard":"بستری روزانه","dentalOne":"اتاق نوع ۱","dentalTwoThree":"اتاق نوع ۲ و ۳","dentalRecovery":"ریکاوری","outpatient":"اتاق درمان سرپایی","equipment":"اتاق سرویس تجهیزات و استریل"},
+"specialUse":{...toolOptions["estimate_hospital_oxygen"]?.["specialUse"],"unknown":"نامشخص","none":"مصرف ویژه ندارد","assessed":"مصرف ویژه ارزیابی شده است"},
+};
+toolOptions["build_intake_apply"]={...toolOptions["build_intake_apply"],
+"mode":{...toolOptions["build_intake_apply"]?.["mode"],"technical_resolve":"تعیین مشخصات فنی نهایی","accept_customer":"ثبت پذیرش مشتری","duration_request":"درخواست مدت تولید","quote_terms":"ثبت شرایط پیش‌فاکتور","ceo_duration":"تصمیم مدیرعامل درباره مدت تولید","finalize":"قطعی‌کردن"},
+"channel":{...toolOptions["build_intake_apply"]?.["channel"],"phone":"تماس تلفنی","message":"پیام","email":"ایمیل","in_person":"مراجعه حضوری","letter":"نامه"},
+};
+toolOptions["apply_bom_effectivity"]={...toolOptions["apply_bom_effectivity"],
+"mode":{...toolOptions["apply_bom_effectivity"]?.["mode"],"preview":"پیش‌نمایش","apply":"اعمال تغییرات"},
+"scope":{...toolOptions["apply_bom_effectivity"]?.["scope"],"future":"سفارش‌های آینده","plans":"برنامه‌های انتخاب‌شده"},
+};
+toolOptions["worker_inventory_apply"]={...toolOptions["worker_inventory_apply"],
+"mode":{...toolOptions["worker_inventory_apply"]?.["mode"],"allocate":"تخصیص قطعات به کارگر","return_to_line":"برگشت به انبار خط","reject_parts":"رد قطعات با علت","physical_output":"ثبت خروجی فیزیکی","receive_output":"دریافت خروجی تولید","assign_diagnosis":"ارجاع عیب‌یابی","repair_complete":"اعلام تکمیل تعمیر","declare_scrap":"اعلام ضایعات","set_buffer":"تنظیم ذخیره قطعات کارگر","count_worker":"ثبت شمارش موجودی کارگر","dispatch_scrap":"ارسال ضایعات","receive_scrap":"دریافت ضایعات","request_scrap_sale":"درخواست فروش ضایعات","package_finished":"بسته‌بندی محصول نهایی","receive_finished":"دریافت محصول نهایی","dispatch_to_central":"ارسال به انبار مرکزی","receive_from_line":"دریافت از خط تولید","revise_line_return":"اصلاح برگشت از خط","count_policy":"تنظیم قواعد شمارش"},
+};
+toolOptions["project_execution_apply"]={...toolOptions["project_execution_apply"],
+"mode":{...toolOptions["project_execution_apply"]?.["mode"],"allocate":"تخصیص","request_quality":"ارسال برای کنترل کیفیت","reconcile":"تطبیق","approve_reconciliation":"تأیید تطبیق","return_reconciliation":"برگشت تطبیق برای اصلاح","finalize":"قطعی‌کردن"},
+};
+toolOptions["review_line_material_request"]={...toolOptions["review_line_material_request"],
+"mode":{...toolOptions["review_line_material_request"]?.["mode"],"request_edit":"درخواست اصلاح","confirm_material_request":"تأیید درخواست مواد","agree_line_quantity":"توافق مقدار تحویل خط","return_line_discrepancy":"برگشت مغایرت خط برای اصلاح"},
+};
+toolOptions["inventory_count_apply"]={...toolOptions["inventory_count_apply"],
+"mode":{...toolOptions["inventory_count_apply"]?.["mode"],"annual_start":"شروع شمارش سالانه","count":"ثبت شمارش","finance_approve":"تأیید مالی","ceo_approve":"تأیید مدیرعامل","resolve_discrepancy":"تعیین تکلیف مغایرت"},
+};
+toolOptions["receive_counted_material"]={...toolOptions["receive_counted_material"],
+"noteRoles.*":{...toolOptions["receive_counted_material"]?.["noteRoles.*"],"supply":"تأمین","finance":"مالی"},
+};
+toolOptions["get_receipt_observations"]={...toolOptions["get_receipt_observations"],
+"view":{...toolOptions["get_receipt_observations"]?.["view"],"people":"بر اساس افراد و زمان","purchase-orders":"سفارش‌های خرید"},
+};
+toolOptions["list_warehouse_receipts"]={...toolOptions["list_warehouse_receipts"],
+"view":{...toolOptions["list_warehouse_receipts"]?.["view"],"open":"باز","history":"سوابق"},
+"state":{...toolOptions["list_warehouse_receipts"]?.["state"],"awaiting_qc_template":"منتظر فرم کنترل کیفیت","pending_qc":"منتظر کنترل کیفیت","awaiting_relabel":"منتظر تعویض لیبل","awaiting_warehouse":"منتظر جانمایی در انبار","stored":"جانمایی‌شده در انبار","rejected":"ردشده"},
+};
+toolOptions["manage_paired_workspace"]={...toolOptions["manage_paired_workspace"],
+"mode":{...toolOptions["manage_paired_workspace"]?.["mode"],"join":"پیوستن به اتصال","poll":"دریافت وضعیت اتصال","work":"کار جاری","ui":"دریافت وضعیت صفحه مشترک","fields":"ثبت اطلاعات فرم مشترک","begin":"شروع کار مشترک","finish":"پایان کار مشترک"},
+"work.kind":{...toolOptions["manage_paired_workspace"]?.["work.kind"],"scan":"اسکن","navigate":"رفتن به صفحه مربوط"},
+};
+toolOptions["upload_subcontract_file"]={...toolOptions["upload_subcontract_file"],
+"purpose":{...toolOptions["upload_subcontract_file"]?.["purpose"],"signed_receipt":"رسید امضاشده","output":"ثبت خروجی"},
+};
+toolOptions["get_accounting"]={...toolOptions["get_accounting"],
+"view":{...toolOptions["get_accounting"]?.["view"],"trial":"تراز آزمایشی","ledger":"دفتر حساب","choices":"گزینه‌ها"},
+"kind":{...toolOptions["get_accounting"]?.["kind"],"party":"طرف حساب","bank":"بانک","project":"پروژه","contract":"قرارداد","employee":"کارمند","asset":"مال"},
+"state":{...toolOptions["get_accounting"]?.["state"],"pending":"در صف","exception":"نیازمند رسیدگی","posted":"ثبت قطعی شده","superseded":"نسخه پیشین","cancelled":"باطل‌شده","no_effect":"بدون اثر حسابداری"},
+};
+toolOptions["accounting_apply"]={...toolOptions["accounting_apply"],
+"mode":{...toolOptions["accounting_apply"]?.["mode"],"setup":"تنظیم حسابداری","create_account":"تعریف حساب حسابداری","account":"ویرایش حساب","preview_rule":"پیش‌نمایش قاعده","end_rule":"پایان اعتبار قاعده","process":"پردازش صف رویدادها","reperiod_event":"انتقال رویداد به دوره مجاز","receipt_value":"تعیین ارزش رسید","manual":"پیش‌نویس سند دستی","opening":"پیش‌نویس افتتاحیه","reverse_journal":"ثبت سند معکوس","refresh_draft":"تازه‌سازی پیش‌نویس","cancel_draft":"ابطال پیش‌نویس","post_journal":"ثبت قطعی سند حسابداری","close_period":"بستن دوره"},
+"level":{...toolOptions["accounting_apply"]?.["level"],"group":"گروه","general":"عمومی","subsidiary":"معین"},
+"classification":{...toolOptions["accounting_apply"]?.["classification"],"asset":"دارایی","liability":"بدهی","equity":"حقوق مالکانه","income":"درآمد","expense":"هزینه","control":"حساب انتظامی / کنترلی"},
+"postingMode":{...toolOptions["accounting_apply"]?.["postingMode"],"draft":"پیش‌نویس","automatic":"خودکار"},
+};
+toolOptions["get_purchase_returns"]={...toolOptions["get_purchase_returns"],
+"view":{...toolOptions["get_purchase_returns"]?.["view"],"materials":"مواد و قطعات"},
+};
+toolOptions["apply_purchase_return"]={...toolOptions["apply_purchase_return"],
+"mode":{...toolOptions["apply_purchase_return"]?.["mode"],"technical":"فنی","dispatch":"ارسال / اعزام","accept_return":"ثبت پذیرش مرجوعی"},
+"disposition":{...toolOptions["apply_purchase_return"]?.["disposition"],"credit":"بستانکاری","replacement":"کالای جایگزین"},
+"representation":{...toolOptions["apply_purchase_return"]?.["representation"],"direct":"مستقیم","credit_invoice":"بستانکاری و فاکتور جدید"},
+};
+toolOptions["custom_production_apply"]={...toolOptions["custom_production_apply"],
+"mode":{...toolOptions["custom_production_apply"]?.["mode"],"configuration":"تعریف نسخه و انتخاب‌های محصول","payment_policy":"شرایط پرداخت محصول","product_policy":"تنظیم قواعد محصول","order_terms":"شرایط همین سفارش"},
+};
+toolOptions["upload_sales_word_template"]={...toolOptions["upload_sales_word_template"],
+"mode":{...toolOptions["upload_sales_word_template"]?.["mode"],"image":"تصویر"},
+};
+toolOptions["get_sales_word_document"]={...toolOptions["get_sales_word_document"],
+"kind":{...toolOptions["get_sales_word_document"]?.["kind"],"custom":"محصول سفارشی","routine":"روتین","general":"عمومی"},
+"mode":{...toolOptions["get_sales_word_document"]?.["mode"],"preview":"پیش‌نمایش","issue":"صدور","template_preview":"پیش‌نمایش قالب"},
+};
+toolOptions["save_daily_usd_rates"]={...toolOptions["save_daily_usd_rates"],
+"mode":{...toolOptions["save_daily_usd_rates"]?.["mode"],"today":"نرخ امروز","preview":"پیش‌نمایش","import":"ورود نرخ‌های تاریخی"},
+};
+toolOptions["save_semi_master"]={...toolOptions["save_semi_master"],
+"mode":{...toolOptions["save_semi_master"]?.["mode"],"identity":"ثبت شناسنامه نیمه‌آماده","functional_template":"تعریف فرم کیفیت عملکردی"},
+};
+toolOptions["project_daily_work_apply"]={...toolOptions["project_daily_work_apply"],
+"mode":{...toolOptions["project_daily_work_apply"]?.["mode"],"report":"گزارش"},
+};
+toolOptions["custom_order_price_apply"]={...toolOptions["custom_order_price_apply"],
+"mode":{...toolOptions["custom_order_price_apply"]?.["mode"],"propose":"ثبت پیشنهاد","confirm_base":"تأیید قیمت نسخه پایه"},
+};
+toolOptions["print_asset_registration"]={...toolOptions["print_asset_registration"],
+"layout":{...toolOptions["print_asset_registration"]?.["layout"],"thermal":"چاپگر حرارتی","roll":"رول چندستونه","a4":"برگه A4"},
+"sheetSize":{...toolOptions["print_asset_registration"]?.["sheetSize"],"a4":"برگه A4","a3":"برگه A3"},
+"rowAnchor":{...toolOptions["print_asset_registration"]?.["rowAnchor"],"top":"بالای صفحه","middle":"وسط صفحه","bottom":"پایین صفحه"},
+};

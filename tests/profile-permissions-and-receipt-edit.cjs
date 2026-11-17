@@ -169,7 +169,7 @@ assert.equal(driverView.userId,admin.userId);
 assert.equal(await transport.transportCanSee(driverView,row('preview-mission')),true);
 assert.equal(await transport.transportCanSee(driverView,row('another-mission')),false);
 assert.equal(await transport.transportCanSee(review.profileSession(admin,'driver',ws()),row('preview-mission')),false);
-const driverWork=await load('lib/profile-work.ts').profileWork(driverView);
+const driverWork=await ctx.run(admin,()=>load('lib/profile-work.ts').profileWork(driverView));
 assert.ok(driverWork.work.some(x=>x.sourceId==='preview-mission'));assert.ok(!driverWork.work.some(x=>x.sourceId==='another-mission'));
 const transportApi=load('app/api/transport/route.ts');
 const checklist={mode:'checklist',revision:1,packagesChecked:true,itemsChecked:true,documentsChecked:true,conditionChecked:true};
