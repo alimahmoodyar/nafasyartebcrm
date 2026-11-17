@@ -1,3 +1,4 @@
+import {personnelDocumentStatus} from './personnel-documents';
 import {contactPatch} from './member-contact';
 import {personnelProfileId} from './personnel-profile';
 import {AccessError} from './authorization';
@@ -29,9 +30,8 @@ export function employmentChanges(b:any,old:any,rows:any[],now:string,members:an
  if(b.mode==='personnel_complete'){
   if(!old||old.type!=='hr_employee')fail('پرونده پرسنلی یافت نشد.',404);
   const d=old.data;requiredPersonnel(d,linkedMobile||d.mobile);
-  for(const category of ['national_card','birth_certificate','spouse_page','children_page'])if(!rows.some(r=>r.type==='hr_file'&&r.data.caseId===old.id&&r.data.category===category))fail('مدرک اجباری پرونده را بارگذاری کنید: '+category);
   if(d.state==='disabled')fail('پرونده همکاری غیرفعال است.');
-  return [{...old,data:{...d,state:'active',identityCompleteAt:now,setupMissing:[],familyBase:d.familyBase||{maritalStatus:d.maritalStatus,childrenCount:d.childrenCount||0,effective:dayAt()}}}];
+  return [{...old,data:{...d,state:'active',profileApprovedAt:d.profileApprovedAt||now,...(personnelDocumentStatus(rows,old.id).complete?{identityCompleteAt:d.identityCompleteAt||now}:{}),setupMissing:[],familyBase:d.familyBase||{maritalStatus:d.maritalStatus,childrenCount:d.childrenCount||0,effective:d.start}}}];
  }
 
  if(b.mode==='contract_save'){
