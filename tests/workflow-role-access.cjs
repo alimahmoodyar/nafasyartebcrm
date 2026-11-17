@@ -37,7 +37,8 @@ const assignment=id=>{const r=policy.jobRoles.find(r=>r.id===id);return{roles:[i
  for(const k of ['sales','treasury','assets','guarantees','inventory'])assert.equal(nav.canOpenSection({...admin,isAdmin:false,permissions:malformed},k),false);
  // Create through the same handler that the browser/MCP uses, with deliberately
  // forged extra grants. The saved role intent derives the complete workflow.
- const response=await as(admin,()=>usersApi.POST(request('/api/users',{name:'Sales colleague',email:'sales@workflow.test',status:'active',permissions:{roleAssignment:{roles:['home_sales','delivery','sales_viewer']},...policy.allPermissions}})));
+ const personnelId=require('./personnel-test-fixture.cjs')(sql,'Sales colleague',now);
+ const response=await as(admin,()=>usersApi.POST(request('/api/users',{personnelId,name:'Sales colleague',email:'sales@workflow.test',status:'active',permissions:{roleAssignment:{roles:['home_sales','delivery','sales_viewer']},...policy.allPermissions}})));
  const created=await response.json();assert.equal(response.status,201,JSON.stringify(created));const m=created.member;
  const p=policy.validatePermissions({roleAssignment:{roles:['home_sales','delivery','sales_viewer']}});
  assert.deepEqual(plain(m.permissions),plain(p));
