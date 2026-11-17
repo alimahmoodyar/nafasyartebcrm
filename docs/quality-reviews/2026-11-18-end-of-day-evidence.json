@@ -1,0 +1,1057 @@
+{
+  "startedBy": "Owner explicitly invoked end-of-day review, superseding previous sequencing wait.",
+  "checkedAtUtc": "2026-11-17T23:32:39.404105+00:00",
+  "checkedAtTehran": "2026-11-18T03:02:39.404105+03:30",
+  "baselineCommit": "251382ab5ce065b2eea16f81a99ce28fc26ea1a3",
+  "reviewedInitialHead": "ffc52f5d65055798e697892e5a06e82969cae14b",
+  "verifiedFixCommit": "6818de79c7296121a594b2dbf5597206255e8d29",
+  "fixTree": "6afffd34f6539429dd2d6a5a4d099f605000fe78",
+  "changedFiles": [
+    "app/api/personnel/files/route.ts",
+    "app/api/staff-missions/files/route.ts",
+    "app/api/staff-missions/route.ts",
+    "app/api/tasks/route.ts",
+    "app/api/users/route.ts",
+    "app/globals.css",
+    "app/page.tsx",
+    "components/trace/after-sales-panel.tsx",
+    "components/trace/assistant-chat.tsx",
+    "components/trace/employee-purchases-panel.tsx",
+    "components/trace/hospital-panel.tsx",
+    "components/trace/iran-iban-input.tsx",
+    "components/trace/passkeys.tsx",
+    "components/trace/personnel-admin-panel.tsx",
+    "components/trace/personnel-family-panel.tsx",
+    "components/trace/personnel-identity-documents.tsx",
+    "components/trace/personnel-panel.tsx",
+    "components/trace/personnel.css",
+    "components/trace/reminders-panel.tsx",
+    "components/trace/sales-leads-panel.tsx",
+    "components/trace/semi-master.tsx",
+    "components/trace/staff-missions-panel.tsx",
+    "components/trace/staff-missions.css",
+    "components/trace/treasury-destination-panel.tsx",
+    "docs/CHANGELOG.md",
+    "docs/PASSKEYS.md",
+    "docs/QUALITY-REVIEW-QUEUE.md",
+    "docs/process-design/STAFF-MISSIONS-PHASE-1.fa.md",
+    "docs/quality-reviews/2026-11-17-assistant-personnel.md",
+    "docs/quality-reviews/2026-11-17-local-sheba.md",
+    "docs/quality-reviews/2026-11-17-passkey-storage.md",
+    "docs/quality-reviews/2026-11-17-personnel-contract-direct.md",
+    "docs/quality-reviews/2026-11-17-reminder-access.md",
+    "drizzle/0028_staff_mission_indexes.sql",
+    "lib/duties.ts",
+    "lib/form-options.ts",
+    "lib/form-vocabulary.ts",
+    "lib/iran-iban.ts",
+    "lib/mcp/tools.ts",
+    "lib/passkey-storage.ts",
+    "lib/passkeys.ts",
+    "lib/personnel-contract-salary.ts",
+    "lib/personnel-contract.ts",
+    "lib/personnel-documents.ts",
+    "lib/personnel-employment.ts",
+    "lib/personnel-family.ts",
+    "lib/personnel-file-review.ts",
+    "lib/personnel-tasks.ts",
+    "lib/personnel.ts",
+    "lib/profile-work.ts",
+    "lib/reminders.ts",
+    "lib/reset-contract.ts",
+    "lib/role-profiles.ts",
+    "lib/staff-mission-tasks.ts",
+    "lib/staff-missions.ts",
+    "lib/system-reset.ts",
+    "lib/treasury.ts",
+    "tests/assistant-dock-browser.cjs",
+    "tests/iran-iban-browser.cjs",
+    "tests/iran-iban.cjs",
+    "tests/passkey-storage.cjs",
+    "tests/passkeys-ui.cjs",
+    "tests/passkeys-worker.cjs",
+    "tests/passkeys.cjs",
+    "tests/personnel-admin-profile.cjs",
+    "tests/personnel-admin-ui.cjs",
+    "tests/personnel-advance.cjs",
+    "tests/personnel-contract-browser.cjs",
+    "tests/personnel-employment.cjs",
+    "tests/personnel-identity-documents-ui.cjs",
+    "tests/personnel-test-fixture.cjs",
+    "tests/personnel-ui.cjs",
+    "tests/personnel.cjs",
+    "tests/production-people.cjs",
+    "tests/production.cjs",
+    "tests/profile-permissions-and-receipt-edit.cjs",
+    "tests/reminder-notifier-ui.cjs",
+    "tests/reminders.cjs",
+    "tests/staff-missions-ui.cjs",
+    "tests/staff-missions.cjs",
+    "tests/workflow-role-access.cjs"
+  ],
+  "changedCommits": [
+    "6818de79c7296121a594b2dbf5597206255e8d29 Fix mission task repair and preserve acknowledged events during refresh failures",
+    "ffc52f5d65055798e697892e5a06e82969cae14b Implement source-linked staff missions through goal-based visit reports",
+    "047231341b0a214f76720ca7007ef6806f1ddd73 Register signed personnel contracts directly with mandatory salary facts and finalize existing drafts",
+    "f3c37629a8eed0575c06af18fdd37450cdf78f21 Prepare missing Passkey storage safely and report traceable authentication setup failures",
+    "63e420dacdf2a88c69f22b9636c4cab745565bef Validate Iranian SHEBA locally with fixed IR inputs and shared server checks",
+    "cd433568055c49b962763f134ad35a1643a5aec4 Dock the assistant beside account and support staged personnel identity completion",
+    "292268ddedb4c0b116a5e42d363671e5e1138c63 Fix personal reminders for scoped owner profiles and suppress background error overlays"
+  ],
+  "selectedTests": {
+    "results": [
+      {
+        "test": "staff-missions-ui",
+        "exitCode": 0,
+        "seconds": 2.02,
+        "log": "post-staff-missions-ui.log"
+      },
+      {
+        "test": "personnel",
+        "exitCode": 0,
+        "seconds": 12.93,
+        "log": "post-personnel.log"
+      },
+      {
+        "test": "staff-missions",
+        "exitCode": 0,
+        "seconds": 14.44,
+        "log": "final-staff-missions.log"
+      },
+      {
+        "test": "personnel-employment",
+        "exitCode": 0,
+        "seconds": 14.81,
+        "log": "post-personnel-employment.log"
+      },
+      {
+        "test": "personnel-ui",
+        "exitCode": 0,
+        "seconds": 3.14,
+        "log": "post-personnel-ui.log"
+      },
+      {
+        "test": "personnel-admin-ui",
+        "exitCode": 0,
+        "seconds": 1.27,
+        "log": "post-personnel-admin-ui.log"
+      },
+      {
+        "test": "personnel-identity-documents-ui",
+        "exitCode": 0,
+        "seconds": 1.31,
+        "log": "personnel-identity-documents-ui.log"
+      },
+      {
+        "test": "personnel-integrity",
+        "exitCode": 0,
+        "seconds": 1.42,
+        "log": "personnel-integrity.log"
+      },
+      {
+        "test": "personnel-admin-profile",
+        "exitCode": 0,
+        "seconds": 7.25,
+        "log": "post-personnel-admin-profile.log"
+      },
+      {
+        "test": "personnel-leave",
+        "exitCode": 0,
+        "seconds": 3.74,
+        "log": "personnel-leave.log"
+      },
+      {
+        "test": "personnel-advance",
+        "exitCode": 0,
+        "seconds": 12.02,
+        "log": "personnel-advance.log"
+      },
+      {
+        "test": "personnel-positions",
+        "exitCode": 0,
+        "seconds": 0.96,
+        "log": "personnel-positions.log"
+      },
+      {
+        "test": "iran-iban",
+        "exitCode": 0,
+        "seconds": 0.58,
+        "log": "iran-iban.log"
+      },
+      {
+        "test": "personnel-leave-route",
+        "exitCode": 0,
+        "seconds": 11.53,
+        "log": "personnel-leave-route.log"
+      },
+      {
+        "test": "passkey-storage",
+        "exitCode": 0,
+        "seconds": 0.72,
+        "log": "passkey-storage.log"
+      },
+      {
+        "test": "passkeys-ui",
+        "exitCode": 0,
+        "seconds": 0.73,
+        "log": "passkeys-ui.log"
+      },
+      {
+        "test": "personnel-profile",
+        "exitCode": 0,
+        "seconds": 11.39,
+        "log": "personnel-profile.log"
+      },
+      {
+        "test": "reminder-notifier-ui",
+        "exitCode": 0,
+        "seconds": 0.89,
+        "log": "reminder-notifier-ui.log"
+      },
+      {
+        "test": "passkeys",
+        "exitCode": 0,
+        "seconds": 9.68,
+        "log": "passkeys.log"
+      },
+      {
+        "test": "assistant-chat-lifecycle-ui",
+        "exitCode": 0,
+        "seconds": 1.67,
+        "log": "assistant-chat-lifecycle-ui.log"
+      },
+      {
+        "test": "reminders",
+        "exitCode": 0,
+        "seconds": 11.89,
+        "log": "reminders.log"
+      },
+      {
+        "test": "assistant-tool-catalog",
+        "exitCode": 0,
+        "seconds": 0.95,
+        "log": "post-assistant-tool-catalog.log"
+      },
+      {
+        "test": "assistant-workspace",
+        "exitCode": 0,
+        "seconds": 18.37,
+        "log": "post-assistant-workspace.log"
+      },
+      {
+        "test": "role-cartable-ui",
+        "exitCode": 0,
+        "seconds": 1.42,
+        "log": "post-role-cartable-ui.log"
+      },
+      {
+        "test": "task-program-access-ui",
+        "exitCode": 0,
+        "seconds": 1.41,
+        "log": "post-task-program-access-ui.log"
+      },
+      {
+        "test": "assistant-profiles",
+        "exitCode": 0,
+        "seconds": 12.03,
+        "log": "assistant-profiles.log"
+      },
+      {
+        "test": "role-access-audit",
+        "exitCode": 0,
+        "seconds": 5.06,
+        "log": "role-access-audit.log"
+      },
+      {
+        "test": "manual-permissions",
+        "exitCode": 0,
+        "seconds": 13.9,
+        "log": "manual-permissions.log"
+      },
+      {
+        "test": "workflow-role-access",
+        "exitCode": 0,
+        "seconds": 12.98,
+        "log": "post-workflow-role-access.log"
+      },
+      {
+        "test": "role-composition",
+        "exitCode": 0,
+        "seconds": 4.38,
+        "log": "role-composition.log"
+      },
+      {
+        "test": "profile-permissions-and-receipt-edit",
+        "exitCode": 0,
+        "seconds": 16.31,
+        "log": "post-profile-permissions-and-receipt-edit.log"
+      },
+      {
+        "test": "after-sales-domain-ui",
+        "exitCode": 0,
+        "seconds": 1.32,
+        "log": "after-sales-domain-ui.log"
+      },
+      {
+        "test": "sales-leads",
+        "exitCode": 0,
+        "seconds": 13.94,
+        "log": "sales-leads.log"
+      },
+      {
+        "test": "service-role-preview",
+        "exitCode": 0,
+        "seconds": 7.7,
+        "log": "post-service-role-preview.log"
+      },
+      {
+        "test": "after-sales",
+        "exitCode": 0,
+        "seconds": 14.77,
+        "log": "after-sales.log"
+      },
+      {
+        "test": "system-reset",
+        "exitCode": 0,
+        "seconds": 15.79,
+        "log": "post-system-reset.log"
+      },
+      {
+        "test": "mcp-integration",
+        "exitCode": 0,
+        "seconds": 14.2,
+        "log": "post-mcp-integration.log"
+      },
+      {
+        "test": "duties",
+        "exitCode": 0,
+        "seconds": 18.78,
+        "log": "post-duties.log"
+      },
+      {
+        "test": "accounting",
+        "exitCode": 0,
+        "seconds": 3.82,
+        "log": "accounting.log"
+      },
+      {
+        "test": "treasury",
+        "exitCode": 0,
+        "seconds": 6.75,
+        "log": "treasury.log"
+      },
+      {
+        "test": "accounting-purchase",
+        "exitCode": 0,
+        "seconds": 4.89,
+        "log": "accounting-purchase.log"
+      },
+      {
+        "test": "production",
+        "exitCode": 0,
+        "seconds": 14.96,
+        "log": "post-production.log"
+      },
+      {
+        "test": "material-flow",
+        "exitCode": 0,
+        "seconds": 13.19,
+        "log": "material-flow.log"
+      },
+      {
+        "test": "night-review-scale",
+        "exitCode": 0,
+        "seconds": 30.64,
+        "log": "night-review-scale.log"
+      },
+      {
+        "test": "assistant-action-form",
+        "exitCode": 0,
+        "seconds": 1.47,
+        "log": "post-assistant-action-form.log"
+      },
+      {
+        "test": "form-presentation-ui",
+        "exitCode": 0,
+        "seconds": 5.59,
+        "log": "final-form-presentation-ui.log"
+      }
+    ],
+    "suites": 46,
+    "passed": 46,
+    "failed": 0,
+    "initialPasses": 41,
+    "initialFailures": 3,
+    "typecheck": {
+      "test": "typecheck",
+      "exitCode": 0,
+      "seconds": 51.81,
+      "log": "final-typecheck.log"
+    }
+  },
+  "missionChecks": [
+    {
+      "syntheticMissionRows": 350,
+      "localSqliteGetSamples": 30,
+      "pageSize": 20,
+      "p95ms": 8.01,
+      "productionCapacityClaim": false
+    },
+    {
+      "taskRepair": "PASS",
+      "globalSweeps": 12,
+      "maxMissionsPerSweep": 50,
+      "oldDraftRecovered": true,
+      "actionableQueueHasMore": true,
+      "sourceRaceRollback": true,
+      "cursorConcurrency": true
+    },
+    {
+      "suite": "staff-missions",
+      "assertions": 360,
+      "status": "PASS",
+      "flows": [
+        "sales",
+        "after-sales-case",
+        "hospital-job",
+        "administrator",
+        "constrained-profile-review"
+      ]
+    }
+  ],
+  "scaleAndRecovery": {
+    "data": {
+      "syntheticBatches": 100000,
+      "syntheticReceipts": 100000,
+      "syntheticCases": 100000,
+      "years": "2020–2026"
+    },
+    "environment": {
+      "node": "v24.22.1",
+      "platform": "win32",
+      "sqlite": "node:sqlite in-memory, local single process, no network/D1 latency"
+    },
+    "metrics": [
+      {
+        "name": "incoming-qc-exact",
+        "samples": 30,
+        "p95Ms": 0.936199999996461,
+        "minMs": 0.29140000000188593,
+        "maxMs": 1.4490000000005239
+      },
+      {
+        "name": "incoming-qc-unknown",
+        "samples": 30,
+        "p95Ms": 0.1915000000008149,
+        "minMs": 0.08400000000256114,
+        "maxMs": 0.7893000000003667
+      },
+      {
+        "name": "office-open",
+        "samples": 30,
+        "p95Ms": 11.012599999998201,
+        "minMs": 4.788300000000163,
+        "maxMs": 14.309300000000803
+      },
+      {
+        "name": "office-serial",
+        "samples": 30,
+        "p95Ms": 0.3875000000007276,
+        "minMs": 0.2261999999973341,
+        "maxMs": 1.0597999999990861
+      }
+    ],
+    "plans": [
+      {
+        "name": "batch-code",
+        "plan": [
+          {
+            "id": 4,
+            "parent": 0,
+            "notused": 61,
+            "detail": "SEARCH records USING INDEX idx_records_kind_code (kind=? AND <expr>=?)"
+          }
+        ]
+      },
+      {
+        "name": "receipt-link",
+        "plan": [
+          {
+            "id": 4,
+            "parent": 0,
+            "notused": 62,
+            "detail": "SEARCH flow_entities USING INDEX idx_flow_agent_created (type=?)"
+          }
+        ]
+      },
+      {
+        "name": "office-serial",
+        "plan": [
+          {
+            "id": 3,
+            "parent": 0,
+            "notused": 62,
+            "detail": "SEARCH flow_entities USING INDEX idx_flow_agent_created (type=?)"
+          }
+        ]
+      }
+    ],
+    "recovery": {
+      "kind": "Synthetic SQLite VACUUM backup, fresh reopen and every table logical SHA-256 equality",
+      "backupMs": 679.6421000000009,
+      "tables": [
+        {
+          "name": "access_audit",
+          "count": 1,
+          "hash": "8ef97e9feac679324c44af9238c8072b1a818e23c9bc4a5a02aa31aea9a9a03a"
+        },
+        {
+          "name": "accounting_accounts",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "accounting_journals",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "accounting_lines",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "accounting_periods",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "accounting_rules",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "accounting_settings",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "app_identity",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "app_members",
+          "count": 1,
+          "hash": "71b568c0b19b16d2d462642f26a5307b522a39e1ec57f5725f48693a8890467c"
+        },
+        {
+          "name": "assistant_actions",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "assistant_turns",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "auth_passkey_challenges",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "auth_passkeys",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "batch_files",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "bom_versions",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "duty_files",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "duty_notices",
+          "count": 1,
+          "hash": "5154aa3c32f1935ba06f0231b1c3902d41d4120e6ca48e1ac4e27e95ae5a3fd0"
+        },
+        {
+          "name": "duty_runs",
+          "count": 1,
+          "hash": "e72175477516e20d722a7085b1237df2a4f7363798a23f34b6128274b6861dc8"
+        },
+        {
+          "name": "economic_events",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "finance_files",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "finance_notes",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "firmware_files",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "flow_entities",
+          "count": 200007,
+          "hash": "d623b2180270f8b45a674f2334f342b02393fc19567e7f1638338345dafab5df"
+        },
+        {
+          "name": "flow_slots",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "inventory_balances",
+          "count": 1,
+          "hash": "9d5baffd7f9dc7ed37f97f97adb6c03423a429b691e8cbfda0523c55f9a97a29"
+        },
+        {
+          "name": "inventory_batches",
+          "count": 1,
+          "hash": "191784b3677d2b4c583282cd478ca36144d0a2e4a5a446d2a7c86a961c66bc86"
+        },
+        {
+          "name": "inventory_entries",
+          "count": 1,
+          "hash": "6de57ed60a5894745206bd0bd3dd3a8d42e5ad04b3dc50d61b7702a0d677bc9c"
+        },
+        {
+          "name": "inventory_operations",
+          "count": 3,
+          "hash": "db4dec501384c7adde972fece937750c28c92584c74c31f9e1e792a38270c007"
+        },
+        {
+          "name": "llm_configs",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "llm_usage",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "login_attempts",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "mcp_messages",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "mcp_streams",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "mcp_tokens",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "password_accounts",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "password_sessions",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "personal_reminders",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "production_materials",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "production_orders",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "production_receipts",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "quality_files",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "quality_reports",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "quality_templates",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "records",
+          "count": 100001,
+          "hash": "67ade3cd481ef247a1a6260aa2c14ed35c6bffa15cdc05947563eb6c76fb92dd"
+        },
+        {
+          "name": "reset_control",
+          "count": 1,
+          "hash": "16576c1de21bc2da957deb821a037af69ff9ff2859fc95da7eb3276ebf47cab4"
+        },
+        {
+          "name": "reset_jobs",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "role_preview_sessions",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "serial_reservations",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "serial_runs",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "service_activations",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "service_files",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "service_ledger",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "service_lots",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "service_offsets",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "service_reservations",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "sourcing_holds",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "sqlite_sequence",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_access_audit",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_app_identity",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_app_members",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_assistant_actions",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_assistant_turns",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_batch_files",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_bom_versions",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_duty_files",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_duty_notices",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_duty_runs",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_finance_files",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_finance_notes",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_firmware_files",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_flow_entities",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_flow_slots",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_inventory_balances",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_inventory_batches",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_inventory_entries",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_inventory_operations",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_llm_configs",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_login_attempts",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_mcp_messages",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_mcp_streams",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_mcp_tokens",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_password_accounts",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_password_sessions",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_production_materials",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_production_orders",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_production_receipts",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_quality_files",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_quality_reports",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_quality_templates",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_records",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_reset_control",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_reset_jobs",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_serial_reservations",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_serial_runs",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_service_activations",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_service_files",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_service_ledger",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_service_lots",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_service_offsets",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_service_reservations",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "training_sourcing_holds",
+          "count": 0,
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "integrityCheck": "ok",
+      "foreignKeyViolations": 0
+    },
+    "limitations": [
+      "No declared production user concurrency/annual volume target",
+      "Not a production load/soak or remote D1/R2 disaster recovery test",
+      "Dedicated lookup indexes are included; use lookup-index-performance.cjs for controlled before/after migration evidence"
+    ]
+  },
+  "initialFailures": {
+    "assistant-workspace": "Missing display captions/options; display dictionaries completed without changing schemas or business rules.",
+    "profile-permissions-and-receipt-edit": "Fixture called guarded profile projection outside its real-admin context; fixture corrected, authentication unchanged.",
+    "production": "Fixture omitted current material placement revision and physical-placement confirmation; fixture now uses owning material_location API then shelves with current revision."
+  },
+  "additionalPresentationFinding": {
+    "test": "form-presentation-ui",
+    "missingNativeDefinitions": 5,
+    "auditedControls": 872,
+    "auditedComponents": 206,
+    "finalPass": true
+  },
+  "labels": {
+    "initialMissingLabelsOptions": 896,
+    "fieldCaptions": 235,
+    "toolPathOptionSets": 167,
+    "schemasChecked": 545,
+    "visibleFieldModeCombinations": 15347
+  },
+  "publicationAtReportCreation": {
+    "githubBeforeThisReview": "ffc52f5d65055798e697892e5a06e82969cae14b",
+    "readyCode": "6818de79c7296121a594b2dbf5597206255e8d29",
+    "liveVersion": 312,
+    "liveSource": "18412a478752ac3fbebe9e714bf5f0c6e9fdbd74",
+    "liveTree": "5d3eb88626b905e4b76864233e70f2e9f84bcfd9",
+    "liveFiles": 1442,
+    "newPublicationConfirmed": false,
+    "priorNativeSourceError": "curl56 connection reset before source ref update",
+    "finalPushDeploymentEvidence": "Recorded separately in finance-core-20261115/night-review-20261118/release-audit.json after pushing this report."
+  },
+  "limits": [
+    "Isolated synthetic SQLite/React VM tests; no browser, personal server or live business-data mutations.",
+    "Not physical GPS/passkey/printer verification.",
+    "No production load/concurrency target established; local p95 is not hosted API latency.",
+    "No long soak or actual hosted D1/R2 disaster recovery.",
+    "Existing broad member/history loaders remain debt.",
+    "Old training-based hospital.cjs fixture has known baseline model-permission initialization failure; direct hospital_job operational tests pass.",
+    "Unfinished payroll-engine work is preserved in separate checkout and is not included in the reviewed release."
+  ]
+}
