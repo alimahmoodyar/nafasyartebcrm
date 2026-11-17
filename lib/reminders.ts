@@ -10,7 +10,9 @@ export {reminderSources};
 export const reminderFail=(message:string,status=400):never=>{throw new AccessError(message,status)};
 export async function reminderActor(){
  if(trainingContext.getStore())reminderFail('یادآورها در محیط اطلاعات شرکت فعال‌اند.',403);
- const u=await session();if(u.isAdmin)return u;
+ // A role review is an authenticated owner's scoped session, not an employee login.
+ // Preserve its effective permissions; stored account grants must not widen the role.
+ const u=await session();if(u.isAdmin||u.profileReview)return u;
  const m:any=await storage().prepare("SELECT * FROM app_members WHERE (id=? OR subject=?) AND status='active'").bind(u.userId.replace(/^local:/,''),u.userId).first();
  if(!m)reminderFail('حساب فعال نیست.',403);return {...u,permissions:validatePermissions(storedAccessPermissions(m.permissions))};
 }
