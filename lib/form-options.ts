@@ -1878,3 +1878,9 @@ toolOptions["print_asset_registration"]={...toolOptions["print_asset_registratio
 "sheetSize":{...toolOptions["print_asset_registration"]?.["sheetSize"],"a4":"برگه A4","a3":"برگه A3"},
 "rowAnchor":{...toolOptions["print_asset_registration"]?.["rowAnchor"],"top":"بالای صفحه","middle":"وسط صفحه","bottom":"پایین صفحه"},
 };
+
+// Reviewed travel return form.
+toolOptions.get_staff_missions.state.return_review='بررسی پایان سفر و بازگشت';
+toolOptions.staff_mission_apply.mode.finish='اعلام پایان سفر و بازگشت';
+toolOptions.staff_mission_apply.returnLocation={planned:'مطابق برنامه',different:'متفاوت با برنامه'};
+toolOptions.upload_staff_mission_file={...toolOptions.upload_staff_mission_file,eventKind:{report:'گزارش بازدید',finish:'اعلام پایان سفر'}};

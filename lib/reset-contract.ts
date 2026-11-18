@@ -294,3 +294,5 @@ resetHelp.push('راهنماهای عیب‌یابی محصول، تاریخچه
 // employee_purchase_request, subcontract_order and subcontract_file are shared operational flow JSON. Both reset scopes back up/delete them, including private R2 manifests via resetFiles; inventory custody and generic 0016 freeze stay atomic. No new table/FK or parallel data source.
 
 // Custom product publication/payment policy/Word originals are versioned catalogs, preserved on operations reset; issued sales_proforma_document and intake/project snapshots are operational. Both reset backups include private DOCX/image objects via resetFiles. Existing 0016 flow/inventory freeze covers transactions; no parallel database or new FK.
+
+// Mission finish evidence is embedded in staff_mission JSON and reuses staff_mission_file with eventKind=finish. Generic flow backup/delete/freeze and existing R2 resetFiles apply unchanged; no new table/FK or catalog exception.
