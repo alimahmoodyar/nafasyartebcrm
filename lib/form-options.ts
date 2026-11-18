@@ -1884,3 +1884,8 @@ toolOptions.get_staff_missions.state.return_review='بررسی پایان سفر
 toolOptions.staff_mission_apply.mode.finish='اعلام پایان سفر و بازگشت';
 toolOptions.staff_mission_apply.returnLocation={planned:'مطابق برنامه',different:'متفاوت با برنامه'};
 toolOptions.upload_staff_mission_file={...toolOptions.upload_staff_mission_file,eventKind:{report:'گزارش بازدید',finish:'اعلام پایان سفر'}};
+
+Object.assign(toolOptions.get_staff_missions.state,{return_completion:'تکمیل توضیحات بازگشت',completed:'پایان سفر تأیید شد'});
+Object.assign(toolOptions.staff_mission_apply.mode,{review_finish:'بررسی پایان سفر توسط مدیر',complete_return:'ارسال توضیح و تکمیل بازگشت'});
+toolOptions.staff_mission_apply.decision={approve:'تأیید پایان سفر',request_completion:'درخواست توضیح / تکمیل'};
+toolOptions.upload_staff_mission_file.eventKind.completion='توضیح و تکمیل بازگشت';

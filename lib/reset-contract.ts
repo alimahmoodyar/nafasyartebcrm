@@ -296,3 +296,5 @@ resetHelp.push('راهنماهای عیب‌یابی محصول، تاریخچه
 // Custom product publication/payment policy/Word originals are versioned catalogs, preserved on operations reset; issued sales_proforma_document and intake/project snapshots are operational. Both reset backups include private DOCX/image objects via resetFiles. Existing 0016 flow/inventory freeze covers transactions; no parallel database or new FK.
 
 // Mission finish evidence is embedded in staff_mission JSON and reuses staff_mission_file with eventKind=finish. Generic flow backup/delete/freeze and existing R2 resetFiles apply unchanged; no new table/FK or catalog exception.
+
+// Return reviews/completions are bounded append-only staff_mission JSON; completion files reuse staff_mission_file R2 manifests. Existing generic flow backup/delete/freeze covers decisions, responses and files; no table/FK/migration change.
