@@ -1,3 +1,7 @@
+# Approved payroll completion (2026-11-19)
+
+Owner authorized completing the confirmed payroll/personnel/mission and batch treasury designs, testing, review and push. Follow docs/process-design/PAYROLL-APPROVED-IMPLEMENTATION.fa.md and its pending-decision register before resuming this area. Do not implement a mission pay formula, an assumed bank workbook parser, bank transfer API or hardware-key requirement. Home-sales workflow review remains design-only.
+
 # Reviewed custom operations execution (2026-11-15)
 
 Latest owner authorized implementing reviewed forms and their approved workflow with the shown graphics. Follow docs/process-design/CUSTOM-OPERATIONS-EXECUTION.fa.md. Supersedes older finalize-by-sales-staff and no-price-proposal assumptions: sales manager sends to factory after price/customer/bank checks; no factory admission approval. Production gets no financial data server-side. Do not implement unreviewed shipping/installation forms.

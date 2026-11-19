@@ -1889,3 +1889,8 @@ Object.assign(toolOptions.get_staff_missions.state,{return_completion:'تکمی�
 Object.assign(toolOptions.staff_mission_apply.mode,{review_finish:'بررسی پایان سفر توسط مدیر',complete_return:'ارسال توضیح و تکمیل بازگشت'});
 toolOptions.staff_mission_apply.decision={approve:'تأیید پایان سفر',request_completion:'درخواست توضیح / تکمیل'};
 toolOptions.upload_staff_mission_file.eventKind.completion='توضیح و تکمیل بازگشت';
+
+toolOptions.get_payroll_workspace={view:{periods:'دوره‌های حقوق',policies:'قواعد مصوب',slips:'فهرست فیش‌ها',slip:'فیش فرد',payments:'فهرست پرداخت',mission_report:'گزارش مأموریت‌های ماه',missions:'شواهد مأموریت فیش'},section:{reports:'گزارش سفر',points:'موقعیت‌های ثبت‌شده',files:'پیوست‌ها'}};
+toolOptions.export_payroll_payment_list={format:{xlsx:'اکسل عمومی فهرست',print:'نسخه قابل چاپ'}};
+Object.assign(toolOptions.personnel_apply,{familyEvent:{...toolOptions.personnel_apply.familyEvent,study:'گواهی اشتغال به تحصیل فرزند',medical:'گواهی کمیسیون پزشکی فرزند'},allowanceDivisor:{'30':'معادل ۳۰ روز',calendar:'روزهای ماه شمسی'},restPay:{paid:'با مزد طبق توافق مصوب',weekly_ratio:'به نسبت کارکرد هفته'},'benefits.*.kind':{job:'مزیت به تبع شغل',welfare:'مزیت رفاهی'},'components.*.kind':{fixed:'مزیت ماهانه',seniority:'پایه سنوات',spouse:'حق تأهل',child:'حق اولاد',overtime:'اضافه‌کاری',night:'شب‌کاری',friday:'جمعه‌کاری',shift:'نوبت‌کاری'}});
+Object.assign(toolOptions.upload_personnel_file.category,{study_certificate:'گواهی اشتغال به تحصیل فرزند',medical_commission:'گواهی کمیسیون پزشکی فرزند',insurance_record:'گزارش سوابق بیمه',payroll_correction:'مستند اصلاح فیش'});

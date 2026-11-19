@@ -1,4 +1,5 @@
 export const identityDocumentCategories=['national_card','birth_certificate','spouse_page','children_page'] as const;
+export const personnelSelfFileCategories=[...identityDocumentCategories,'insurance_record'] as const;
 // Older personnel-file uploads were restricted to HR; their evidence stays valid.
 export function acceptedPersonnelFile(file:any){return !file.data.reviewState||file.data.reviewState==='approved';}
 export function personnelDocumentStatus(rows:any[],recordId:string){

@@ -2,6 +2,7 @@ import {normalizeIranIban,iranIbanError} from './iran-iban';
 import {personnelDocumentStatus} from './personnel-documents';
 import {contactPatch} from './member-contact';
 import {personnelProfileId} from './personnel-profile';
+import {payrollEmployeeFacts,contractPayrollFacts} from './personnel-payroll-facts';
 import {AccessError} from './authorization';
 import {sreq,stxt,sday} from './sales';
 import {dayAt,addDay} from './duties';
@@ -25,7 +26,7 @@ export function employmentChanges(b:any,old:any,rows:any[],now:string,members:an
  if(b.mode==='personnel_create'){
   if(old)fail('برای شخص تازه، پرونده تازه بسازید.',409);
   const memberId='person:'+b.id,name=sreq(b.name,100),details=employeeDetails(b),mobile=contactPatch({mobile:b.mobile}).mobile;
-  const data={memberId,name,code:'P-'+b.id.replace(/-/g,'').toUpperCase(),unit:'',title:'',location:sreq(b.location,200),employment:sreq(b.employment,100),managerId:stxt(b.managerId||'',200),start:sday(b.start),end:'',...details,mobile,bankAccount:personnelBankAccount(b.bankAccount,true),personal:stxt(b.personal||'',2000),leaveMinutes:0,state:'setup',productionEligible:false};
+  const data={...payrollEmployeeFacts(b),memberId,name,code:'P-'+b.id.replace(/-/g,'').toUpperCase(),unit:'',title:'',location:sreq(b.location,200),employment:sreq(b.employment,100),managerId:stxt(b.managerId||'',200),start:sday(b.start),end:'',...details,mobile,bankAccount:personnelBankAccount(b.bankAccount,true),personal:stxt(b.personal||'',2000),leaveMinutes:0,state:'setup',productionEligible:false};
   requiredPersonnel(data,mobile);if(data.managerId&&(data.managerId===memberId||!members.some(m=>m.id===data.managerId&&m.status==='active')&&!rows.some(r=>r.type==='hr_employee'&&r.data.memberId===data.managerId&&r.data.state!=='disabled')))fail('مدیر مستقیم را از اشخاص ثبت‌شده انتخاب کنید.');
   if(rows.some(r=>r.type==='hr_employee'&&r.data.nationalId===data.nationalId))fail('برای این کد ملی پرونده پرسنلی وجود دارد.',409);
   return [{id:personnelProfileId(memberId),type:'hr_employee',revision:0,data}];
@@ -54,7 +55,7 @@ export function employmentChanges(b:any,old:any,rows:any[],now:string,members:an
   const changes:any[]=[];
   if(previousId){const prev=rows.find(r=>r.id===previousId&&r.type==='hr_contract');if(!prev||prev.data.memberId!==memberId||prev.data.state!=='active'||!prev.data.end||start!==addDay(prev.data.end,1))fail('تمدید باید از روز بعد از پایان قرارداد فعال قبلی شروع شود؛ قرارداد قبلی را تازه‌سازی کنید.',409);changes.push({...prev,data:{...prev.data,state:'renewed',renewedBy:id}});}
   const signedFileIds=[...new Set([...(Array.isArray(previous.signedFileIds)?previous.signedFileIds:[]),...rows.filter(r=>r.type==='hr_file'&&r.data.caseId===id&&r.data.category==='signed_contract').map(r=>r.id)])];
-  changes.push({id,type:'hr_contract',revision:old?.revision||0,data:{...previous,memberId,title:'قرارداد پرسنلی',contractKind:'fixed',start,end,previousId,text:stxt(value('text')||'',12000),baseSalary:BigInt(baseSalary).toString(),salaryBasis,salaryCurrency:'IRR',registrationBasis:'physical_signed_contract',state:'active',finalizedAt:now,signedFileIds}});return changes;
+  changes.push({id,type:'hr_contract',revision:old?.revision||0,data:{...previous,memberId,title:'قرارداد پرسنلی',contractKind:'fixed',start,end,previousId,text:stxt(value('text')||'',12000),baseSalary:BigInt(baseSalary).toString(),salaryBasis,salaryCurrency:'IRR',registrationBasis:'physical_signed_contract',...contractPayrollFacts(b,previous,start,end),state:'active',finalizedAt:now,signedFileIds}});return changes;
  }
  if(!old||old.type!=='hr_contract')fail('قرارداد یافت نشد.',404);
  const d=old.data;

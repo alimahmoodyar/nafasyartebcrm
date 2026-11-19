@@ -298,3 +298,11 @@ resetHelp.push('راهنماهای عیب‌یابی محصول، تاریخچه
 // Mission finish evidence is embedded in staff_mission JSON and reuses staff_mission_file with eventKind=finish. Generic flow backup/delete/freeze and existing R2 resetFiles apply unchanged; no new table/FK or catalog exception.
 
 // Return reviews/completions are bounded append-only staff_mission JSON; completion files reuse staff_mission_file R2 manifests. Existing generic flow backup/delete/freeze covers decisions, responses and files; no table/FK/migration change.
+
+// Contract-v2 payroll uses existing hr_employee child/insurance histories,
+// hr_contract/hr_ruling effective wage facts, hr_policy versions, hr_period work
+// snapshots and hr_payroll components/source revisions/edits/mission snapshots.
+// Correction/certificate manifests remain hr_file; reminders are duty_runs/notices.
+// Existing flow_entities freeze, both reset scopes and R2 manifest backup cover
+// them atomically. Payroll economic events/journals use the existing accounting
+// reset/backup order; no parallel tables, new FK or new blob store were added.
