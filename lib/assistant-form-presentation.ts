@@ -64,8 +64,8 @@ export function generalPresentation(tool:string,args:any,input:any,title:string)
     if(!path.includes('values')&&(['day','date','due','expiry','startDate','needBy','availableOn','validFrom','validUntil','invoiceDay','fxDate','nextDue','sampleDue','deliveryDay','issuedOn','expiresOn','repaymentStart','installedOn','contractUntil','contractFrom','warrantyStart','baselineDay'].includes(key)||(tool==='routine_production_apply'&&key==='effective')))f.format='date';
     if(['notes','body','description','instructions','interest','reason','nextAction','generalSpecs','supplierSpecs','discrepancyResolution'].includes(key))f.multiline=true;
     const p=[...path,key],options=optionTitles(tool,p);if(Object.keys(options).length)f.enumLabels={...options,...f.enumLabels};
-    if(technical.has(key)||(!path.length&&key==='id'&&!['update_record','delete_record','update_user','delete_user'].includes(tool))||key==='previous')f.uiHidden=true;
-    if(!path.length&&key==='id'&&['update_record','delete_record','update_user','delete_user'].includes(tool))f.uiHidden=false;
+    if(technical.has(key)||(!path.length&&key==='id'&&!['update_record','delete_record','update_user','delete_user','restore_user'].includes(tool))||key==='previous')f.uiHidden=true;
+    if(!path.length&&key==='id'&&['update_record','delete_record','update_user','delete_user','restore_user'].includes(tool))f.uiHidden=false;
     decorate(f,value?.[key],p);
    }
   }

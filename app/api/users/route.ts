@@ -44,16 +44,66 @@ async function protectedAccount(row:any,actor:{userId:string}) {
   return actor.userId==='local:'+row.id || (!!row.subject&&row.subject===actor.userId) || row.email===env.TRACE_OWNER_EMAIL?.trim().toLowerCase() || identities.some(i=>i.subject===row.id||(!!row.subject&&i.subject===row.subject));
 }
 const conflict=()=>Response.json({error:'حساب توسط فرد دیگری تغییر کرده است؛ فهرست را تازه کنید.'},{status:409});
+// Login credentials are intentionally destroyed on deletion. Recover only display/login hints,
+// never a password, from the last trusted account audit. Old installations may retain the login.
+async function archivedIdentity(row:any) {
+  const db=storage(),credential:any=await db.prepare('SELECT username FROM password_accounts WHERE member_id=?').bind(row.id).first();
+  const audits=(await db.prepare("SELECT before,after FROM access_audit WHERE target=? AND action IN ('create_member','update_member','delete_member','restore_member','automatic_representative_account') ORDER BY at DESC,rowid DESC").bind(row.id).all()).results as any[];
+  let login=credential?.username&&!credential.username.startsWith('@deleted:')?credential.username:'';
+  let email=row.email?.endsWith('@deleted.invalid')?'':row.email,subject=row.subject||null;
+  for(const audit of audits)for(const raw of [audit.after,audit.before]){
+    let d:any;try{d=JSON.parse(raw||'null')}catch{continue}if(!d||typeof d!=='object')continue;
+    if(!login&&typeof d.username==='string'&&!d.username.startsWith('@deleted:'))login=d.username;
+    if(!email&&typeof d.email==='string'&&!d.email.endsWith('@deleted.invalid'))email=d.email;
+    if(!subject&&typeof d.subject==='string')subject=d.subject;
+  }
+  return {localAccount:!!credential,username:login,email:credential?'':email||'',subject};
+}
+async function restoreAccount(body:any,actor:{userId:string}) {
+  if(body.confirmed!==true)throw new AccessError('بازیابی حساب به تأیید صریح شما نیاز دارد.',400);
+  if(typeof body.id!=='string'||!Number.isSafeInteger(body.revision)||body.revision<1)throw new AccessError('شناسه و نسخه حساب معتبر لازم است.',400);
+  const db=storage(),old=await db.prepare('SELECT * FROM app_members WHERE id=?').bind(body.id).first<any>();
+  if(!old)throw new AccessError('حساب یافت نشد.',404);
+  if(old.status!=='deleted'||old.revision!==body.revision||body.accountName!==old.name)return Response.json({error:'وضعیت حساب تغییر کرده است؛ فهرست حذف‌شده‌ها را تازه کنید.',code:'STALE_ACCOUNT'},{status:409});
+  if(await protectedAccount(old,actor))throw new AccessError('حساب مدیر اصلی یا حساب جاری از این مسیر قابل بازیابی نیست.',403);
+  const identity=await archivedIdentity(old),login=identity.localAccount?username(body.username):null;
+  const passwordHash=identity.localAccount?await hashPassword(password(body.password)):null;
+  const data=payload({...old,status:'active',permissions:storedAccessPermissions(old.permissions),email:identity.localAccount?crypto.randomUUID()+'@local.invalid':identity.email||body.email});
+  await checkServiceAgent(data.permissions);
+  const now=new Date().toISOString(),auditId=crypto.randomUUID(),operationId=crypto.randomUUID(),subject=identity.localAccount?null:identity.subject;
+  const warehouseGuards=await warehouseResponsibilityGuards(data.permissions,operationId);
+  const next={...old,...data,subject,username:login||undefined,updated:now,revision:old.revision+1};
+  const gate='EXISTS(SELECT 1 FROM access_audit WHERE id=?)';
+  try {
+    await db.batch([
+      db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(operationId,'restore_member',JSON.stringify({memberId:old.id}),actor.userId,now),
+      db.prepare("UPDATE inventory_operations SET guard=CASE WHEN EXISTS(SELECT 1 FROM app_members WHERE id=? AND revision=? AND status='deleted') THEN guard ELSE 0 END WHERE id=?").bind(old.id,old.revision,operationId),
+      ...warehouseGuards,
+      db.prepare("INSERT INTO access_audit(id,actor,target,action,before,after,at) SELECT ?,?,?,?,?,?,? FROM app_members WHERE id=? AND revision=? AND status='deleted'").bind(auditId,actor.userId,old.id,'restore_member',JSON.stringify(old),JSON.stringify(next),now,old.id,old.revision),
+      db.prepare('UPDATE app_members SET email=?,subject=?,status=?,permissions=?,updated=?,revision=revision+1 WHERE id=? AND '+gate).bind(data.email,subject,'active',data.permissions,now,old.id,auditId),
+      ...(login?[db.prepare('UPDATE password_accounts SET username=?,password_hash=?,password_ciphertext=NULL,version=version+1 WHERE member_id=? AND '+gate).bind(login,passwordHash,old.id,auditId)]:[]),
+      db.prepare('DELETE FROM password_sessions WHERE member_id=? AND '+gate).bind(old.id,auditId),
+      db.prepare('UPDATE mcp_tokens SET revoked=1 WHERE (subject=? OR subject=?) AND '+gate).bind('local:'+old.id,identity.subject||'local:'+old.id,auditId),
+      db.prepare('DELETE FROM mcp_streams WHERE token_id IN (SELECT id FROM mcp_tokens WHERE subject=? OR subject=?) AND '+gate).bind('local:'+old.id,identity.subject||'local:'+old.id,auditId),
+      db.prepare('DELETE FROM role_preview_sessions WHERE member_id=? AND '+gate).bind(old.id,auditId),
+    ]);
+  }catch(error){if(/UNIQUE/.test(String(error)))return Response.json({error:login?'این نام کاربری اکنون متعلق به حساب دیگری است؛ نام دیگری انتخاب کنید.':'این ایمیل اکنون متعلق به حساب دیگری است؛ ابتدا تداخل حساب‌ها را بررسی کنید.',code:'LOGIN_CONFLICT'},{status:409});throw error;}
+  try{await syncMaterialTasks()}catch{}
+  const contact=(await memberContactsForAccounts([old.id]))[0];
+  return Response.json({restored:true,member:present({...next,permissions:JSON.stringify(warehouseProfilePermissions(next,await materialWarehouses())),mobile:contact.mobile,contactEmail:contact.contactEmail,contactRevision:contact.revision,protected:false})});
+}
 export async function GET() {
   try {
     const actor=await requireAdmin();
     await memberContactAdminContext(actor);
     const result=await storage().prepare("SELECT m.*,a.username FROM app_members m LEFT JOIN password_accounts a ON a.member_id=m.id WHERE m.status!='deleted' ORDER BY m.created DESC").all();
+    const deletedRows=(await storage().prepare("SELECT * FROM app_members WHERE status='deleted' ORDER BY updated DESC,id").all()).results;
+    const deletedMembers=await Promise.all(deletedRows.map(async(row:any)=>{const identity=await archivedIdentity(row);return {id:row.id,name:row.name,unit:row.unit,status:'deleted',revision:row.revision,deletedAt:row.updated,localAccount:identity.localAccount,username:identity.username,email:identity.email,permissions:storedAccessPermissions(row.permissions)};}));
     const warehouses=await materialWarehouses();
     const contacts=await memberContactsForAccounts(result.results.map((row:any)=>row.id));
     const personnelCandidates=(await storage().prepare("SELECT e.id,e.revision,e.data FROM flow_entities e WHERE e.type='hr_employee' AND NOT EXISTS(SELECT 1 FROM app_members m WHERE m.id=json_extract(e.data,'$.memberId')) ORDER BY e.created,e.id").all()).results.map((r:any)=>{const d=JSON.parse(r.data);return {id:r.id,revision:r.revision,name:d.name,unit:d.unit,code:d.code,mobile:d.mobile||'',ready:personnelBaseApproved(d)}});
     const members=await Promise.all(result.results.map(async (row:any)=>{const c=contacts.find(c=>c.memberId===row.id)!;return present({...row,permissions:JSON.stringify(warehouseProfilePermissions(row,warehouses)),mobile:c.mobile,contactEmail:c.contactEmail,contactRevision:c.revision,protected:await protectedAccount(row,actor)})}));
-    return Response.json({members,personnelCandidates,accountId:actor.userId,warehouses:warehouses.map(w=>({id:w.id,name:w.data.name,active:w.data.active}))},{headers:{'Cache-Control':'no-store'}});
+    return Response.json({members,deletedMembers,personnelCandidates,accountId:actor.userId,warehouses:warehouses.map(w=>({id:w.id,name:w.data.name,active:w.data.active}))},{headers:{'Cache-Control':'no-store'}});
   } catch(error) {return failure(error);}
 }
 export async function POST(request: Request) {
@@ -89,6 +139,7 @@ export async function PATCH(request: Request) {
   try {
     checkOrigin(request); const actor=await requireAdmin(); checkAccount(request,actor);
     const body=await request.json() as any;
+    if(body.mode==='restore')return await restoreAccount(body,actor);
     if(typeof body.id!=='string'||!Number.isInteger(body.revision)||body.revision<1)throw new Error('نسخه حساب معتبر نیست.');
     const db=storage(); const old=await db.prepare('SELECT * FROM app_members WHERE id=?').bind(body.id).first<any>();
     if(!old||old.status==='deleted')return Response.json({error:'حساب یافت نشد یا حذف شده است.'},{status:404});
@@ -145,10 +196,11 @@ export async function DELETE(request:Request) {
     if(old.status==='deleted')return Response.json({deleted:true,id:old.id,alreadyDeleted:true});
     if(body.accountName!==undefined&&body.accountName!==old.name)return conflict();
     if(old.revision!==body.revision)return conflict();
+    const credential:any=await db.prepare('SELECT username FROM password_accounts WHERE member_id=?').bind(old.id).first();
     const now=new Date().toISOString(),auditId=crypto.randomUUID(),next={...old,status:'deleted',updated:now,revision:old.revision+1};
     const gate='EXISTS(SELECT 1 FROM access_audit WHERE id=?)';
     const results=await db.batch([
-      db.prepare("INSERT INTO access_audit(id,actor,target,action,before,after,at) SELECT ?,?,?,?,?,?,? FROM app_members WHERE id=? AND revision=? AND status!='deleted'").bind(auditId,actor.userId,old.id,'delete_member',JSON.stringify(old),JSON.stringify(next),now,old.id,old.revision),
+      db.prepare("INSERT INTO access_audit(id,actor,target,action,before,after,at) SELECT ?,?,?,?,?,?,? FROM app_members WHERE id=? AND revision=? AND status!='deleted'").bind(auditId,actor.userId,old.id,'delete_member',JSON.stringify({...old,username:credential?.username}),JSON.stringify({...next,username:credential?.username}),now,old.id,old.revision),
       // Keep the member row for historical references, but release all login identity keys.
       // The audit snapshot retains the original email/subject for traceability.
       db.prepare("UPDATE app_members SET status='deleted',email='deleted+'||id||'@deleted.invalid',subject=NULL,updated=?,revision=revision+1 WHERE id=? AND "+gate).bind(now,old.id,auditId),

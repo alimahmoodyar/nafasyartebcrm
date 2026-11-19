@@ -1,3 +1,7 @@
+# Deleted-account restoration (2026-11-19)
+
+Owner authorized restoring deleted profiles in administrator Users. The deleted list and PATCH /api/users mode=restore reuse the original member ID, personnel/history and validated stored permissions. Local restore requires a NEW password and unique username; old password hashes cannot be recovered and old sessions/tokens/Passkeys must remain invalid. Legacy email/subject come from account audits when available. Restore has explicit name/revision/confirmation, atomic conflict/rollback checks, admin-only UI/API/MCP parity. Do not restore any real account as a test. See docs/quality-reviews/2026-11-19-account-restore.md; source parity and actual publication are recorded separately outside tracked source.
+
 # Individual account deletion from editor (2026-11-19)
 
 Owner separately authorized adding account deletion to the existing administrator account editor, testing and push. Reuse existing DELETE /api/users and delete_user; preserve primary/current administrator, history/FKs, session/token revocation and explicit confirmation. This is not the pending factory reset and does not authorize deleting any live account. See docs/quality-reviews/2026-11-19-account-edit-delete.md.

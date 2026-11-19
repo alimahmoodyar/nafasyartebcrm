@@ -130,6 +130,34 @@ async function enter(pass='Test-password-123'){return login.POST(request('/api/a
  await assert.rejects(()=>load('lib/mcp/auth.ts').tokenPrincipal(liveToken.token));
  assert.equal(sql.prepare("SELECT assignee FROM duty_runs WHERE id='historical-duty'").get().assignee,target.id);
  assert.equal((await userApi.POST(request('/api/users','POST',{...body,username:'renamed-user'}))).status,409,'active name remains reserved');
+ // Restore an archived identity without creating a second person or reviving credentials.
+ let archivedList=await (await userApi.GET()).json();let archiveRow=archivedList.deletedMembers.find(m=>m.id===target.id);
+ assert.equal(archiveRow.username,'renamed-user');assert.equal(archiveRow.localAccount,true);assert.ok(!JSON.stringify(archiveRow).includes('password_hash'));assert.ok(!JSON.stringify(archiveRow).includes('subject'));
+ const restoreBody={mode:'restore',id:target.id,revision:archiveRow.revision,accountName:archiveRow.name,confirmed:true,username:'recovered-user',password:'Recovered-password-123'};
+ const restore=b=>userApi.PATCH(request('/api/users','PATCH',b));
+ assert.equal((await restore({...restoreBody,confirmed:false})).status,400);
+ assert.equal((await restore({...restoreBody,password:''})).status,400);
+ assert.equal((await restore({...restoreBody,revision:target.revision})).status,409);
+ assert.equal((await restore({...restoreBody,accountName:'Different person'})).status,409);
+ assert.equal((await userApi.PATCH(request('/api/users','PATCH',restoreBody,{origin:'https://evil.test'}))).status,403);
+ assert.equal((await userApi.PATCH(request('/api/users','PATCH',restoreBody,{'x-assistant-account':'wrong'}))).status,409);
+ await enterNamed('renamed-user');assert.equal((await restore(restoreBody)).status,403);cookie='';identity=owner;
+ sql.prepare('UPDATE password_accounts SET must_change=1 WHERE member_id=?').run(target.id);
+ const restoreVersion=sql.prepare('SELECT version FROM password_accounts WHERE member_id=?').get(target.id).version;
+ before=auditCount();r=await restore({...restoreBody,username:'renamed-user'});assert.equal(r.status,409);assert.equal((await r.json()).code,'LOGIN_CONFLICT');assert.equal(auditCount(),before);assert.equal(sql.prepare('SELECT status FROM app_members WHERE id=?').get(target.id).status,'deleted');
+ sql.exec("CREATE TRIGGER reject_test_restore BEFORE UPDATE ON app_members WHEN OLD.status='deleted' AND NEW.status='active' BEGIN SELECT RAISE(ABORT,'SQLITE_TEST_RESTORE_FAILURE'); END");
+ before=auditCount();assert.equal((await restore(restoreBody)).status,503);assert.equal(auditCount(),before);assert.equal(sql.prepare('SELECT version FROM password_accounts WHERE member_id=?').get(target.id).version,restoreVersion);sql.exec('DROP TRIGGER reject_test_restore');
+ sql.exec(`CREATE TRIGGER race_test_restore AFTER INSERT ON inventory_operations WHEN NEW.kind='restore_member' BEGIN UPDATE app_members SET revision=revision+1 WHERE id='${target.id}'; END`);
+ before=auditCount();assert.equal((await restore(restoreBody)).status,409);assert.equal(auditCount(),before);assert.equal(sql.prepare('SELECT revision FROM app_members WHERE id=?').get(target.id).revision,archiveRow.revision,'transaction guard rolls back a concurrent stale restore');sql.exec('DROP TRIGGER race_test_restore');
+ const hrBefore=sql.prepare("SELECT id,data FROM flow_entities WHERE type='hr_employee' AND json_extract(data,'$.memberId')=?").get(target.id);
+ r=await restore(restoreBody);assert.equal(r.status,200,await r.clone().text());const restored=(await r.json()).member;assert.equal(restored.id,target.id);assert.equal(restored.status,'active');assert.equal(sql.prepare('SELECT must_change FROM password_accounts WHERE member_id=?').get(target.id).must_change,1,'restore preserves any existing mandatory-password-change policy');assert.equal(restored.username,'recovered-user');assert.equal(restored.revision,archiveRow.revision+1);assert.equal(restored.contactRevision,(await (await userApi.GET()).json()).members.find(m=>m.id===target.id).contactRevision,'restored row is immediately editable with current contact revision');
+ assert.equal(sql.prepare('SELECT version FROM password_accounts WHERE member_id=?').get(target.id).version,restoreVersion+1);
+ assert.deepEqual(sql.prepare("SELECT id,data FROM flow_entities WHERE type='hr_employee' AND json_extract(data,'$.memberId')=?").get(target.id),hrBefore);assert.equal(sql.prepare("SELECT assignee FROM duty_runs WHERE id='historical-duty'").get().assignee,target.id);
+ assert.ok(!(await (await userApi.GET()).json()).deletedMembers.some(m=>m.id===target.id));before=auditCount();assert.equal((await restore(restoreBody)).status,409);assert.equal(auditCount(),before,'repeat restore cannot reset credentials again');
+ cookie=liveCookie;await assert.rejects(()=>auth.session(),e=>e.status===401);cookie='';await assert.rejects(()=>load('lib/mcp/auth.ts').tokenPrincipal(liveToken.token));identity=null;
+ assert.equal((await login.POST(request('/api/auth/login','POST',{username:'recovered-user',password:body.password}))).status,401);
+ assert.equal((await login.POST(request('/api/auth/login','POST',{username:'recovered-user',password:restoreBody.password}))).status,200);identity=owner;
+ assert.equal(sql.prepare('PRAGMA foreign_key_check').all().length,0);assert.ok(!JSON.stringify(sql.prepare('SELECT * FROM access_audit').all()).includes(restoreBody.password));
  // Repair previously deleted accounts without releasing disabled or active names.
  const archived=await createLocal('old-deleted'),disabled=await createLocal('still-disabled');
  const archivedEmail=sql.prepare('SELECT email FROM app_members WHERE id=?').get(archived.id).email;
@@ -151,11 +179,17 @@ async function enter(pass='Test-password-123'){return login.POST(request('/api/a
  identity={userId:'legacy-subject',email:'legacy@example.com',displayName:'Legacy'};await auth.session();identity=owner;
  assert.equal((await userApi.DELETE(request('/api/users','DELETE',{id:legacy.id,revision:legacy.revision,confirmed:true}))).status,200);
  await assert.rejects(()=>auth.resolveIdentity({userId:'legacy-subject',email:'legacy@example.com',displayName:'Legacy'}),e=>e.status===403);
+ const legacyArchive=(await (await userApi.GET()).json()).deletedMembers.find(m=>m.id===legacy.id);assert.equal(legacyArchive.localAccount,false);assert.equal(legacyArchive.email,'legacy@example.com');
+ r=await restore({mode:'restore',id:legacy.id,revision:legacyArchive.revision,accountName:legacy.name,confirmed:true,email:'evil-substitution@example.com'});assert.equal(r.status,200);
+ assert.equal(sql.prepare('SELECT email FROM app_members WHERE id=?').get(legacy.id).email,'legacy@example.com','audited email cannot be substituted');assert.equal((await auth.resolveIdentity({userId:'legacy-subject',email:'legacy@example.com',displayName:'Legacy'})).isAdmin,false);
  // MCP must enforce the same explicit confirmation and role checks.
  const ownerPrincipal={user:await auth.session(),scope:'read_write',tokenId:null};
  await assert.rejects(()=>catalog.executeTool('delete_user',{id:other.id,revision:other.revision,confirmed:false},base,ownerPrincipal));
  const updated=await catalog.executeTool('update_user',{id:other.id,revision:other.revision,email:'',name:'Via MCP',unit:other.unit,status:'active',permissions:other.permissions,confirmed:true},base,ownerPrincipal);assert.equal(updated.member.name,'Via MCP');
  assert.equal((await catalog.executeTool('delete_user',{id:other.id,revision:updated.member.revision,confirmed:true},base,ownerPrincipal)).deleted,true);
+ const mcpArchive=(await catalog.executeTool('list_users',{},base,ownerPrincipal)).deletedMembers.find(m=>m.id===other.id);assert.ok(mcpArchive);
+ await assert.rejects(()=>catalog.executeTool('restore_user',{id:other.id,revision:mcpArchive.revision,accountName:mcpArchive.name,username:'keep-me',password:'Mcp-restored-password-123',confirmed:false},base,ownerPrincipal));
+ const viaRestore=await catalog.executeTool('restore_user',{id:other.id,revision:mcpArchive.revision,accountName:mcpArchive.name,username:'keep-me',password:'Mcp-restored-password-123',confirmed:true},base,ownerPrincipal);assert.equal(viaRestore.member.id,other.id);assert.equal(viaRestore.member.status,'active');
  assert.ok(!JSON.stringify(sql.prepare('SELECT * FROM access_audit').all()).includes(body.password));
  // Role-based account creation must derive permissions on the same authenticated API/MCP path.
  const policy=load('lib/permissions.ts');
@@ -175,7 +209,7 @@ async function enter(pass='Test-password-123'){return login.POST(request('/api/a
  const persisted=JSON.parse(sql.prepare('SELECT permissions FROM app_members WHERE id=?').get(roleMember.id).permissions);assert.equal(persisted.roleAssignment.roles.length,1);assert.equal(persisted.roleAssignment.roles[0],'driver');
  const guide=await catalog.executeTool('get_user_creation_guide',{},base,ownerPrincipal);assert.ok(guide.jobRoles.some(r=>r.id==='inventory'));
  console.log('Job roles passed: all policies, required scope, incompatible external roles, shared grants, role removal, forged extra grants, HTTP/MCP parity, persistence and stale update.');
- console.log('Account lifecycle passed: editing, rename/revocation, duplicate rollback, stale revision, deletion confirmation/roles/origin, protected admin, legacy accounts, retained history, failed-delete rollback, MCP parity and retry.');
+ console.log('Account restore passed: archive identity hints, missing/new password, duplicate login and stale/race rollback, exact personnel/history, revoked old sessions/tokens, legacy verified email, HTTP/MCP parity.\nAccount lifecycle passed: editing, rename/revocation, duplicate rollback, stale revision, deletion confirmation/roles/origin, protected admin, legacy accounts, retained history, failed-delete rollback, MCP parity and retry.');
  console.log('Bootstrap admin passed: no seed on bad password, administrator session and MCP, changed password persists.');
  console.log('Password accounts passed: creation, unique usernames, hashing, no secrets in audit, login, CSRF, permission enforcement, reset/session revocation, logout, disabling and rate limiting.');
 })().catch(e=>{console.error(e);process.exit(1)});

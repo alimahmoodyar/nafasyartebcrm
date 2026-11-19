@@ -1,18 +1,18 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript'),React=require('react');
-let slots=[],cursor=0,effects=[],calls=[],failure=false;
+let slots=[],cursor=0,effects=[],calls=[],failure=false,removed=false;
 const leaves={};const leaf=name=>leaves[name]||(leaves[name]=Object.defineProperty(()=>null,'name',{value:name}));
 const react={...React,useState:init=>{const i=cursor++;if(!(i in slots))slots[i]=typeof init==='function'?init():init;return[slots[i],v=>slots[i]=typeof v==='function'?v(slots[i]):v]},useEffect:(fn,deps)=>{const i=cursor++;if(!slots[i]||deps.some((v,j)=>v!==slots[i][j]))effects.push(fn);slots[i]=deps}};
 const owner={userId:'local:admin-id',name:'Owner',email:'owner@test.local',isAdmin:true};
 const member=(id,name,canDelete)=>({id,name,username:id,email:'',unit:'staff',status:'active',revision:3,canDelete,permissions:{read:[],write:[],eventStages:[],roleAssignment:{roles:[]}}});
 const members=[member('employee','Employee',true),member('admin','Administrator',false)];
 const imports={react,'react/jsx-runtime':require('react/jsx-runtime'),'@/lib/permissions':{jobRoles:[],validatePermissions:p=>p,toManualPermissions:p=>p},'@/lib/account-change':{notifyAccountChange(){}}};
-const exportsUI={};vm.runInNewContext(ts.transpileModule(fs.readFileSync('components/trace/users-panel.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText,{exports:exportsUI,require:n=>imports[n]||new Proxy({},{get:(_,k)=>leaf(k)}),crypto:globalThis.crypto,console,fetch:async(url,options={})=>{calls.push({url,...options});if(options.method==='DELETE')return{ok:!failure,status:failure?409:200,json:async()=>failure?{error:'STALE_ACCOUNT'}:{deleted:true,id:'employee'}};return{ok:true,json:async()=>url==='/api/users'?{members,accountId:owner.userId,warehouses:[],personnelCandidates:[]}:{agents:[]}}},setTimeout,clearTimeout});
+const exportsUI={};vm.runInNewContext(ts.transpileModule(fs.readFileSync('components/trace/users-panel.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText,{exports:exportsUI,require:n=>imports[n]||new Proxy({},{get:(_,k)=>leaf(k)}),crypto:globalThis.crypto,console,fetch:async(url,options={})=>{calls.push({url,...options});if(options.method==='DELETE'){if(!failure)removed=true;return{ok:!failure,status:failure?409:200,json:async()=>failure?{error:'STALE_ACCOUNT'}:{deleted:true,id:'employee'}};}return{ok:true,json:async()=>url==='/api/users'?{members:removed?members.filter(m=>m.id!=='employee'):members,accountId:owner.userId,warehouses:[],personnelCandidates:[]}:{agents:[]}}},setTimeout,clearTimeout});
 function tree(){cursor=0;return exportsUI.UsersPanel({owner})}
 function nodes(x){if(Array.isArray(x))return x.flatMap(nodes);if(!React.isValidElement(x))return[];if(['Dialog','AlertDialog'].includes(x.type.name)&&!x.props.open)return[x];return[x,...nodes(x.props.children)]}
 const text=x=>Array.isArray(x)?x.map(text).join(''):React.isValidElement(x)?text(x.props.children):x==null?'':String(x);
 const button=(t,label)=>{const b=nodes(t).find(n=>n.type==='button'&&(n.props['aria-label']===label||text(n)===label));assert.ok(b,label);return b};
 async function settle(){for(let i=0;i<4;i++){tree();effects.splice(0).forEach(f=>f());await new Promise(r=>setImmediate(r))}return tree()}
-async function mount(){slots=[];effects=[];calls=[];failure=false;return settle()}
+async function mount(){slots=[];effects=[];calls=[];failure=false;removed=false;return settle()}
 (async()=>{
  let t=await mount();button(t,'ویرایش حساب Employee').props.onClick();t=tree();const name=nodes(t).find(n=>n.props.fieldKey==='name');name.props.onChange({target:{value:'UNSAVED NAME'}});t=tree();button(t,'حذف حساب کاربری').props.onClick();t=tree();assert.equal(calls.filter(c=>c.method==='DELETE').length,0,'opening confirmation never deletes');assert.equal(nodes(t).find(n=>n.type.name==='Dialog').props.open,false,'only confirmation modal is active');
  nodes(t).find(n=>n.type.name==='AlertDialog').props.onOpenChange(false);t=tree();assert.equal(nodes(t).find(n=>n.type.name==='Dialog').props.open,true);assert.equal(nodes(t).find(n=>n.props.fieldKey==='name').props.value,'UNSAVED NAME','cancel preserves unsaved edit');
