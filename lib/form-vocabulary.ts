@@ -1362,3 +1362,6 @@ Object.assign(fieldTitles,{childId:'فرزند مربوط',children:'فرزند�
 Object.assign(toolModeTitles.personnel_apply,{payroll_policy:'نسخه قواعد حقوق',salary_amend:'اصلاح مزد قرارداد',payroll_prepare:'پیش‌محاسبه و کنترل',payroll_work_accept:'تأیید کارکردهای کامل',payroll_calculate:'محاسبه حقوق افراد آماده',payroll_finalize:'تأیید و صدور فیش فرد',payroll_edit:'اصلاح مستند فیش',payroll_recalculate:'بازمحاسبه همین فیش از منابع'});
 
 Object.assign(toolFieldTitles.personnel_apply,{components:'اقلام و قواعد مزایا',source:'مرجع مصوبه حقوق'});
+
+Object.assign(fieldTitles,{payTimes:'زمان واقعی مسیر و کار مقصد',arrivedAt:'زمان واقعی رسیدن به مقصد',returnStartedAt:'زمان واقعی شروع مسیر برگشت',work:'بازه‌های کار واقعی مقصد'});
+Object.assign(toolModeTitles,{staff_mission_apply:{...(toolModeTitles.staff_mission_apply||{}),start_work:'شروع کار در مقصد',end_work:'پایان کار در مقصد',return_start:'شروع مسیر برگشت'}});

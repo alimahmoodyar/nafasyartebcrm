@@ -125,6 +125,42 @@ const lines=d=>d.components.map(c=>({key:c.key,title:c.title,amount:c.amount,ins
  assert.throws(()=>calc([dayWork(from)],contract,rule,[loan,{id:'older',type:'hr_payroll',data:{state:'review',loanDeductions:[{id:loan.id}]}}]),/رزرو/);
  const unpaidWork=[{day:from,expected:0,credited:0,worked:0,overtime:0,nightMinutes:0}];assert.equal(calc(unpaidWork,contract,rule,[{id:'unpaid',type:'hr_request',data:{memberId:'pure',kind:'leave',leaveType:'unpaid',state:'approved',start:from,end:from}}]).gross,'0');
  const span=[{id:'trip',type:'staff_mission',revision:1,data:{memberIds:['pure'],state:'completed',startedAt:from+'T04:30:00.000Z',finishedAt:from+'T12:30:00.000Z',returnReviews:[{decision:'approve'}]}}];const shift={start:Date.parse(from+'T08:00:00+03:30'),end:Date.parse(from+'T16:00:00+03:30'),minutes:480};assert.equal(missions.missionIntervalCredit(span,'pure',from,shift,[[shift.start,shift.end]]).minutes,0);assert.equal(missions.missionIntervalCredit(span,'pure',from,shift,[]).minutes,480);
+
+ // Approved company mission examples. All dates/rates are isolated synthetic fixtures.
+ const missionPay=load('lib/staff-mission-pay.ts'),clock=(day,time)=>Date.parse(day+'T'+time+':00+03:30'),iso=(day,time)=>new Date(clock(day,time)).toISOString(),next=duties.addDay(from,1),last=duties.addDay(from,2);
+ const trip=(start,arrive,back,finish,work=[])=>({id:'auto-trip',revision:7,type:'staff_mission',data:{memberIds:['pure'],state:'completed',startedAt:start,finishedAt:finish,returnReviews:[{decision:'approve'}],payTimesApprovedBy:'local:manager',payTimes:{arrivedAt:arrive,returnStartedAt:back,work}}});
+ const sh=day=>({start:clock(day,'08:00'),end:clock(day,'16:00'),minutes:480,working:true,breakMinutes:0});
+ const mp=(t,day,office=[])=>missionPay.missionPayDay([t],'pure',day,sh(day),office);
+ const mr={...premiumRule,data:{...premiumRule.data,components:[...premiumRule.data.components,{kind:'mission',amount:'0',bps:10000,title:'Mission classification',insured:false,taxable:false}]}};
+ const auto=(t,day,office=[])=>{const m=mp(t,day,office),w={...dayWork(day),worked:office.length?480:0,missionIds:[t.id],missionPay:m};return calc([w],contract,mr,[t]);};
+ const fourteen=trip(iso(from,'16:00'),iso(from,'22:00'),iso(last,'22:00'),iso(last,'23:00'));
+ assert.equal(mp(fourteen,from,[[clock(from,'08:00'),clock(from,'16:00')]]).ordinaryMinutes,840);
+ assert.equal(calc([{...dayWork(from),missionIds:[fourteen.id],missionPay:mp(fourteen,from,[[clock(from,'08:00'),clock(from,'16:00')]])}],{...contract,data:{...contract.data,baseSalary:'30000000'}},mr,[fourteen]).base,'1750000');
+ assert.equal(auto(fourteen,from,[[clock(from,'08:00'),clock(from,'16:00')]]).base,'175');assert.equal(auto(fourteen,from,[[clock(from,'08:00'),clock(from,'16:00')]]).gross,'175');
+ const sixteen=trip(iso(from,'16:00'),iso(next,'00:00'),iso(last,'22:00'),iso(last,'23:00'));
+ assert.equal(mp(sixteen,from,[[clock(from,'08:00'),clock(from,'16:00')]]).category,'departure_full');assert.equal(auto(sixteen,from,[[clock(from,'08:00'),clock(from,'16:00')]]).gross,'200');
+ // A full destination day pays two BASES; other benefits are not doubled. Actual work after 16:00 gets 1.4, never travel.
+ const workTrip=trip(iso(from,'16:00'),iso(from,'22:00'),iso(next,'21:00'),iso(last,'03:00'),[{memberId:'pure',start:iso(next,'08:00'),end:iso(next,'18:00'),notes:'Productive on-site work'}]);
+ const destination=auto(workTrip,next);assert.equal(destination.base,'100');assert.equal(destination.components.find(c=>c.key==='mission').amount,'100');assert.equal(destination.components.find(c=>c.title==='OT').amount,'35');assert.equal(destination.gross,'235');assert.equal(destination.missionAmountStatus,'calculated');assert.equal(destination.missionPayVersion,missionPay.missionPayVersion);
+ const benefits=calc([{...dayWork(next),missionIds:[workTrip.id],missionPay:mp(workTrip,next)}],jobContract,mr,[workTrip]);assert.equal(benefits.components.find(c=>c.title==='job pay').amount,'10');assert.equal(benefits.components.find(c=>c.key==='mission').amount,'100');
+ assert.equal(mp(workTrip,last).ordinaryMinutes,180);assert.equal(mp(workTrip,last).attendanceExempt,true);assert.equal(auto(workTrip,last).base,'38');assert.equal(auto(workTrip,last).components.find(c=>c.title==='OT').amount,'0');
+ assert.equal(mp(workTrip,last,[[clock(last,'08:00'),clock(last,'16:00')]]).ordinaryMinutes,660);assert.equal(auto(workTrip,last,[[clock(last,'08:00'),clock(last,'16:00')]]).base,'138');
+ // Same-day return on a destination day adds no return-travel amount; crossing midnight splits it correctly.
+ const sameReturn=trip(iso(from,'16:00'),iso(from,'22:00'),iso(next,'18:00'),iso(next,'23:00'));
+ assert.equal(mp(sameReturn,next).category,'destination_full');assert.equal(auto(sameReturn,next).gross,'200');
+ const afterMidnightReturn=trip(iso(from,'16:00'),iso(from,'22:00'),iso(last,'00:30'),iso(last,'03:00'));assert.equal(mp(afterMidnightReturn,last).category,'return_hourly');assert.equal(mp(afterMidnightReturn,last).ordinaryMinutes,150);
+ const justShort=trip(iso(from,'16:00'),new Date(clock(next,'00:00')-1000).toISOString(),iso(last,'21:00'),iso(last,'23:00'));assert.equal(mp(justShort,from,[[clock(from,'08:00'),clock(from,'16:00')]]).category,'departure_hourly');
+ const noEvidence={...workTrip,data:{...workTrip.data,payTimes:undefined}};assert.equal(mp(noEvidence,next).status,'missing_times');
+ assert.throws(()=>mp(workTrip,next,[[clock(next,'08:00'),clock(next,'09:00')]]),/هم‌پوشانی/);
+ assert.throws(()=>missionPay.normalizeMissionPayTimes({...workTrip.data.payTimes,arrivedAt:iso(last,'23:00')},workTrip.data,workTrip.data.finishedAt),/ترتیب/);
+ assert.throws(()=>missionPay.normalizeMissionPayTimes({...workTrip.data.payTimes,work:[{memberId:'other',start:iso(next,'08:00'),end:iso(next,'09:00'),notes:'Wrong employee'}]},workTrip.data,workTrip.data.finishedAt));
+ assert.throws(()=>missionPay.normalizeMissionPayTimes({...workTrip.data.payTimes,work:[...workTrip.data.payTimes.work,...workTrip.data.payTimes.work]},workTrip.data,workTrip.data.finishedAt),/هم‌پوشانی/);
+ assert.throws(()=>missionPay.missionPayDay([workTrip,{...workTrip,id:'duplicate'}],'pure',next,sh(next),[]),/چند مأموریت/);
+ assert.throws(()=>calc([{...dayWork(next),missionIds:[workTrip.id],missionPay:mp(workTrip,next)}],contract,premiumRule,[workTrip]),/طبقه‌بندی/);
+ // Real workSummary: absent remainder of the return day is not leave/absence, while financial minutes remain 180.
+ const sourceRows=[{id:'e-auto',type:'hr_employee',revision:1,data:emp},{id:'s-auto',type:'hr_shift',revision:1,data:{startTime:'08:00',endTime:'16:00',breakMinutes:0,weekdays:[0,1,2,3,4,5,6],holidays:[]}},{id:'a-auto',type:'hr_assignment',revision:1,data:{memberId:'pure',start:from,end:last,shiftId:'s-auto'}},workTrip];
+ const returnSummary=load('lib/personnel.ts').workSummary(sourceRows,'pure',last,last);assert.equal(returnSummary.shortfall,0);assert.equal(returnSummary.days[0].credited,480);assert.equal(returnSummary.days[0].missionPay.ordinaryMinutes,180);assert.equal(sourceRows.some(r=>r.type==='hr_request'),false);
+ const monthEnd='2026-11-21',monthNext='2026-11-22',boundary=trip(iso(monthEnd,'16:00'),iso(monthEnd,'22:00'),iso(monthEnd,'23:00'),iso(monthNext,'03:00'));assert.equal(mp(boundary,monthNext).ordinaryMinutes,180);assert.equal(mp(boundary,monthEnd).ordinaryMinutes,420);
  const accounting=load('lib/accounting-contract.ts'),eventPayload=JSON.parse(sql.prepare("SELECT payload FROM economic_events WHERE kind='payroll_accrual' LIMIT 1").get().payload);const posting=accounting.eventLines('payroll_accrual',eventPayload,accounting.defaultPostingAccounts);assert.equal(posting.reduce((n,l)=>n+BigInt(l.debit),0n),posting.reduce((n,l)=>n+BigInt(l.credit),0n));assert.ok(!accounting.postingAccountKeys('purchase_advance').includes('salaryPayable'),'new payroll mappings do not block existing purchase rules');
  // Bank matching is pure and cannot declare execution from a client checkbox.
  const payable=[{id:'one',type:'hr_payroll',revision:1,data:{name:'A',net:'100',state:'payable',published:true,bankAccount:iban,payments:[]}}];
@@ -134,9 +170,21 @@ const lines=d=>d.components.map(c=>({key:c.key,title:c.title,amount:c.amount,ins
  assert.equal(payments.previewPayrollBankMatch(payable,[{...transaction,status:'failed'}],[]).matches.length,0);
  assert.equal(payments.previewPayrollBankMatch(payable,[{...transaction,status:'reversed'}],[]).matches.length,0);
  assert.equal(payments.previewPayrollBankMatch(payable,[{...transaction,amount:'101'}],[]).matches.length,0);
+
+ // Full authenticated monthly path with automatic mission amounts (no manual mission edit/extra mission approval).
+ const cindy=actor('cindy'),autoFrom='2026-10-28',autoMiddle='2026-10-29',autoEnd='2026-10-30';
+ seed('employee-cindy','hr_employee',employee('cindy'));seed('contract-cindy','hr_contract',{...contract.data,memberId:'cindy',start:autoFrom,end:autoEnd,salaryEffective:autoFrom});
+ seed('shift-cindy','hr_shift',{title:'Synthetic 8h',startTime:'08:00',endTime:'16:00',breakMinutes:0,weekdays:[0,1,2,3,4,5,6],holidays:[]});seed('assignment-cindy','hr_assignment',{memberId:'cindy',start:autoFrom,end:autoEnd,shiftId:'shift-cindy'});
+ seed('punch-cindy-in','hr_punch',{memberId:'cindy',day:autoFrom,direction:'in',at:iso(autoFrom,'08:00')});seed('punch-cindy-out','hr_punch',{memberId:'cindy',day:autoFrom,direction:'out',at:iso(autoFrom,'16:00')});
+ const ctrip=trip(iso(autoFrom,'16:00'),iso(autoFrom,'22:00'),iso(autoMiddle,'21:00'),iso(autoEnd,'03:00'),[{memberId:'cindy',start:iso(autoMiddle,'08:00'),end:iso(autoMiddle,'18:00'),notes:'Actual work'}]);ctrip.data.memberIds=['cindy'];seed('trip-cindy','staff_mission',ctrip.data);
+ const cpolicy=await ok(payroll,{...policyInput,start:autoFrom,end:autoEnd,insuranceBps:0,taxExemption:'0',taxBands:[{upper:'',bps:0}],components:mr.data.components.map(c=>({...c,source:'Explicit synthetic classification not law'}))});await success(payroll,cpolicy,'submit');await success(approver,cpolicy,'publish');
+ const cperiod=await ok(hr,{mode:'period',title:'Automatic mission synthetic monthly payroll',start:autoFrom,end:autoEnd,deadline:autoEnd,memberIds:['cindy']});await success(hr,cperiod,'payroll_work_accept');assert.equal(row(cperiod).data.work.cindy.shortfall,0);await success(payroll,cperiod,'payroll_calculate');
+ const cs=domainRows().find(r=>r.type==='hr_payroll'&&r.data.memberId==='cindy');assert.ok(cs);assert.equal(cs.data.missionAmountStatus,'calculated');assert.equal(cs.data.base,'313');assert.equal(cs.data.gross,'448');assert.equal(cs.data.missionDays.length,3);assert.equal(cs.data.slipEdits,undefined);
+ assert.equal((await apply(approver,cs.id,'payroll_finalize')).status,400,'existing independent review must acknowledge statutory/contract warning');await success(approver,cs.id,'payroll_finalize',{warningsReviewed:true});await success(finance,cs.id,'approve_payment');assert.equal(row(cs.id).data.state,'payable');assert.equal((await read(treasury,{view:'payments',periodId:cperiod})).data.items[0].amount,'448');
+ const csBefore=JSON.stringify(row(cs.id).data);assert.equal((await apply(payroll,cs.id,'payroll_recalculate',{notes:'No rewrite after financial finality'})).status,409);assert.equal(JSON.stringify(row(cs.id).data),csBefore);
  // MCP uses same routes, not a separate permission bypass.
  const mcpRead=await catalog.executeTool('get_payroll_workspace',{view:'payments',periodId:period},base,{user:treasury,scope:'read',tokenId:null});assert.match(JSON.stringify(mcpRead),/690/);
  await assert.rejects(()=>catalog.executeTool('get_payroll_workspace',{view:'slip',id:b.id},base,{user:treasury,scope:'read',tokenId:null}),e=>e.status===404);
- console.log('payroll-approved: PASS — contract source, mission unknown/manual, final review, finance, treasury privacy/export, children/study, insurance evidence, edits, sources and bank match');
+ console.log('payroll-approved: PASS — contract source, approved mission 14/16 departure, full/destination overtime, 3/11 return, monthly split, legacy unknown/manual, final review, finance, treasury privacy/export, children/study, insurance evidence, edits, sources and bank match');
 })().catch(e=>{console.error(e);process.exitCode=1});
 function domainRows(){return sql.prepare("SELECT * FROM flow_entities WHERE type GLOB 'hr_*'").all().map(r=>({...r,data:JSON.parse(r.data)}));}

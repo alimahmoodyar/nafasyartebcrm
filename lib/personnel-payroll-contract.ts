@@ -1,1 +1,1 @@
-export const payrollComponentKinds:Record<string,string>={fixed:'مزیت ماهانه',seniority:'پایه سنوات روزانه',spouse:'حق تأهل',child:'حق اولاد هر فرزند',overtime:'اضافه‌کاری',night:'شب‌کاری',friday:'فوق‌العاده جمعه‌کاری',shift:'فوق‌العاده نوبت‌کاری'};
+export const payrollComponentKinds:Record<string,string>={fixed:'مزیت ماهانه',seniority:'پایه سنوات روزانه',spouse:'حق تأهل',child:'حق اولاد هر فرزند',overtime:'اضافه‌کاری',night:'شب‌کاری',friday:'فوق‌العاده جمعه‌کاری',shift:'فوق‌العاده نوبت‌کاری',mission:'حق مأموریت؛ طبقه‌بندی بیمه و مالیات'};

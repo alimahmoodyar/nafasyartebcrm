@@ -1894,3 +1894,7 @@ toolOptions.get_payroll_workspace={view:{periods:'دوره‌های حقوق',po
 toolOptions.export_payroll_payment_list={format:{xlsx:'اکسل عمومی فهرست',print:'نسخه قابل چاپ'}};
 Object.assign(toolOptions.personnel_apply,{familyEvent:{...toolOptions.personnel_apply.familyEvent,study:'گواهی اشتغال به تحصیل فرزند',medical:'گواهی کمیسیون پزشکی فرزند'},allowanceDivisor:{'30':'معادل ۳۰ روز',calendar:'روزهای ماه شمسی'},restPay:{paid:'با مزد طبق توافق مصوب',weekly_ratio:'به نسبت کارکرد هفته'},'benefits.*.kind':{job:'مزیت به تبع شغل',welfare:'مزیت رفاهی'},'components.*.kind':{fixed:'مزیت ماهانه',seniority:'پایه سنوات',spouse:'حق تأهل',child:'حق اولاد',overtime:'اضافه‌کاری',night:'شب‌کاری',friday:'جمعه‌کاری',shift:'نوبت‌کاری'}});
 Object.assign(toolOptions.upload_personnel_file.category,{study_certificate:'گواهی اشتغال به تحصیل فرزند',medical_commission:'گواهی کمیسیون پزشکی فرزند',insurance_record:'گزارش سوابق بیمه',payroll_correction:'مستند اصلاح فیش'});
+
+Object.assign(toolOptions.staff_mission_apply.mode,{start_work:'شروع کار در مقصد',end_work:'پایان کار در مقصد',return_start:'شروع مسیر برگشت'});
+
+Object.assign(toolOptions.personnel_apply['components.*.kind'],{mission:'حق مأموریت؛ طبقه‌بندی بیمه و مالیات'});

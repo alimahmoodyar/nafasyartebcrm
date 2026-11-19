@@ -6,7 +6,7 @@ export function approvedMissionFacts(rows:any[],memberId:string,start:string,end
  const from=Date.parse(start+'T00:00:00+03:30'),until=Date.parse(end+'T23:59:59.999+03:30');
  return rows.filter(r=>r.type==='staff_mission'&&r.data.memberIds?.includes(memberId)&&r.data.state==='completed'&&Date.parse(r.data.startedAt)<=until&&Date.parse(r.data.finishedAt)>=from).map(r=>{
   const d=r.data,review=(d.returnReviews||[]).filter((x:any)=>x.decision==='approve').at(-1);
-  return {id:r.id,revision:r.revision,title:d.goal||'مأموریت کاری',kind:d.kind,domain:d.domain,source:d.source,startedAt:d.startedAt,finishedAt:d.finishedAt,returnPoint:d.finish?.actualReturnPoint||d.returnPoint||'',review:review||null,amount:null,calculationStatus:'pending_policy'};
+  return {id:r.id,revision:r.revision,title:d.goal||'مأموریت کاری',kind:d.kind,domain:d.domain,source:d.source,startedAt:d.startedAt,finishedAt:d.finishedAt,returnPoint:d.finish?.actualReturnPoint||d.returnPoint||'',review:review||null,amount:null as string|null,calculationStatus:'pending_policy'};
  });
 }
 

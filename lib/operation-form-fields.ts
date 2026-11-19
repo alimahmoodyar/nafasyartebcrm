@@ -55,6 +55,7 @@ export function operationDataSchema(tool:string,mode:string):any|undefined{
   if(p.fields){p.fields.items.properties.required.type='boolean';p.fields.items.properties.type={type:'string',enum:['text','number','date','choice','boolean'],enumLabels:{text:'متن',number:'عدد',date:'تاریخ',choice:'انتخاب از فهرست',boolean:'بله / خیر'}};p.fields.items.properties.options={type:'array',items:{type:'string'}};}
   if(p.links)p.links={type:'array',items:{type:'string'}};
  }
+ if(tool==='staff_mission_apply'&&p.payTimes)p.payTimes={type:'object',properties:{arrivedAt:{type:'string'},returnStartedAt:{type:'string'},work:{type:'array',items:{type:'object',properties:{memberId:{type:'string'},start:{type:'string'},end:{type:'string'},notes:{type:'string'}},required:['memberId','start','end','notes']}}},required:['arrivedAt','returnStartedAt','work']};
  return schema;
 }
 // Only prune field supersets where the mode contract is explicit. Never remove argument values.

@@ -1,6 +1,10 @@
+# Mission pay policy recorded (2026-11-19)
+
+Owner explicitly confirmed the internal mission calculation rules in docs/process-design/STAFF-MISSION-PAY-POLICY.fa.md. This supersedes the earlier statement that no business formula was agreed. The owner subsequently explicitly authorized implementation. The automatic formula and authenticated start/end-work plus foreground GPS are implemented in lib/staff-mission-pay.ts and the existing mission/payroll handlers. Read docs/quality-reviews/2026-11-19-mission-pay.md for tests and release verification; do not infer a published version from code alone. Preserve the approved departure threshold, ordinary travel/no travel overtime, destination full-day pay, actual overtime and return-day examples exactly. Keep statutory-floor and return-day contractual wage checks visible before activation; do not claim legal compliance. Do not silently restore the rejected doubled-hours interpretation or turn the return-day attendance exemption into leave/absence. Existing pending bank/API/security and home-sales decisions remain open.
+
 # Approved payroll completion (2026-11-19)
 
-Owner authorized completing the confirmed payroll/personnel/mission and batch treasury designs, testing, review and push. Follow docs/process-design/PAYROLL-APPROVED-IMPLEMENTATION.fa.md and its pending-decision register before resuming this area. Do not implement a mission pay formula, an assumed bank workbook parser, bank transfer API or hardware-key requirement. Home-sales workflow review remains design-only.
+Owner authorized completing the confirmed payroll/personnel/mission and batch treasury designs, testing, review and push. Follow docs/process-design/PAYROLL-APPROVED-IMPLEMENTATION.fa.md and its pending-decision register before resuming this area. Mission business rules are now recorded in STAFF-MISSION-PAY-POLICY.fa.md; read the newer checkpoint above before implementation. Do not invent a bank workbook parser, bank transfer API or hardware-key requirement. Home-sales workflow review remains design-only.
 
 # Reviewed custom operations execution (2026-11-15)
 

@@ -306,3 +306,5 @@ resetHelp.push('راهنماهای عیب‌یابی محصول، تاریخچه
 // Existing flow_entities freeze, both reset scopes and R2 manifest backup cover
 // them atomically. Payroll economic events/journals use the existing accounting
 // reset/backup order; no parallel tables, new FK or new blob store were added.
+
+// Mission workEvents/arrival/return leg and manager-approved payTimes are bounded staff_mission JSON; daily calculation/version is immutable hr_payroll JSON. Existing 0016 freeze/backup/delete covers both atomically; no new table, blob or FK. No history rewrite.
