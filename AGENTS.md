@@ -1,3 +1,11 @@
+# Individual account deletion from editor (2026-11-19)
+
+Owner separately authorized adding account deletion to the existing administrator account editor, testing and push. Reuse existing DELETE /api/users and delete_user; preserve primary/current administrator, history/FKs, session/token revocation and explicit confirmation. This is not the pending factory reset and does not authorize deleting any live account. See docs/quality-reviews/2026-11-19-account-edit-delete.md.
+
+# Owner-only clean-start reset request (2026-11-19)
+
+Owner explicitly wants all application data/catalogs/accounts/files removed except their administrator username `admin`. Existing operations/full reset does NOT implement this: it preserves accounts/configuration/training and file bytes. Read docs/process-design/FACTORY-RESET-ADMIN-ONLY.fa.md. No destructive runtime work has been executed or authorized for the agent; owner plans to execute on their own company installation. Do not claim this new scope implemented/published. Actual startup command, DB location and file-store ownership/isolation are pending the colleague report requested in chat; do not guess paths or wipe a shared bucket. Continue independent design/tests, preserving unique current admin access and secret-free controls, then complete source audit/publish before owner execution.
+
 # Phase-one rollout priority (2026-11-19)
 
 Owner approved starting with personnel administration and asset custody, resuming office execution Saturday 2026-11-21. Follow docs/process-design/PILOT-ADMIN-ASSETS.fa.md. Prioritize isolated workflow/access/data integrity tests and focused usable UI fixes for these roles; preserve approved business rules. No production data entry/reset, server inspection or automatic schedule is authorized by this preparation request. Record physical phone/printer and rented-server readiness as pending until actually verified.
