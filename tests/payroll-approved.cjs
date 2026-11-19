@@ -150,6 +150,7 @@ const lines=d=>d.components.map(c=>({key:c.key,title:c.title,amount:c.amount,ins
  assert.equal(mp(sameReturn,next).category,'destination_full');assert.equal(auto(sameReturn,next).gross,'200');
  const afterMidnightReturn=trip(iso(from,'16:00'),iso(from,'22:00'),iso(last,'00:30'),iso(last,'03:00'));assert.equal(mp(afterMidnightReturn,last).category,'return_hourly');assert.equal(mp(afterMidnightReturn,last).ordinaryMinutes,150);
  const justShort=trip(iso(from,'16:00'),new Date(clock(next,'00:00')-1000).toISOString(),iso(last,'21:00'),iso(last,'23:00'));assert.equal(mp(justShort,from,[[clock(from,'08:00'),clock(from,'16:00')]]).category,'departure_hourly');
+ const longOffice=trip(iso(from,'18:00'),iso(next,'00:00'),iso(last,'22:00'),iso(last,'23:00'));assert.equal(mp(longOffice,from,[[clock(from,'08:00'),clock(from,'18:00')]]).thresholdMinutes,960);assert.equal(mp(longOffice,from,[[clock(from,'08:00'),clock(from,'18:00')]]).category,'departure_full');
  const noEvidence={...workTrip,data:{...workTrip.data,payTimes:undefined}};assert.equal(mp(noEvidence,next).status,'missing_times');
  assert.throws(()=>mp(workTrip,next,[[clock(next,'08:00'),clock(next,'09:00')]]),/هم‌پوشانی/);
  assert.throws(()=>missionPay.normalizeMissionPayTimes({...workTrip.data.payTimes,arrivedAt:iso(last,'23:00')},workTrip.data,workTrip.data.finishedAt),/ترتیب/);

@@ -30,10 +30,10 @@ export function missionPayDay(rows:any[],memberId:string,day:string,shift:{start
  const officeRegular=shift.working===false?0:Math.max(0,rangeMinutes(office,Math.max(from,shift.start),Math.min(until,shift.end))-(office.length?(shift.breakMinutes||0):0)),destinationRegular=shift.working===false?0:rangeMinutes(destination,Math.max(from,shift.start),Math.min(until,shift.end));
  const actualOT=rangeMinutes(destination,from,until)-destinationRegular;
  const first=missionLocalDay(start)===day,last=missionLocalDay(end)===day;
- const travelMinutes=rangeMinutes(travel,from,until),thresholdMinutes=officeRegular+travelMinutes;
+ const travelMinutes=rangeMinutes(travel,from,until),officeActual=Math.max(0,rangeMinutes(office,from,until)-(office.length?(shift.breakMinutes||0):0)),thresholdMinutes=officeActual+travelMinutes;
  // The departure threshold uses actual office + travel time, never doubled hours.
  // A later return day is partial only when the return leg crossed midnight.
  const category=first?(thresholdMinutes>=960?'departure_full':'departure_hourly'):last&&(missionLocalDay(back)<day||back<shift.start)?'return_hourly':'destination_full';
  const full=category.endsWith('_full'),ordinaryMinutes=full?null:officeRegular+destinationRegular+travelMinutes;
- return {id:trip.id,revision:trip.revision,version:missionPayVersion,status:'ready',day,category,full,ordinaryMinutes,travelMinutes,officeMinutes:officeRegular,destinationMinutes:destinationRegular,overtimeMinutes:actualOT,thresholdMinutes,attendanceExempt:category==='return_hourly',approvedBy:d.payTimesApprovedBy};
+ return {id:trip.id,revision:trip.revision,version:missionPayVersion,status:'ready',day,category,full,ordinaryMinutes,travelMinutes,officeMinutes:officeRegular,officeActualMinutes:officeActual,destinationMinutes:destinationRegular,overtimeMinutes:actualOT,thresholdMinutes,attendanceExempt:category==='return_hourly',approvedBy:d.payTimesApprovedBy};
 }
