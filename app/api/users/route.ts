@@ -1,3 +1,5 @@
+import {accountPersonnelLink,personnelAccountLinkPlan} from '@/lib/personnel-account-link';
+import {hrRows} from '@/lib/personnel';
 import {personnelBaseApproved} from '@/lib/personnel-documents';
 import {requiredPersonnel} from '@/lib/personnel-employment';
 import {materialWarehouses,warehouseProfilePermissions,warehouseResponsibilityGuards} from '@/lib/material-warehouses';
@@ -90,19 +92,49 @@ async function restoreAccount(body:any,actor:{userId:string}) {
   }catch(error){if(/UNIQUE/.test(String(error)))return Response.json({error:login?'این نام کاربری اکنون متعلق به حساب دیگری است؛ نام دیگری انتخاب کنید.':'این ایمیل اکنون متعلق به حساب دیگری است؛ ابتدا تداخل حساب‌ها را بررسی کنید.',code:'LOGIN_CONFLICT'},{status:409});throw error;}
   try{await syncMaterialTasks()}catch{}
   const contact=(await memberContactsForAccounts([old.id]))[0];
-  return Response.json({restored:true,member:present({...next,permissions:JSON.stringify(warehouseProfilePermissions(next,await materialWarehouses())),mobile:contact.mobile,contactEmail:contact.contactEmail,contactRevision:contact.revision,protected:false})});
+  return Response.json({restored:true,member:present({...next,personnelLink:accountPersonnelLink(next,await hrRows()),permissions:JSON.stringify(warehouseProfilePermissions(next,await materialWarehouses())),mobile:contact.mobile,contactEmail:contact.contactEmail,contactRevision:contact.revision,protected:false})});
+}
+async function linkExistingPersonnel(body:any,actor:any){
+  const allowed=['mode','requestId','id','revision','accountName','personnelId','personnelRevision','personnelName','contactRevision','reason','confirmed'];
+  if(!body||Object.keys(body).some(k=>!allowed.includes(k))||body.confirmed!==true)throw new AccessError('اطلاعات اتصال و تأیید صریح دو هویت لازم است.',400);
+  if(typeof body.requestId!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.requestId)||typeof body.id!=='string'||typeof body.personnelId!=='string'||!Number.isSafeInteger(body.revision)||body.revision<1||!Number.isSafeInteger(body.personnelRevision)||body.personnelRevision<1||!Number.isSafeInteger(body.contactRevision)||body.contactRevision<0||typeof body.reason!=='string'||!body.reason.trim()||body.reason.length>4000)throw new AccessError('شناسه، نسخه حساب و پرونده و دلیل اتصال لازم است.',400);
+  const db=storage(),scope=await memberContactAdminContext(actor),signature=JSON.stringify({id:body.id,revision:body.revision,accountName:body.accountName,personnelId:body.personnelId,personnelRevision:body.personnelRevision,personnelName:body.personnelName,contactRevision:body.contactRevision,reason:body.reason.trim()});
+  const prior:any=await db.prepare('SELECT kind,actor,payload FROM inventory_operations WHERE id=?').bind(body.requestId).first();
+  if(prior){if(prior.kind!=='link_personnel_account'||prior.actor!==actor.userId||prior.payload!==signature)throw new AccessError('شناسه عملیات قبلاً با اطلاعات دیگری استفاده شده است.',409);return Response.json({linked:true,repeated:true,personnelId:body.personnelId});}
+  const old:any=await db.prepare('SELECT m.*,a.username FROM app_members m LEFT JOIN password_accounts a ON a.member_id=m.id WHERE m.id=?').bind(body.id).first();if(!old||old.status==='deleted')throw new AccessError('ابتدا حساب حذف‌شده را بازیابی کنید؛ حساب موجود و حذف‌نشده لازم است.',404);
+  const rows=await hrRows(),profile=rows.find(r=>r.id===body.personnelId&&r.type==='hr_employee');
+  if(!profile)throw new AccessError('پرونده پرسنلی یافت نشد.',404);
+  if(old.revision!==body.revision||old.name!==body.accountName||profile.revision!==body.personnelRevision||profile.data.name!==body.personnelName)return conflict();
+  const contact=(await memberContactsForAccounts([old.id]))[0];if(contact.revision!==body.contactRevision)return conflict();
+  const now=new Date().toISOString(),plan=personnelAccountLinkPlan(rows,scope.members,old,profile,actor,body.reason.trim(),now),nextContact=contactPatch({mobile:profile.data.mobile},contact);
+  const externalGuard="NOT EXISTS(SELECT 1 FROM flow_entities f,json_tree(CASE WHEN json_valid(f.data) THEN f.data ELSE '{}' END) j WHERE f.type NOT GLOB 'hr_*' AND (j.value=? OR j.key=?))";
+  if(!await db.prepare('SELECT 1 AS valid WHERE '+externalGuard).bind(plan.from,plan.from).first())throw new AccessError('شناسه موقت در بخش دیگری سابقه دارد؛ پیش از اتصال باید ارتباط آن بررسی شود.',409);
+  const next={...old,name:profile.data.name,updated:now,revision:old.revision+1};
+  await db.batch([
+    db.prepare('INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,?,?,?,?,1)').bind(body.requestId,'link_personnel_account',signature,actor.userId,now),
+    ...memberContactGuards(db,body.requestId,scope),contactRevisionGuard(db,body.requestId,old.id,contact.revision),
+    db.prepare("UPDATE inventory_operations SET guard=CASE WHEN EXISTS(SELECT 1 FROM app_members WHERE id=? AND revision=? AND status!='deleted') AND (SELECT COUNT(*) FROM flow_entities WHERE type GLOB 'hr_*')=? AND (SELECT COALESCE(SUM(revision),0) FROM flow_entities WHERE type GLOB 'hr_*')=? AND "+externalGuard+' THEN guard ELSE 0 END WHERE id=?').bind(old.id,old.revision,rows.length,rows.reduce((n,r)=>n+r.revision,0),plan.from,plan.from,body.requestId),
+    ...plan.changes.map(r=>db.prepare('UPDATE flow_entities SET type=?,data=?,revision=revision+1,updated=? WHERE id=? AND revision=?').bind(r.type,JSON.stringify(r.data),now,r.id,r.revision)),
+    db.prepare('UPDATE app_members SET name=?,updated=?,revision=revision+1 WHERE id=? AND revision=?').bind(next.name,now,old.id,old.revision),
+    memberContactWrite(db,old.id,nextContact,now),
+    db.prepare('INSERT INTO access_audit(id,actor,target,action,before,after,at) VALUES(?,?,?,?,?,?,?)').bind(body.requestId,actor.userId,profile.id,'link_personnel_account',JSON.stringify({member:{id:old.id,name:old.name,revision:old.revision},contact,records:plan.changes.map(r=>rows.find(x=>x.id===r.id))}),JSON.stringify({member:{id:old.id,name:next.name,revision:next.revision},personnelId:profile.id,previousMemberId:plan.from,reason:body.reason.trim(),previousBaseId:plan.previousBaseId,records:plan.changes.map(r=>({id:r.id,type:r.type,revision:r.revision+1}))}),now),
+  ]);
+  const linkedRows=rows.map(r=>{const changed=plan.changes.find(c=>c.id===r.id);return changed?{...changed,revision:r.revision+1}:r;});
+  try{await syncMaterialTasks()}catch{}
+  return Response.json({linked:true,personnelId:profile.id,member:present({...next,permissions:JSON.stringify(warehouseProfilePermissions(next,await materialWarehouses())),...nextContact,contactRevision:contact.revision+1,protected:await protectedAccount(next,actor),personnelLink:accountPersonnelLink(next,linkedRows)})});
 }
 export async function GET() {
   try {
     const actor=await requireAdmin();
     await memberContactAdminContext(actor);
+    const personnelRows=await hrRows();
     const result=await storage().prepare("SELECT m.*,a.username FROM app_members m LEFT JOIN password_accounts a ON a.member_id=m.id WHERE m.status!='deleted' ORDER BY m.created DESC").all();
     const deletedRows=(await storage().prepare("SELECT * FROM app_members WHERE status='deleted' ORDER BY updated DESC,id").all()).results;
     const deletedMembers=await Promise.all(deletedRows.map(async(row:any)=>{const identity=await archivedIdentity(row);return {id:row.id,name:row.name,unit:row.unit,status:'deleted',revision:row.revision,deletedAt:row.updated,localAccount:identity.localAccount,username:identity.username,email:identity.email,permissions:storedAccessPermissions(row.permissions)};}));
     const warehouses=await materialWarehouses();
     const contacts=await memberContactsForAccounts(result.results.map((row:any)=>row.id));
     const personnelCandidates=(await storage().prepare("SELECT e.id,e.revision,e.data FROM flow_entities e WHERE e.type='hr_employee' AND NOT EXISTS(SELECT 1 FROM app_members m WHERE m.id=json_extract(e.data,'$.memberId')) ORDER BY e.created,e.id").all()).results.map((r:any)=>{const d=JSON.parse(r.data);return {id:r.id,revision:r.revision,name:d.name,unit:d.unit,code:d.code,mobile:d.mobile||'',ready:personnelBaseApproved(d)}});
-    const members=await Promise.all(result.results.map(async (row:any)=>{const c=contacts.find(c=>c.memberId===row.id)!;return present({...row,permissions:JSON.stringify(warehouseProfilePermissions(row,warehouses)),mobile:c.mobile,contactEmail:c.contactEmail,contactRevision:c.revision,protected:await protectedAccount(row,actor)})}));
+    const members=await Promise.all(result.results.map(async (row:any)=>{const c=contacts.find(c=>c.memberId===row.id)!;return present({...row,personnelLink:accountPersonnelLink(row,personnelRows),permissions:JSON.stringify(warehouseProfilePermissions(row,warehouses)),mobile:c.mobile,contactEmail:c.contactEmail,contactRevision:c.revision,protected:await protectedAccount(row,actor)})}));
     return Response.json({members,deletedMembers,personnelCandidates,accountId:actor.userId,warehouses:warehouses.map(w=>({id:w.id,name:w.data.name,active:w.data.active}))},{headers:{'Cache-Control':'no-store'}});
   } catch(error) {return failure(error);}
 }
@@ -131,7 +163,7 @@ export async function POST(request: Request) {
       db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),actor.userId,id,'member_contact_create',JSON.stringify({memberId:id,...contact,revision:1}),now),
     ]);
     try{await syncMaterialTasks()}catch{}
-    return Response.json({member: present({...row,...contact,contactRevision:1})}, {status: 201});
+    return Response.json({member: present({...row,personnelLink:accountPersonnelLink(row,await hrRows()),...contact,contactRevision:1})}, {status: 201});
   } catch (error) {return failure(error, localAccount ? 'username' : 'email');}
 }
 export async function PATCH(request: Request) {
@@ -140,6 +172,7 @@ export async function PATCH(request: Request) {
     checkOrigin(request); const actor=await requireAdmin(); checkAccount(request,actor);
     const body=await request.json() as any;
     if(body.mode==='restore')return await restoreAccount(body,actor);
+    if(body.mode==='link_personnel')return await linkExistingPersonnel(body,actor);
     if(typeof body.id!=='string'||!Number.isInteger(body.revision)||body.revision<1)throw new Error('نسخه حساب معتبر نیست.');
     const db=storage(); const old=await db.prepare('SELECT * FROM app_members WHERE id=?').bind(body.id).first<any>();
     if(!old||old.status==='deleted')return Response.json({error:'حساب یافت نشد یا حذف شده است.'},{status:404});
@@ -181,7 +214,7 @@ export async function PATCH(request: Request) {
     if(!results[contactSupplied?5:4].meta.changes)return conflict();
     const latestContact=contactSupplied?{...contact,revision:oldContact.revision+1}:(await memberContactsForAccounts([old.id]))[0];
     try{await syncMaterialTasks()}catch{}
-    return Response.json({member:present({...next,mobile:latestContact.mobile,contactEmail:latestContact.contactEmail,contactRevision:latestContact.revision,protected:protectedUser}),reauthenticate:revoke&&actor.userId==='local:'+old.id});
+    return Response.json({member:present({...next,personnelLink:accountPersonnelLink(next,await hrRows()),mobile:latestContact.mobile,contactEmail:latestContact.contactEmail,contactRevision:latestContact.revision,protected:protectedUser}),reauthenticate:revoke&&actor.userId==='local:'+old.id});
   }catch(error){return failure(error, localAccount ? 'username' : 'email');}
 }
 export async function DELETE(request:Request) {
