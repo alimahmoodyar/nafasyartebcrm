@@ -101,6 +101,7 @@ export const resetPreserved=['محیط آزمایش نقش‌ها (جدول‌ه
 export const resetCatalog=['قیمت‌های فروش نمایندگان','پرونده تأمین‌کنندگان، مدارک نسخه‌دار، اقدامات اصلاحی، ارتباط کالا و ارزیابی','محصولات و نسخه‌های نرم‌افزار دستگاه','تعاریف مواد اولیه، BOM و فرم‌های کنترل کیفیت','فرم مشخصات مدل دستگاه و فهرست فیلترهای سرویس کمپرسورها','ظرفیت تولید، گیرندگان فروش، تعرفه خدمات و خودروها'];
 // Ordered children before parents. SQL identifiers and predicates are constant, never caller input.
 export const resetTables:Record<string,string>={
+ bale_outbox:'سابقه ارسال بله',bale_invites:'پیوندهای موقت اتصال بله',bale_links:'اتصال‌های تأییدشده بله (حفظ می‌شوند)',bale_config:'تنظیمات امن بله (حفظ می‌شوند)',
  accounting_lines:'ردیف‌های حسابداری',accounting_journals:'اسناد حسابداری',economic_events:'رویدادهای اقتصادی',accounting_rules:'قواعد حسابداری',accounting_periods:'دوره‌های حسابداری',accounting_accounts:'کدینگ حساب‌ها',accounting_settings:'تنظیمات دفتر',
  personal_reminders:'یادآورهای شخصی و اعلان‌های آن‌ها',llm_usage:'مصرف درخواست‌های مدل',assistant_actions:'فرمان‌های دستیار',assistant_turns:'گفت‌وگوهای دستیار',duty_files:'پیوست‌های وظایف',duty_notices:'اعلان‌های وظایف',duty_runs:'سوابق انجام وظایف',
  service_offsets:'تهاتر خدمات',service_reservations:'رزرو قطعات خدمات',service_files:'پیوست‌های خدمات',service_ledger:'گردش مالی خدمات',service_lots:'موجودی قطعات خدمات',service_activations:'فعال‌سازی گارانتی',sourcing_holds:'تخصیص‌های تأمین؛ قابل مصرف، منتظر کنترل و خرید باز',
@@ -125,6 +126,7 @@ export const resetFlowCatalog=['functional_qc_template','daily_usd_rate','custom
 export function resetWhere(table:string,scope:string){
  if(scope!=='operations'&&scope!=='full')throw Error('Invalid reset scope');
  if(!Object.hasOwn(resetTables,table))throw Error('Invalid reset table');
+  if(['bale_config','bale_links'].includes(table))return '0=1';
  if(scope==='operations'&&['accounting_rules','accounting_periods','accounting_accounts','accounting_settings'].includes(table))return '0=1';
  if(table==='flow_entities')return "type NOT IN ("+[...resetFlowPreserved,...(scope==='operations'?resetFlowCatalog:[])].map(t=>"'"+t+"'").join(',')+")";
  if(scope==='operations'&&['quality_templates','bom_versions','firmware_files'].includes(table))return '0=1';

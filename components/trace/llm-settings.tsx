@@ -1,4 +1,5 @@
 "use client";
+import {BaleSettings} from './bale-settings';
 import {RefreshButton} from './refresh-button';
 import {NumberInput} from '@/components/trace/number-input';
 import {IconDisclosure,IconActions} from "./program-workspace";
@@ -28,7 +29,7 @@ export function LlmSettings(){
  async function revoke(t:Token){if(!window.confirm('اتصال «'+t.name+'» لغو شود؟'))return;setBusy(true);try{await fetch('/api/mcp-tokens?id='+encodeURIComponent(t.id),{method:'DELETE'}).then(response);setSecret('');await refresh();}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
  const sse=origin+'/sse?token='+secret,config=JSON.stringify({mcpServers:{nafasyar:{url:sse}}},null,2);
  async function copy(value:string){try{await navigator.clipboard.writeText(value);setMessage('کپی شد.');}catch{setError('کپی خودکار ممکن نشد؛ متن را انتخاب و کپی کنید.');}}
- return <div className="llm-settings">
+ return <div className="llm-settings"><BaleSettings admin/>
  {error&&<p className="notice error" role="alert">{error}</p>}{message&&<p className="notice" role="status">{message}</p>}
  <IconSections scope="llm-settings-areas-1" items={[{key:"area-0",title:"پروفایل‌های مدل زبانی",content:<><div className="panel"><div className="panelhead"><h2>پروفایل‌های مدل زبانی</h2><IconActions scope="llm-settings-actions-4407b73188"><RefreshButton retry={!!error} className="btn" disabled={busy||loading} onRefresh={()=>refresh()} /><button data-pair-open="llm-settings:e8a48f25e0d0" className="btn primary" disabled={busy} onClick={()=>setDraft(blank())}><Plus size={16}/>پروفایل جدید</button></IconActions></div>
  <div className="inside"><p className="subtle">محیط فعلی: <span dir="ltr">{origin}</span> · {profiles.length} پروفایل ذخیره‌شده</p><p className="subtle">دستیار چت پایین صفحه از این مدل‌ها استفاده می‌کند. ارائه‌دهنده باید از Chat Completions و ابزارها پشتیبانی کند. ارسال پیام ممکن است هزینه API داشته باشد. ذخیره پروفایل هیچ درخواست پولی ارسال نمی‌کند؛ مدل یا System Prompt نرم‌افزار Cursor و ChatGPT را تغییر نمی‌دهد. فرمان صوتی نیز از مدل انتخاب‌شده در همان پنجره دستیار استفاده می‌کند. «آزمون پاسخ» یک درخواست کوتاه با هزینه احتمالی API می‌فرستد.</p>
