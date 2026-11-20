@@ -7,6 +7,7 @@ Owner-approved implementation; baseline 7eec81e9175315cd8f0638147622c530cd57a05d
 - Atomic HR base approval plus personal-only account/contact/audit, national-ID username and mobile initial password hash, universal must-change enforcement for local sessions and MCP principals. No password returned and no job grants. Existing-account preservation, username collision handoff and rollback.
 - Private employee declaration/photos, independent numbered units, explicit condition, quantity/add-row and no-assets assertion. Custodian review/return, source passport matching and holder/serial/pending/disposal/version guards. Atomic official opening inventory, file binding, events, registration group and numbered print copies; no invented historical handover.
 - Separate HR minimal tracking, personal self-service, custodian review/inbox and profile obligations. Same HTTP/MCP handlers, confirmed file upload and private chunk download.
+- Photo object keys include the content digest; competing uploads with the same UUID cannot overwrite committed bytes. Loser cleanup preserves the winning blob, verified with a real interleaved upload fixture.
 - Receipt camera editing-state cleanup now uses the latest callback only on unmount; parent rerenders no longer incorrectly release another row while a photo is being confirmed.
 
 ## Validation
