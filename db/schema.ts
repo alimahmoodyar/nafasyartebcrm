@@ -1,4 +1,5 @@
 import {sql} from "drizzle-orm";
+export * from './bale-schema';
 export * from './accounting-schema';
 import {sqliteTable,text,index,integer,uniqueIndex,check} from "drizzle-orm/sqlite-core";
 export const records=sqliteTable("records",{id:text("id").primaryKey(),kind:text("kind").notNull(),payload:text("payload").notNull(),created:text("created").notNull()},t=>[index("idx_records_kind").on(t.kind),index("idx_records_kind_code").on(t.kind,sql`json_extract(${t.payload},'$.code')`)]);

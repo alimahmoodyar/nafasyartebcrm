@@ -197,6 +197,13 @@
       "when": 1794730652310,
       "tag": "0027_accounting_core",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "6",
+      "when": 1795188637341,
+      "tag": "0029_bale_integration",
+      "breakpoints": true
     }
   ]
 }
