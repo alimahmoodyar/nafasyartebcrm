@@ -4,6 +4,7 @@ import {trainingContext} from './training-context';
 import {encryptToken,decryptToken} from './llm-secrets';
 import {baleRequest,baleFile,BaleProviderError} from './bale-transport';
 import type {Session} from './permissions';
+import {baleSchemaStatements} from './bale-schema';
 
 const fail=(message:string,status=400):never=>{throw new AccessError(message,status)};
 const now=()=>new Date().toISOString();
@@ -14,6 +15,18 @@ export async function baleBoundary(u?:Session){
  const control:any=await storage().prepare('SELECT phase FROM reset_control WHERE id=1').first();if(control?.phase==='maintenance')fail('سامانه در حالت نگهداری است.',423);
 }
 export const baleConfig=()=>storage().prepare("SELECT * FROM bale_config WHERE id='company'").first<any>();
+async function existingBaleConfig(){return await storage().prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='bale_config'").first()?baleConfig():null;}
+export async function baleStorageReady(){
+ const names=baleSchemaStatements.map(sql=>/^CREATE (?:TABLE|UNIQUE INDEX|INDEX|TRIGGER) IF NOT EXISTS (\w+)/.exec(sql)![1]);
+ const rows=await storage().prepare(`SELECT name FROM sqlite_master WHERE name IN (${names.map(()=>'?').join(',')})`).bind(...names).all();return rows.results.length===names.length;
+}
+async function prepareBaleStorage(u:Session){
+ await baleBoundary(u);if(!u.isAdmin)fail('راه‌اندازی اتصال شرکت فقط با مدیر است.',403);if(await baleStorageReady())return;
+ const db=storage();await db.batch([
+  db.prepare("INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,'bale_storage_setup','{}',?,?,CASE WHEN (SELECT phase FROM reset_control WHERE id=1)!='maintenance' THEN 1 ELSE 0 END)").bind(crypto.randomUUID(),u.userId,now()),
+  ...baleSchemaStatements.map(sql=>db.prepare(sql)),audit(u,'company','storage_setup',{version:29})
+ ]);
+}
 export function baleConfigView(c:any){return {configured:!!c,enabled:!!c?.enabled,username:c?.username||'',revision:c?.revision||0};}
 const audit=(u:Session,target:string,action:string,data:unknown)=>storage().prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,target,'bale_'+action,JSON.stringify(data),now());
 async function guarded(u:Session,condition:string,args:unknown[],statements:D1PreparedStatement[]){
@@ -34,7 +47,9 @@ async function recipient(u:Session,supplierId?:string){
 }
 async function ownedLink(u:Session,id:string){const row:any=await storage().prepare('SELECT * FROM bale_links WHERE id=?').bind(id).first();if(!row||row.owner!==await owner(u)&&!(u.isAdmin&&row.kind==='supplier'))fail('این اتصال در دسترسی شما نیست.',403);return row;}
 export async function baleStatus(u:Session,manage=false){
- await baleBoundary(u);const c=await baleConfig();if(manage&&!u.isAdmin)fail('دسترسی مدیر لازم است.',403);
+ await baleBoundary(u);if(manage&&!u.isAdmin)fail('دسترسی مدیر لازم است.',403);
+ if(!await baleStorageReady())return {accountId:u.userId,setupRequired:true,config:baleConfigView(await existingBaleConfig()),links:[],outbox:[],suppliers:[]};
+ const c=await baleConfig();
  const own=await owner(u),links=(await storage().prepare(manage?'SELECT * FROM bale_links ORDER BY updated DESC LIMIT 200':'SELECT * FROM bale_links WHERE owner=?').bind(...(manage?[]:[own])).all()).results as any[];
  const result=[];for(const l of links){const invitation:any=await storage().prepare("SELECT id,candidate_name,state,expires FROM bale_invites WHERE link_id=? AND state IN ('waiting','claimed') AND expires>? ORDER BY expires DESC LIMIT 1").bind(l.id,Date.now()).first();result.push({id:l.id,label:l.label,kind:l.kind,state:l.state,chatName:l.chat_name||'',revision:l.revision,pending:invitation?{id:invitation.id,name:invitation.candidate_name||'',state:invitation.state,expires:invitation.expires}:null});}
  const outbox=(await storage().prepare(manage?'SELECT o.id,o.link_id,o.purpose,o.state,o.message_id,o.error,o.created FROM bale_outbox o ORDER BY created DESC LIMIT 50':'SELECT o.id,o.link_id,o.purpose,o.state,o.message_id,o.error,o.created FROM bale_outbox o JOIN bale_links l ON l.id=o.link_id WHERE l.owner=? ORDER BY o.created DESC LIMIT 20').bind(...(manage?[]:[own])).all()).results;
@@ -43,7 +58,7 @@ export async function baleStatus(u:Session,manage=false){
 }
 export async function saveBaleConfig(u:Session,b:any){
  await baleBoundary(u);if(!u.isAdmin)fail('دسترسی مدیر لازم است.',403);if(b.confirmed!==true||!Number.isSafeInteger(b.revision)||typeof b.enabled!=='boolean')fail('تأیید و نسخه معتبر لازم است.');
- const old=await baleConfig();if((old?.revision||0)!==b.revision)fail('تنظیمات تغییر کرده است؛ تازه‌سازی کنید.',409);
+ const old=await existingBaleConfig();if((old?.revision||0)!==b.revision)fail('تنظیمات تغییر کرده است؛ تازه‌سازی کنید.',409);
  let cipher=old?.token_cipher,botId=old?.bot_id,username=old?.username;
  if(b.token){
   if(typeof b.token!=='string'||!/^\d{1,24}:[A-Za-z0-9_-]{20,180}$/.test(b.token))fail('توکن بازو معتبر نیست.');
@@ -54,6 +69,7 @@ export async function saveBaleConfig(u:Session,b:any){
   cipher=await encryptToken(b.token,'bale:company');
  }
  if(!cipher)fail('توکن بازو را در همین فرم امن وارد کنید.');
+ await prepareBaleStorage(u);
  const at=now(),db=storage();const change=old?db.prepare("UPDATE bale_config SET token_cipher=?,bot_id=?,username=?,enabled=?,revision=revision+1,poll_offset=CASE WHEN bot_id=? THEN poll_offset ELSE 0 END,poll_after=0,updated=? WHERE id='company' AND revision=?").bind(cipher,botId,username,b.enabled?1:0,botId,at,b.revision):db.prepare("INSERT INTO bale_config(id,token_cipher,bot_id,username,enabled,revision,updated) VALUES('company',?,?,?,?,1,?)").bind(cipher,botId,username,b.enabled?1:0,at);
  await guarded(u,"COALESCE((SELECT revision FROM bale_config WHERE id='company'),0)=?",[b.revision],[change,audit(u,'company','config',{enabled:b.enabled,tokenChanged:!!b.token,revision:b.revision+1})]);
  return {config:baleConfigView(await baleConfig())};

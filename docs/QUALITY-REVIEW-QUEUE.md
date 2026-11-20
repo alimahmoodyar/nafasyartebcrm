@@ -1,3 +1,10 @@
+## Bale onboarding correction — 2026-11-21
+
+- Changed scope: separate Bale icon from Cursor; one-input initial connection; dependent actions after setup; safe missing-schema readiness and additive authenticated setup using the same idempotent 0029 DDL. Shared domain handler remains authoritative for HTTP/MCP; no caller-provided DDL or secret in responses.
+- Completed: bale-ui, bale-integration (real SQLite migration/bootstrap parity, missing/partial schema, admin/role/training/maintenance guards, preserving ciphertext/recipients, repeated deployment, existing pairing/send/replay/FK/reset checks), system-reset and TypeScript. Actual LlmSettings/ProgramWorkspace was walked in a local browser with a synthetic HTTP fixture; no company token, company database, message delivery or server migration was used for that test.
+- Screenshot evidence shows the generic read error and hidden token form; the live SQL cause was not inspected. Source/push evidence is separate from company-server deployment. After deployment, verify the owner can enter their token in the secure form and the actual provider can be reached; do not claim live connection from the fixture.
+- Future feature scope unchanged: receipt sending and workflow notifications still need their owning domain authorization; do not introduce unrestricted chat/file sends or automatic financial confirmations.
+
 ## 2026-11-19 — تکمیل مصوبه‌های پرونده، حقوق و فهرست خزانه
 
 اطلاعات مؤثر بر حقوق در همان پرونده، فرزندان/گواهی شش‌ماهه، سابقه بیمه با مدرک و تأیید، قرارداد و اصلاح مزد تاریخ‌دار، کارکرد و محاسبه قراردادمحور با قواعد نسخه‌دار و مرجع اضافه شد. مأموریت دارای تأیید مدیر از همان داده مشترک در فیش ماهانه دیده می‌شود؛ مبلغ نامعلوم صفر نیست. بررسی فیش یکپارچه، اصلاح کامل با دلیل/قبل‌وبعد/پیوست و بازمحاسبه همان فرد، همراه با تأیید مستقل دوباره و قفل قطعیت مالی است. خزانه فهرست سه‌ستونه با جمع، چاپ و اکسل عمومی دارد؛ پارسر بانک و فرمول مأموریت منتظر تصمیم مالک‌اند. جزئیات و حدود: quality-reviews/2026-11-19-approved-payroll.md و process-design/PAYROLL-APPROVED-IMPLEMENTATION.fa.md.
