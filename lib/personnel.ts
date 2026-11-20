@@ -1,3 +1,4 @@
+import {approvedStaffAccount} from './staff-account';
 import {missionPayDay} from './staff-mission-pay';
 import {payrollSourcesCurrent} from './personnel-payroll-operations';
 import {readPayrollMissionRows,missionIntervalCredit,payrollMissionGuards,approvedMissionFacts} from './personnel-payroll-missions';
@@ -130,7 +131,10 @@ export async function applyPersonnel(u:Session,b:any){
  }
  if(mode==='file_approve'||mode==='file_reject'){const next=reviewPersonnelFile(b,old,rows,a,now);next.data=history(old?.data,next.data);await commitHr(u,b.id,signature,rows,members,[next],mode);return {saved:true,id:next.id};}
  if((familyModes as readonly string[]).includes(mode)){const next=familyChanges(b,old,rows,a,now).map(r=>({...r,data:history(rows.find(x=>x.id===r.id)?.data,r.data)}));await commitHr(u,b.id,signature,rows,members,next,mode);return {saved:true,id:next.at(-1)!.id};}
- if((employmentModes as readonly string[]).includes(mode)){role('hr');const next=employmentChanges(b,old,rows,now,members,old&&members.some(m=>m.id===old.data.memberId)?(await memberContactsForAccounts([old.data.memberId]))[0].mobile:'').map(r=>({...r,data:history(rows.find(x=>x.id===r.id)?.data,{...r.data,...(r.type==='hr_contract'&&r.id===id&&r.data.state==='active'?{finalizedBy:u.userId}:{}),...(!r.revision?{createdBy:u.userId,createdAt:now}:{})})}));await commitHr(u,b.id,signature,rows,members,next,mode);return {saved:true,id:next.at(-1)!.id,memberId:next.at(-1)!.data.memberId};}
+ if((employmentModes as readonly string[]).includes(mode)){role('hr');const next=employmentChanges(b,old,rows,now,members,old&&members.some(m=>m.id===old.data.memberId)?(await memberContactsForAccounts([old.data.memberId]))[0].mobile:'').map(r=>({...r,data:history(rows.find(x=>x.id===r.id)?.data,{...r.data,...(r.type==='hr_contract'&&r.id===id&&r.data.state==='active'?{finalizedBy:u.userId}:{}),...(!r.revision?{createdBy:u.userId,createdAt:now}:{})})}));
+ const provision=mode==='personnel_complete'?await approvedStaffAccount(next.at(-1),members,u,b.id,now):null;
+ if(provision)next[next.length-1]={...next.at(-1)!,data:{...next.at(-1)!.data,accountProvisioning:provision.summary}};
+ await commitHr(u,b.id,signature,rows,members,next,mode,provision?.statements||[]);return {saved:true,id:next.at(-1)!.id,memberId:next.at(-1)!.data.memberId,...(provision?{accountProvisioning:provision.summary}:{})};}
  if(['employee','shift','assignment','delegate','policy','ruling','document','period','punch','request'].includes(mode)&&old&&mode!=='employee')hrFail('برای این عملیات رکورد تازه بسازید؛ سوابق پیشین حفظ می‌شوند.');
  if(mode==='request'&&b.kind==='family')hrFail('از فرم اعلام تغییر خانوادگی استفاده کنید.');
  if(mode==='employee'){

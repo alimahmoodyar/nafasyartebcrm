@@ -1,3 +1,4 @@
+// Opening-inventory asset_declaration, review history and asset-declarations duty_runs are operational in both reset scopes; declaration_photo is existing asset_file/BUCKET. Generic 0016 freeze, file manifest and full backups apply. Automatically provisioned app_members/password_accounts retain existing account-reset semantics (operations/full reset preserve accounts); no new reset authority or tables.
 // Direct voice messages use existing inbox_thread/message/file/state and BUCKET; existing reset/backup/freeze scopes include these JSON fields and file blobs. No new persistence type.
 // Handover sender/receiver photographs remain existing asset_file (purpose transfer_photo),
 // bound atomically to asset_event; generic operational backup/reset, R2 manifest and 0016 freeze apply.

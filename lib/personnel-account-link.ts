@@ -39,7 +39,7 @@ export function personnelAccountLinkPlan(rows:any[],members:any[],member:any,pro
    if(['hr_employee','hr_delegate'].includes(row.type)&&data.managerId===from)data={...data,managerId:to};
    if(row.type==='hr_request'&&data.substituteId===from)data={...data,substituteId:to};
   }else if(row.type==='hr_period')data=remapPeriod(data,from,to);
-  if(row.id===profile.id)data={...data,accountLinkedAt:now,accountLink:{memberId:to,previousMemberId:from,previousBaseId:oldBase?.id||'',at:now,actor:actor.userId,reason},history:[...(data.history||[]),{at:now,actor:actor.userId,name:actor.name||'',mode:'account_link',notes:reason,state:data.state}]};
+  if(row.id===profile.id)data={...data,accountLinkedAt:now,accountProvisioning:{state:'linked',memberId:to,at:now},accountLink:{memberId:to,previousMemberId:from,previousBaseId:oldBase?.id||'',at:now,actor:actor.userId,reason},history:[...(data.history||[]),{at:now,actor:actor.userId,name:actor.name||'',mode:'account_link',notes:reason,state:data.state}]};
   if(JSON.stringify(data)!==JSON.stringify(row.data))changes.set(row.id,{...row,data});
  }
  if(oldBase)changes.set(oldBase.id,{...oldBase,type:'hr_link_archive',data:{...oldBase.data,state:'linked',linkedIntoId:profile.id,linkedAt:now,linkedBy:actor.userId}});

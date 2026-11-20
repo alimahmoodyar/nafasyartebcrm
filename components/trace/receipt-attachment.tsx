@@ -5,9 +5,10 @@ import {ReceiptPhotoEditor} from './receipt-photo-editor';
 
 export function ReceiptAttachment({file,onChange,disabled=false,allowPdf=false,onEditingChange,subject='رسید',required=false,multiple=false,onFiles,allowDocuments=false}:{multiple?:boolean;onFiles?:(files:File[])=>void;allowDocuments?:boolean;required?:boolean;subject?:string;file:File|null;onChange:(file:File|null)=>void;disabled?:boolean;allowPdf?:boolean;onEditingChange?:(editing:boolean)=>void}){
  const video=useRef<HTMLVideoElement|null>(null),stream=useRef<MediaStream|null>(null),request=useRef(0);
+ const editingCallback=useRef(onEditingChange);editingCallback.current=onEditingChange;
  const [photo,setPhoto]=useState<File|null>(null);
- function candidate(next:File|null){setPhoto(next);onEditingChange?.(!!next)}
- useEffect(()=>()=>onEditingChange?.(false),[onEditingChange]);
+ function candidate(next:File|null){setPhoto(next);editingCallback.current?.(!!next)}
+ useEffect(()=>()=>editingCallback.current?.(false),[]);
  const [open,setOpen]=useState(false),[waiting,setWaiting]=useState(false),[ready,setReady]=useState(false),[error,setError]=useState(''),[preview,setPreview]=useState('');
  function stop(){request.current++;stream.current?.getTracks().forEach(track=>track.stop());stream.current=null;if(video.current)video.current.srcObject=null;setOpen(false);setWaiting(false);setReady(false)}
  useEffect(()=>()=>{request.current++;stream.current?.getTracks().forEach(track=>track.stop());stream.current=null},[]);

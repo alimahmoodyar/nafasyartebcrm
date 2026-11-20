@@ -1,0 +1,7 @@
+import {requireAccess,checkOrigin,accessResponse} from '@/lib/authorization';
+import {boundedBody} from '@/lib/firmware-storage';
+import {readAssetDeclarations,applyAssetDeclaration} from '@/lib/asset-declarations';
+import {syncAssetTasks} from '@/lib/assets-tasks';
+const headers={'Cache-Control':'private, no-store','Vary':'Cookie, Authorization'};
+export async function GET(request:Request){try{const u=await requireAccess();if(request.headers.get('x-asset-account')&&request.headers.get('x-asset-account')!==u.userId)return Response.json({error:'حساب ورود تغییر کرده است.'},{status:409,headers});return Response.json(await readAssetDeclarations(u,new URL(request.url).searchParams),{headers});}catch(e){return accessResponse(e)||Response.json({error:'دریافت اعلام اموال انجام نشد.'},{status:503,headers});}}
+export async function POST(request:Request){try{checkOrigin(request);const u=await requireAccess();if(request.headers.get('x-asset-account')&&request.headers.get('x-asset-account')!==u.userId)return Response.json({error:'حساب ورود تغییر کرده است.'},{status:409,headers});const b=JSON.parse(new TextDecoder().decode(await boundedBody(request,64000))),result=await applyAssetDeclaration(u,b);let followupPending=false;try{await syncAssetTasks()}catch{followupPending=true}return Response.json({...result,followupPending},{headers});}catch(e){return accessResponse(e)||Response.json({error:'ثبت انجام نشد؛ اطلاعات را تازه کنید.'},{status:/inventory_operation_guard|UNIQUE/.test(String(e))?409:503,headers});}}
