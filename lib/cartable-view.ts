@@ -1,6 +1,6 @@
 export const roleTaskTools:Record<string,string>={review:'پیگیری و بررسی پاسخ‌ها','inbox-workflow':'درخواست‌های کاری و پیام‌های سازمانی','receipt-notes':'یادداشت‌های دریافت کالا','purchase-services':'تحویل خرید و خدمات',management:'نظارت مدیریتی',definitions:'سمت‌ها و برنامه وظایف',positions:'شرح مسئولیت‌های من',notifications:'اعلان‌های من',reminders:'به‌روزرسانی یادآوری‌های سامانه'};
 export function cartableTarget(target:string){
- if(target==='inbox')return 'inbox';
+ if(['inbox','sent','personal-reminders'].includes(target))return target;
  if(target.startsWith('reminder-task:'))return 'inbox-workflow';
  if(target.startsWith('receipt-note:'))return 'receipt-notes';
  const tool=target.startsWith('role-tools:')?target.slice(11):'';

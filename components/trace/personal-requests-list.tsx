@@ -1,0 +1,11 @@
+'use client';
+import {useEffect,useState} from 'react';
+import {personnelKinds,personnelStates} from '@/lib/personnel-contract';
+import {formatDate} from '@/lib/persian-date';
+import './employee-self-service.css';
+export function PersonalRequestsList({accountId,onNavigate}:{accountId:string;onNavigate:(section:string,target?:string)=>void}){
+ const [data,setData]=useState<any>(null),[error,setError]=useState(''),[version,setVersion]=useState(0);
+ useEffect(()=>{const abort=new AbortController();setData(null);setError('');void fetch('/api/personnel',{cache:'no-store',signal:abort.signal,headers:{'x-assistant-account':accountId}}).then(async r=>{const d=await r.json() as any;if(!r.ok)throw Error(d.error||'دریافت درخواست‌ها انجام نشد.');if(d.accountId&&d.accountId!==accountId)throw Error('حساب ورود تغییر کرده است؛ صفحه را تازه کنید.');if(!abort.signal.aborted)setData({accountId,payload:d})}).catch(e=>{if(!abort.signal.aborted)setError(e.message)});return()=>abort.abort()},[accountId,version]);
+ const current=data?.accountId===accountId?data.payload:null,rows=(current?.records||[]).filter((r:any)=>r.type==='hr_request'&&r.data.memberId===current.me).sort((a:any,b:any)=>String(b.created).localeCompare(String(a.created)));
+ return <section className="personal-requests-list"><div className="tools"><h3>درخواست‌های شخصی من</h3><button type="button" className="btn" onClick={()=>onNavigate('personnel','personal-requests:')}>درخواست جدید</button><button type="button" className="btn" onClick={()=>setVersion(v=>v+1)}>تازه‌سازی</button></div>{error&&<p role="alert">{error}</p>}{!current&&!error&&<p role="status">در حال دریافت…</p>}{current&&!rows.length&&<p>هنوز درخواست شخصی ثبت نکرده‌اید.</p>}{rows.map((r:any)=><article className="flow-card" key={r.id}><div className="panelhead"><h4>{r.data.title||personnelKinds[r.data.kind]||'درخواست شخصی'}</h4><span className="personnel-status">{personnelStates[r.data.state]||r.data.state}</span></div><p>{r.data.start?formatDate(r.data.start)+' تا '+formatDate(r.data.end):'ثبت در '+formatDate(r.created)}</p><p>مسئول رسیدگی: {r.reviewers?.map((id:string)=>current.members?.find((m:any)=>m.id===id)?.name||'مسئول مربوط').join('، ')||'مرحلهٔ رسیدگی در جزئیات درخواست'}</p><button type="button" className="btn" onClick={()=>onNavigate('personnel',r.id)}>جزئیات، مدارک و پاسخ‌ها</button></article>)}</section>;
+}
