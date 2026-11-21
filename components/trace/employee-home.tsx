@@ -5,12 +5,14 @@ import type {Session} from '@/lib/permissions';
 import {cartableRows,type CartableRow} from '@/lib/cartable-view';
 import {PersonalHome} from './personal-home';
 import {RoleTaskTools} from './role-task-tools';
+import {personnelWorkEntry} from './employee-home-policy';
 import './employee-self-service.css';
 type App={key:string;title:string;shortTitle?:string;icon:LucideIcon};
 type Snapshot={accountId:string;tasks:CartableRow[];unread:number|null;limited:boolean};
 export function EmployeeHome({user,apps,onNavigate}:{user:Session;apps:App[];onNavigate:(section:string,target?:string)=>void}){
  const [summary,setSummary]=useState<Snapshot|null>(null),[error,setError]=useState(''),[version,setVersion]=useState(0);
- const jobs=apps.filter(a=>!['tasks','personnel','reminders','development','mobile-install'].includes(a.key));
+ const personnelWork=personnelWorkEntry(user);
+ const jobs=apps.flatMap(a=>a.key==='personnel'?(personnelWork?[{...a,title:personnelWork.title,shortTitle:personnelWork.title}]:[]):!['tasks','reminders','development','mobile-install'].includes(a.key)?[a]:[]);
  useEffect(()=>{
   const abort=new AbortController();setSummary(null);setError('');
   const read=async(url:string)=>{const r=await fetch(url,{cache:'no-store',headers:{'x-assistant-account':user.userId},signal:abort.signal}),d=await r.json() as any;if(!r.ok)throw Error(d.error||'دریافت خلاصه انجام نشد.');if(d.accountId&&d.accountId!==user.userId)throw Error('حساب ورود تغییر کرده است؛ صفحه را تازه کنید.');return d};
@@ -41,6 +43,6 @@ export function EmployeeHome({user,apps,onNavigate}:{user:Session;apps:App[];onN
    <nav className="employee-home-actions" aria-label="بخش‌های کارتابل">{[['','منتظر اقدام',ListTodo],['inbox','پیام‌ها',Mail],['sent','ارسالی‌ها',Send],['personal-reminders','یادآورها',Bell]].map(([target,title,Icon]:any)=><button type="button" key={target} onClick={()=>onNavigate('tasks',target)}><Icon size={16}/>{title}</button>)}</nav>
   </section>
   <div className="employee-home-help"><p>ارسال و پاسخ پیام‌ها از بخش «پیام‌ها» در کارتابل انجام می‌شود.</p>{apps.some(a=>a.key==='mobile-install')&&<button type="button" onClick={()=>onNavigate('mobile-install')}>نصب روی گوشی</button>}</div>
-  {!!jobs.length&&<section className="employee-home-work"><h3>برنامه‌های شغلی شما</h3><PersonalHome accountId={user.userId} name={user.name} apps={jobs} scope="employee-work" title="برنامه‌های شغلی" greeting={false} compact onNavigate={onNavigate}/><RoleTaskTools accountId={user.userId} onNavigate={onNavigate}/></section>}
+  {!!jobs.length&&<section className="employee-home-work"><h3>برنامه‌های شغلی شما</h3><PersonalHome accountId={user.userId} name={user.name} apps={jobs} scope="employee-work" title="برنامه‌های شغلی" greeting={false} compact onNavigate={section=>onNavigate(section,section==='personnel'?personnelWork?.target:undefined)}/><RoleTaskTools accountId={user.userId} onNavigate={onNavigate}/></section>}
  </section>;
 }

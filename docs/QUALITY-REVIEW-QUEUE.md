@@ -1,3 +1,11 @@
+## 2026-11-21 — Personal asset category choices
+
+Personal declarations and direct registration reuse the same visual category component/catalog. Independent per-row selection, explicit empty default, existing category text preserved, disabled while busy. Current-checkout browser test replaces stale hard-coded source import and verifies desktop/mobile categories, payloads, numbered photos and review. SQLite HTTP/MCP and registration UI regressions passed. See quality-reviews/2026-11-21-personal-asset-categories.md. No domain grants, stored schema or approval rules changed; no live records created.
+
+## 2026-11-21 — Personnel work entry after role assignment
+
+The employee home no longer hides all personnel work behind personal services. HR opens the existing administration panel; other existing personnel roles open management with unchanged API controls. No grants come from display metadata. SQLite existing-session grant/revoke and real authorized create/forbidden stale create passed; internal operational profile linked-section access audit and real desktop/mobile component navigation passed. See quality-reviews/2026-11-21-personnel-role-home.md. This is not a full end-to-end audit of every profile workflow or verification of the company domain.
+
 ## 2026-11-21 — Visible role-assignment review
 
 Preview now opens in the shared scoped dialog; persistent footer, local pending/error/success feedback, timeout and malformed-response recovery. Existing grants, reviewed removal, open-work guards, idempotent save and audit are unchanged. Browser fixture no longer scrolls the result into view; tests actual LayoutAccountProvider, sticky header, desktop/mobile, retry/cancel/save/conflict and HR-only summary. Details: quality-reviews/2026-11-21-role-preview-feedback.md. Company-domain runtime and release remain separately unverified; no real assignments changed.
