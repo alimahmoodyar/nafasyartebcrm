@@ -100,8 +100,9 @@ async function buildBatchLabelPdf(){
 async function showBatchLabelPdf(){
  try{
   const pdf=await buildBatchLabelPdf();
-  batchPdfStatus('PDF آماده شد. چاپ را از نمایشگر PDF انجام دهید.');
-  window.location.assign(URL.createObjectURL(pdf));
+  const {openBatchPdf}=await import('/label-pdf/batch-viewer.mjs');
+  await openBatchPdf(pdf,'batch-labels.pdf',batchPdf.layout==='a4'?300:thermalDpi);
+  batchPdfStatus('');
  }catch(error){
   batchPdfStatus('ساخت PDF لیبل انجام نشد. '+error.message);
  }

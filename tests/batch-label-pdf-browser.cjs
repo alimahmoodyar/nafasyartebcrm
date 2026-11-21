@@ -3,7 +3,8 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const vm = require('node:vm');
-const {spawnSync} = require('node:child_process');
+const {spawnSync,spawn} = require('node:child_process');
+const {createServer} = require('node:http');
 const {createRequire} = require('node:module');
 const {pathToFileURL} = require('node:url');
 const ts = require('typescript');
@@ -59,6 +60,73 @@ function verifyCodes(file,expected){
  assert.ok(gray.slice(w*(h-7)).every(pixel=>pixel>250));
 }
 
+async function verifyViewer(markup){
+ const probe = `<script>
+ const panel=document.getElementById('batch-pdf-viewer');
+ const report=body=>fetch('/viewer-result',{method:'POST',body});
+ window.print=()=>{
+  const images=document.querySelectorAll('#batch-pdf-print-pages img');
+  const size=document.getElementById('batch-pdf-page-style').textContent;
+  void report(images.length===2&&size.includes('45.0000mm 30.0000mm;margin:0')?'PASS':'Print geometry failed');
+  window.dispatchEvent(new Event('afterprint'));
+ };
+ new MutationObserver(()=>{
+  if(panel.hidden)return;
+  const canvas=panel.querySelector('canvas');
+  const pixels=canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;
+  if(!panel.querySelector('[data-download]').href.startsWith('blob:')||
+     !pixels.some((pixel,index)=>index%4===0&&pixel<80)){
+   void report('PDF was not rendered');return;
+  }
+  panel.querySelector('[data-print]').click();
+ }).observe(panel,{attributes:true,attributeFilter:['hidden']});
+ new MutationObserver(()=>{
+  const status=document.getElementById('batch-pdf-status').textContent;
+  if(status.startsWith('ساخت PDF لیبل انجام نشد'))void report(status);
+ }).observe(document.getElementById('batch-pdf-status'),{childList:true});
+ </script>`;
+ const html = markup.replace('</body>',probe+'</body>');
+ const assets = new Map([
+  ['/label-pdf/batch-viewer.mjs','text/javascript'],
+  ['/label-pdf/pdfjs-6.5.438/pdf.min.mjs','text/javascript'],
+  ['/label-pdf/pdfjs-6.5.438/pdf.worker.min.mjs','text/javascript'],
+  ['/fonts/Vazirmatn.woff2','font/woff2'],
+ ]);
+ let finish;
+ const result = new Promise(resolve=>{finish=resolve;});
+ const server = createServer((req,res)=>{
+  const url = new URL(req.url,'http://localhost');
+  if(url.pathname==='/batch'){
+   res.writeHead(200,{'Content-Type':'text/html; charset=utf-8',
+    'Content-Security-Policy':"default-src 'none'; img-src blob:; font-src 'self'; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; worker-src 'self'; connect-src 'self'"});
+   res.end(html);
+  }else if(url.pathname==='/viewer-result'&&req.method==='POST'){
+   let value='';
+   req.setEncoding('utf8');
+   req.on('data',chunk=>value+=chunk);
+   req.on('end',()=>{res.writeHead(204).end();finish(value);});
+  }else if(assets.has(url.pathname)){
+   res.writeHead(200,{'Content-Type':assets.get(url.pathname)});
+   res.end(fs.readFileSync(path.join(root,'public',url.pathname)));
+  }else res.writeHead(404).end();
+ });
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ const browser=spawn(chrome,['--headless=new','--disable-gpu','--no-first-run',
+  '--user-data-dir='+path.join(output,'chrome-viewer-'+Date.now()),
+  'http://127.0.0.1:'+server.address().port+'/batch?print=1'],
+ {windowsHide:true,stdio:'ignore'});
+ const timeout=setTimeout(()=>finish('Timed out waiting for rendered PDF'),25000);
+ browser.once('error',error=>finish(error.message));
+ try{
+  assert.equal(await result,'PASS');
+ }finally{
+  clearTimeout(timeout);
+  browser.kill();
+  server.close();
+  server.closeAllConnections();
+ }
+}
+
 (async()=>{
  const {batchLabelHtml,batchLabelOptions} = load(path.join(root,'lib/batch-labels.ts'));
  const font = fs.readFileSync(path.join(root,'public/fonts/Vazirmatn.woff2')).toString('base64');
@@ -107,6 +175,9 @@ window.addEventListener('load',async()=>{
   if(sample.name==='thermal-45x30')verifyCodes(pdf,batch.data.code);
   console.log('PASS',sample.name,sample.pages+' page(s)',sample.width+'×'+sample.height+' mm');
  }
+ const viewerQuery = new URLSearchParams('layout=thermal&width=45&height=30&copies=2');
+ await verifyViewer(await batchLabelHtml(batch,batchLabelOptions(viewerQuery),true));
+ console.log('PASS print request opens the generated PDF in the site viewer and prepares both pages at 45×30 mm');
  console.log('PASS Code 128 and QR at 203 dpi from the actual 45×30 PDF. Footer is blank.');
  console.log(output);
 })().catch(error=>{console.error(error);process.exitCode=1});
