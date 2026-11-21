@@ -27,7 +27,7 @@ export function EmployeeHome({user,apps,onNavigate}:{user:Session;apps:App[];onN
  const open=(_row:CartableRow)=>onNavigate('tasks');
  return <section className="employee-home" dir="rtl" aria-label="خانهٔ شخصی کارکنان">
   <header className="employee-home-header"><div><h2>سلام، {user.name}</h2><p>پیام‌ها و امور شخصی شما، در دو جای مشخص.</p></div></header>
-  {!jobs.length&&!user.permissions.roleAssignment?.roles?.length&&<p className="employee-home-role"><UserRound size={19}/>نقش سازمانی هنوز تخصیص داده نشده است. امکانات شغلی پس از تعیین نقش اضافه می‌شوند.</p>}
+  {!jobs.length&&!user.assignedProfileIds?.length&&!user.permissions.roleAssignment?.roles?.length&&<p className="employee-home-role"><UserRound size={19}/>نقش سازمانی هنوز تخصیص داده نشده است. امکانات شغلی پس از تعیین نقش اضافه می‌شوند.</p>}
   <div className="employee-home-cards">
    <button type="button" className="employee-home-card" onClick={()=>onNavigate('tasks')}><span className="employee-service-icon"><Inbox size={23}/></span><span><strong>کارتابل</strong><small>کارها، پیام‌ها، درخواست‌های ارسالی و یادآورها</small></span>{current&&<span className="employee-home-count" aria-label="کارهای منتظر اقدام">{current.tasks.length.toLocaleString('fa-IR')}{current.limited?' +':''}</span>}</button>
    {apps.some(a=>a.key==='personnel')&&<button type="button" className="employee-home-card" onClick={()=>onNavigate('personnel')}><span className="employee-service-icon"><ContactRound size={23}/></span><span><strong>پرسنلی من</strong><small>پرونده، حقوق و کارکرد، درخواست‌ها و اموال</small></span></button>}

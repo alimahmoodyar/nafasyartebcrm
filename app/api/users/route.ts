@@ -180,8 +180,11 @@ export async function PATCH(request: Request) {
     if(protectedUser&&body.status!=='active')throw new AccessError('حساب مدیر اصلی یا حساب جاری را نمی‌توان غیرفعال کرد.',403);
     const credential:any=await db.prepare('SELECT username FROM password_accounts WHERE member_id=?').bind(old.id).first(); localAccount=!!credential;
     const login=credential?username(body.username===undefined?credential.username:body.username):null;
+    const permissionSupplied=Object.hasOwn(body,'permissions'),roleRecord:any=await db.prepare("SELECT revision FROM flow_entities WHERE id=? AND type='member_role_assignment'").bind('member-role-assignment:'+old.id).first();
     const oldWarehousePermissions=warehouseProfilePermissions(old,await materialWarehouses()),submitted=body.permissions?.roleAssignment?{...body.permissions,roleAssignment:{...body.permissions.roleAssignment,warehouseResponsibilities:body.permissions.roleAssignment.warehouseResponsibilities??oldWarehousePermissions.warehouseResponsibilities}}:{...body.permissions,warehouseResponsibilities:body.permissions?.warehouseResponsibilities??oldWarehousePermissions.warehouseResponsibilities};
-    const data=payload({...body,permissions:submitted,unit:body.unit===undefined?old.unit:body.unit,email:credential?old.email:body.email});
+    const data=payload({...body,permissions:permissionSupplied?submitted:JSON.parse(old.permissions),unit:body.unit===undefined?old.unit:body.unit,email:credential?old.email:body.email});
+    if(!permissionSupplied)data.permissions=old.permissions;
+    if(permissionSupplied&&data.permissions!==JSON.stringify(validatePermissions(JSON.parse(old.permissions))))throw new AccessError('دسترسی این حساب را از فرم تخصیص نقش تغییر دهید.',409);
     const newHash=credential&&body.password?await hashPassword(password(body.password)):null;
     await checkServiceAgent(data.permissions);
     if(old.email!==data.email)throw new Error('ایمیل ورود قبلی ثابت است؛ برای ایمیل دیگر حساب جدا تعریف کنید.');
@@ -209,6 +212,7 @@ export async function PATCH(request: Request) {
         db.prepare('DELETE FROM mcp_streams WHERE token_id IN (SELECT id FROM mcp_tokens WHERE subject=? OR subject=?) AND '+gate).bind('local:'+old.id,old.subject||'local:'+old.id,auditId)
       ]:[]),
       ...warehouseGuards,
+      ...(permissionSupplied?[db.prepare("UPDATE inventory_operations SET guard=CASE WHEN COALESCE((SELECT revision FROM flow_entities WHERE id=? AND type='member_role_assignment'),0)=? THEN guard ELSE 0 END WHERE id=?").bind('member-role-assignment:'+old.id,roleRecord?.revision||0,operationId)]:[]),
       ...(contactSupplied?[memberContactWrite(db,old.id,contact,now),db.prepare('INSERT INTO access_audit(id,actor,target,action,before,after,at) VALUES(?,?,?,?,?,?,?)').bind(crypto.randomUUID(),actor.userId,old.id,'member_contact_update',JSON.stringify(oldContact),JSON.stringify({memberId:old.id,...contact,revision:oldContact.revision+1}),now)]:[]),
     ]);
     if(!results[contactSupplied?5:4].meta.changes)return conflict();

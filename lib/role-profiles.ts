@@ -20,8 +20,8 @@ export const salesBankTestTarget='sales-bank-test:';
 export const salesBankRowTarget='sales-bank-row:';
 export const bankGapTarget='sales-bank-gap:';
 export const bankTestGapTarget='sales-bank-test-gap:';
-// A review catalog, deliberately separate from account permissions/jobRoles.
-// Profiles do not create accounts or grant authority to ordinary users.
+// Shared role-profile catalog. Previewing never grants authority.
+// Explicit admin assignment materializes a reviewed, scoped grant snapshot through member-role-assignments.
 export const roleProfiles:RoleProfile[]=[
  {id:'personnel-hr',title:'مسئول اداری',group:'اداری و اموال',operational:true,workflowRoles:[],links:[link('پرسنل، مدارک و قراردادها','personnel','hr-admin:')],gaps:[]},
  {id:'custodian',title:'اموال‌دار',group:'اداری و اموال',operational:true,workflowRoles:[],links:[link('مدیریت اموال، تحویل و پیگیری','assets')],gaps:[]},

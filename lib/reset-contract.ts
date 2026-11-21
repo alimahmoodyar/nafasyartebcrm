@@ -112,7 +112,7 @@ export const resetTables:Record<string,string>={
 };
 // Member contacts are preserved account identity data, keyed by app_members.id.
 // Existing 0016 generic flow_entities freeze protects their atomic writes; no new migration.
-export const resetFlowPreserved=['representative_identity','representative_identity_file','hospital_center','account_profile','member_contact','position','duty_template','duty_catalog_install','transport_migration','development_request','as_agent','sales_agent'];
+export const resetFlowPreserved=['member_role_assignment','representative_identity','representative_identity_file','hospital_center','account_profile','member_contact','position','duty_template','duty_catalog_install','transport_migration','development_request','as_agent','sales_agent'];
 // material_photo is catalog data: active and removed originals/thumbnails survive operations reset with material; full reset backs up both object keys and deletes all photo rows. Generic 0016 flow/inventory freeze protects upload/removal; no new table/FK. Training uses existing flow and bucket isolation.
 // Shared print layouts are configuration; existing flow_entities freeze and backup apply.
 // Service representation contract versions and current pointers on as_agent: operations preserve catalog/history; full reset removes contracts and leaves explicit missing-reference state, never invents validity. Generic flow freeze covers atomic renewal/termination and warning closure; no new table/FK/blob.
@@ -243,7 +243,7 @@ resetHelp.push('نوع رسمی یا غیررسمی، سند متصل و ساب�
 
 // Scheduled delegation configuration is in personal_reminders; resulting inbox_thread/message/state are operational flow_entities. Existing 0020/0016 freeze and both reset backups/deletions cover them; no new table or migration.
 
-// Job-role assignments are embedded in preserved app_members.permissions; no new table or reset deletion is introduced.
+// Effective grants stay in preserved app_members.permissions. member_role_assignment stores reviewed profile bindings, retained legacy snapshot and audit history in preserved flow_entities; both reset scopes retain it. Generic 0016 flow/member/inventory freeze and existing backup apply; no new table, object key or migration.
 // Service diagnosis traceStatus is embedded in as_case data; existing full-JSON backup, reset scope and freeze rules cover it without a new table.
 
 // sales_payment staff_entry attribution is embedded in the existing operational entity;
