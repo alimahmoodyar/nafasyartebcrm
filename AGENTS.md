@@ -1,3 +1,7 @@
+# Administrator release number
+
+For every new source revision pushed to sites/nafasyar-trace, increment lib/release-number.ts once above the current remote release number in the same push. Keep the number identical across deployment copies and report it to the owner.
+
 # Short permanent personnel codes (2026-11-21)
 
 Owner approved automatic staff numbers from 1001, preserving prior short codes and all dossier/account/contract/history links. lib/personnel-code-storage.ts reserves immutable per-dossier numbers plus canonical claims and a durable high-water mark in existing flow_entities. New HR creation reserves in the same commitHr transaction; supplied manual codes cannot override new numbering. Owner-approved bounded read-time backfill registers existing codes and gives only old generated P-32hex codes short aliases, without modifying old HR data/revisions or payroll snapshots. UI/API/MCP/print read the canonical projection; legacy code remains searchable. Never reuse a number after leaving, deletion or either existing business reset. These identity registry types are preserved by reset-contract; generic freeze/backup applies, no new schema/migration. Existing duplicate canonical short codes fail for explicit review, never pick a winner. No production HR records were created or edited for QA. Follow docs/quality-reviews/2026-11-21-personnel-codes.md and external release evidence for actual push/publication. Keep role metadata and position projection as separate concerns.
