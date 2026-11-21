@@ -1,3 +1,7 @@
+## 2026-11-21 — Personnel form feedback and amount readability
+
+Local confirmation feedback distinguishes pending, committed, rejected and refresh-failed outcomes. Server account states remain authoritative; unresolved account linking/restoration is never called account creation, and document completion is separate. Shared exact money input and adjacent RTL checkboxes; active contract editing through the same HR-authorized confirmed/idempotent HTTP/MCP handler, required reason and before/after history. Locked work, calculated payroll and salary amendments block direct overwrites; payroll rules remain unchanged. Focused UI/domain checks and real-component browser fixture at 1280/430/320px; see quality-reviews/2026-11-21-personnel-form-feedback.md. Company-domain deployment is tracked separately from GitHub and Sites publication.
+
 ## 2026-11-21 — Warehouse compact presentation pilot
 
 Scoped warehouse appearance only. Existing receipt, movement, QC/placement, stock grouping and permission tests passed. No domain/API/MCP or persistence changes. Desktop/mobile fixture rendering and source parity recorded externally. Pre-existing warehouse-profile-roles test needs its fixture updated for the approved HR dossier requirement; same failure reproduced on the unchanged baseline. See quality-reviews/2026-11-21-warehouse-compact-pilot.md. Owner acceptance of this warehouse-only pilot precedes any rollout to other roles.

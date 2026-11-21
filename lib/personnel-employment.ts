@@ -8,7 +8,7 @@ import {sreq,stxt,sday} from './sales';
 import {dayAt,addDay} from './duties';
 import {contractSalaryBases,normalizeContractSalary,validContractSalary} from './personnel-contract-salary';
 
-export const employmentModes=['personnel_create','personnel_complete','contract_save','contract_finalize','contract_close'] as const;
+export const employmentModes=['personnel_create','personnel_complete','contract_save','contract_finalize','contract_edit','contract_close'] as const;
 export {personnelFileCategories} from './personnel-contract';
 const fail=(message:string,status=400):never=>{throw new AccessError(message,status)};
 export function personnelBankAccount(value:unknown,required=false){const iban=normalizeIranIban(stxt(value||'',100)),error=iranIbanError(iban,required);if(error)fail(error);return iban;}
@@ -38,9 +38,14 @@ export function employmentChanges(b:any,old:any,rows:any[],now:string,members:an
   return [{...old,data:{...d,state:'active',bankAccount:personnelBankAccount(d.bankAccount,true),profileApprovedAt:d.profileApprovedAt||now,...(personnelDocumentStatus(rows,old.id).complete?{identityCompleteAt:d.identityCompleteAt||now}:{}),setupMissing:[],familyBase:d.familyBase||{maritalStatus:d.maritalStatus,childrenCount:d.childrenCount||0,effective:d.start}}}];
  }
 
- if(b.mode==='contract_save'||b.mode==='contract_finalize'){
+ if(b.mode==='contract_save'||b.mode==='contract_finalize'||b.mode==='contract_edit'){
+  const editing=b.mode==='contract_edit';
+  if(editing){
+   if(!old||old.type!=='hr_contract'||old.data.state!=='active')fail('فقط قرارداد نهایی‌شده فعال قابل اصلاح است.',409);
+   sreq(b.notes,4000);
+  }
   if(b.mode==='contract_finalize'&&!old)fail('پیش‌نویس قرارداد یافت نشد.',404);
-  if(old&&(old.type!=='hr_contract'||old.data.state!=='draft'))fail('فقط پیش‌نویس قرارداد قابل ویرایش است.',409);
+  if(!editing&&old&&(old.type!=='hr_contract'||old.data.state!=='draft'))fail('فقط پیش‌نویس قرارداد قابل ویرایش است.',409);
   const previous=old?.data||{},value=(key:string)=>Object.hasOwn(b,key)?b[key]:previous[key];
   const memberId=sreq(value('memberId')),employee=rows.find(r=>r.type==='hr_employee'&&r.data.memberId===memberId&&r.data.state==='active');if(!employee)fail('پرونده پرسنلی فعال لازم است.');
   if(old&&old.data.memberId!==memberId)fail('صاحب قرارداد قابل تعویض نیست.');
@@ -50,12 +55,25 @@ export function employmentChanges(b:any,old:any,rows:any[],now:string,members:an
   if(!validContractSalary(baseSalary))fail('حقوق پایه را به ریال صحیح و مثبت وارد کنید.');
   if(typeof salaryBasis!=='string'||!Object.hasOwn(contractSalaryBases,salaryBasis))fail('مبنای محاسبه حقوق پایه را انتخاب کنید.');
   const previousId=stxt(value('previousId')||'',200);
+  if(editing){
+   if(previousId!==(previous.previousId||''))fail('ارتباط تمدید قرارداد قابل تعویض نیست.',409);
+   const rangeStart=start<previous.start?start:previous.start,rangeEnd=end>previous.end?end:previous.end;
+   const overlaps=(from:string,to:string)=>from<=rangeEnd&&to>=rangeStart;
+   if(rows.some(r=>r.type==='hr_period'&&r.data.state!=='draft'&&r.data.memberIds?.includes(memberId)&&overlaps(r.data.start,r.data.end)&&(!r.data.payrollV2||!!r.data.work?.[memberId])))fail('کارکرد این بازه قفل شده است؛ بازگشایی مجاز یا اصلاح مزد در دوره باز لازم است.',409);
+   if(rows.some(r=>{
+    if(r.type!=='hr_payroll'||r.data.memberId!==memberId||r.data.state==='cancelled')return false;
+    if(r.data.contracts?.some((c:any)=>c.id===old.id))return true;
+    const period=rows.find(p=>p.type==='hr_period'&&p.id===r.data.periodId);
+    return !period||overlaps(period.data.start,period.data.end);
+   }))fail('این قرارداد مبنای فیش محاسبه‌شده است؛ سابقه آن قابل بازنویسی نیست. اصلاح مزد را از مسیر حقوق در دوره باز ثبت کنید.',409);
+   if(rows.some(r=>r.type==='hr_ruling'&&r.data.contractId===old.id&&r.data.state!=='cancelled'))fail('این قرارداد سابقه اصلاح مزد دارد؛ تغییر مزد را از مسیر اصلاح مزد قرارداد ثبت کنید.',409);
+  }
   const others=rows.filter(r=>r.type==='hr_contract'&&r.id!==id&&r.id!==previousId&&r.data.memberId===memberId&&['active','renewed'].includes(r.data.state));
   if(others.some(r=>r.data.start<=end&&(r.data.end||'9999-12-31')>=start))fail('قرارداد نهایی‌شده دیگری با این بازه هم‌پوشانی دارد.',409);
   const changes:any[]=[];
-  if(previousId){const prev=rows.find(r=>r.id===previousId&&r.type==='hr_contract');if(!prev||prev.data.memberId!==memberId||prev.data.state!=='active'||!prev.data.end||start!==addDay(prev.data.end,1))fail('تمدید باید از روز بعد از پایان قرارداد فعال قبلی شروع شود؛ قرارداد قبلی را تازه‌سازی کنید.',409);changes.push({...prev,data:{...prev.data,state:'renewed',renewedBy:id}});}
+  if(previousId){const prev=rows.find(r=>r.id===previousId&&r.type==='hr_contract');if(!prev||prev.data.memberId!==memberId||prev.data.state!==(editing?'renewed':'active')||editing&&prev.data.renewedBy!==id||!prev.data.end||start!==addDay(prev.data.end,1))fail('تمدید باید از روز بعد از پایان قرارداد قبلی شروع شود؛ قرارداد قبلی را تازه‌سازی کنید.',409);if(!editing)changes.push({...prev,data:{...prev.data,state:'renewed',renewedBy:id}});}
   const signedFileIds=[...new Set([...(Array.isArray(previous.signedFileIds)?previous.signedFileIds:[]),...rows.filter(r=>r.type==='hr_file'&&r.data.caseId===id&&r.data.category==='signed_contract').map(r=>r.id)])];
-  changes.push({id,type:'hr_contract',revision:old?.revision||0,data:{...previous,memberId,title:'قرارداد پرسنلی',contractKind:'fixed',start,end,previousId,text:stxt(value('text')||'',12000),baseSalary:BigInt(baseSalary).toString(),salaryBasis,salaryCurrency:'IRR',registrationBasis:'physical_signed_contract',...contractPayrollFacts(b,previous,start,end),state:'active',finalizedAt:now,signedFileIds}});return changes;
+  changes.push({id,type:'hr_contract',revision:old?.revision||0,data:{...previous,memberId,title:'قرارداد پرسنلی',contractKind:'fixed',start,end,previousId,text:stxt(value('text')||'',12000),baseSalary:BigInt(baseSalary).toString(),salaryBasis,salaryCurrency:'IRR',registrationBasis:'physical_signed_contract',...contractPayrollFacts(b,previous,start,end),state:'active',finalizedAt:editing?previous.finalizedAt:now,...(editing?{editedAt:now}:{}),signedFileIds}});return changes;
  }
  if(!old||old.type!=='hr_contract')fail('قرارداد یافت نشد.',404);
  const d=old.data;

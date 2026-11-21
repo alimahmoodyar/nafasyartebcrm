@@ -1737,7 +1737,7 @@ toolOptions["staff_mission_apply"]={...toolOptions["staff_mission_apply"],
 "status":{...toolOptions["staff_mission_apply"]?.["status"],"received":"موقعیت دریافت شد","denied":"اجازه موقعیت‌یابی داده نشده","timeout":"مهلت دریافت موقعیت تمام شد","unavailable":"موقعیت در دسترس نیست"},
 };
 toolOptions["personnel_apply"]={...toolOptions["personnel_apply"],
-"mode":{...toolOptions["personnel_apply"]?.["mode"],"file_approve":"تأیید مدرک","file_reject":"رد مدرک با علت","family_start":"ثبت درخواست تغییر خانوادگی","family_submit":"ارسال تغییر خانوادگی برای بررسی","family_approve":"تأیید تغییر خانوادگی","family_reject":"رد تغییر خانوادگی با علت","personnel_create":"تشکیل پرونده پرسنلی","personnel_complete":"تأیید اطلاعات پرونده پرسنلی","contract_save":"ثبت قرارداد پرسنلی","contract_finalize":"نهایی‌کردن قرارداد","contract_close":"بستن قرارداد با علت"},
+"mode":{...toolOptions["personnel_apply"]?.["mode"],"file_approve":"تأیید مدرک","file_reject":"رد مدرک با علت","family_start":"ثبت درخواست تغییر خانوادگی","family_submit":"ارسال تغییر خانوادگی برای بررسی","family_approve":"تأیید تغییر خانوادگی","family_reject":"رد تغییر خانوادگی با علت","personnel_create":"تشکیل پرونده پرسنلی","personnel_complete":"تأیید اطلاعات پرونده پرسنلی","contract_save":"ثبت قرارداد پرسنلی","contract_finalize":"نهایی‌کردن قرارداد","contract_edit":"ویرایش قرارداد فعال با دلیل","contract_close":"بستن قرارداد با علت"},
 "familyEvent":{...toolOptions["personnel_apply"]?.["familyEvent"],"birth":"تولد فرزند","marriage":"ازدواج","divorce":"جدایی از همسر"},
 "maritalStatus":{...toolOptions["personnel_apply"]?.["maritalStatus"],"single":"مجرد","married":"متأهل"},
 "contractKind":{...toolOptions["personnel_apply"]?.["contractKind"],"fixed":"مدت‌دار"},

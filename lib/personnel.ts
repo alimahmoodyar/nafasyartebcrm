@@ -116,7 +116,7 @@ export async function applyPersonnel(u:Session,b:any){
  const isType=(t:string)=>{if(!old||type!==t)hrFail('نوع پرونده معتبر نیست.')};
  const independent=()=>{if(d.memberId===a.id||d.createdBy===u.userId)hrFail('تهیه‌کننده یا صاحب پرونده نمی‌تواند تأییدکننده باشد.',403)};
  const put=(r:any,data:any)=>changes.push({...r,data});
- const history=(prev:any,data:any)=>{if((prev?.history||[]).length>=500)hrFail('سقف تاریخچه پرونده پر شده است؛ پرونده جایگزین بسازید.');return ({...data,history:[...(prev?.history||[]),{at:now,actor:u.userId,name:u.name,mode,notes:note,state:data.state,...(['employee','contract_save','contract_finalize'].includes(mode)&&prev?{previous:{...prev,history:undefined}}:{})}]});};
+ const history=(prev:any,data:any)=>{if((prev?.history||[]).length>=500)hrFail('سقف تاریخچه پرونده پر شده است؛ پرونده جایگزین بسازید.');return ({...data,history:[...(prev?.history||[]),{at:now,actor:u.userId,name:u.name,mode,notes:note,state:data.state,...(['employee','contract_save','contract_finalize','contract_edit'].includes(mode)&&prev?{previous:{...prev,history:undefined}}:{})}]});};
  if(mode==='pay'&&old?.data.engine==='contract-v2')hrFail('پرداخت این فیش باید از گزارش موفق بانک تطبیق داده شود؛ قالب بانک هنوز پیکربندی نشده است.',409);
  if((payrollModes as readonly string[]).includes(mode)||mode==='approve_payroll'&&old?.data.engine==='contract-v2'){
   const period=old?.type==='hr_period'?old:rows.find(r=>r.id===old?.data.periodId&&r.type==='hr_period');
@@ -131,7 +131,7 @@ export async function applyPersonnel(u:Session,b:any){
  }
  if(mode==='file_approve'||mode==='file_reject'){const next=reviewPersonnelFile(b,old,rows,a,now);next.data=history(old?.data,next.data);await commitHr(u,b.id,signature,rows,members,[next],mode);return {saved:true,id:next.id};}
  if((familyModes as readonly string[]).includes(mode)){const next=familyChanges(b,old,rows,a,now).map(r=>({...r,data:history(rows.find(x=>x.id===r.id)?.data,r.data)}));await commitHr(u,b.id,signature,rows,members,next,mode);return {saved:true,id:next.at(-1)!.id};}
- if((employmentModes as readonly string[]).includes(mode)){role('hr');const next=employmentChanges(b,old,rows,now,members,old&&members.some(m=>m.id===old.data.memberId)?(await memberContactsForAccounts([old.data.memberId]))[0].mobile:'').map(r=>({...r,data:history(rows.find(x=>x.id===r.id)?.data,{...r.data,...(r.type==='hr_contract'&&r.id===id&&r.data.state==='active'?{finalizedBy:u.userId}:{}),...(!r.revision?{createdBy:u.userId,createdAt:now}:{})})}));
+ if((employmentModes as readonly string[]).includes(mode)){role('hr');const next=employmentChanges(b,old,rows,now,members,old&&members.some(m=>m.id===old.data.memberId)?(await memberContactsForAccounts([old.data.memberId]))[0].mobile:'').map(r=>({...r,data:history(rows.find(x=>x.id===r.id)?.data,{...r.data,...(r.type==='hr_contract'&&r.id===id&&r.data.state==='active'&&mode!=='contract_edit'?{finalizedBy:u.userId}:{}),...(mode==='contract_edit'?{editedBy:u.userId}:{}),...(!r.revision?{createdBy:u.userId,createdAt:now}:{})})}));
  const provision=mode==='personnel_complete'?await approvedStaffAccount(next.at(-1),members,u,b.id,now):null;
  if(provision)next[next.length-1]={...next.at(-1)!,data:{...next.at(-1)!.data,accountProvisioning:provision.summary}};
  await commitHr(u,b.id,signature,rows,members,next,mode,provision?.statements||[]);return {saved:true,id:next.at(-1)!.id,memberId:next.at(-1)!.data.memberId,...(provision?{accountProvisioning:provision.summary}:{})};}
