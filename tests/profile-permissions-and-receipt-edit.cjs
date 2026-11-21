@@ -33,6 +33,10 @@ entity('scope-buyer-b','sales_agent',{name:'Buyer B',kind:'representative',activ
 entity('scope-inactive','sales_agent',{name:'Inactive',kind:'representative',active:false});
 for(const profile of profiles.roleProfiles){
  cookieValues[review.profileReviewCookie]=profile.id+(profile.id==='sales-representative'?'~scope-buyer-a':'');const actual=await ctx.run(admin,()=>auth.session());assert.equal(actual.userId,admin.userId);assert.equal(actual.name,admin.name);assert.equal(actual.isAdmin,false,profile.id);assert.equal(actual.profileReview.id,profile.id);assert.ok(!actual.permissions.flowRoles?.includes('qc')||profile.id==='quality',profile.id);assert.ok(!actual.permissions.supplyRoles?.includes('finance')||profile.id==='finance-director',profile.id);await assert.rejects(()=>ctx.run(admin,()=>auth.requireAdmin()),e=>e.status===403);await assert.rejects(()=>ctx.run(admin,()=>auth.requireRealAdmin()),e=>e.status===403);
+ {
+  const detail=await ctx.run(admin,()=>profileApi.GET(request('/api/role-profiles?profile='+profile.id)));
+  assert.equal(detail.status,200,profile.id);const body=await detail.json();assert.equal(body.activeProfile,profile.id);assert.equal(body.profile.id,profile.id);assert.ok(Array.isArray(body.work));
+ }
  const roleResponse=await ctx.run(admin,()=>flow.GET());assert.equal(roleResponse.status,['central-store','line-store','line-manager','quality','technical','domestic','foreign'].includes(profile.id)?200:403,profile.id+' API role scope');
  if(!profile.operational){assert.equal(actual.permissions.read.length,0);assert.equal(actual.permissions.write.length,0);assert.equal(navigation.canOpenSection(actual,'flow'),false);}
 }

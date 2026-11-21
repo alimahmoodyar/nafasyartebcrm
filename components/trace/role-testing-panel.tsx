@@ -12,6 +12,13 @@ import type {RoleProfile,ProfileWork} from '@/lib/role-profiles';
 
 const roleSearchText=(s:string)=>s.normalize('NFKC').replace(/[يى]/g,'ی').replace(/ك/g,'ک').replace(/[\u064B-\u065F\u0670\u0640\u200c\u200d\s]/g,'').toLocaleLowerCase();
 type Snapshot={activeProfile?:string;profile:RoleProfile;work:ProfileWork[];workHasMore?:boolean;unverified:string[];personalPreview:boolean;buyerId?:string;buyerChoices?:{id:string;name:string}[];sample?:boolean};
+async function readProfileResponse(response:Response){
+ try{
+  const data:unknown=await response.json();
+  if(data && typeof data==='object' && !Array.isArray(data))return data;
+ }catch{}
+ throw new Error('پاسخ کامل پروفایل از سرور دریافت نشد. صفحه را تازه کنید. (کد '+response.status+')');
+}
 function BatchLookup(){
  const [open,setOpen]=useState(false),[value,setValue]=useState(''),[error,setError]=useState('');
  const input=useRef<HTMLTextAreaElement>(null);
@@ -45,7 +52,7 @@ export function RoleTestingPanel({targetId='',onNavigate,onProfile,onAccessChang
  const selection=useRef(false);const id=targetId;
  useEffect(()=>{let live=true;setLoading(true);setError('');setSnapshot(null);
   fetch('/api/role-profiles'+(id?'?profile='+encodeURIComponent(id):''),{cache:'no-store'}).then(async r=>{
-   const d=await r.json() as Snapshot&{profiles?:RoleProfile[];error?:string};
+   const d=await readProfileResponse(r) as Snapshot&{profiles?:RoleProfile[];error?:string};
    if(!r.ok)throw Error(d.error||'دریافت پروفایل انجام نشد.');
    if(!live)return;
    if(!id){
@@ -61,10 +68,10 @@ export function RoleTestingPanel({targetId='',onNavigate,onProfile,onAccessChang
    setSnapshot(d);onProfile({id:d.profile.id,title:d.profile.title});
   }).catch(e=>{if(live)setError(e instanceof Error?e.message:'دریافت انجام نشد.')}).finally(()=>{if(live)setLoading(false)});return()=>{live=false};
  },[id]);
- async function select(p:RoleProfile|null,buyerId=''){if(selection.current)return false;selection.current=true;setLoading(true);setError('');try{const r=await fetch('/api/role-profiles',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:crypto.randomUUID(),mode:p?'select_profile':'exit_profile',profileId:p?.id,buyerId,confirmed:true})});const d=await r.json() as any;if(!r.ok)throw Error(d.error);setChoosing(null);setBuyer('');onProfile(p?{id:p.id,title:p.title}:null);onNavigate('role-testing',p?.id||'');await onAccessChanged?.();if(p&&id===p.id){const fresh=await fetch('/api/role-profiles?profile='+encodeURIComponent(id),{cache:'no-store'});const next=await fresh.json() as Snapshot&{error?:string};if(!fresh.ok)throw Error(next.error);setSnapshot(next);}return true;}catch(e){setError((e as Error).message);return false;}finally{selection.current=false;setLoading(false)}}async function open(p:RoleProfile,chooseScope=false){
+ async function select(p:RoleProfile|null,buyerId=''){if(selection.current)return false;selection.current=true;setLoading(true);setError('');try{const r=await fetch('/api/role-profiles',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:crypto.randomUUID(),mode:p?'select_profile':'exit_profile',profileId:p?.id,buyerId,confirmed:true})});const d=await readProfileResponse(r) as any;if(!r.ok)throw Error(d.error);setChoosing(null);setBuyer('');onProfile(p?{id:p.id,title:p.title}:null);onNavigate('role-testing',p?.id||'');await onAccessChanged?.();if(p&&id===p.id){const fresh=await fetch('/api/role-profiles?profile='+encodeURIComponent(id),{cache:'no-store'});const next=await readProfileResponse(fresh) as Snapshot&{error?:string};if(!fresh.ok)throw Error(next.error);setSnapshot(next);}return true;}catch(e){setError((e as Error).message);return false;}finally{selection.current=false;setLoading(false)}}async function open(p:RoleProfile,chooseScope=false){
   if(!chooseScope){void select(p);return;}
   setChoosing(p);setChoices([]);setBuyer('');setError('');setLoading(true);
-  try{const r=await fetch('/api/role-profiles?profile='+encodeURIComponent(p.id),{cache:'no-store'}),d=await r.json() as Snapshot&{error?:string};if(!r.ok)throw Error(d.error);setChoices(d.buyerChoices||[]);}
+  try{const r=await fetch('/api/role-profiles?profile='+encodeURIComponent(p.id),{cache:'no-store'}),d=await readProfileResponse(r) as Snapshot&{error?:string};if(!r.ok)throw Error(d.error);setChoices(d.buyerChoices||[]);}
   catch(error){setError((error as Error).message);}finally{setLoading(false);}
  }
  const searchWords=query.trim().split(/\s+/).map(roleSearchText).filter(Boolean),filteredProfiles=profiles.filter(p=>{const text=roleSearchText(p.title+' '+p.group);return searchWords.every(word=>text.includes(word));});

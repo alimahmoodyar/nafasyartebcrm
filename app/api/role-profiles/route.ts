@@ -1,3 +1,5 @@
+import {mcpActor} from '@/lib/mcp/context';
+import {staffMissionProfileWork} from '@/lib/staff-mission-tasks';
 import {runServiceRolePreview,serviceRolePreview} from '@/lib/service-role-preview';
 import {runRepresentativeSample} from '@/lib/representative-sample';
 import {profileWork} from '@/lib/profile-work';
@@ -28,7 +30,14 @@ export async function GET(request:Request){try{
   return json({profile:visibleProfile(profile),work,activeProfile:active?.id||'',buyerChoices:await profileScopeChoices(profile.id),sample:true,unverified:[],personalPreview:false});
  }
  const previewPosition=profileSession(admin,profile.id,[],buyerId);
- if(serviceRolePreview(previewPosition))return runServiceRolePreview(previewPosition,async position=>json({profile:visibleProfile(profile),work:(await profileWork(position)).work,activeProfile:active?.id||'',buyerId:position.profileReview?.buyerId||'',buyerChoices:[],unverified:[],personalPreview:false,sharedApplicationData:true}));
+ if(serviceRolePreview(previewPosition)){
+  return await runServiceRolePreview(previewPosition,async position=>{
+   // Mission preview verifies the administrator separately from the role whose queue it reads.
+   const missions=await mcpActor.run(admin,()=>staffMissionProfileWork(position));
+   const {work,workHasMore}=await profileWork(position,missions);
+   return json({profile:visibleProfile(profile),work,workHasMore:!!workHasMore,activeProfile:active?.id||'',buyerId:position.profileReview?.buyerId||'',buyerChoices:[],unverified:[],personalPreview:false,sharedApplicationData:true});
+  });
+ }
  const templateSync=await syncReceiptTemplates(admin);if(templateSync.needsTaskSync)await syncMaterialTasks();await syncInventoryCounts();
  const buyerChoices=await profileScopeChoices(profile.id);
  const position=profileSession(admin,profile.id,(await storage().prepare("SELECT id,data FROM flow_entities WHERE type='material_warehouse'").all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)})),buyerId);
