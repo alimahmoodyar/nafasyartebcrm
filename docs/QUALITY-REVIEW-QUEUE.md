@@ -1,3 +1,7 @@
+## 2026-11-21 — Warehouse compact presentation pilot
+
+Scoped warehouse appearance only. Existing receipt, movement, QC/placement, stock grouping and permission tests passed. No domain/API/MCP or persistence changes. Desktop/mobile fixture rendering and source parity recorded externally. Pre-existing warehouse-profile-roles test needs its fixture updated for the approved HR dossier requirement; same failure reproduced on the unchanged baseline. See quality-reviews/2026-11-21-warehouse-compact-pilot.md. Owner acceptance of this warehouse-only pilot precedes any rollout to other roles.
+
 ## 2026-11-21 — استقرار اداری و اعلام اموال
 
 مسیرهای مصوب در docs/process-design/ONBOARDING-ASSETS.fa.md و شواهد آزمون در docs/quality-reviews/2026-11-21-onboarding-assets.md ثبت شد. آزمون‌های مستقل نقش، تراکنش، پرونده/حساب، اموال و دوربین/فرم اجرا می‌شوند؛ نتیجه نهایی و شناسه‌های دقیق انتشار در گزارش خارجی. تست فیزیکی دوربین/چاپگر و پذیرش کاربران دفتر با مالک باقی است؛ داده واقعی ایجاد/ریست نشده و قاعده جدیدی برای دسترسی شغلی یا حقوق اعمال نشده است.

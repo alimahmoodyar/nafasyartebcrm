@@ -1,0 +1,16 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path'),ts=require('typescript');
+const root=path.resolve(__dirname,'..'),exports_={};
+vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(root,'components/trace/warehouse-presentation.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:exports_});
+const appearance=exports_.warehouseCompactAppearance;
+const user={userId:'warehouse-user',isAdmin:false,permissions:{read:[],write:[],eventStages:[],flowRoles:['inventory']}};
+const snapshot=JSON.stringify(user);
+for(const section of ['home','warehouse','tasks','flow','routine-production'])assert.equal(appearance(user,section),true);
+assert.equal(JSON.stringify(user),snapshot,'Presentation cannot mutate grants or account identity');
+for(const id of ['central-store','line-store'])assert.equal(appearance({...user,isAdmin:true,profileReview:{id}},'role-testing'),true);
+for(const id of ['quality','technical','ceo','custodian','sales','personnel-hr','line-manager'])assert.equal(appearance({...user,isAdmin:true,profileReview:{id}},'warehouse'),false,'Administrator preview must follow the selected persona: '+id);
+for(const role of ['inventory','warehouse_supervisor','production_store_assistant'])assert.equal(appearance({...user,permissions:{...user.permissions,flowRoles:[],roleAssignment:{roles:[role]}}},'tasks'),true);
+for(const flowRoles of [[],['qc'],['production'],['logistics']])assert.equal(appearance({...user,permissions:{...user.permissions,flowRoles}},'warehouse'),false);
+assert.equal(appearance({...user,isAdmin:true},'warehouse'),true);
+assert.equal(appearance({...user,isAdmin:true},'sales'),false);
+assert.equal(appearance({...user,isAdmin:true},'home'),false);
+console.log('PASS warehouse presentation scope: assigned warehouse personnel, selected test persona, administrator warehouse-only, other-role isolation and immutable grants.');

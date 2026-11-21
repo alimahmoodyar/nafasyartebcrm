@@ -1,0 +1,125 @@
+/* Warehouse-only presentation pilot. Screen rules never change printed labels.
+ * Dialogs use a portal; :has scopes those panels to the current visual persona.
+ * Keep DOM order, hidden/disabled states, validation and business handlers intact.
+ */
+@media screen {
+  .workspace-body.warehouse-compact-pilot {
+    --warehouse-surface: #fff;
+    --warehouse-background: #f5f7fa;
+    --warehouse-text: #24324a;
+    --warehouse-muted: #617086;
+    --warehouse-line: #dfe6ee;
+    --warehouse-soft: #f0f3f8;
+    --warehouse-brand: #434c94;
+    --warehouse-action: #167449;
+    --warehouse-radius: 10px;
+    background: var(--warehouse-background);
+    color: var(--warehouse-text);
+  }
+  .workspace-body.warehouse-compact-pilot .workspace-topbar { min-height:60px; padding:10px 22px; gap:12px; box-shadow:none; }
+  .workspace-body.warehouse-compact-pilot .workspace-breadcrumb { font-size:14px; gap:8px; }
+  .workspace-body.warehouse-compact-pilot > main.shell { padding:18px 22px 28px; }
+  .workspace-body.warehouse-compact-pilot .heading { margin:0 0 14px; gap:12px; }
+  .workspace-body.warehouse-compact-pilot .heading h1 { font-size:22px; letter-spacing:0; }
+  .workspace-body.warehouse-compact-pilot .panel { border-radius:10px; border-color:#dfe6ee; background:#fff; box-shadow:none; }
+  .workspace-body.warehouse-compact-pilot .panelhead { padding:14px 18px; gap:12px; }
+  .workspace-body.warehouse-compact-pilot .panelhead h2 { font-size:18px; }
+  .workspace-body.warehouse-compact-pilot .inside { padding:16px 18px; }
+  .workspace-body.warehouse-compact-pilot .panel .panel { box-shadow:none; }
+  .workspace-body.warehouse-compact-pilot .warehouse-page-path { margin:0 0 12px; font-size:14px; }
+  .workspace-body.warehouse-compact-pilot .warehouse-page-path ol { padding:0; gap:8px; }
+  /* One breadcrumb remains in the application header; no repeated route below. */
+  .workspace-body.warehouse-compact-pilot .workspace-topbar ~ main .warehouse-page-path { display:none; }
+  .workspace-body.warehouse-compact-pilot .personal-home { padding:0; }
+  .workspace-body.warehouse-compact-pilot .personal-home-header { margin-bottom:14px; gap:12px; align-items:center; }
+  .workspace-body.warehouse-compact-pilot .personal-home-header h2 { font-size:22px; }
+  .workspace-body.warehouse-compact-pilot .personal-home h3 { font-size:14px; margin:16px 0 10px; }
+  .workspace-body.warehouse-compact-pilot .personal-app-grid { grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:10px; }
+  .workspace-body.warehouse-compact-pilot .personal-app { border:0; padding:0; min-width:0; }
+  .workspace-body.warehouse-compact-pilot .personal-app-open { display:flex; flex-direction:row; align-items:center; justify-content:flex-start; gap:10px; min-height:68px; width:100%; padding:12px 14px; background:#fff; border:1px solid #dfe6ee; border-radius:10px; text-align:right; box-shadow:none; }
+  .workspace-body.warehouse-compact-pilot .personal-app-open:hover { background:#f0f3f8; border-color:#abb8cb; transform:none; box-shadow:none; }
+  .workspace-body.warehouse-compact-pilot .personal-app-icon { width:34px; height:34px; min-width:34px; padding:7px; margin:0; border-radius:8px; background:#f0f3f8; color:#434c94; box-shadow:none; }
+  .workspace-body.warehouse-compact-pilot .personal-app-icon svg { width:20px; height:20px; }
+  .workspace-body.warehouse-compact-pilot .personal-app-open strong { font-size:14px; line-height:1.7; font-weight:600; }
+  .workspace-body.warehouse-compact-pilot .personal-home-search { max-width:none; margin-bottom:16px; padding:0 12px; min-height:40px; border-radius:10px; background:#fff; }
+  .workspace-body.warehouse-compact-pilot .personal-home-search input { padding:8px 0; font-size:16px; }
+  .workspace-body.warehouse-compact-pilot .personal-other-title { margin-top:20px; }
+
+  /* Shared control sizes for inline forms and portal-based dialogs. */
+  :is(.workspace-body.warehouse-compact-pilot, body:has(.workspace-body.warehouse-compact-pilot) .modal) .btn {
+    min-height:40px; padding:7px 12px; border-radius:10px;
+    font-size:14px; line-height:1.6; gap:7px; box-shadow:none;
+  }
+  :is(.workspace-body.warehouse-compact-pilot, body:has(.workspace-body.warehouse-compact-pilot) .modal) .btn svg { width:17px; height:17px; flex-shrink:0; }
+  :is(.workspace-body.warehouse-compact-pilot, body:has(.workspace-body.warehouse-compact-pilot) .modal) .btn.primary { background:#167449; border-color:#167449; color:#fff; box-shadow:none; }
+  :is(.workspace-body.warehouse-compact-pilot, body:has(.workspace-body.warehouse-compact-pilot) .modal) .btn.primary:hover { background:#105c39; }
+  /* Selected navigation is subtle; green continues to identify submit actions. */
+  :is(.workspace-body.warehouse-compact-pilot, body:has(.workspace-body.warehouse-compact-pilot) .modal) :is(nav.tools,.tools[role="group"],.flow-tabs) .btn.primary,
+  :is(.workspace-body.warehouse-compact-pilot, body:has(.workspace-body.warehouse-compact-pilot) .modal) .btn[aria-pressed="true"] {
+    background:#eef1fa; color:#3c4787; border-color:#aab5d1; box-shadow:none;
+  }
+  :is(.workspace-body.warehouse-compact-pilot, body:has(.workspace-body.warehouse-compact-pilot) .modal) .tools { gap:8px; flex-wrap:wrap; margin-block:10px; }
+  :is(.workspace-body.warehouse-compact-pilot, body:has(.workspace-body.warehouse-compact-pilot) .modal) .formgrid { gap:14px 16px; padding:0; align-items:start; }
+  :is(.workspace-body.warehouse-compact-pilot, body:has(.workspace-body.warehouse-compact-pilot) .modal) .field { margin:0; gap:6px; min-width:0; font-size:14px; line-height:1.7; }
+  :is(.workspace-body.warehouse-compact-pilot, body:has(.workspace-body.warehouse-compact-pilot) .modal) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]):not([type="range"]):not([type="color"]),select,textarea) {
+    box-sizing:border-box; min-width:0; max-width:100%; font-size:16px;
+    border:1px solid #cfd8e4; border-radius:10px; background:#fff; color:#24324a;
+    padding:8px 10px; line-height:1.5;
+  }
+  :is(.workspace-body.warehouse-compact-pilot, body:has(.workspace-body.warehouse-compact-pilot) .modal) :is(.field,.warehouse-stock__filters) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]):not([type="range"]):not([type="color"]),select),
+  :is(.workspace-body.warehouse-compact-pilot, body:has(.workspace-body.warehouse-compact-pilot) .modal) .solar-date select { height:40px; min-height:40px; width:100%; }
+  :is(.workspace-body.warehouse-compact-pilot, body:has(.workspace-body.warehouse-compact-pilot) .modal) textarea { min-height:80px; resize:vertical; }
+  :is(.workspace-body.warehouse-compact-pilot, body:has(.workspace-body.warehouse-compact-pilot) .modal) :is(input[type="checkbox"],input[type="radio"]) { width:18px; height:18px; min-height:0; flex-shrink:0; accent-color:#167449; }
+  :is(.workspace-body.warehouse-compact-pilot, body:has(.workspace-body.warehouse-compact-pilot) .modal) :is(.flow-check,.llm-check,.inline-check) { display:flex; align-items:center; gap:8px; font-size:14px; }
+  :is(.workspace-body.warehouse-compact-pilot, body:has(.workspace-body.warehouse-compact-pilot) .modal) .field:has(>input[type="checkbox"]) { display:flex; flex-direction:row; align-items:center; gap:8px; }
+  :is(.workspace-body.warehouse-compact-pilot, body:has(.workspace-body.warehouse-compact-pilot) .modal) .solar-date { min-width:0; padding:0; border:0; margin:0; gap:6px; }
+  :is(.workspace-body.warehouse-compact-pilot, body:has(.workspace-body.warehouse-compact-pilot) .modal) .solar-date legend { font-size:14px; padding:0; margin-bottom:6px; }
+  :is(.workspace-body.warehouse-compact-pilot, body:has(.workspace-body.warehouse-compact-pilot) .modal) [data-slot="select-trigger"] { width:100%; min-width:0; height:40px; min-height:40px; border:1px solid #cfd8e4; border-radius:10px; background:#fff; color:#24324a; box-shadow:none; }
+  :is(.workspace-body.warehouse-compact-pilot, body:has(.workspace-body.warehouse-compact-pilot) .modal) .notice { display:block; padding:10px 12px; border-radius:10px; font-size:14px; margin-block:12px; line-height:1.8; }
+  :is(.workspace-body.warehouse-compact-pilot, body:has(.workspace-body.warehouse-compact-pilot) .modal) :is(.flow-card,.production-order) { padding:14px; gap:10px; margin-block:12px; border-radius:10px; box-shadow:none; }
+  :is(.workspace-body.warehouse-compact-pilot, body:has(.workspace-body.warehouse-compact-pilot) .modal) :is(.flow-card h3,.production-order h3) { font-size:16px; }
+  :is(.workspace-body.warehouse-compact-pilot, body:has(.workspace-body.warehouse-compact-pilot) .modal) .subtle { font-size:14px; line-height:1.8; }
+  :is(.workspace-body.warehouse-compact-pilot, body:has(.workspace-body.warehouse-compact-pilot) .modal) .kv { border-radius:8px; padding:10px 12px; }
+  :is(.workspace-body.warehouse-compact-pilot, body:has(.workspace-body.warehouse-compact-pilot) .modal) :is(.flow-table,.stocktable) :is(th,td) { padding:10px 12px; font-size:14px; line-height:1.7; }
+  :is(.workspace-body.warehouse-compact-pilot, body:has(.workspace-body.warehouse-compact-pilot) .modal) .tablecell { padding:10px 12px!important; font-size:14px; }
+
+  /* Current stock grouping, totals, disclosure and rejection columns are retained. */
+  .workspace-body.warehouse-compact-pilot .warehouse-stock__filters { gap:12px; }
+  .workspace-body.warehouse-compact-pilot .warehouse-stock__filters .field { gap:6px; }
+  .workspace-body.warehouse-compact-pilot .warehouse-stock__toolbar { margin:12px 0; }
+  .workspace-body.warehouse-compact-pilot .warehouse-stock__scroll { border-radius:10px; }
+  .workspace-body.warehouse-compact-pilot .warehouse-stock .warehouse-stock__table :is(th,td) { padding:10px 12px; }
+  .workspace-body.warehouse-compact-pilot .warehouse-stock .warehouse-stock__table th { height:48px; background:#f0f3f8; font-size:14px; }
+  .workspace-body.warehouse-compact-pilot .warehouse-stock__number { font-size:15px; font-variant-numeric:tabular-nums; }
+  .workspace-body.warehouse-compact-pilot .warehouse-stock__code { margin-top:2px; }
+  .workspace-body.warehouse-compact-pilot .warehouse-stock__actions { gap:6px; }
+  .workspace-body.warehouse-compact-pilot .warehouse-stock__action { min-height:36px; padding:6px 9px; font-size:13px; }
+  .workspace-body.warehouse-compact-pilot .warehouse-stock__detail-heading { padding:10px 12px; }
+  .workspace-body.warehouse-compact-pilot .warehouse-stock__note { margin-top:10px; font-size:13px; }
+  /* Scoped portal panels keep their original size limits, focus and busy guards. */
+  body:has(.workspace-body.warehouse-compact-pilot) .modal { background:#fff; border:1px solid #dfe6ee; border-radius:12px; padding:20px; gap:14px; box-shadow:0 18px 60px #17243a26; }
+  body:has(.workspace-body.warehouse-compact-pilot) .modal [data-slot="dialog-title"] { padding-inline-end:30px; font-size:19px; line-height:1.7; }
+  body:has(.workspace-body.warehouse-compact-pilot) .modal [data-slot="dialog-description"] { font-size:14px; line-height:1.8; color:#617086; }
+  body:has(.workspace-body.warehouse-compact-pilot) .modal [data-slot="dialog-close"] { width:32px; height:32px; display:grid; place-items:center; top:12px; right:12px; }
+  body:has(.workspace-body.warehouse-compact-pilot) .modal form > .tools:last-child { justify-content:flex-end; border-top:1px solid #e0e6ee; padding-top:12px; margin-top:16px; }
+
+  @media(max-width:700px) {
+    .workspace-body.warehouse-compact-pilot .workspace-topbar { padding:10px 14px; gap:8px; }
+    .workspace-body.warehouse-compact-pilot > main.shell { padding:14px 12px 24px; }
+    .workspace-body.warehouse-compact-pilot .panelhead,.workspace-body.warehouse-compact-pilot .inside { padding:14px; }
+    .workspace-body.warehouse-compact-pilot .personal-app-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+    .workspace-body.warehouse-compact-pilot .personal-app-open { padding:10px; gap:8px; min-height:66px; }
+    .workspace-body.warehouse-compact-pilot .personal-app-icon { width:30px; height:30px; min-width:30px; padding:6px; }
+    .workspace-body.warehouse-compact-pilot .personal-app-open strong { font-size:14px; }
+    :is(.workspace-body.warehouse-compact-pilot, body:has(.workspace-body.warehouse-compact-pilot) .modal) .formgrid { grid-template-columns:minmax(0,1fr); gap:12px; }
+    body:has(.workspace-body.warehouse-compact-pilot) .modal { padding:16px; gap:12px; }
+  }
+  @media(max-width:380px) { .workspace-body.warehouse-compact-pilot .personal-app-grid { grid-template-columns:minmax(0,1fr); } }
+  @media(pointer:coarse) {
+    :is(.workspace-body.warehouse-compact-pilot, body:has(.workspace-body.warehouse-compact-pilot) .modal) .btn,
+    :is(.workspace-body.warehouse-compact-pilot, body:has(.workspace-body.warehouse-compact-pilot) .modal) [data-slot="select-trigger"],
+    .workspace-body.warehouse-compact-pilot .warehouse-stock__action { min-height:44px; }
+    :is(.workspace-body.warehouse-compact-pilot, body:has(.workspace-body.warehouse-compact-pilot) .modal) .field :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),select),
+    :is(.workspace-body.warehouse-compact-pilot, body:has(.workspace-body.warehouse-compact-pilot) .modal) .solar-date select { min-height:44px!important; height:44px!important; }
+  }
+}
