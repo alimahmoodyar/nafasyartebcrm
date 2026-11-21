@@ -9,6 +9,7 @@ function load(name){
  vm.runInNewContext(source,{exports,require:n=>{
   if(n==='./storage')return {storage:()=>db};
   if(n==='./authorization')return {AccessError};
+  if(n==='./personnel-code-storage')return {ensurePersonnelCodes:async()=>{},projectPersonnelCodes:async rows=>rows}; // Numbering and real SQLite malformed-row behavior are covered by personnel-codes.cjs.
   if(['./personnel-contract','./persian-date','./personnel-profile','./permissions','./workflow-programs','./qms-contract'].includes(n))return load('lib/'+n.slice(2)+'.ts');
   return {};
  },Error,Date,Intl,BigInt,Array,Object,Set,Map,console},{filename});return exports;

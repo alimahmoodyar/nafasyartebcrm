@@ -26,7 +26,7 @@ export function employmentChanges(b:any,old:any,rows:any[],now:string,members:an
  if(b.mode==='personnel_create'){
   if(old)fail('برای شخص تازه، پرونده تازه بسازید.',409);
   const memberId='person:'+b.id,name=sreq(b.name,100),details=employeeDetails(b),mobile=contactPatch({mobile:b.mobile}).mobile;
-  const data={...payrollEmployeeFacts(b),memberId,name,code:'P-'+b.id.replace(/-/g,'').toUpperCase(),unit:'',title:'',location:sreq(b.location,200),employment:sreq(b.employment,100),managerId:stxt(b.managerId||'',200),start:sday(b.start),end:'',...details,mobile,bankAccount:personnelBankAccount(b.bankAccount,true),personal:stxt(b.personal||'',2000),leaveMinutes:0,state:'setup',productionEligible:false};
+  const data={...payrollEmployeeFacts(b),memberId,name,code:'',unit:'',title:'',location:sreq(b.location,200),employment:sreq(b.employment,100),managerId:stxt(b.managerId||'',200),start:sday(b.start),end:'',...details,mobile,bankAccount:personnelBankAccount(b.bankAccount,true),personal:stxt(b.personal||'',2000),leaveMinutes:0,state:'setup',productionEligible:false};
   requiredPersonnel(data,mobile);if(data.managerId&&(data.managerId===memberId||!members.some(m=>m.id===data.managerId&&m.status==='active')&&!rows.some(r=>r.type==='hr_employee'&&r.data.memberId===data.managerId&&r.data.state!=='disabled')))fail('مدیر مستقیم را از اشخاص ثبت‌شده انتخاب کنید.');
   if(rows.some(r=>r.type==='hr_employee'&&r.data.nationalId===data.nationalId))fail('برای این کد ملی پرونده پرسنلی وجود دارد.',409);
   return [{id:personnelProfileId(memberId),type:'hr_employee',revision:0,data}];

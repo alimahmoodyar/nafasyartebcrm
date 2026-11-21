@@ -26,7 +26,7 @@ const profile={mode:'employee',code:'A01',memberId:'alice',managerId:'manager',s
  const users=load('app/api/users/route.ts'),employment=load('lib/personnel-employment.ts'),taskSync=load('lib/personnel-tasks.ts');
  const rawPermissions=sql.prepare('SELECT permissions FROM app_members WHERE id=?').get('alice').permissions;
  const eid=await ok(hr,{...profile,code:undefined,leaveMinutes:undefined,notes:''});
- assert.match(row(eid).data.code,/^P-[A-F0-9]+$/);const code=row(eid).data.code;
+ assert.equal(row(eid).data.code,'1001');const code=row(eid).data.code;
  await success(hr,eid,'employee',{...profile,leaveMinutes:0,code:'CHANGED',nationalId:'۰۰۱۲۳۴۵۶۷۸',birthDate:'1990-01-01',address:'PRIVATE-ADDRESS',emergencyContact:'PRIVATE-EMERGENCY',notes:''});assert.equal(row(eid).data.code,code);
  const managerProjection=(await get(manager)).data;assert.ok(!JSON.stringify(managerProjection).includes('PRIVATE-ADDRESS'));assert.ok(!JSON.stringify(managerProjection).includes('PRIVATE-EMERGENCY'));
  assert.equal((await ctx.run(hr,()=>users.POST(req('/api/users',{id:crypto.randomUUID(),mode:'update',confirmed:true,memberId:'alice',permissions:{personnelRoles:['hr']}})))).status,403);
@@ -133,9 +133,9 @@ const profile={mode:'employee',code:'A01',memberId:'alice',managerId:'manager',s
  await catalog.executeTool('personnel_apply',{id:crypto.randomUUID(),confirmed:true,mode:'file_approve',recordId:mcpFile.id,revision:row(mcpFile.id).revision,notes:'Reviewed'},base,{...principal,user:hr});assert.equal(row(mcpFile.id).data.reviewState,'approved');
  await success(hr,createdPerson,'personnel_complete');assert.ok(row(createdPerson).data.identityCompleteAt);
 
- // Assignment is changed through its existing account handler. HR derives every current role on read, without snapshots or choosing a primary role.
+ // Legacy explicit assignments are seeded here; current profile assignment HTTP/MCP is covered by member-role-assignments.cjs. The deprecated account mutation must reject permission changes. HR derives every current role on read, without snapshots or choosing a primary role.
  const beforeRoles=JSON.stringify(row(createdPerson));
- async function assigned(roleIds){const member=sql.prepare('SELECT * FROM app_members WHERE id=?').get(person.data.memberId),permissions=roleIds.length?{read:[],write:[],eventStages:[],roleAssignment:{roles:roleIds}}:{read:[],write:[],eventStages:[]};const response=await ctx.run(admin,()=>users.PATCH(new Request(base+'/api/users',{method:'PATCH',headers:{origin:base,'Content-Type':'application/json'},body:JSON.stringify({id:member.id,revision:member.revision,name:member.name,status:member.status,permissions})})));assert.equal(response.status,200,await response.text());return (await get(hr)).data.records.find(r=>r.id===createdPerson).data;}
+ async function assigned(roleIds){const member=sql.prepare('SELECT * FROM app_members WHERE id=?').get(person.data.memberId),permissions=roleIds.length?{read:[],write:[],eventStages:[],roleAssignment:{roles:roleIds}}:{read:[],write:[],eventStages:[]};const response=await ctx.run(admin,()=>users.PATCH(new Request(base+'/api/users',{method:'PATCH',headers:{origin:base,'Content-Type':'application/json'},body:JSON.stringify({id:member.id,revision:member.revision,name:member.name,status:member.status,permissions})})));assert.equal(response.status,409,await response.text());sql.prepare('UPDATE app_members SET permissions=?,revision=revision+1 WHERE id=?').run(JSON.stringify(permissions),member.id);return (await get(hr)).data.records.find(r=>r.id===createdPerson).data;}
  const emptyPosition=(await get(hr)).data.records.find(r=>r.id===createdPerson).data;assert.equal(emptyPosition.unit,'');assert.equal(emptyPosition.title,'');
  let currentPosition=await assigned(['home_sales']);assert.equal(currentPosition.title,'کارشناس فروش خانگی');assert.equal(currentPosition.unit,'فروش');
  currentPosition=await assigned(['treasurer']);assert.equal(currentPosition.title,'خزانه‌دار');assert.equal(currentPosition.unit,'مالی','later assignments replace the live projection');

@@ -112,7 +112,7 @@ export const resetTables:Record<string,string>={
 };
 // Member contacts are preserved account identity data, keyed by app_members.id.
 // Existing 0016 generic flow_entities freeze protects their atomic writes; no new migration.
-export const resetFlowPreserved=['member_role_assignment','representative_identity','representative_identity_file','hospital_center','account_profile','member_contact','position','duty_template','duty_catalog_install','transport_migration','development_request','as_agent','sales_agent'];
+export const resetFlowPreserved=['personnel_code','personnel_code_claim','personnel_code_sequence','member_role_assignment','representative_identity','representative_identity_file','hospital_center','account_profile','member_contact','position','duty_template','duty_catalog_install','transport_migration','development_request','as_agent','sales_agent'];
 // material_photo is catalog data: active and removed originals/thumbnails survive operations reset with material; full reset backs up both object keys and deletes all photo rows. Generic 0016 flow/inventory freeze protects upload/removal; no new table/FK. Training uses existing flow and bucket isolation.
 // Shared print layouts are configuration; existing flow_entities freeze and backup apply.
 // Service representation contract versions and current pointers on as_agent: operations preserve catalog/history; full reset removes contracts and leaves explicit missing-reference state, never invents validity. Generic flow freeze covers atomic renewal/termination and warning closure; no new table/FK/blob.

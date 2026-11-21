@@ -1,3 +1,5 @@
+import {personnelCodeKey} from './personnel-code';
+import {ensurePersonnelCodes,projectPersonnelCodes} from './personnel-code-storage';
 import {env} from 'cloudflare:workers';
 import {storage} from './storage';
 import {AccessError} from './authorization';
@@ -61,10 +63,11 @@ function normalizeBindings(input:any,warehouses:any[],agents:any[]):ProfileBindi
 }
 export async function memberRoleContext(actor:Session,memberId='',options:{q?:string;tab?:string;page?:number}={}){
  if(!actor.isAdmin||actor.profileReview)fail('تخصیص نقش فقط برای مدیر سامانه مجاز است.',403);
- const db=storage(),q=(options.q||'').trim().slice(0,120),tab=options.tab||'pending',page=Number.isSafeInteger(options.page)&&options.page!>=0?Math.min(options.page!,100000):0;
+ await ensurePersonnelCodes();
+ const db=storage(),q=personnelCodeKey((options.q||'').trim().slice(0,120)),tab=options.tab||'pending',page=Number.isSafeInteger(options.page)&&options.page!>=0?Math.min(options.page!,100000):0;
  const assigned="EXISTS(SELECT 1 FROM flow_entities a WHERE a.type='member_role_assignment' AND json_extract(a.data,'$.memberId')=m.id AND json_array_length(a.data,'$.bindings')>0)";
- const where="m.status!='deleted' AND (?='' OR instr(lower(m.name),lower(?))>0 OR EXISTS(SELECT 1 FROM flow_entities h WHERE h.type='hr_employee' AND json_extract(h.data,'$.memberId')=m.id AND instr(lower(json_extract(h.data,'$.code')),lower(?))>0))"+(tab==='assigned'?' AND '+assigned:tab==='pending'?' AND NOT '+assigned:'');
- const args=[q,q,q],count:any=memberId?{n:1}:await db.prepare('SELECT COUNT(*) n FROM app_members m WHERE '+where).bind(...args).first();
+ const where="m.status!='deleted' AND (?='' OR instr(lower(m.name),lower(?))>0 OR EXISTS(SELECT 1 FROM flow_entities h WHERE h.type='hr_employee' AND json_extract(h.data,'$.memberId')=m.id AND (instr(lower(COALESCE((SELECT json_extract(c.data,'$.code') FROM flow_entities c WHERE c.type='personnel_code' AND c.id='personnel-code:'||h.id),json_extract(h.data,'$.code'))),lower(?))>0 OR instr(lower(json_extract(h.data,'$.code')),lower(?))>0)))"+(tab==='assigned'?' AND '+assigned:tab==='pending'?' AND NOT '+assigned:'');
+ const args=[q,q,q,q],count:any=memberId?{n:1}:await db.prepare('SELECT COUNT(*) n FROM app_members m WHERE '+where).bind(...args).first();
  const listed=memberId?await db.prepare('SELECT id,name,status,subject,permissions FROM app_members WHERE id=?').bind(memberId).all():await db.prepare('SELECT id,name,status,subject,permissions FROM app_members m WHERE '+where+' ORDER BY name,id LIMIT 25 OFFSET ?').bind(...args,page*25).all();
  const members=listed.results as any[],actorRows=await db.prepare('SELECT id,name,status,subject,permissions FROM app_members WHERE id=? OR subject=? ORDER BY id').bind(actor.userId.startsWith('local:')?actor.userId.slice(6):actor.userId,actor.userId).all();
  const guardedMembers=[...new Map([...members,...actorRows.results as any[]].map(m=>[m.id,m])).values()].sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0);
@@ -77,7 +80,7 @@ export async function memberRoleContext(actor:Session,memberId='',options:{q?:st
   db.prepare('SELECT id FROM app_members WHERE lower(email)=?').bind(env.TRACE_OWNER_EMAIL?.trim().toLowerCase()||'').all()
  ]);
  if(entities.results.length>2000)fail('فهرست محدوده‌های نقش از سقف بررسی بیشتر است؛ پشتیبان سامانه بررسی کند.',409);
- return {db,actor,members,guardedMembers,total:count.n,page,entityWhere,entityArgs:ids,entities:entities.results.map(parse),runs:runs.results as any[],identity:identity.results as any[],owners:owners.results as any[]};
+ return {db,actor,members,guardedMembers,total:count.n,page,entityWhere,entityArgs:ids,entities:await projectPersonnelCodes(entities.results.map(parse)),runs:runs.results as any[],identity:identity.results as any[],owners:owners.results as any[]};
 }
 
 type Context=Awaited<ReturnType<typeof memberRoleContext>>;
