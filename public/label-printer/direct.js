@@ -14,7 +14,10 @@
     const [x,y] = JSON.parse(localStorage.getItem(offsetsKey()) || '[0,0]');
     get('x').value = x; get('y').value = y;
   }
-  printer.onchange = loadOffsets;
+  printer.onchange = () => {
+    if(printer.value)localStorage.setItem(key,printer.value);
+    loadOffsets();
+  };
   let port=18743;
   async function call(path, body) {
     const result = await fetch('http://127.0.0.1:'+port+'/' + path, {
@@ -27,6 +30,9 @@
   let connecting;
   async function discover() {
     get('connect').disabled = true;
+    printer.disabled = true;
+    get('controls').hidden = true;
+    printer.replaceChildren(new Option('در حال شناسایی…',''));
     try {
       port=18743;
       let directory;
@@ -34,6 +40,7 @@
       const {printers,version}=directory;
       if(!['1.0.0','1.1.0'].includes(version)){
         get('controls').hidden = true; get('install').open = true;
+        printer.replaceChildren(new Option('رابط چاپ نیاز به به‌روزرسانی دارد',''));
         status.textContent='برای این صفحه، نسخهٔ ۱٫۱٫۰ رابط چاپ را نصب کنید.';
         return;
       }
@@ -41,11 +48,14 @@
       if (printers.includes(localStorage.getItem(key))) printer.value = localStorage.getItem(key);
       get('controls').hidden = !printers.length;
       get('install').open = false;
-      get('connect').hidden = printers.length > 0;
+      printer.disabled=!printers.length;
+      if(!printers.length)printer.replaceChildren(new Option('چاپگر سازگار پیدا نشد',''));
       status.textContent = printers.length ? ('رابط چاپ متصل است'+(version?' · نسخهٔ '+version:'')) : 'چاپگر GoDEX G500 در ویندوز پیدا نشد.';
       loadOffsets();
     } catch {
       get('controls').hidden = true; get('install').open = true;
+      printer.disabled=true;
+      printer.replaceChildren(new Option('رابط چاپ در دسترس نیست',''));
       status.textContent = 'ارتباط برقرار نشد. رابط ویندوز را نصب کنید و اجازهٔ دسترسی مرورگر به دستگاه محلی را بدهید.';
     } finally { get('connect').disabled = false; }
   };
@@ -164,5 +174,5 @@
   }
   get('test').onclick=()=>send(true);
   get('send').onclick=()=>send(false);
-  if (localStorage.getItem(key)) void get('connect').onclick();
+  void connect();
 })();
