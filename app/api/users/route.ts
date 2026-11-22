@@ -1,4 +1,5 @@
 import {accountPersonnelLink,personnelAccountLinkPlan} from '@/lib/personnel-account-link';
+import {testStaffCleanup,testStaffWasCleaned} from '@/lib/test-staff-cleanup';
 import {hrRows} from '@/lib/personnel';
 import {personnelBaseApproved} from '@/lib/personnel-documents';
 import {requiredPersonnel} from '@/lib/personnel-employment';
@@ -68,6 +69,7 @@ async function restoreAccount(body:any,actor:{userId:string}) {
   if(!old)throw new AccessError('حساب یافت نشد.',404);
   if(old.status!=='deleted'||old.revision!==body.revision||body.accountName!==old.name)return Response.json({error:'وضعیت حساب تغییر کرده است؛ فهرست حذف‌شده‌ها را تازه کنید.',code:'STALE_ACCOUNT'},{status:409});
   if(await protectedAccount(old,actor))throw new AccessError('حساب مدیر اصلی یا حساب جاری از این مسیر قابل بازیابی نیست.',403);
+  if(await testStaffWasCleaned(db,old.id))throw new AccessError('این حساب آزمایشی همراه پرونده بایگانی شده است.',409);
   const identity=await archivedIdentity(old),login=identity.localAccount?username(body.username):null;
   const passwordHash=identity.localAccount?await hashPassword(password(body.password)):null;
   const data=payload({...old,status:'active',permissions:storedAccessPermissions(old.permissions),email:identity.localAccount?crypto.randomUUID()+'@local.invalid':identity.email||body.email});
@@ -129,8 +131,8 @@ export async function GET() {
     await memberContactAdminContext(actor);
     const personnelRows=await hrRows();
     const result=await storage().prepare("SELECT m.*,a.username FROM app_members m LEFT JOIN password_accounts a ON a.member_id=m.id WHERE m.status!='deleted' ORDER BY m.created DESC").all();
-    const deletedRows=(await storage().prepare("SELECT * FROM app_members WHERE status='deleted' ORDER BY updated DESC,id").all()).results;
-    const deletedMembers=await Promise.all(deletedRows.map(async(row:any)=>{const identity=await archivedIdentity(row);return {id:row.id,name:row.name,unit:row.unit,status:'deleted',revision:row.revision,deletedAt:row.updated,localAccount:identity.localAccount,username:identity.username,email:identity.email,permissions:storedAccessPermissions(row.permissions)};}));
+    const deletedRows=(await storage().prepare("SELECT m.*,EXISTS(SELECT 1 FROM access_audit a WHERE a.target=m.id AND a.action='cleanup_test_staff') AS testCleaned FROM app_members m WHERE status='deleted' ORDER BY updated DESC,id").all()).results;
+    const deletedMembers=await Promise.all(deletedRows.map(async(row:any)=>{const identity=await archivedIdentity(row);return {id:row.id,name:row.name,unit:row.unit,status:'deleted',revision:row.revision,deletedAt:row.updated,localAccount:identity.localAccount,username:identity.username,email:identity.email,permissions:storedAccessPermissions(row.permissions),testCleaned:!!row.testCleaned};}));
     const warehouses=await materialWarehouses();
     const contacts=await memberContactsForAccounts(result.results.map((row:any)=>row.id));
     const personnelCandidates=(await storage().prepare("SELECT e.id,e.revision,e.data FROM flow_entities e WHERE e.type='hr_employee' AND NOT EXISTS(SELECT 1 FROM app_members m WHERE m.id=json_extract(e.data,'$.memberId')) ORDER BY e.created,e.id").all()).results.map((r:any)=>{const d=JSON.parse(r.data);return {id:r.id,revision:r.revision,name:d.name,unit:d.unit,code:d.code,mobile:d.mobile||'',ready:personnelBaseApproved(d)}});
@@ -230,13 +232,24 @@ export async function DELETE(request:Request) {
     const db=storage(),old=await db.prepare('SELECT * FROM app_members WHERE id=?').bind(body.id).first<any>();
     if(!old)throw new AccessError('حساب یافت نشد.',404);
     if(await protectedAccount(old,actor))throw new AccessError('حساب مدیر اصلی یا حساب جاری قابل حذف نیست.',403);
+    const cleanup=body.mode==='cleanup_test_staff';
+    if(cleanup&&body.accountName!==old.name)return conflict();
+    if(cleanup&&old.status==='deleted'&&await testStaffWasCleaned(db,old.id))return Response.json({deleted:true,testCleaned:true,id:old.id});
+    if(cleanup&&old.revision!==body.revision)return conflict();
+    const now=new Date().toISOString();
+    const cleanupStatements=cleanup?await testStaffCleanup(db,old,old.status==='deleted'?(await archivedIdentity(old)).subject:old.subject,actor.userId,now):[];
+    if(cleanup&&old.status==='deleted'){
+      await db.batch([...cleanupStatements,db.prepare('UPDATE app_members SET revision=revision+1,updated=? WHERE id=? AND revision=?').bind(now,old.id,old.revision)]);
+      return Response.json({deleted:true,testCleaned:true,id:old.id});
+    }
     if(old.status==='deleted')return Response.json({deleted:true,id:old.id,alreadyDeleted:true});
     if(body.accountName!==undefined&&body.accountName!==old.name)return conflict();
     if(old.revision!==body.revision)return conflict();
     const credential:any=await db.prepare('SELECT username FROM password_accounts WHERE member_id=?').bind(old.id).first();
-    const now=new Date().toISOString(),auditId=crypto.randomUUID(),next={...old,status:'deleted',updated:now,revision:old.revision+1};
+    const auditId=crypto.randomUUID(),next={...old,status:'deleted',updated:now,revision:old.revision+1};
     const gate='EXISTS(SELECT 1 FROM access_audit WHERE id=?)';
     const results=await db.batch([
+      ...cleanupStatements,
       db.prepare("INSERT INTO access_audit(id,actor,target,action,before,after,at) SELECT ?,?,?,?,?,?,? FROM app_members WHERE id=? AND revision=? AND status!='deleted'").bind(auditId,actor.userId,old.id,'delete_member',JSON.stringify({...old,username:credential?.username}),JSON.stringify({...next,username:credential?.username}),now,old.id,old.revision),
       // Keep the member row for historical references, but release all login identity keys.
       // The audit snapshot retains the original email/subject for traceability.
@@ -246,8 +259,8 @@ export async function DELETE(request:Request) {
       db.prepare('UPDATE mcp_tokens SET revoked=1 WHERE (subject=? OR subject=?) AND '+gate).bind('local:'+old.id,old.subject||'local:'+old.id,auditId),
       db.prepare('DELETE FROM mcp_streams WHERE token_id IN (SELECT id FROM mcp_tokens WHERE subject=? OR subject=?) AND '+gate).bind('local:'+old.id,old.subject||'local:'+old.id,auditId),
     ]);
-    if(!results[0].meta.changes)return conflict();
+    if(!results[cleanupStatements.length].meta.changes)return conflict();
     try{await syncMaterialTasks()}catch{}
-    return Response.json({deleted:true,id:old.id});
+    return Response.json({deleted:true,id:old.id,...(cleanup?{testCleaned:true}:{})});
   }catch(error){return failure(error);}
 }
