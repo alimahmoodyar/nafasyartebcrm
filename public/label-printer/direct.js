@@ -57,7 +57,9 @@
   }
   async function bitmap(label, dx, dy) {
     const scale = 25.4 * 8 / 96;
-    const image = typeof buildBatchLabelPdf === 'function' ? await buildBatchLabelPdf(label) : await window.html2canvas(label, {
+    const approved = label.matches('.approved-asset');
+    if (approved) await prepareApprovedAssets();
+    const image = approved ? label.querySelector('canvas') : typeof buildBatchLabelPdf === 'function' ? await buildBatchLabelPdf(label) : await window.html2canvas(label, {
       scale, backgroundColor:'#fff', logging:false, onclone(doc,copy) {
         copy.style.borderColor = 'transparent';
         const style = doc.createElement('style');
@@ -111,7 +113,7 @@
       localStorage.setItem(key, printer.value);
       localStorage.setItem(offsetsKey(),JSON.stringify([Number(x.value),Number(y.value)]));
       await document.fonts.ready;
-      if (typeof buildBatchLabelPdf !== 'function') await loadRenderer();
+      if (typeof buildBatchLabelPdf !== 'function' && !rows[0].matches('.approved-asset')) await loadRenderer();
       const pages=[];
       for (const label of rows) {
         status.textContent='آماده‌سازی لیبل '+(pages.length+1)+' از '+rows.length;

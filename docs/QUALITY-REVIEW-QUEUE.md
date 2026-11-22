@@ -1,5 +1,7 @@
 ## 2026-11-22 · Single-column GoDEX label printing
 
+The owner approved the physical 45×30 mm sample on G500. The integrated data-driven rendering passed the direct-label browser test with a decoded asset QR. Company deployment is pending.
+
 Windows installer 1.0.0 built. Bridge tested directly on owner workstation; interactive install and later logon still require an operator check. Real Windows queue discovered on USB001; untrusted web origin rejected. Browser fixture captured actual 45×30 mm batch job, decoded QR and Code 128, plus generic 60×40 mm QR. Physical single-row alignment, feed drift over successive labels and on-paper scanning await owner at office. No physical job sent. Source publication is separate from company-site deployment.
 
 ## 2026-11-21 — Personal asset category choices

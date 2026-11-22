@@ -6,7 +6,7 @@ export function assetPdfScript(config:{selector:string;width:number;height:numbe
 let assetPdfBusy=false;
 function assetPdfStatus(message){const node=document.getElementById('asset-pdf-status');if(node)node.textContent=message;}
 async function buildAssetPdf(){
- await document.fonts.ready;fitAssetLabels();
+ await document.fonts.ready;if(typeof prepareApprovedAssets==='function')await prepareApprovedAssets();fitAssetLabels();
  const pages=Array.from(document.querySelectorAll(assetPdfConfig.selector));
  if(!pages.length)throw Error('لیبلی برای چاپ وجود ندارد.');
  function lines(ctx,text,maxWidth,nowrap){
@@ -34,7 +34,13 @@ async function buildAssetPdf(){
  return createLabelPdf(pages,assetPdfConfig.width,assetPdfConfig.height,async(ctx,page)=>{
   const rect=page.getBoundingClientRect();
   const labels=page.matches('.label')?[page]:Array.from(page.querySelectorAll('.label'));
-  for(const label of labels){const qr=label.querySelector('.qr'),svg=qr&&qr.querySelector('svg'),words=label.querySelector('.words');if(!svg||!words)throw Error('محتوای لیبل کامل نیست.');const qrRect=qr.getBoundingClientRect(),textRect=words.getBoundingClientRect();ctx.drawImage(await loadLabelSvg(svg),qrRect.left-rect.left+margin,qrRect.top-rect.top+margin,qrRect.width,qrRect.height);drawWords(ctx,words,textRect.left-rect.left+margin,textRect.top-rect.top+margin,textRect.width,textRect.height);}
+  for(const label of labels){
+   if(label.matches('.approved-asset')){
+    const box=label.getBoundingClientRect();
+    ctx.drawImage(label.querySelector('canvas'),box.left-rect.left+margin,box.top-rect.top+margin,box.width,box.height);
+    continue;
+   }
+   const qr=label.querySelector('.qr'),svg=qr&&qr.querySelector('svg'),words=label.querySelector('.words');if(!svg||!words)throw Error('محتوای لیبل کامل نیست.');const qrRect=qr.getBoundingClientRect(),textRect=words.getBoundingClientRect();ctx.drawImage(await loadLabelSvg(svg),qrRect.left-rect.left+margin,qrRect.top-rect.top+margin,qrRect.width,qrRect.height);drawWords(ctx,words,textRect.left-rect.left+margin,textRect.top-rect.top+margin,textRect.width,textRect.height);}
  },(current,total)=>assetPdfStatus('آماده‌سازی PDF؛ صفحه '+current.toLocaleString('fa-IR')+' از '+total.toLocaleString('fa-IR')));
 }
 
