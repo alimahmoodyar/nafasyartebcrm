@@ -1,0 +1,159 @@
+<div id="hamnafas-role-models" class="viz-carousel" aria-label="خانهٔ تک‌نقشی و چندنقشی" data-previous-label="طرح قبل" data-next-label="طرح بعد">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700&display=swap');
+    #hamnafas-role-models .rh-app {
+      color-scheme:light dark;
+      --rh-bg:light-dark(#f5f7fa,#151b28);
+      --rh-paper:light-dark(#fff,#202a3c);
+      --rh-ink:light-dark(#24324a,#eef3ff);
+      --rh-muted:light-dark(#617086,#becce5);
+      --rh-line:light-dark(#dfe6ee,#3a4862);
+      --rh-brand:light-dark(#434c94,#c7d2ff);
+      --rh-tint:light-dark(#f0f3f8,#2d374d);
+      background:var(--rh-bg);color:var(--rh-ink);border:1px solid var(--rh-line);border-radius:10px;
+      font:14px/1.8 Vazirmatn,Tahoma,sans-serif;min-height:470px;
+    }
+    #hamnafas-role-models .rh-app * {box-sizing:border-box}
+    #hamnafas-role-models .rh-app [hidden] {display:none!important}
+    #hamnafas-role-models :is(h1,h2,p) {margin:0}
+    #hamnafas-role-models .rh-header {display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:60px;flex-wrap:wrap;background:var(--rh-paper);padding:10px 22px;border-bottom:1px solid var(--rh-line);border-radius:10px 10px 0 0}
+    #hamnafas-role-models .rh-person {display:flex;align-items:center;gap:7px;color:var(--rh-muted)}
+    #hamnafas-role-models .rh-person svg {width:19px;height:19px}
+    #hamnafas-role-models .rh-body {padding:18px 22px 28px;display:grid;gap:14px}
+    #hamnafas-role-models h1 {font-size:22px;line-height:1.5;font-weight:600}
+    #hamnafas-role-models h2 {font-size:14px;font-weight:600}
+    #hamnafas-role-models .rh-note {color:var(--rh-muted);font-size:14px}
+    #hamnafas-role-models .rh-group {display:grid;gap:9px}
+    #hamnafas-role-models .rh-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    #hamnafas-role-models button {font:inherit;color:inherit}
+    #hamnafas-role-models .rh-tile {background:var(--rh-paper);border:1px solid var(--rh-line);border-radius:10px;padding:12px 14px;min-height:68px;display:flex;align-items:center;gap:10px;text-align:start;min-width:0;box-shadow:none}
+    #hamnafas-role-models .rh-tile:hover,#hamnafas-role-models .rh-back:hover {background:var(--rh-tint)}
+    #hamnafas-role-models .rh-icon {background:var(--rh-tint);color:var(--rh-brand);border-radius:8px;display:grid;place-items:center;width:34px;height:34px;flex:none}
+    #hamnafas-role-models .rh-icon svg {width:20px;height:20px;stroke-width:1.8}
+    #hamnafas-role-models .rh-tile strong {display:block;font-weight:600}
+    #hamnafas-role-models .rh-tile small {display:block;color:var(--rh-muted);font-size:14px}
+    #hamnafas-role-models .rh-tools {display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+    #hamnafas-role-models .rh-tool {display:flex;align-items:center;gap:10px;min-height:68px;border:1px solid var(--rh-line);border-radius:10px;padding:12px 14px;background:var(--rh-paper)}
+    #hamnafas-role-models .rh-tool .rh-tool-icon {background:var(--rh-tint);border-radius:8px;width:34px;height:34px;display:grid;place-items:center;flex:none}
+    #hamnafas-role-models .rh-tool svg {width:20px;height:20px;flex:none;color:var(--rh-brand)}
+    #hamnafas-role-models .rh-back {justify-self:start;display:flex;align-items:center;gap:7px;min-height:40px;padding:7px 12px;background:var(--rh-paper);border:1px solid var(--rh-line);border-radius:10px}
+    #hamnafas-role-models .rh-back svg {width:17px;height:17px}
+    #hamnafas-role-models .rh-list {background:var(--rh-paper);border:1px solid var(--rh-line);border-radius:10px}
+    #hamnafas-role-models .rh-row {padding:12px;display:flex;justify-content:space-between;align-items:baseline;gap:5px 12px;flex-wrap:wrap}
+    #hamnafas-role-models .rh-row+.rh-row {border-top:1px solid var(--rh-line)}
+    #hamnafas-role-models .rh-row small {color:var(--rh-muted)}
+    @media(max-width:600px) {
+      #hamnafas-role-models .rh-app {min-height:570px}
+      #hamnafas-role-models .rh-header {padding:12px 14px}
+      #hamnafas-role-models .rh-body {padding:14px 12px 24px}
+      #hamnafas-role-models .rh-tools {grid-template-columns:1fr}
+      #hamnafas-role-models .rh-tile {padding:10px;gap:8px;min-height:66px}
+      #hamnafas-role-models .rh-icon {width:30px;height:30px}
+    }
+    @media(max-width:400px) {
+      #hamnafas-role-models .rh-grid {grid-template-columns:1fr}
+      #hamnafas-role-models .rh-tile {min-height:65px}
+      #hamnafas-role-models .rh-app {min-height:660px}
+    }
+    @media(pointer:coarse) {
+      #hamnafas-role-models .rh-back {min-height:44px}
+    }
+  </style>
+  <section data-variant="یک نقش" aria-label="فرد تک‌نقشی">
+    <div class="rh-app" dir="rtl" lang="fa" data-account="single" aria-label="چیدمان فرد تک‌نقشی">
+      <header class="rh-header"><strong>هم‌نفس</strong><span class="rh-person"><i data-lucide="circle-user-round" aria-hidden="true"></i>مریم رضایی</span></header>
+      <section class="rh-body" data-screen="home">
+        <div><h1>مسئول اداری</h1><p class="rh-note">سلام، مریم رضایی</p></div>
+        <div class="rh-grid">
+          <button class="rh-tile" type="button" data-open="tasks"><span class="rh-icon"><i data-lucide="inbox" aria-hidden="true"></i></span><span><strong>کارتابل من</strong><small>۲ کار منتظر اقدام · ۱ پیام جدید</small></span></button>
+          <button class="rh-tile" type="button" data-open="personal"><span class="rh-icon"><i data-lucide="contact-round" aria-hidden="true"></i></span><span><strong>پرسنلی من</strong><small>پرونده، فیش حقوقی و مرخصی</small></span></button>
+        </div>
+        <section class="rh-group"><h2>ابزارهای اداری</h2><div class="rh-tools">
+          <div class="rh-tool"><i data-lucide="users-round" aria-hidden="true"></i>پرونده‌های پرسنلی</div>
+          <div class="rh-tool"><i data-lucide="file-text" aria-hidden="true"></i>قراردادها و مدارک</div>
+          <div class="rh-tool"><i data-lucide="clipboard-list" aria-hidden="true"></i>گزارش‌های اداری</div>
+        </div></section>
+      </section>
+      <section class="rh-body" data-screen="tasks" hidden>
+        <button class="rh-back" type="button" data-open="home"><i data-lucide="arrow-right" aria-hidden="true"></i>صفحهٔ مسئول اداری</button>
+        <h1>کارتابل من</h1><p class="rh-note">کارها و پیام‌های مریم رضایی</p>
+        <div class="rh-list"><div class="rh-row"><span>بررسی مدارک همکار جدید</span><small>مسئول اداری</small></div><div class="rh-row"><span>تکمیل اطلاعات پروندهٔ خودم</span><small>شخصی</small></div></div>
+        <section class="rh-group"><h2>پیام‌ها</h2><div class="rh-list"><div class="rh-row"><span>پیگیری تکمیل قرارداد</span><small>۱ پیام خوانده‌نشده</small></div></div></section>
+      </section>
+      <section class="rh-body" data-screen="personal" hidden>
+        <button class="rh-back" type="button" data-open="home"><i data-lucide="arrow-right" aria-hidden="true"></i>صفحهٔ مسئول اداری</button>
+        <h1>پرسنلی من</h1><div class="rh-tools">
+          <div class="rh-tool"><i data-lucide="contact-round" aria-hidden="true"></i>پرونده و مدارک من</div><div class="rh-tool"><i data-lucide="receipt-text" aria-hidden="true"></i>حقوق و کارکرد</div><div class="rh-tool"><i data-lucide="calendar-days" aria-hidden="true"></i>مرخصی و درخواست‌ها</div><div class="rh-tool"><i data-lucide="package" aria-hidden="true"></i>اموال امانی من</div>
+        </div>
+      </section>
+    </div>
+  </section>
+  <section data-variant="دو یا چند نقش" aria-label="فرد چندنقشی" hidden>
+    <div class="rh-app" dir="rtl" lang="fa" data-account="multiple" aria-label="چیدمان فرد چندنقشی">
+      <header class="rh-header"><strong>هم‌نفس</strong><span class="rh-person"><i data-lucide="circle-user-round" aria-hidden="true"></i>مریم رضایی</span></header>
+      <section class="rh-body" data-screen="home">
+        <div><h1>خانهٔ من</h1><p class="rh-note">سلام، مریم رضایی</p></div>
+        <section class="rh-group"><h2>امور من</h2><div class="rh-grid">
+          <button class="rh-tile" type="button" data-open="tasks"><span class="rh-icon"><i data-lucide="inbox" aria-hidden="true"></i></span><span><strong>کارتابل من</strong><small>۳ کار منتظر اقدام · ۱ پیام جدید</small></span></button>
+          <button class="rh-tile" type="button" data-open="personal"><span class="rh-icon"><i data-lucide="contact-round" aria-hidden="true"></i></span><span><strong>پرسنلی من</strong><small>پرونده، فیش حقوقی و مرخصی</small></span></button>
+        </div></section>
+        <section class="rh-group"><h2>نقش‌های من</h2><div class="rh-grid">
+          <button class="rh-tile" type="button" data-open="hr"><span class="rh-icon"><i data-lucide="users-round" aria-hidden="true"></i></span><span><strong>مسئول اداری</strong><small>پروندهٔ کارکنان و قراردادها</small></span></button>
+          <button class="rh-tile" type="button" data-open="assets"><span class="rh-icon"><i data-lucide="package-check" aria-hidden="true"></i></span><span><strong>اموال‌دار</strong><small>ثبت، تحویل و گزارش اموال</small></span></button>
+        </div></section>
+      </section>
+      <section class="rh-body" data-screen="tasks" hidden>
+        <button class="rh-back" type="button" data-open="home"><i data-lucide="arrow-right" aria-hidden="true"></i>خانهٔ من</button><h1>کارتابل من</h1>
+        <div class="rh-list"><div class="rh-row"><span>بررسی مدارک همکار جدید</span><small>مسئول اداری</small></div><div class="rh-row"><span>تأیید تحویل لپ‌تاپ</span><small>اموال‌دار</small></div><div class="rh-row"><span>تکمیل اطلاعات پروندهٔ خودم</span><small>شخصی</small></div></div>
+        <section class="rh-group"><h2>پیام‌ها</h2><div class="rh-list"><div class="rh-row"><span>هماهنگی تحویل تجهیزات</span><small>۱ پیام خوانده‌نشده</small></div></div></section>
+      </section>
+      <section class="rh-body" data-screen="personal" hidden>
+        <button class="rh-back" type="button" data-open="home"><i data-lucide="arrow-right" aria-hidden="true"></i>خانهٔ من</button><h1>پرسنلی من</h1>
+        <div class="rh-tools"><div class="rh-tool"><i data-lucide="contact-round" aria-hidden="true"></i>پرونده و مدارک من</div><div class="rh-tool"><i data-lucide="receipt-text" aria-hidden="true"></i>حقوق و کارکرد</div><div class="rh-tool"><i data-lucide="calendar-days" aria-hidden="true"></i>مرخصی و درخواست‌ها</div><div class="rh-tool"><i data-lucide="package" aria-hidden="true"></i>اموال امانی من</div></div>
+      </section>
+      <section class="rh-body" data-screen="hr" hidden>
+        <button class="rh-back" type="button" data-open="home"><i data-lucide="arrow-right" aria-hidden="true"></i>خانهٔ من</button><h1>مسئول اداری</h1>
+        <section class="rh-group"><h2>ابزارهای اداری</h2><div class="rh-tools"><div class="rh-tool"><i data-lucide="users-round" aria-hidden="true"></i>پرونده‌های پرسنلی</div><div class="rh-tool"><i data-lucide="file-text" aria-hidden="true"></i>قراردادها و مدارک</div><div class="rh-tool"><i data-lucide="clipboard-list" aria-hidden="true"></i>گزارش‌های اداری</div></div></section>
+      </section>
+      <section class="rh-body" data-screen="assets" hidden>
+        <button class="rh-back" type="button" data-open="home"><i data-lucide="arrow-right" aria-hidden="true"></i>خانهٔ من</button><h1>اموال‌دار</h1>
+        <section class="rh-group"><h2>ابزارهای اموال</h2><div class="rh-tools"><div class="rh-tool"><i data-lucide="package-plus" aria-hidden="true"></i>ثبت و فهرست اموال</div><div class="rh-tool"><i data-lucide="arrow-left-right" aria-hidden="true"></i>تحویل و جابه‌جایی</div><div class="rh-tool"><i data-lucide="clipboard-list" aria-hidden="true"></i>گزارش اموال</div></div></section>
+      </section>
+    </div>
+  </section>
+</div>
+<script>
+  (() => {
+    const root = document.getElementById('hamnafas-role-models');
+    for (const account of root.querySelectorAll('[data-account]')) {
+      const screens = Array.from(account.querySelectorAll('[data-screen]'));
+      const links = Array.from(account.querySelectorAll('[data-open]'));
+      let lastEntry = null;
+      for (const link of links) {
+        link.addEventListener('click', () => {
+          const target = screens.find(screen => screen.dataset.screen === link.dataset.open);
+          for (const screen of screens) screen.hidden = screen !== target;
+          if (link.dataset.open === 'home') lastEntry?.focus();
+          else {
+            lastEntry = link;
+            target.querySelector('.rh-back').focus();
+          }
+        });
+      }
+      for (const icon of account.querySelectorAll('.rh-tool > i[data-lucide]')) {
+        const holder = document.createElement('span');
+        holder.className = 'rh-tool-icon';
+        icon.replaceWith(holder);
+        holder.append(icon);
+      }
+      const settings = {spacing:14};
+      function updateSpacing() {
+        for (const screen of screens) screen.style.gap = settings.spacing + 'px';
+      }
+      if (globalThis.Tweak) {
+        const tweak = new Tweak({container:account,onChange:updateSpacing});
+        tweak.addSlider(settings,'spacing',{label:'فاصلهٔ بخش‌ها',min:10,max:18,unit:'px'});
+      }
+    }
+  })();
+</script>

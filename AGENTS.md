@@ -1,6 +1,12 @@
+# Unified real employee home and release order (2026-11-22)
+
+Owner approved and authorized implementing, testing, pushing and publishing the saved single/multi-role home package and carrying forward approved local changes in this release. Follow docs/process-design/UNIFIED-EMPLOYEE-HOME.fa.md and the saved prototype. Single assigned internal role opens directly; multiple roles share one real-account cartable/personnel entry and enter original role tools. Never reuse admin preview identity or grant permissions from navigation metadata. Preserve legacy access, scoped workflows, account/message isolation and histories. Appearance follows the compact warehouse pilot.
+
+Default for subsequent tasks follows the owner's newer standing instruction: publish for review first, then push the same approved source to GitHub only when the owner explicitly requests or approves push. The current package has that explicit authorization. Native hosting source synchronization necessary to publish is separate from a GitHub push. Increment the visible administrator release number once per published revision and keep it identical in both source copies.
+
 # Administrator release number
 
-For every new source revision pushed to sites/nafasyar-trace, increment lib/release-number.ts once above the current remote release number in the same push. Keep the number identical across deployment copies and report it to the owner.
+For each new published source revision, increment lib/release-number.ts once above the latest release. Keep it identical in the deployed source and the later owner-approved GitHub push, and report it to the owner.
 
 # Short permanent personnel codes (2026-11-21)
 

@@ -25,3 +25,36 @@
 .personal-requests-list{padding:18px}.personal-requests-list .flow-card{margin-block:10px}.personal-requests-list h3{font-size:18px}.personal-requests-list p{font-size:16px}.personal-requests-list .tools{flex-wrap:wrap}
 @media(max-width:850px){.employee-personnel-groups{grid-template-columns:1fr 1fr}}
 @media(max-width:600px){.employee-home-cards{grid-template-columns:1fr}.employee-home-card{padding:17px;min-height:100px}.employee-personnel-groups{gap:8px}.employee-personnel-group{padding:12px;gap:8px;align-items:flex-start}.employee-personnel-group strong{font-size:15px}.employee-personnel-group small{font-size:14px}.employee-service-icon{width:28px;height:32px;flex-basis:28px}.employee-home-header h2{font-size:24px}.employee-home-header{align-items:flex-start;gap:10px}.employee-personnel-links{gap:4px}.employee-personnel-subnav button,.employee-home-actions button,.cartable-self-service-tabs button,.cartable-sent-tabs button{min-height:44px}.employee-request-kind{width:100%;flex-wrap:wrap}.employee-request-kind select{max-width:100%;width:100%;min-height:44px;min-width:0}.employee-home-summary>header{padding:12px}.employee-home-row{padding:14px 12px}.employee-home-row strong{font-size:15px}.employee-home-actions{gap:8px;padding:8px 10px}}
+
+/* Approved compact employee home. Local scope leaves operational forms and print intact. */
+.employee-home{color:#24324a;background:#f5f7fa;padding:14px;border-radius:10px}
+.employee-home .employee-home-header{gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.employee-home .employee-home-header h2{font-size:22px;font-weight:700}
+.employee-home .employee-home-header p{font-size:16px;color:#617086}
+.employee-home .employee-home-cards,.employee-workspace-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:10px}
+.employee-home .employee-home-card,.employee-workspace-tile{display:flex;align-items:center;gap:10px;min-width:0;min-height:68px;padding:12px 14px;border:1px solid #dfe6ee;border-radius:10px;background:#fff;color:#24324a;box-shadow:none;text-align:start;cursor:pointer}
+.employee-home .employee-home-card strong,.employee-workspace-tile strong{font-size:14px;font-weight:600;display:block;overflow-wrap:anywhere}
+.employee-home .employee-home-card small,.employee-workspace-tile small{font-size:14px;color:#617086;display:block;margin-top:3px}
+.employee-home .employee-service-icon{width:34px;height:34px;flex:0 0 34px;border-radius:8px;background:#f0f3f8;color:#434c94}
+.employee-home .employee-home-count{color:#434c94;background:#f0f3f8;white-space:nowrap}
+.employee-home .employee-home-summary{margin-top:14px;border-color:#dfe6ee;border-radius:10px;box-shadow:none}
+.employee-home .employee-home-summary>header{padding:10px 14px;border-color:#dfe6ee}
+.employee-home .employee-home-summary h3,.employee-home h3{font-size:16px;font-weight:600}
+.employee-home .employee-home-row{padding:10px 14px;min-height:60px;color:#24324a;border-color:#dfe6ee;gap:10px}
+.employee-home .employee-home-row strong{font-size:14px}
+.employee-home .employee-home-row small,.employee-home .employee-empty,.employee-home .employee-home-help{color:#617086}
+.employee-home .employee-home-actions{gap:10px;background:#fff;padding:8px 14px}
+.employee-home .employee-home-actions button,.employee-home .employee-home-summary>header button,.employee-home .employee-home-help button{color:#434c94;min-height:40px}
+.employee-home .employee-workspace-back{border:1px solid #dfe6ee;border-radius:8px;background:#fff;color:#434c94;padding:7px 12px;min-height:40px;font-size:14px;cursor:pointer}
+.employee-workspaces,.employee-workspace-tools{margin-top:14px}
+.employee-workspace-note{font-size:14px;color:#617086;margin:12px 0}
+.employee-workspace-tile:hover,.employee-home .employee-home-card:hover{border-color:#a8afcd;background:#f8f9fc}
+.employee-home .personal-home{padding:0;border:0;background:transparent;box-shadow:none}
+.employee-home .personal-home .personal-app-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:10px}
+.employee-home .personal-home .personal-app{padding:0;border:1px solid #dfe6ee;border-radius:10px;background:#fff;box-shadow:none}
+.employee-home .personal-home .personal-app-open{min-height:68px;padding:12px 14px;display:flex;flex-direction:row;justify-content:flex-start;gap:10px;text-align:start;color:#24324a;background:transparent}
+.employee-home .personal-home .personal-app-icon{width:34px;height:34px;flex:0 0 34px;border-radius:8px;background:#f0f3f8;color:#434c94}
+.employee-home .personal-home .personal-app-icon svg{width:20px;height:20px}
+.employee-home .personal-home .personal-app-open strong{font-size:14px;font-weight:600}
+@media(pointer:coarse){.employee-home button{min-height:44px}}
+@media(max-width:600px){.employee-home{padding:10px}.employee-home .employee-home-cards,.employee-workspace-grid{grid-template-columns:1fr}.employee-home .employee-home-header h2{font-size:22px}.employee-home .employee-home-card{padding:12px 14px;min-height:68px}}
