@@ -224,6 +224,7 @@ export async function PATCH(request: Request) {
   }catch(error){return failure(error, localAccount ? 'username' : 'email');}
 }
 export async function DELETE(request:Request) {
+  let cleanup=false;
   try {
     checkOrigin(request);const actor=await requireAdmin();checkAccount(request,actor);
     const body=await request.json() as any;
@@ -232,7 +233,7 @@ export async function DELETE(request:Request) {
     const db=storage(),old=await db.prepare('SELECT * FROM app_members WHERE id=?').bind(body.id).first<any>();
     if(!old)throw new AccessError('حساب یافت نشد.',404);
     if(await protectedAccount(old,actor))throw new AccessError('حساب مدیر اصلی یا حساب جاری قابل حذف نیست.',403);
-    const cleanup=body.mode==='cleanup_test_staff';
+    cleanup=body.mode==='cleanup_test_staff';
     if(cleanup&&body.accountName!==old.name)return conflict();
     if(cleanup&&old.status==='deleted'&&await testStaffWasCleaned(db,old.id))return Response.json({deleted:true,testCleaned:true,id:old.id});
     if(cleanup&&old.revision!==body.revision)return conflict();
@@ -262,5 +263,16 @@ export async function DELETE(request:Request) {
     if(!results[cleanupStatements.length].meta.changes)return conflict();
     try{await syncMaterialTasks()}catch{}
     return Response.json({deleted:true,id:old.id,...(cleanup?{testCleaned:true}:{})});
-  }catch(error){return failure(error);}
+  }catch(error){
+    if(!cleanup)return failure(error);
+    const denied=accessResponse(error);
+    if(denied)return denied;
+    const details=[String(error),String((error as {cause?:unknown})?.cause||'')].join(' ');
+    if(details.includes('inventory_operation_guard'))return conflict();
+    const reference=crypto.randomUUID();
+    const reason=/no such (?:table|column)|has no column/i.test(details)?'schema':/malformed JSON/i.test(details)?'invalid_json':/timeout|too many|database is locked/i.test(details)?'database_busy':'storage';
+    console.error('Test staff cleanup failed',{reference,reason});
+    const errorText=reason==='schema'?'ساختار پایگاه داده برای پاک‌سازی حساب کامل نیست.':reason==='invalid_json'?'خواندن یکی از رکوردهای قدیمی هنگام بررسی وابستگی ممکن نشد.':'بررسی وابستگی‌ها یا ثبت پاک‌سازی حساب انجام نشد.';
+    return Response.json({error:errorText+' کد پیگیری '+reference,reference,reason},{status:503});
+  }
 }

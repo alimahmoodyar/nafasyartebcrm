@@ -99,7 +99,17 @@ const makeBody=async(memberId,personnelId)=>{const d=await list(admin),m=d.membe
  assert.ok(!hrRecords.some(r=>r.id==='unused-dossier'));assert.ok(hrRecords.some(r=>r.id==='real-dossier'));
  assert.equal((await remove(admin,await account('deleted-test'),'ordinary')).status,200);
  assert.equal(row('previously-deleted-dossier').type,'hr_employee');
+ const oldDeletedTest=await deleted('deleted-test');
+ actor('with-economic-history');
+ sql.prepare("INSERT INTO economic_events(id,source_key,kind,source_id,source_version,occurred_day,created,actor,payload) VALUES('cleanup-event','cleanup-event','test','test',1,?,?,?,'{}')").run(day,now,'local:with-economic-history');
+ assert.equal((await remove(admin,await account('with-economic-history'))).status,409,'installed accounting dependencies are checked');
+ sql.exec('DROP INDEX idx_records_kind_code');
+ sql.prepare("INSERT INTO records(id,kind,payload,created) VALUES('legacy-record','note',?,?)").run('invalid legacy JSON mentioning deleted-test',now);
+ assert.equal((await remove(admin,oldDeletedTest)).status,409,'a reference inside malformed legacy JSON blocks cleanup');
+ sql.prepare("UPDATE records SET payload='invalid unrelated legacy JSON' WHERE id='legacy-record'").run();
+ sql.exec('ALTER TABLE accounting_journals RENAME TO absent_accounting_journals; ALTER TABLE economic_events RENAME TO absent_economic_events;');
  assert.equal((await remove(admin,await deleted('deleted-test'))).status,200);
+ sql.exec('ALTER TABLE absent_economic_events RENAME TO economic_events; ALTER TABLE absent_accounting_journals RENAME TO accounting_journals;');
  assert.equal(row('previously-deleted-dossier').type,'staff_test_archive');
  const archive=await deleted('deleted-test');assert.equal(archive.testCleaned,true);
  assert.equal((await patch(admin,{mode:'restore',id:archive.id,revision:archive.revision,accountName:archive.name,confirmed:true})).status,409);
