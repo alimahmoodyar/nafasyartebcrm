@@ -35,6 +35,8 @@ export function EmployeeHome({user,apps,onNavigate,workspace,onWorkspaceChange}:
  },[user.userId,accessKey,version]);
  const current=summary?.accountId===user.userId&&summary.accessKey===accessKey?summary:null;
  const open=(_row:CartableRow)=>onNavigate('tasks');
+ const roleTools=<>{workspaces.length>1&&!active&&<section className="employee-workspaces" aria-label="نقش‌های من"><h3>نقش‌های من</h3><div className="employee-workspace-grid">{workspaces.map(w=><button type="button" className="employee-workspace-tile" key={w.id} onClick={()=>selectWorkspace(w.id)}><span className="employee-service-icon"><BriefcaseBusiness size={20}/></span><span><strong>{w.title}</strong><small>{w.group}</small></span></button>)}</div></section>}
+  {active&&<section className="employee-workspace-tools" aria-label={'ابزارهای '+active.title}><h3>ابزارهای {active.title}</h3><div className="employee-workspace-grid">{active.links.filter((link,index,all)=>all.findIndex(other=>other.section===link.section&&(other.target||'')===(link.target||''))===index).map(link=>{const Icon=apps.find(a=>a.key===link.section)?.icon||(link.section==='assets'?Boxes:ClipboardList);return <button type="button" className="employee-workspace-tile" key={link.section+':'+(link.target||'')} onClick={()=>onNavigate(link.section,link.target)}><span className="employee-service-icon"><Icon size={20}/></span><strong>{link.title}</strong></button>})}</div><p className="employee-workspace-note">کارها و پیام‌های این نقش در «کارتابل من» پیگیری می‌شوند.</p>{rolePage&&<button type="button" className="employee-workspace-back" onClick={()=>onNavigate('tasks')}>باز کردن کارتابل من</button>}</section>}</>;
  return <section className="employee-home" dir="rtl" aria-label="خانهٔ شخصی کارکنان">
   <header className="employee-home-header"><div><h2>{active?.title||'خانهٔ من'}</h2><p>{user.name}، خوش آمدید</p></div>{rolePage&&<button type="button" className="employee-workspace-back" onClick={()=>selectWorkspace('')}>همهٔ نقش‌های من</button>}</header>
   {!rolePage&&<>
@@ -43,6 +45,9 @@ export function EmployeeHome({user,apps,onNavigate,workspace,onWorkspaceChange}:
    <button type="button" className="employee-home-card" onClick={()=>onNavigate('tasks')}><span className="employee-service-icon"><Inbox size={20}/></span><span><strong>کارتابل من</strong><small>کارها، پیام‌ها، درخواست‌های ارسالی و یادآورها</small></span>{current&&<span className="employee-home-count" aria-label="کارهای منتظر اقدام">{current.tasks.length.toLocaleString('fa-IR')}{current.limited?' +':''}</span>}</button>
    {apps.some(a=>a.key==='personnel')&&<button type="button" className="employee-home-card" onClick={()=>onNavigate('personnel')}><span className="employee-service-icon"><ContactRound size={20}/></span><span><strong>پرسنلی من</strong><small>پرونده، حقوق و کارکرد، درخواست‌ها و اموال</small></span></button>}
   </div>
+  {roleTools}
+
+  {!rolePage&&!!jobs.length&&<section className="employee-home-work"><h3>{workspaces.length?'سایر ابزارهای مجاز':'برنامه‌های شغلی شما'}</h3><PersonalHome accountId={user.userId} name={user.name} apps={jobs} scope="employee-work" title="برنامه‌های شغلی" greeting={false} compact onNavigate={section=>onNavigate(section,section==='personnel'?personnelWork?.target:undefined)}/></section>}
   <section className="employee-home-summary"><header><h3>خلاصهٔ کارتابل</h3><button type="button" onClick={()=>onNavigate('tasks')}>مشاهدهٔ همه</button></header>
    {error&&<p role="alert" className="employee-empty">{error}<button type="button" className="btn" onClick={()=>setVersion(v=>v+1)}>تلاش دوباره</button></p>}
    {!current&&!error&&<p role="status" className="employee-empty">در حال دریافت خلاصهٔ کارتابل…</p>}
@@ -54,8 +59,7 @@ export function EmployeeHome({user,apps,onNavigate,workspace,onWorkspaceChange}:
   </section>
   <div className="employee-home-help"><p>ارسال و پاسخ پیام‌ها از بخش «پیام‌ها» در کارتابل انجام می‌شود.</p>{apps.some(a=>a.key==='mobile-install')&&<button type="button" onClick={()=>onNavigate('mobile-install')}>نصب روی گوشی</button>}</div>
   </>}
-  {workspaces.length>1&&!active&&<section className="employee-workspaces" aria-label="نقش‌های من"><h3>نقش‌های من</h3><div className="employee-workspace-grid">{workspaces.map(w=><button type="button" className="employee-workspace-tile" key={w.id} onClick={()=>selectWorkspace(w.id)}><span className="employee-service-icon"><BriefcaseBusiness size={20}/></span><span><strong>{w.title}</strong><small>{w.group}</small></span></button>)}</div></section>}
-  {active&&<section className="employee-workspace-tools" aria-label={'ابزارهای '+active.title}><h3>ابزارهای {active.title}</h3><div className="employee-workspace-grid">{active.links.filter((link,index,all)=>all.findIndex(other=>other.section===link.section&&(other.target||'')===(link.target||''))===index).map(link=>{const Icon=apps.find(a=>a.key===link.section)?.icon||(link.section==='assets'?Boxes:ClipboardList);return <button type="button" className="employee-workspace-tile" key={link.section+':'+(link.target||'')} onClick={()=>onNavigate(link.section,link.target)}><span className="employee-service-icon"><Icon size={20}/></span><strong>{link.title}</strong></button>})}</div><p className="employee-workspace-note">کارها و پیام‌های این نقش در «کارتابل من» پیگیری می‌شوند.</p>{rolePage&&<button type="button" className="employee-workspace-back" onClick={()=>onNavigate('tasks')}>باز کردن کارتابل من</button>}</section>}
-  {!rolePage&&!!jobs.length&&<section className="employee-home-work"><h3>{workspaces.length?'سایر ابزارهای مجاز':'برنامه‌های شغلی شما'}</h3><PersonalHome accountId={user.userId} name={user.name} apps={jobs} scope="employee-work" title="برنامه‌های شغلی" greeting={false} compact onNavigate={section=>onNavigate(section,section==='personnel'?personnelWork?.target:undefined)}/></section>}
+  {rolePage&&roleTools}
+
  </section>;
 }

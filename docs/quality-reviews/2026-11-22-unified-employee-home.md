@@ -13,3 +13,7 @@ The session endpoint projects catalog navigation from current assigned profile I
 - inbox checks participant-only privacy, positions, reassignment, approval, attachment, idempotency and separate test profile identity/audit rules.
 
 Build, exact GitHub/native source parity, publication and live verification are recorded in the external release evidence after completion. Local browser uses isolated fixture accounts; no production employee role or personnel data was edited for QA. Earlier release-5 remote-build publication failed on an unsupported dependency source, so a successful release-6 deployment must be confirmed before reporting publication.
+
+## Owner layout amendment — release 7
+
+Move single-role tools and multi-role selection immediately below the shared cartable/personnel cards, before the cartable summary. Legacy tools follow role tools. This is DOM order only; original navigation, grants and workflow handlers are unchanged. Rebuild and responsive browser verification apply to the final layout.
