@@ -16,7 +16,7 @@ import {accessPermissions} from './permissions';
 import {advanceMonth} from './personnel-contract';
 import {storage} from './storage';
 import {AccessError,requireProfileAdmin} from './authorization';
-import {employeeDetails,employmentChanges,employmentModes,personnelBankAccount} from './personnel-employment';
+import {employeeDetails,employmentChanges,employmentModes,personnelBankAccount,personnelBankDetails} from './personnel-employment';
 import {trainingContext} from './training-context';
 import {leadMembers,leadMemberGuard} from './sales-leads';
 import {dayAt,addDay} from './duties';
@@ -149,9 +149,9 @@ export async function applyPersonnel(u:Session,b:any){
   if(old&&d.state==='active'&&d.leaveMinutes===0&&!d.leaveOpeningAsOf&&opening>0&&!openingAsOf)hrFail('برای افزودن مانده دستی به اعتبار ماهانه، تاریخ مانده اولیه را هم ثبت کنید.');
   if(old&&d.leaveMinutes>0&&!d.leaveOpeningAsOf&&!openingAsOf&&opening<d.leaveMinutes-legacyLeaveBalance(rows,mid))hrFail('مانده پایه کمتر از مرخصی مصرف یا رزروشده است.');
   const familyChange=old?administrativeFamilyChange(b,old,rows,a,now):null;if(familyChange)changes.push({...familyChange,data:history(null,familyChange.data)});
-  const accountInput=Object.hasOwn(b,'bankAccount')?stxt(b.bankAccount||'',100):d.bankAccount||'',bankAccount=old&&accountInput===(old.data.bankAccount||'')?accountInput:personnelBankAccount(accountInput);
+  const bankDetails=personnelBankDetails(b,old?.data);
   const details=employeeDetails(b,d);if(old&&(d.profileApprovedAt||d.identityCompleteAt)){details.maritalStatus=d.maritalStatus;details.childrenCount=d.childrenCount;}
-  d={...d,...details,...payrollEmployeeFacts(b,d,rows),...(provisional?{mobile:contactPatch({mobile:b.mobile??d.mobile}).mobile}:{}),productionEligible:Object.hasOwn(b,'productionEligible')?b.productionEligible:typeof d.productionEligible==='boolean'?d.productionEligible:productionRoleDefault(m),memberId:mid,name:m.name,code:old?.data.code||'',unit:old?.data.unit||'',title:old?.data.title||'',location:sreq(b.location,200),managerId,start,end,employment:sreq(b.employment,100),state:b.active===false?'disabled':'active',leaveMinutes:opening,...(openingAsOf?{leaveOpeningAsOf:openingAsOf}:{}),bankAccount,personal:stxt(b.personal||'',2000)};
+  d={...d,...details,...payrollEmployeeFacts(b,d,rows),...(provisional?{mobile:contactPatch({mobile:b.mobile??d.mobile}).mobile}:{}),productionEligible:Object.hasOwn(b,'productionEligible')?b.productionEligible:typeof d.productionEligible==='boolean'?d.productionEligible:productionRoleDefault(m),memberId:mid,name:m.name,code:old?.data.code||'',unit:old?.data.unit||'',title:old?.data.title||'',location:sreq(b.location,200),managerId,start,end,employment:sreq(b.employment,100),state:b.active===false?'disabled':'active',leaveMinutes:opening,...(openingAsOf?{leaveOpeningAsOf:openingAsOf}:{}),...bankDetails,personal:stxt(b.personal||'',2000)};
   if(old&&old.data.state==='active'&&(opening!==old.data.leaveMinutes||openingAsOf!==(old.data.leaveOpeningAsOf||'')||start!==old.data.start||end!==(old.data.end||''))){let prospective;try{prospective=leaveAccounting(rows.map(r=>r.id===old.id?{...r,data:d}:r),mid,dayAt());}catch(e){return hrFail((e as Error).message);}if(prospective.accountingMode==='legacy'?prospective.availableMinutes===null||prospective.availableMinutes<0:prospective.remainingDays===null||prospective.remainingDays<0)hrFail('مانده جدید کمتر از مرخصی مصرف یا رزروشده است؛ ابتدا سوابق و درخواست‌های معطل را تطبیق دهید.');}
   delete d.setupMissing;
  }else if(mode==='shift'){
