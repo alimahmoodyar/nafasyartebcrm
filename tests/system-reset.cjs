@@ -96,6 +96,59 @@ let chain=Promise.resolve();const batch=db.batch.bind(db);db.batch=s=>{const p=c
  assert.ok(!JSON.stringify(sql.prepare('SELECT * FROM access_audit').all()).includes(secret));assert.ok(!JSON.stringify(sql.prepare('SELECT * FROM reset_jobs').all()).includes(secret));
  // Test-only re-arm for the other scope; app offers no way to undo go-live.
  restoreTest();seed('sub-order-full','subcontract_order',{state:'closed'});seed('sub-file-full','subcontract_file',{orderId:'sub-order-full',objectKey:'subcontract-full',filename:'signed.pdf'});objects.set('subcontract-full',new TextEncoder().encode('SIGNED_FULL'));seed('driver-mission','transport',{state:'assigned',driverId:'staff',vehicleId:'vehicle',checklist:{packagesChecked:true},blocker:{state:'open',reason:'vehicle_fault',retryDay:'2026-10-08'},vehicleReports:[{id:'reading',odometer:1000,kind:'reading'}]});await post({mode:'password',revision:control().revision,password:secret});id=crypto.randomUUID();job=(await post({mode:'prepare',id,scope:'full',password:secret})).data.job;await run(u,()=>backup.GET(request('/api/system-reset/backup?id='+id)));r=await post({mode:'execute',id,password:secret,confirmationCode:job.confirmationCode,backupAcknowledged:true});assert.equal(r.status,200,JSON.stringify(r));assert.equal(sql.prepare("SELECT id FROM flow_entities WHERE id='driver-mission'").get(),undefined);assert.equal(sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type IN ('subcontract_order','subcontract_file','employee_purchase_request')").get().n,0);assert.equal(count('records'),0);assert.equal(sql.prepare("SELECT id FROM flow_entities WHERE type GLOB 'asset_*'").get(),undefined);assert.equal(sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type GLOB 'hr_*'").get().n,0);assert.equal(sql.prepare("SELECT id FROM flow_entities WHERE id='test-sales-lead'").get(),undefined);assert.equal(sql.prepare("SELECT id FROM duty_runs WHERE id='lead-task'").get(),undefined);assert.equal(sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type IN ('bank_guarantee','guarantee_file')").get().n,0);assert.ok(sql.prepare("SELECT id FROM flow_entities WHERE id='hospital-center'").get());assert.equal(count('quality_templates'),0);assert.equal(count('bom_versions'),0);assert.equal(sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type IN ('supplier','supplier_material','supplier_review','supplier_document','supplier_capa','material','party','transport_vehicle')").get().n,0);assert.ok(sql.prepare("SELECT id FROM flow_entities WHERE id='agent'").get());assert.ok(sql.prepare("SELECT id FROM flow_entities WHERE id='profile:staff'").get());
+ // Start a fresh simulated installation with real personnel dossiers and throwaway operations.
+ restoreTest();
+ const keepPersonnel={
+  'kept-employee':['hr_employee',{memberId:'staff',nationalId:'SYNTHETIC',insuranceBasis:{reportFileId:'kept-personnel-file'}}],
+  'kept-contract':['hr_contract',{memberId:'staff',state:'active'}],
+  'kept-employment-doc':['hr_document',{memberId:'staff',state:'published'}],
+  'kept-ruling':['hr_ruling',{memberId:'staff',contractId:'kept-contract',policyId:'kept-payroll-policy'}],
+  'kept-payroll-policy':['hr_policy',{state:'published'}],
+  'kept-shift':['hr_shift',{state:'published'}],
+  'kept-assignment':['hr_assignment',{memberId:'staff',shiftId:'kept-shift'}],
+  'kept-family':['hr_request',{memberId:'staff',kind:'family',state:'approved'}],
+  'kept-personnel-file':['hr_file',{caseId:'kept-employee',objectKey:'staff-private-proof',filename:'proof.pdf'}],
+  'kept-contract-file':['hr_file',{caseId:'kept-contract',objectKey:'contract-private-proof',filename:'proof.pdf'}],
+  'kept-family-file':['hr_file',{caseId:'kept-family',objectKey:'family-private-proof',filename:'proof.pdf'}],
+ };
+ for(const [key,[type,data]] of Object.entries(keepPersonnel))seed(key,type,data);
+ objects.set('staff-private-proof',new TextEncoder().encode('KEPT_HR_PRIVATE_FILE'));
+ const purgePersonnel={
+  'demo-punch':['hr_punch',{memberId:'staff'}],
+  'demo-payroll':['hr_payroll',{memberId:'staff'}],
+  'demo-leave':['hr_request',{memberId:'staff',kind:'leave',state:'approved'}],
+  'demo-family-draft':['hr_request',{memberId:'staff',kind:'family',state:'draft'}],
+  'demo-incomplete-request':['hr_request',{memberId:'staff'}],
+  'demo-orphan-file':['hr_file',{memberId:'staff',objectKey:'demo-orphan',filename:'test.pdf'}],
+  'demo-payroll-file':['hr_file',{caseId:'demo-payroll',objectKey:'demo-payslip',filename:'payroll.pdf'}],
+  'demo-warehouse':['material_warehouse',{kind:'raw',active:true}],
+ };
+ for(const [key,[type,data]] of Object.entries(purgePersonnel))seed(key,type,data);
+ record('demo-product','product');
+ const rawRow=key=>sql.prepare('SELECT * FROM flow_entities WHERE id=?').get(key);
+ const preservedRows=Object.keys(keepPersonnel).map(rawRow);
+ const personnelScope='full_keep_personnel';
+ const preview=await get(u,personnelScope);assert.equal(preview.status,200,JSON.stringify(preview));assert.equal(preview.data.scope,personnelScope);
+ assert.ok(preview.data.preserved.some(x=>x.includes('پرونده‌های پرسنلی')));
+ await post({mode:'password',revision:control().revision,password:secret});
+ id=crypto.randomUUID();r=await post({mode:'prepare',id,scope:personnelScope,password:secret});assert.equal(r.status,200,JSON.stringify(r));job=r.data.job;
+ assert.equal(job.scope,personnelScope);
+ assert.deepEqual(Object.keys(keepPersonnel).map(rawRow),preservedRows);
+ br=await run(u,()=>backup.GET(request('/api/system-reset/backup?id='+id)));assert.equal(br.status,200);
+ const personnelSnapshot=await br.json(),backedUpIds=personnelSnapshot.tables.flow_entities.map(row=>row.id);
+ for(const key of Object.keys(keepPersonnel))assert.ok(!backedUpIds.includes(key),key);
+ for(const key of Object.keys(purgePersonnel))assert.ok(backedUpIds.includes(key),key);
+ const personnelCommit={mode:'execute',id,password:secret,confirmationCode:job.confirmationCode,backupAcknowledged:true};
+ sql.exec("CREATE TRIGGER test_personnel_rollback BEFORE DELETE ON records BEGIN SELECT RAISE(ABORT,'test rollback'); END;");
+ assert.equal((await post(personnelCommit)).status,409);assert.ok(rawRow('demo-payroll'));
+ assert.deepEqual(Object.keys(keepPersonnel).map(rawRow),preservedRows);
+ sql.exec('DROP TRIGGER test_personnel_rollback');
+ r=await post(personnelCommit);assert.equal(r.status,200,JSON.stringify(r));
+ assert.deepEqual(Object.keys(keepPersonnel).map(rawRow),preservedRows);
+ for(const key of Object.keys(purgePersonnel))assert.equal(rawRow(key),undefined,key);
+ assert.equal(count('records'),0);assert.equal(count('password_accounts'),1);
+ assert.equal(new TextDecoder().decode(objects.get('staff-private-proof')),'KEPT_HR_PRIVATE_FILE');
+ assert.equal(control().phase,'live');
  const p={user:staff,scope:'read_write',tokenId:null};await assert.rejects(()=>catalog.executeTool('get_system_reset_status',{},base,p),/Administrator/);await assert.rejects(()=>catalog.executeTool('execute_system_reset',{id,password:secret,confirmationCode:job.confirmationCode,backupAcknowledged:true,confirmed:true},base,{...p,user:u,scope:'read'}),/read-only/);
  const policy=load('lib/assistant-policy.ts');for(const n of ['set_system_reset_password','prepare_system_reset','execute_system_reset','cancel_system_reset'])assert.equal(policy.assistantWriteNames.has(n),false);
  assert.equal(policy.canOpenSection(staff,'system-reset'),false);assert.equal(policy.canOpenSection(u,'system-reset'),true);

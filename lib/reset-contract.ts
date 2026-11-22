@@ -91,7 +91,13 @@
 // full flow_entities backups, both deletion scopes and 0016 maintenance freeze
 // cover it; no new table, FK, blob or preservation exception. Raw device/invite
 // capabilities are never stored; closing scrubs drafts and expiry denies access.
-export const resetScopes:Record<string,string>={operations:'پاک‌سازی سوابق و موجودی؛ حفظ تعاریف کالا',full:'پاک‌سازی سوابق، موجودی و تعاریف کالا'};
+export const personnelResetScope='full_keep_personnel';
+export const personnelResetPreserved=[
+ 'پرونده‌های پرسنلی، قراردادها، احکام و مدارک متصل به پرونده',
+ 'تغییرات خانوادگی تأییدشده و مدارک آن‌ها، برنامهٔ شیفت و قواعد حقوق',
+];
+export const resetScopes:Record<string,string>={operations:'پاک‌سازی سوابق و موجودی؛ حفظ تعاریف کالا',full:'پاک‌سازی سوابق، موجودی و تعاریف کالا',[personnelResetScope]:'پاک‌سازی سوابق و تعاریف کالا با حفظ پرونده‌های پرسنلی'};
+export const preservedForReset=(scope:string)=>scope===personnelResetScope?[...personnelResetPreserved,...resetPreserved]:resetPreserved;
 // build_intake, approval/specification versions and linked build_project are operational
 // flow_entities: both scopes back up/delete them; generic 0016 freezes all mutations.
 // Product customer-order templates remain qms_record catalogs; attachments reuse sales_file
@@ -113,6 +119,10 @@ export const resetTables:Record<string,string>={
 // Member contacts are preserved account identity data, keyed by app_members.id.
 // Existing 0016 generic flow_entities freeze protects their atomic writes; no new migration.
 export const resetFlowPreserved=['personnel_code','personnel_code_claim','personnel_code_sequence','member_role_assignment','representative_identity','representative_identity_file','hospital_center','account_profile','member_contact','position','duty_template','duty_catalog_install','transport_migration','development_request','as_agent','sales_agent'];
+const personnelDossierTypes="'hr_employee','hr_contract','hr_document','hr_ruling','hr_link_archive','hr_shift','hr_assignment','hr_policy'";
+// Family approvals contribute to the current dossier. Other requests are operational history.
+const personnelDossier=(row:string)=>`(${row}.type IN (${personnelDossierTypes}) OR (${row}.type='hr_request' AND CASE WHEN json_valid(${row}.data) THEN COALESCE(json_extract(${row}.data,'$.kind')='family' AND json_extract(${row}.data,'$.state')='approved',0) ELSE 0 END))`;
+const personnelFile=`(flow_entities.type='hr_file' AND CASE WHEN json_valid(flow_entities.data) THEN json_extract(flow_entities.data,'$.caseId') IN (SELECT dossier.id FROM flow_entities dossier WHERE ${personnelDossier('dossier')}) ELSE 0 END)`;
 // material_photo is catalog data: active and removed originals/thumbnails survive operations reset with material; full reset backs up both object keys and deletes all photo rows. Generic 0016 flow/inventory freeze protects upload/removal; no new table/FK. Training uses existing flow and bucket isolation.
 // Shared print layouts are configuration; existing flow_entities freeze and backup apply.
 // Service representation contract versions and current pointers on as_agent: operations preserve catalog/history; full reset removes contracts and leaves explicit missing-reference state, never invents validity. Generic flow freeze covers atomic renewal/termination and warning closure; no new table/FK/blob.
@@ -125,11 +135,14 @@ export const resetFlowCatalog=['functional_qc_template','daily_usd_rate','custom
 // Service province/coverage lives inside as_agent (preserved identity) and
 // customer province inside as_case (operational reset); existing backup/freeze apply.
 export function resetWhere(table:string,scope:string){
- if(scope!=='operations'&&scope!=='full')throw Error('Invalid reset scope');
+ if(!Object.hasOwn(resetScopes,scope))throw Error('Invalid reset scope');
  if(!Object.hasOwn(resetTables,table))throw Error('Invalid reset table');
   if(['bale_config','bale_links'].includes(table))return '0=1';
  if(scope==='operations'&&['accounting_rules','accounting_periods','accounting_accounts','accounting_settings'].includes(table))return '0=1';
- if(table==='flow_entities')return "type NOT IN ("+[...resetFlowPreserved,...(scope==='operations'?resetFlowCatalog:[])].map(t=>"'"+t+"'").join(',')+")";
+ if(table==='flow_entities'){
+  const existing="type NOT IN ("+[...resetFlowPreserved,...(scope==='operations'?resetFlowCatalog:[])].map(t=>"'"+t+"'").join(',')+")";
+  return scope===personnelResetScope?`${existing} AND NOT ${personnelDossier('flow_entities')} AND NOT COALESCE(${personnelFile},0)`:existing;
+ }
  if(scope==='operations'&&['quality_templates','bom_versions','firmware_files'].includes(table))return '0=1';
  if(table==='records'&&scope==='operations')return "kind NOT IN ('product','firmware')";
  return '1=1';

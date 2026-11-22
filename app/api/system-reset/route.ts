@@ -4,7 +4,7 @@ import {storage} from '@/lib/storage';
 import {boundedBody,firmwareBucket} from '@/lib/firmware-storage';
 import {hashPassword,password as validatePassword,digest} from '@/lib/password-auth';
 import {localDay} from '@/lib/persian-date';
-import {resetTables,resetScopes,resetPreserved,resetCatalog,resetWhere,resetHelp} from '@/lib/reset-contract';
+import {resetTables,resetScopes,preservedForReset,resetCatalog,resetWhere,resetHelp} from '@/lib/reset-contract';
 import {resetControl,resetSecret,resetCounts,resetFiles,readResetBackup,resetCode,publicResetJob,resetAudit,resetFail as fail} from '@/lib/system-reset';
 const json=(v:unknown)=>Response.json(v,{headers:{'Cache-Control':'private, no-store','Vary':'Cookie, Authorization'}});
 const uuid=(x:any)=>{if(typeof x!=='string'||! /^[a-f0-9-]{36}$/i.test(x))fail('شناسه معتبر لازم است.');return x as string};
@@ -13,7 +13,7 @@ export async function GET(request:Request){try{
  const q=new URL(request.url).searchParams;if(q.get('view')==='state'){const u=await requireAccess();account(request,u);const c=await resetControl();return json({accountId:u.userId,phase:c.phase});}
  const u=await requireAdmin();account(request,u);await guardQmsBackup(u);const c=await resetControl(),db=storage(),scope=q.get('scope')||'operations';if(!Object.hasOwn(resetScopes,scope))fail('محدوده معتبر انتخاب کنید.');
  const jobs=(await db.prepare('SELECT * FROM reset_jobs ORDER BY created DESC LIMIT 20').all()).results;
- return json({accountId:u.userId,phase:c.phase,hasPassword:!!c.password_hash,revision:c.revision,activeJobId:c.job_id,scopes:resetScopes,preserved:resetPreserved,catalog:resetCatalog,help:resetHelp,counts:await resetCounts(scope),scope,jobs:jobs.map(publicResetJob)});
+ return json({accountId:u.userId,phase:c.phase,hasPassword:!!c.password_hash,revision:c.revision,activeJobId:c.job_id,scopes:resetScopes,preserved:preservedForReset(scope),catalog:resetCatalog,help:resetHelp,counts:await resetCounts(scope),scope,jobs:jobs.map(publicResetJob)});
  }catch(e){return accessResponse(e)||Response.json({error:'دریافت تنظیمات پاک‌سازی ممکن نشد؛ مهاجرت 0016 سرور را بررسی کنید.'},{status:503})}}
 export async function POST(request:Request){let preparing='';try{
  checkOrigin(request);const u=await requireAdmin();account(request,u);await guardQmsBackup(u);const b=JSON.parse(new TextDecoder().decode(await boundedBody(request,4000))),db=storage(),c=await resetControl();
