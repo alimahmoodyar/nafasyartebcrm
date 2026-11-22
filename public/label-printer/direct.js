@@ -24,7 +24,8 @@
     if (!result.ok) throw Error('رابط چاپ درخواست را نپذیرفت.');
     return result.json();
   }
-  get('connect').onclick = async () => {
+  let connecting;
+  async function discover() {
     get('connect').disabled = true;
     try {
       port=18743;
@@ -47,6 +48,22 @@
       get('controls').hidden = true; get('install').open = true;
       status.textContent = 'ارتباط برقرار نشد. رابط ویندوز را نصب کنید و اجازهٔ دسترسی مرورگر به دستگاه محلی را بدهید.';
     } finally { get('connect').disabled = false; }
+  };
+  function connect(){
+    if(!connecting)connecting=discover().finally(()=>{connecting=null;});
+    return connecting;
+  }
+  get('connect').onclick=connect;
+  panel.requestPrint=async test=>{
+    panel.scrollIntoView({block:'nearest'});
+    if(get('controls').hidden)await connect();
+    if(get('controls').hidden||!printer.value)return;
+    if(printer.options.length>1 && printer.value!==localStorage.getItem(key)){
+      printer.focus();
+      status.textContent='چاپگر را انتخاب کنید و دکمهٔ ارسال را بزنید.';
+      return;
+    }
+    await send(test);
   };
   let renderer;
   function loadRenderer() {

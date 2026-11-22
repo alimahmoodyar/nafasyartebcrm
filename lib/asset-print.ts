@@ -13,7 +13,7 @@ export async function assetPrintHtml(row:any,query:URLSearchParams,templates:Lab
  if(template?.assetPaper)for(const [key,v]of Object.entries({paperHeight:template.assetPaper.height,rowAnchor:template.assetPaper.anchor,offsetX:template.assetPaper.x,offsetY:template.assetPaper.y}))if(!q.has(key))q.set(key,String(v));
  const layout=q.get('layout')||'thermal',sheet=q.get('sheetSize')||'a4',copies=Number(q.get('copies')||row.labelCopies||'1');
  if(!['thermal','roll','a4'].includes(layout)||!['a4','a3'].includes(sheet)||!/^\d+$/.test(q.get('copies')||'1')||copies<1||copies>100)throw new AccessError('نوع کاغذ، اندازه برگه یا تعداد چاپ معتبر نیست.',400);
- const group=Array.isArray(row.registrationItems)?row.registrationItems:null,printItems=group||[{...row,number:row.registrationNumber,copies}],longest=(key:string)=>printItems.reduce((a:string,r:any)=>String(r[key]||'').length>a.length?String(r[key]||''):a,''),roll=readRoll(q,{width:60,height:40}),{width,height}=roll,fit=assetPrintLayout(width,height,longest('name'),longest('code'))!;
+ const group=Array.isArray(row.registrationItems)?row.registrationItems:null,printItems=group||[{...row,number:row.registrationNumber,copies}],longest=(key:string)=>printItems.reduce((a:string,r:any)=>String(r[key]||'').length>a.length?String(r[key]||''):a,''),roll=readRoll(q,layout==='thermal'?{width:45,height:30}:{width:60,height:40}),{width,height}=roll,fit=assetPrintLayout(width,height,longest('name'),longest('code'))!;
  if(width>1000||height>1000||roll.rollWidth>3000||roll.gapX>1000||roll.gapY>1000)throw new AccessError('اندازه چاپ خارج از محدوده است.',400);
  const assetPaper=layout==='roll'?readAssetPaper(q,roll,!!template&&!template.assetPaper):{height:rollPitch(roll),anchor:'top',x:0,y:0},rowTop=assetPaper.anchor==='bottom'?assetPaper.height-height:assetPaper.anchor==='middle'?(assetPaper.height-height)/2:roll.top;
  const paper=sheet==='a3'?{width:297,height:420}:{width:210,height:297},margin=8;
@@ -46,5 +46,15 @@ export async function assetPrintHtml(row:any,query:URLSearchParams,templates:Lab
  function fitAssetLabels(){document.querySelectorAll('.label .words').forEach(target=>{const initial=Number(target.dataset.font)||parseFloat(getComputedStyle(target).fontSize);target.dataset.font=String(initial);target.style.fontSize=initial+'px';const fits=()=>target.scrollHeight<=target.clientHeight+0.5&&target.scrollWidth<=target.clientWidth+0.5&&Array.from(target.children).every(child=>child.scrollWidth<=child.clientWidth+0.5&&child.scrollHeight<=child.clientHeight+1);if(fits())return;let low=.01,high=initial;for(let n=0;n<20;n++){const size=(low+high)/2;target.style.fontSize=size+'px';if(fits())low=size;else high=size;}target.style.fontSize=low+'px';});}
  ${assetPdfScript(pdfConfig)}
  ${approved?approvedAssetLabelScript:''}
+ const initialAssetOptions=new URLSearchParams(new FormData(form)).toString();
+ form.addEventListener('submit',event=>{
+  const action=event.submitter;
+  if(event.defaultPrevented||action?.name!=='print'||!['1','test'].includes(action.value)||layout.value!=='thermal')return;
+  if(new URLSearchParams(new FormData(form)).toString()!==initialAssetOptions)return;
+  event.preventDefault();
+  const panel=document.querySelector('.direct-label');
+  if(panel?.requestPrint)void panel.requestPrint(action.value==='test');
+  else assetPdfStatus('ابزار چاپ بارگذاری نشد. صفحه را دوباره باز کنید.');
+ });
  window.addEventListener('beforeprint',fitAssetLabels);window.addEventListener('load',()=>{document.fonts.ready.then(()=>{fitAssetLabels();${valid&&!!q.get('print')?"const url=new URL(window.location.href);url.searchParams.delete('print');window.history.replaceState(null,'',url);void showAssetPdf("+(q.get('print')==='download'?'true':'false')+");":''}});});</script></body></html>`;
 }

@@ -35,6 +35,7 @@ function load(file) {
   }
   const asset=process.argv.includes('--asset');
   if(asset){
+    for(const key of ['width','height','layout'])query.delete(key);
     const id='00000000-0000-4000-8000-000000000001';
     code='NAFASYAR-ASSET/1:'+id;
     html=await load(path.join(root,'lib/asset-print.ts')).assetPrintHtml({id,name:'چاپگر لیبل',code:'AM-001245',registrationNumber:3},query,[],false,false);
@@ -46,9 +47,13 @@ function load(file) {
   const originalFetch=window.fetch;
   window.fetch=(url,args)=>String(url).startsWith('http://127.0.0.1:18743/')?originalFetch('/mock/'+url.split('/').pop(),args):originalFetch(url,args);
   window.addEventListener('load',async()=>{
-    await document.querySelector('[data-connect]').onclick();
-    document.querySelector('[data-send]').click();
-    new MutationObserver(()=>{const s=document.querySelector('[data-status]').textContent;if(!s.startsWith('آماده‌سازی لیبل'))originalFetch('/status',{method:'POST',body:s});}).observe(document.querySelector('[data-status]'),{childList:true});
+    if(${asset}){
+      document.querySelector('#label-options button[name="print"][value="1"]').click();
+    }else{
+      await document.querySelector('[data-connect]').onclick();
+      document.querySelector('[data-send]').click();
+    }
+    new MutationObserver(()=>{const s=document.querySelector('[data-status]').textContent;if(!s.startsWith('آماده‌سازی لیبل')&&!s.startsWith('رابط چاپ متصل است'))originalFetch('/status',{method:'POST',body:s});}).observe(document.querySelector('[data-status]'),{childList:true});
   });</script>`;
   let job;
   const server=createServer(async(req,res)=>{
