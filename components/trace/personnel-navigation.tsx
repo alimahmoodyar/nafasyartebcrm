@@ -5,10 +5,10 @@ import './employee-self-service.css';
 const groups=[
  {key:'information',title:'اطلاعات و مدارک',description:'مشخصات، قرارداد و مسئولیت‌ها',icon:ContactRound,views:['personal_contact','personal_documents','personal_duties']},
  {key:'pay',title:'حقوق و کارکرد',description:'فیش حقوقی و حضور',icon:WalletCards,views:['personal_payroll','personal_hours']},
- {key:'requests',title:'درخواست‌ها',description:'ثبت درخواست شخصی',icon:ClipboardPlus,views:['personal_requests','personal_leave','personal_missions','personal_advance','personal_loan','personal_purchase','personal_tracking']},
+ {key:'requests',title:'درخواست‌ها',description:'ثبت درخواست شخصی',icon:ClipboardPlus,views:['personal_requests','personal_family','personal_leave','personal_missions','personal_advance','personal_loan','personal_purchase','personal_tracking']},
  {key:'assets',title:'اموال من',description:'اعلام و تحویل اموال',icon:Package,views:['personal_assets']}
 ];
-const requests=[['personal_requests','انتخاب نوع درخواست'],['personal_leave','مرخصی'],['personal_missions','مأموریت کاری'],['personal_advance','مساعده'],['personal_loan','وام'],['personal_purchase','خرید کالا یا خدمت']];
+const requests=[['personal_requests','انتخاب نوع درخواست'],['personal_leave','مرخصی'],['personal_missions','مأموریت کاری'],['personal_advance','مساعده'],['personal_loan','وام'],['personal_purchase','خرید کالا یا خدمت'],['personal_family','اعلام تغییر وضعیت خانوادگی']];
 export function PersonnelNavigation({value,onChange,contact=false,canManage=false,onTrack}:{value:string;onChange:(value:string)=>void;contact?:boolean;canManage?:boolean;onTrack?:()=>void}){
  const group=groups.find(g=>g.views.includes(value));
  const tabs=group?.key==='information'?[...(contact?[['personal_contact','اطلاعات تماس']]:[]),['personal_documents','مدارک و قراردادها'],['personal_duties','شرح وظایف']]:group?.key==='pay'?[['personal_payroll','فیش‌های حقوقی'],['personal_hours','کارکرد و تردد']]:[];
