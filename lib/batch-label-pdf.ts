@@ -63,10 +63,19 @@ async function buildBatchLabelPdf(directLabel){
  })):[];
  const qrSvg=labels[0].querySelector('.qr svg');
  const qrImage=qrSvg?await loadLabelSvg(qrSvg):null;
+ const logo=labels[0].querySelector('.product-logo');
+ if(logo)await logo.decode();
  const drawPage=async(ctx,page)=>{
   for(const {label,x,y} of page){
    const origin=label.getBoundingClientRect();
    ctx.save();ctx.beginPath();ctx.rect(x,y,batchPdf.width*labelMm,batchPdf.height*labelMm);ctx.clip();
+   if(logo){
+    const rect=label.querySelector('.product-logo').getBoundingClientRect();
+    ctx.drawImage(logo,x+rect.left-origin.left,y+rect.top-origin.top,rect.width,rect.height);
+    const rule=label.querySelector('.brand-rule').getBoundingClientRect();
+    ctx.fillStyle='#111';
+    ctx.fillRect(x+rule.left-origin.left,y+rule.top-origin.top,rule.width,rule.height);
+   }
    if(barcodeBox){
     const rect=label.querySelector('.barcode').getBoundingClientRect();
     // Align Code 128 modules with whole pixels in the generated PDF.

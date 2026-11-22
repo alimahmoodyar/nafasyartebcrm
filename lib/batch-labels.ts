@@ -5,13 +5,16 @@ import {readRoll,readLabelSize,labelContentCss,rollCss,rollInputs,rollPitch,roll
 import {AccessError} from './authorization';
 export type BatchLabelOptions={layout:'thermal'|'a4'|'roll';roll?:RollLayout;symbol:'both'|'barcode'|'qr';copies:number;requestedCopies?:number;hideLocation?:boolean;width:number;height:number};
 export function batchLabelSize(symbol:BatchLabelOptions['symbol'],code='',defaultLocation=''){return symbol==='qr'?{width:60,height:75}:symbol==='barcode'?{width:70,height:defaultLocation.length>120?50:40}:{width:100,height:80};}
+const productLabelSize={width:45,height:30};
 export function batchLabelOptions(q:URLSearchParams,code='',defaultLocation=''):BatchLabelOptions{
  const choice=(key:string,values:string[],fallback:string)=>{const v=q.get(key)??fallback;if(!values.includes(v))throw new AccessError('قالب چاپ یا نوع کد معتبر نیست.',400);return v;};
  const number=(key:string,fallback:number,min:number,max:number)=>{const raw=q.get(key)??String(fallback);if(!/^\d+$/.test(raw)||Number(raw)<min||Number(raw)>max)throw new AccessError('تعداد یا اندازه لیبل خارج از محدوده است.',400);return Number(raw);};
- const symbol=choice('symbol',['both','barcode','qr'],'both') as BatchLabelOptions['symbol'],size=batchLabelSize(symbol,code,defaultLocation);
+ const symbol=choice('symbol',['both','barcode','qr'],'qr') as BatchLabelOptions['symbol'];
+ const simpleQr=symbol==='qr' && (q.get('qrContent')??'scan')==='scan';
+ const hideLocation=(q.get('location')??(simpleQr?'hide':'show'))==='hide';
+ const size=simpleQr && hideLocation?productLabelSize:batchLabelSize(symbol,code,defaultLocation);
  const layout=choice('layout',['thermal','a4','roll'],'thermal') as BatchLabelOptions['layout'];
  const copies=number('copies',1,1,100);
- const hideLocation=q.get('location')==='hide';
  if(layout!=='roll')return {layout,symbol,copies,hideLocation,...readLabelSize(q,size)};
  const roll=readRoll(q,size);
  return {layout,symbol,width:roll.width,height:roll.height,hideLocation,copies:q.get('print')==='test'?Math.min(roll.columns,copies):copies,requestedCopies:copies,roll};
@@ -24,19 +27,29 @@ export async function batchLabelHtml(batch:{id:string;data:Record<string,string>
  const {code128,qrcode,drawingSVG}=await import('@bwip-js/generic');
  const barcode=o.symbol==='qr'?'':code128({bcid:'code128',text:code,scale:1,height:12,paddingwidth:10,paddingheight:1,backgroundcolor:'FFFFFF'},drawingSVG()) as string;
  const qr=o.symbol==='barcode'?'':qrcode({bcid:'qrcode',text:qrText,scale:1,padding:4,backgroundcolor:'FFFFFF'},drawingSVG()) as string;
- const design=batchLabelSize(o.symbol,code,defaultLocation),qrSize=Math.min(40,design.height-15);
+ // Use the small roll at its actual size for the short, scannable batch identity.
+ const compactProduct=o.width===productLabelSize.width && o.height===productLabelSize.height && o.symbol==='qr' && qrContent==='scan' && (!defaultLocation || o.hideLocation);
+ const design=compactProduct?productLabelSize:batchLabelSize(o.symbol,code,defaultLocation),qrSize=Math.min(40,design.height-15);
  const name=esc(batch.data.part||batch.data.name||'کالا'),human=esc(code),id=esc(batch.id);
  const symbols=`<div class="symbols">${barcode?`<div class="barcode" role="img" aria-label="بارکد بچ ${human}">${barcode}</div>`:''}${qr?`<div class="qr" role="img" aria-label="QR بچ ${human}">${qr}</div>`:''}</div>`;
- const label=`<article class="label"><div class="label-content"><div class="name">${name}</div>${symbols}<div class="batch" dir="ltr">${human}</div><div class="part">کد کالا: <bdi>${esc(batch.data.partCode||'—')}</bdi></div>${defaultLocation?`<div class="storage"><strong>محل پیش‌فرض نگهداری:</strong> ${esc(defaultLocation)}</div>`:''}</div></article>`;
+ const label=`<article class="label${compactProduct?' compact-product':''}"><div class="label-content">${compactProduct?'<img class="product-logo" src="/brand/nafasyar-logo.png" alt="نفس‌یار"><span class="brand-rule" aria-hidden="true"></span>':''}<div class="name">${name}</div>${symbols}<div class="batch" dir="${compactProduct?'rtl':'ltr'}">${compactProduct?'بچ \u2066'+human+'\u2069':human}</div><div class="part">کد کالا: <bdi>${esc(batch.data.partCode||'—')}</bdi></div>${defaultLocation&&!o.hideLocation?`<div class="storage"><strong>محل پیش‌فرض نگهداری:</strong> ${esc(defaultLocation)}</div>`:''}</div></article>`;
  const roll=o.roll,pitch=roll?rollPitch(roll):0;
  const columns=Math.max(1,Math.floor(194/(o.width+2)));
  const scale=Math.min(1,o.width/design.width,o.height/design.height);
  const rows=roll?rollRows(Array(o.copies).fill(label),roll):label.repeat(o.copies);
  const geometry=roll??readRoll(new URLSearchParams(),{width:o.width,height:o.height});
- const sizes=Object.fromEntries((['barcode','qr','both'] as const).map(symbol=>[symbol,batchLabelSize(symbol,code,defaultLocation)])),recommended=batchLabelSize(o.symbol,code,defaultLocation);
+ const sizes=Object.fromEntries((['barcode','qr','both'] as const).map(symbol=>[symbol,symbol==='qr' && o.hideLocation && qrContent==='scan'?productLabelSize:batchLabelSize(symbol,code,defaultLocation)])),recommended=sizes[o.symbol];
  const select=(key:string,choices:[string,string][],value:string)=>`<select name="${key}">${choices.map(([v,title])=>`<option value="${v}"${value===v?' selected':''}>${title}</option>`).join('')}</select>`;
  return `<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>چاپ لیبل بچ ${human}</title><style>
  @font-face{font-family:Vazirmatn;src:url('/fonts/Vazirmatn.woff2') format('woff2');font-display:swap}*{box-sizing:border-box}body{margin:0;background:#eef2f7;color:#111;font-family:Vazirmatn,Tahoma,sans-serif}header{max-width:900px;margin:16px auto;padding:16px;background:white;border-radius:12px;line-height:1.9}h1{font-size:20px;margin:0}.recommendation{padding:10px 12px;background:#eef8f3;border-radius:8px;font-weight:600}form{display:flex;gap:12px;flex-wrap:wrap;align-items:end}label{display:flex;flex-direction:column;font-size:13px}input,select,button{font:inherit;padding:7px;border:1px solid #bbc7d4;border-radius:6px}input{width:90px}button{cursor:pointer}.print{margin-top:12px;background:#177a4c;color:white;padding:8px 20px}.sheet{display:grid;grid-template-columns:repeat(${o.layout==='a4'?columns:1},${o.width}mm);gap:${o.layout==='a4'?'2mm':'0'};width:max-content;margin:16px auto}.label{width:${o.width}mm;height:${o.height}mm;background:white;break-inside:avoid;border:1px dashed #aaa;overflow:hidden;direction:rtl}.label-content{padding:2mm;display:flex;flex-direction:column;align-items:stretch;justify-content:space-between}${labelContentCss(o,design)}.name{font-size:9pt;font-weight:bold;line-height:1.25;max-height:${design.height<36?'4':'7'}mm;overflow:hidden;overflow-wrap:anywhere;text-align:center}.symbols{display:flex;flex-direction:${o.symbol==='both'?'column':'row'};gap:1mm;align-items:center;justify-content:center;direction:ltr;height:${o.symbol==='both'?qrSize+15:o.symbol==='barcode'?14:qrSize}mm;flex-shrink:0}.barcode{width:100%;min-width:0;height:14mm}.barcode svg{width:100%;height:100%;display:block}.qr{width:${qrSize}mm;height:${qrSize}mm;flex-shrink:0}.qr svg{width:100%;height:100%;display:block}.batch{font:700 ${code.length>35?'6':'8'}pt monospace;text-align:center;white-space:nowrap}.storage{font-size:6.5pt;line-height:1.25;text-align:center;overflow-wrap:anywhere}.part{font-size:7pt;text-align:center;line-height:1.2}small{color:#526276}${roll?rollCss(roll)+`.roll-row .label{padding:1.5mm} .roll-row .name{font-size:8pt;max-height:${o.height<30?'4':'7'}mm}.roll-row .symbols,.roll-row .barcode{${o.symbol==='barcode'&&o.height<30?'height:8mm':''}}.roll-row .part{font-size:6pt}.roll-row .batch{font-size:${o.width<35?5:7}pt}`:''}@page{size:${roll?`${roll.rollWidth}mm ${pitch}mm`:o.layout==='thermal'?`${o.width}mm ${o.height}mm`:'A4'};margin:${o.layout==='a4'?'8mm':'0'}}@media print{body{background:white}header{display:none}.sheet{margin:0;${o.layout==='thermal'?'display:block;':''}}.label{border:0;${o.layout==='thermal'?'break-after:page;':''}}.label:last-child{break-after:auto}}
+ .compact-product .label-content{display:grid;padding:1mm;grid-template-columns:minmax(0,1fr) 24mm;grid-template-rows:9mm 7mm 7mm 3.5mm;gap:.5mm;align-items:center}
+ .compact-product .symbols{grid-column:2;grid-row:1/4;width:24mm;height:24mm}
+ .compact-product .qr{width:24mm;height:24mm}
+ .compact-product .product-logo{grid-column:1;grid-row:1;justify-self:center;width:auto;height:auto;max-width:100%;max-height:8mm}
+ .compact-product .brand-rule{grid-column:1;grid-row:1;align-self:end;background:#111;height:.25mm}
+ .compact-product .name{grid-column:1;grid-row:2;font-size:10pt;line-height:1.15;max-height:10mm}
+ .compact-product .part{grid-column:1;grid-row:3;font-size:8pt}
+ .compact-product .batch{grid-column:1/3;grid-row:4;font-family:Vazirmatn,Tahoma,sans-serif;font-size:10pt;line-height:1.2}
  [hidden]{display:none!important}.batch-pdf-open>header,.batch-pdf-open>.sheet{display:none}
  .batch-pdf-viewer{max-width:960px;margin:16px auto;padding:16px;background:#fff;border-radius:12px;color:#111}
  .batch-pdf-toolbar,.batch-pdf-pages{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
