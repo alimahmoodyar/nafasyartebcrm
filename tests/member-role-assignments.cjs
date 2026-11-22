@@ -63,6 +63,22 @@ const record=()=>JSON.parse(sql.prepare("SELECT data FROM flow_entities WHERE id
  const profiles=load('lib/role-profiles.ts').roleProfiles;
  for(const profile of profiles.filter(p=>p.operational&&!['sales-representative','home-service-representative'].includes(p.id))){const binding={profileId:profile.id,...(['central-store','line-store','quality'].includes(profile.id)?{warehouseIds:[profile.id==='line-store'?'line':'central']}:{})};const test=await draft([binding],'replace'),r=await post(admin,test);assert.equal(r.status,200,profile.id+': '+await r.clone().text());const checked=await r.json(),real={...target,permissions:checked.after};for(const link of profile.links)assert.ok(load('lib/navigation-access.ts').canOpenSection(real,link.section),profile.id+' real account cannot open '+link.section);if(profile.id==='personnel-hr')assert.equal(load('components/trace/employee-home-policy.ts').personnelWorkEntry(real).target,'hr-admin:');}
  const homePolicy=load('lib/employee-workspaces.ts');
+ const menuPolicy=load('lib/central-warehouse-menu.ts'),navigation=load('lib/navigation-access.ts'),warehouseRoutes=load('lib/warehouse-workspace.ts');
+ const warehouseAssignment=await preview(await draft([{profileId:'central-store',warehouseIds:['central']}],'replace'));
+ const warehouseUser={...target,permissions:warehouseAssignment.after};
+ const [warehouseHome]=homePolicy.employeeWorkspaces(warehouseUser,['central-store']);
+ const warehouseEntries=Object.values(navigation.warehouseNavigation(warehouseUser)).flat();
+ assert.deepEqual(Array.from(warehouseHome.menus,w=>w.id),['stock','operations','supply','dispatch','returns','counts','locations']);
+ const supplyMenus=warehouseHome.menus.find(m=>m.id==='supply').links;
+ assert.deepEqual(Array.from(supplyMenus,m=>warehouseRoutes.parseWarehouseTarget(m.target).target),['warehouse-menu:direct','','warehouse-menu:history']);
+ for(const link of warehouseHome.menus.flatMap(m=>m.links)){
+  assert.ok(navigation.canAccessSection(warehouseUser,link.section),link.title);
+  if(link.section==='warehouse'){
+   const route=warehouseRoutes.parseWarehouseTarget(link.target);
+   assert.ok(warehouseEntries.some(entry=>entry.source===route.source&&entry.view===route.view),link.title);
+  }
+ }
+ assert.equal(menuPolicy.centralWarehouseMenus({...target,permissions:empty}).length,0);
  for(const profile of profiles.filter(p=>p.operational&&!['sales-representative','home-service-representative'].includes(p.id))){const binding={profileId:profile.id,...(['central-store','line-store','quality'].includes(profile.id)?{warehouseIds:[profile.id==='line-store'?'line':'central']}:{})};const d=await draft([binding],'replace'),projection=await preview(d),real={...target,permissions:projection.after};const homes=homePolicy.employeeWorkspaces(real,[profile.id]);assert.equal(homes.length,1,profile.id+' must have a real role home');assert.equal(homes[0].title,profile.title);assert.ok(homes[0].links.every(l=>!l.taskOnly));}
  assert.equal(homePolicy.employeeWorkspaces({...target,permissions:empty},['personnel-hr','custodian']).length,0,'metadata alone grants no HR or custody launcher');
  b=await draft([{profileId:'personnel-hr'},{profileId:'custodian'}],'replace');p=await preview(b);assert.deepEqual(Array.from(homePolicy.employeeWorkspaces({...target,permissions:p.after},['personnel-hr','custodian']),w=>w.id),['personnel-hr','custodian']);

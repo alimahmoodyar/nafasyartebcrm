@@ -12,9 +12,9 @@ import {supplyStates} from '@/lib/sourcing-labels';
 import {formatDate} from '@/lib/persian-date';
 const amount=(n:number)=>((n||0)/1000).toLocaleString('fa-IR');
 const priorityLabels:Record<string,string>={critical:'بحرانی',urgent:'فوری',normal:'عادی',planned:'قابل‌برنامه‌ریزی'};
-export function WarehouseSupplyPanel({demo,onNavigate,initialId=''}:{demo:boolean;initialId?:string;onNavigate:(section:string,target?:string)=>void}){
- const [catalog,setCatalog]=useState<any>(null),[detail,setDetail]=useState<any>(null),[selected,setSelected]=useState(initialId),[tab,setTab]=useState('open'),[query,setQuery]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');
- const [creating,setCreating]=useState(false),[materialId,setMaterial]=useState(''),[quantity,setQuantity]=useState(''),[needPriority,setNeedPriority]=useState('normal'),[needBy,setDay]=useState(''),[reference,setReference]=useState(''),[notes,setNotes]=useState(''),[review,setReview]=useState(false),[editingDirect,setEditingDirect]=useState<any>(null);
+export function WarehouseSupplyPanel({demo,onNavigate,initialId='',initialView='open'}:{demo:boolean;initialId?:string;initialView?:'open'|'history'|'direct';onNavigate:(section:string,target?:string)=>void}){
+ const [catalog,setCatalog]=useState<any>(null),[detail,setDetail]=useState<any>(null),[selected,setSelected]=useState(initialId),[tab,setTab]=useState(initialView==='history'?'history':'open'),[query,setQuery]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');
+ const [creating,setCreating]=useState(initialView==='direct'),[materialId,setMaterial]=useState(''),[quantity,setQuantity]=useState(''),[needPriority,setNeedPriority]=useState('normal'),[needBy,setDay]=useState(''),[reference,setReference]=useState(''),[notes,setNotes]=useState(''),[review,setReview]=useState(false),[editingDirect,setEditingDirect]=useState<any>(null);
  const [warehouseId,setWarehouseId]=useState('');
  const [stockTreatment,setStockTreatment]=useState<'full'|'subtract'>('full'),[stockPreview,setStockPreview]=useState<DirectStockPreview|null>(null);
  const seq=useRef(0),operation=useRef<{signature:string;id:string}|null>(null);

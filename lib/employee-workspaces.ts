@@ -1,4 +1,5 @@
 import {accessPermissions,type Session} from './permissions';
+import {centralWarehouseMenus,type WarehouseMenu} from './central-warehouse-menu';
 import {roleProfiles,type RoleLink} from './role-profiles';
 import {canAccessSection,sectionDestination} from './navigation-access';
 
@@ -8,6 +9,7 @@ export type EmployeeWorkspace={
  group:string;
  programs:string[];
  links:RoleLink[];
+ menus?:WarehouseMenu[];
 };
 
 /** Navigation only. Every form continues to enforce the account's current grants. */
@@ -22,6 +24,7 @@ export function employeeWorkspaces(user:Session,assignedIds:string[]):EmployeeWo
   .map(profile=>({
    id:profile.id,title:profile.title,group:profile.group,
    programs:[...new Set(profile.links.filter(link=>canAccessSection(user,link.section)).map(link=>sectionDestination(user,link.section).section))],
+   ...(profile.id==='central-store'?{menus:centralWarehouseMenus(user)}:{}),
    links:profile.links.filter(link=>!link.taskOnly&&canAccessSection(user,link.section)),
   }));
 }
