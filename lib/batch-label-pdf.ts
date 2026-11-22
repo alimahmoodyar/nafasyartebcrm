@@ -50,9 +50,9 @@ function drawBatchText(ctx,node,x,y,width,height){
  for(const [i,content] of lines.entries())ctx.fillText(content,x+width/2,y+(i+.5)*spacing,width);
 }
 
-async function buildBatchLabelPdf(){
+async function buildBatchLabelPdf(directLabel){
  await document.fonts.ready;
- const labels=Array.from(document.querySelectorAll('.sheet .label'));
+ const labels=directLabel?[directLabel]:Array.from(document.querySelectorAll('.sheet .label'));
  if(!labels.length)throw Error('لیبلی برای چاپ وجود ندارد.');
  const {width,height,pages}=batchPdfPages(labels);
  const barcodeSvg=labels[0].querySelector('.barcode svg');
@@ -63,7 +63,7 @@ async function buildBatchLabelPdf(){
  })):[];
  const qrSvg=labels[0].querySelector('.qr svg');
  const qrImage=qrSvg?await loadLabelSvg(qrSvg):null;
- return createLabelPdf(pages,width,height,async(ctx,page)=>{
+ const drawPage=async(ctx,page)=>{
   for(const {label,x,y} of page){
    const origin=label.getBoundingClientRect();
    ctx.save();ctx.beginPath();ctx.rect(x,y,batchPdf.width*labelMm,batchPdf.height*labelMm);ctx.clip();
@@ -93,7 +93,9 @@ async function buildBatchLabelPdf(){
    }
    ctx.restore();
   }
- },(current,total)=>batchPdfStatus('آماده‌سازی PDF، صفحهٔ '+current.toLocaleString('fa-IR')+' از '+total.toLocaleString('fa-IR')),
+ };
+ if(directLabel)return renderLabelCanvas([{label:directLabel,x:0,y:0}],batchPdf.width,batchPdf.height,drawPage,8*25.4);
+ return createLabelPdf(pages,width,height,drawPage,(current,total)=>batchPdfStatus('آماده‌سازی PDF، صفحهٔ '+current.toLocaleString('fa-IR')+' از '+total.toLocaleString('fa-IR')),
  batchPdf.layout==='a4'?600:thermalDpi);
 }
 

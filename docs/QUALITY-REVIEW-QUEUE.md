@@ -1,4 +1,9 @@
+## 2026-11-22 · Single-column GoDEX label printing
+
+Windows installer 1.0.0 built. Bridge tested directly on owner workstation; interactive install and later logon still require an operator check. Real Windows queue discovered on USB001; untrusted web origin rejected. Browser fixture captured actual 45×30 mm batch job, decoded QR and Code 128, plus generic 60×40 mm QR. Physical single-row alignment, feed drift over successive labels and on-paper scanning await owner at office. No physical job sent. Source publication is separate from company-site deployment.
+
 ## 2026-11-21 — Personal asset category choices
+
 
 Personal declarations and direct registration reuse the same visual category component/catalog. Independent per-row selection, explicit empty default, existing category text preserved, disabled while busy. Current-checkout browser test replaces stale hard-coded source import and verifies desktop/mobile categories, payloads, numbered photos and review. SQLite HTTP/MCP and registration UI regressions passed. See quality-reviews/2026-11-21-personal-asset-categories.md. No domain grants, stored schema or approval rules changed; no live records created.
 
