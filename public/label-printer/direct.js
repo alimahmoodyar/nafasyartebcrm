@@ -15,8 +15,9 @@
     get('x').value = x; get('y').value = y;
   }
   printer.onchange = loadOffsets;
+  let port=18743;
   async function call(path, body) {
-    const result = await fetch('http://127.0.0.1:18742/' + path, {
+    const result = await fetch('http://127.0.0.1:'+port+'/' + path, {
       method:'POST', headers:{'Content-Type':'application/json'}, credentials:'omit',
       body:JSON.stringify(body), signal:AbortSignal.timeout(60000)
     });
@@ -26,10 +27,13 @@
   get('connect').onclick = async () => {
     get('connect').disabled = true;
     try {
-      const {printers,version} = await call('printers',{});
-      if(version !== '1.0.0'){
+      port=18743;
+      let directory;
+      try{directory=await call('printers',{});}catch{port=18742;directory=await call('printers',{});}
+      const {printers,version}=directory;
+      if(!['1.0.0','1.1.0'].includes(version)){
         get('controls').hidden = true; get('install').open = true;
-        status.textContent='برای این صفحه، نسخهٔ ۱٫۰٫۰ رابط چاپ را نصب کنید.';
+        status.textContent='برای این صفحه، نسخهٔ ۱٫۱٫۰ رابط چاپ را نصب کنید.';
         return;
       }
       printer.replaceChildren(...printers.map(name => new Option(name,name)));
@@ -93,7 +97,7 @@
       if ((pixels[i]*3+pixels[i+1]*6+pixels[i+2])/10 < 155) packed[y*stride+(x>>3)] |= 128 >> (x%8);
     }
     if (!packed.some(byte=>byte)) throw Error('تصویر لیبل خالی است.');
-    return Array.from(packed, b => b.toString(16).padStart(2,'0')).join('').toUpperCase();
+    return packed;
   }
   let busy = false;
   async function send(test) {
@@ -102,7 +106,14 @@
     const x=get('x'), y=get('y');
     if (!x.reportValidity() || !y.reportValidity()) return;
     const labels = Array.from(document.querySelectorAll(panel.dataset.selector));
-    const rows = test ? labels.slice(0,1) : labels;
+    const groups=new Map();
+    for(const label of labels){
+      const key=label.closest('.roll-row')||label;
+      if(!groups.has(key))groups.set(key,[]);
+      groups.get(key).push(label);
+    }
+    const allRows=[...groups.values()];
+    const rows=test?allRows.slice(0,1):allRows;
     if (!rows.length || width<1 || width>864 || height<32 || height>4000 || rows.length>500 || rows.length*Math.ceil(width/8)*height*2>11500000) {
       status.textContent='اندازه یا تعداد از ظرفیت چاپ مستقیم بیشتر است. اندازه یا تعداد را کم کنید.'; return;
     }
@@ -113,16 +124,21 @@
       localStorage.setItem(key, printer.value);
       localStorage.setItem(offsetsKey(),JSON.stringify([Number(x.value),Number(y.value)]));
       await document.fonts.ready;
-      if (typeof buildBatchLabelPdf !== 'function' && !rows[0].matches('.approved-asset')) await loadRenderer();
+      if (typeof buildBatchLabelPdf !== 'function' && !rows[0][0].matches('.approved-asset')) await loadRenderer();
       const pages=[];
-      for (const label of rows) {
+      for (const row of rows) {
         status.textContent='آماده‌سازی لیبل '+(pages.length+1)+' از '+rows.length;
-        pages.push(await bitmap(label,Number(x.value)*8,Number(y.value)*8));
+        const merged=new Uint8Array(Math.ceil(width/8)*height);
+        for(const label of row){
+          const image=await bitmap(label,Number(x.value)*8,Number(y.value)*8);
+          for(let i=0;i<merged.length;i++)merged[i]|=image[i];
+        }
+        pages.push(Array.from(merged,b=>b.toString(16).padStart(2,'0')).join('').toUpperCase());
       }
       submitted=true;
       const reply=await call('jobs',{id:crypto.randomUUID(),printer:printer.value,width,height,pages});
       if (!reply.queued) throw Error();
-      status.textContent=rows.length+' لیبل به صف '+printer.value+' ارسال شد.';
+      status.textContent=rows.reduce((sum,row)=>sum+row.length,0)+' لیبل به صف '+printer.value+' ارسال شد.';
     } catch(error) {
       status.textContent=submitted?'نتیجهٔ ارسال قطعی نیست. پیش از ارسال مجدد، صف چاپگر را بررسی کنید.':(error.message || 'آماده‌سازی چاپ انجام نشد.');
     } finally {

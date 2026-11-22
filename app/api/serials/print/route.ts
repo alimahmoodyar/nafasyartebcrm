@@ -1,3 +1,4 @@
+import {documentPrintButton} from '@/lib/direct-document';
 import {directLabelPanel} from '@/lib/direct-label';
 import {serviceDeviceQr} from '@/lib/service-device-contract';
 import {formatDate} from '@/lib/persian-date';
@@ -45,8 +46,8 @@ export async function GET(request:Request){
   ${templatePicker(templates,labelTemplateManager,user.isAdmin&&!trainingContext.getStore(),q.get('template')??'',!trainingContext.getStore())}
   <div>${rollInputs(geometry,['rollWidth','columns','gapX','gapY','left','top'])}</div>
   <fieldset id="roll-settings" ${roll?'':'hidden disabled'}><legend>تنظیمات رول</legend><div>${rollInputs(geometry,['width','height'])}</div></fieldset>
-  <button type="submit" id="label-preview">پیش‌نمایش</button><button type="submit" name="print" value="test" id="test-roll" ${roll?'':'hidden'}>چاپ یک ردیف آزمایشی</button><button class="print" type="submit" name="print" value="1">چاپ / ذخیره PDF</button></form>
-  <p>مقیاس چاپ ۱۰۰٪ باشد. چاپ مجدد از همان شماره‌ها استفاده می‌کند.</p>${(layout==='thermal'||roll?.columns===1)?directLabelPanel(roll?.rollWidth??geometry.width,geometry.height,".sheet .label"):''}</header><main class="sheet">${roll?rollRows(labels,roll):labels.join('')}</main>
+  <button type="submit" id="label-preview">پیش‌نمایش</button><button type="submit" name="print" value="test" id="test-roll" ${roll?'':'hidden'}>چاپ یک ردیف آزمایشی</button><button class="print" type="submit" name="print" value="1">چاپ مستقیم</button></form>
+  <p>مقیاس چاپ ۱۰۰٪ باشد. چاپ مجدد از همان شماره‌ها استفاده می‌کند.</p>${(layout!=='a4')?directLabelPanel(roll?.rollWidth??geometry.width,geometry.height,".sheet .label")+documentPrintButton(roll?.rollWidth??geometry.width,roll?rollPitch(roll):geometry.height,true):documentPrintButton()}</header><main class="sheet">${roll?rollRows(labels,roll):labels.join('')}</main>
   <script>
   const form=document.getElementById('label-options'),layout=form.elements.namedItem('layout');
   function updateRoll(){
@@ -56,6 +57,6 @@ export async function GET(request:Request){
   layout.addEventListener('change',updateRoll);
   ${selectRollScript}
   ${printOnLoad(test||q.get('print')==='1')}
-  </script></body></html>`,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'none'; img-src 'self' data: blob:; font-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline' 'self'; connect-src 'self' http://127.0.0.1:18742; form-action 'self'; base-uri 'none'; frame-ancestors 'self'; frame-src 'self'"}});
+  </script></body></html>`,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'none'; img-src 'self' data: blob:; font-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline' 'self'; connect-src 'self' http://127.0.0.1:18742 http://127.0.0.1:18743; form-action 'self'; base-uri 'none'; frame-ancestors 'self'; frame-src 'self'"}});
  }catch(e){return accessResponse(e)||Response.json({error:'آماده‌سازی چاپ انجام نشد؛ دوباره تلاش کنید.'},{status:503});}
 }

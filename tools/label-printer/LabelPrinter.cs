@@ -13,13 +13,13 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Web.Script.Serialization;
 
-[assembly: AssemblyVersion("1.0.0.0")]
-[assembly: AssemblyFileVersion("1.0.0.0")]
+[assembly: AssemblyVersion("1.1.0.0")]
+[assembly: AssemblyFileVersion("1.1.0.0")]
 
 internal class LabelPrinter {
     const string Origin = "https://newcrm.nafasyar.com";
     const int Limit = 12 * 1024 * 1024;
-    static readonly JavaScriptSerializer Json = new JavaScriptSerializer { MaxJsonLength = Limit };
+    static readonly JavaScriptSerializer Json = new JavaScriptSerializer { MaxJsonLength = 32*1024*1024 };
     static readonly string Claims = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "HamnafasLabel", "jobs");
 
     public class Job {
@@ -73,6 +73,43 @@ internal class LabelPrinter {
             if (!EndDocPrinter(h)) throw new IOException();
         } finally { ClosePrinter(h); }
     }
+    public class DocumentJob {
+        public string id, printer, html, mode;
+        public double width,height;
+    }
+    static string[] OfficePrinters() {
+        using(var query=new ManagementObjectSearcher("SELECT Name,DriverName,PortName FROM Win32_Printer"))
+        using(var result=query.Get()){
+            return result.Cast<ManagementObject>().Where(p=>{
+                string identity=(p["Name"]+" "+p["DriverName"]+" "+p["PortName"]).ToLowerInvariant();
+                return !new[]{"godex g500","pdf","xps","fax","onenote","portprompt:","file:","nul:","anydesk","dorsandesk"}.Any(identity.Contains);
+            }).Select(p=>Convert.ToString(p["Name"])).ToArray();
+        }
+    }
+    static object PrintDocument(string input){
+        var j=Json.Deserialize<DocumentJob>(input);
+        Guid id;
+        if(j==null || !Guid.TryParseExact(j.id,"D",out id) || string.IsNullOrEmpty(j.html)
+            || !(j.width>=10 && j.width<=600 && j.height>=10 && j.height<=1200)
+            || (j.mode!="print" && j.mode!="pdf") || (j.mode=="print"&&!OfficePrinters().Contains(j.printer)))throw new ArgumentException();
+        string worker=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"DocumentWorker.exe");
+        if(!File.Exists(worker))throw new IOException();
+        if(j.mode=="print"){
+            using(new FileStream(Path.Combine(Claims,id.ToString("D")),FileMode.CreateNew,FileAccess.Write,FileShare.None)){}
+        }
+        var info=new ProcessStartInfo(worker){UseShellExecute=false,CreateNoWindow=true,RedirectStandardInput=true,RedirectStandardOutput=true};
+        using(var process=Process.Start(info)){
+            var output=process.StandardOutput.ReadToEndAsync();
+            byte[] inputBytes=Encoding.UTF8.GetBytes(input);
+            process.StandardInput.BaseStream.Write(inputBytes,0,inputBytes.Length);
+            process.StandardInput.Close();
+            if(!process.WaitForExit(90000)){process.Kill();throw new IOException();}
+            if(process.ExitCode==3)throw new NotSupportedException();
+            if(process.ExitCode!=0)throw new IOException();
+            if(j.mode=="pdf")return new { pdf=output.Result };
+            return new { queued=true };
+        }
+    }
     static void Reply(HttpListenerResponse r,int status,object value) {
         byte[] bytes=Encoding.UTF8.GetBytes(Json.Serialize(value));
         r.StatusCode=status; r.ContentType="application/json"; r.ContentLength64=bytes.Length;
@@ -80,7 +117,7 @@ internal class LabelPrinter {
     }
     static void Handle(HttpListenerContext c) {
         var r=c.Response; var q=c.Request;
-        if(q.Headers["Origin"] != Origin || q.UserHostName != "127.0.0.1:18742") { Reply(r,403,false);return; }
+        if(q.Headers["Origin"] != Origin || q.UserHostName != "127.0.0.1:18743") { Reply(r,403,false);return; }
         r.Headers["Access-Control-Allow-Origin"]=Origin;
         r.Headers["Cache-Control"]="no-store";
         if(q.HttpMethod=="OPTIONS") {
@@ -90,31 +127,39 @@ internal class LabelPrinter {
             r.StatusCode=204;return;
         }
         if(q.HttpMethod!="POST" || q.ContentType!="application/json") { Reply(r,415,false);return; }
-        if(q.Url.AbsolutePath=="/printers") { Reply(r,200,new { printers=Printers(), version=Version });return; }
-        if(q.Url.AbsolutePath!="/jobs") { Reply(r,404,false);return; }
+        if(q.Url.AbsolutePath=="/printers") { Reply(r,200,new { printers=Printers(), version=Version, office=OfficePrinters() });return; }
+        if(q.Url.AbsolutePath!="/jobs" && q.Url.AbsolutePath!="/documents") { Reply(r,404,false);return; }
         if(q.ContentLength64<1 || q.ContentLength64>Limit) { Reply(r,413,false);return; }
         using(var reader=new StreamReader(q.InputStream, Encoding.UTF8)) {
-            var job=Json.Deserialize<Job>(reader.ReadToEnd());
+            string input=reader.ReadToEnd();
+            if(q.Url.AbsolutePath=="/documents"){Reply(r,200,PrintDocument(input));return;}
+            var job=Json.Deserialize<Job>(input);
             var data=Encode(job);
             Submit(job,data);
         }
         Reply(r,200,new { queued=true });
     }
-    const string Version = "1.0.0";
+    const string Version = "1.1.0";
     static void Install() {
         string folder=Path.GetDirectoryName(Claims);
+        Directory.CreateDirectory(folder);
+        folder=Path.Combine(folder,Version);
         Directory.CreateDirectory(folder);
         string target=Path.Combine(folder,"HamnafasLabel-"+Version+".exe");
         string source=Assembly.GetExecutingAssembly().Location;
         bool running=Process.GetProcessesByName(Path.GetFileNameWithoutExtension(target))
             .Any(p=>String.Equals(p.MainModule.FileName,target,StringComparison.OrdinalIgnoreCase));
-        if(!running) File.Copy(source,target,true);
+        if(!running) {
+            foreach(string file in new[]{"DocumentWorker.exe","Microsoft.Web.WebView2.Core.dll","Microsoft.Web.WebView2.WinForms.dll","WebView2Loader.dll","LICENSE.txt","NOTICE.txt"})
+                File.Copy(Path.Combine(Path.GetDirectoryName(source),file),Path.Combine(folder,file),true);
+            File.Copy(source,target,true);
+        }
         using(var run=Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run"))
             run.SetValue("HamnafasLabel","\""+target+"\" --serve");
         if(!running) Process.Start(new ProcessStartInfo(target,"--serve"){UseShellExecute=false,CreateNoWindow=true});
         for(int attempt=0;attempt<20;attempt++){
             try {
-                var request=(HttpWebRequest)WebRequest.Create("http://127.0.0.1:18742/printers");
+                var request=(HttpWebRequest)WebRequest.Create("http://127.0.0.1:18743/printers");
                 request.Proxy=null; request.Method="POST";request.ContentType="application/json";
                 request.Headers["Origin"]=Origin;request.ContentLength=0;request.Timeout=3000;
                 using(var response=request.GetResponse())
@@ -148,11 +193,12 @@ internal class LabelPrinter {
         Directory.CreateDirectory(Claims);
         foreach (string file in Directory.GetFiles(Claims)) if(File.GetCreationTimeUtc(file)<DateTime.UtcNow.AddDays(-30)) File.Delete(file);
         using(var server=new HttpListener()) {
-            server.Prefixes.Add("http://127.0.0.1:18742/");
+            server.Prefixes.Add("http://127.0.0.1:18743/");
             try { server.Start(); } catch(HttpListenerException){ return 2; }
             while(true) {
                 var c=server.GetContext();
                 try { Handle(c); }
+                catch(NotSupportedException) { Reply(c.Response,422,new { code="paper_size" }); }
                 catch(ArgumentException) { Reply(c.Response,400,false); }
                 catch(Exception) { try { Reply(c.Response,503,false); } catch(IOException) {} catch(HttpListenerException) {} }
                 finally { c.Response.Close(); }

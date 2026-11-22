@@ -23,6 +23,8 @@ function load(file) {
   const {batchLabelHtml,batchLabelOptions}=load(path.join(root,'lib/batch-labels.ts'));
   let code='991002-14050812-001';
   const query=new URLSearchParams('layout=thermal&symbol=both&width=45&height=30&copies=2');
+  const multi=process.argv.includes('--multi');
+  if(multi){query.set('layout','roll');query.set('columns','2');query.set('rollWidth','92');query.set('copies','3');}
   let html=await batchLabelHtml({id:'sample',data:{code,part:'ابر آکوستیک',partCode:'991002'}},batchLabelOptions(query),false,code,'');
   const receipt=process.argv.includes('--receipt');
   if(receipt){
@@ -42,7 +44,7 @@ function load(file) {
   const done=new Promise(resolve=>finish=resolve);
   const probe=`<script>
   const originalFetch=window.fetch;
-  window.fetch=(url,args)=>String(url).startsWith('http://127.0.0.1:18742/')?originalFetch('/mock/'+url.split('/').pop(),args):originalFetch(url,args);
+  window.fetch=(url,args)=>String(url).startsWith('http://127.0.0.1:18743/')?originalFetch('/mock/'+url.split('/').pop(),args):originalFetch(url,args);
   window.addEventListener('load',async()=>{
     await document.querySelector('[data-connect]').onclick();
     document.querySelector('[data-send]').click();
@@ -68,14 +70,21 @@ function load(file) {
   try{
     const status=await done;
     assert.ok(job,status);
-    assert.deepEqual([job.width,job.height,job.pages.length],receipt?[480,320,1]:[360,240,2]);
+    assert.deepEqual([job.width,job.height,job.pages.length],multi?[736,240,2]:receipt?[480,320,1]:[360,240,2]);
     const bytes=Buffer.from(job.pages[0],'hex'),gray=new Uint8ClampedArray(job.width*job.height);
     for(let i=0;i<gray.length;i++)gray[i]=(bytes[i>>3]&(128>>(i%8)))?0:255;
     const bitmap=new zx.BinaryBitmap(new zx.HybridBinarizer(new zx.RGBLuminanceSource(gray,job.width,job.height)));
     for(const format of (receipt||asset?[zx.BarcodeFormat.QR_CODE]:[zx.BarcodeFormat.QR_CODE,zx.BarcodeFormat.CODE_128])){
       const hints=new Map([[zx.DecodeHintType.POSSIBLE_FORMATS,[format]],[zx.DecodeHintType.TRY_HARDER,true]]);
-      assert.equal(new zx.MultiFormatReader().decode(bitmap,hints).getText(),code);
+      if(multi){
+        for(const offset of [0,376]){
+          const cropped=new Uint8ClampedArray(360*240);
+          for(let y=0;y<240;y++)cropped.set(gray.subarray(y*736+offset,y*736+offset+360),y*360);
+          const region=new zx.BinaryBitmap(new zx.HybridBinarizer(new zx.RGBLuminanceSource(cropped,360,240)));
+          assert.equal(new zx.MultiFormatReader().decode(region,hints).getText(),code);
+        }
+      }else assert.equal(new zx.MultiFormatReader().decode(bitmap,hints).getText(),code);
     }
-    console.log(asset?'PASS approved asset layout at 45x30 mm with decodable asset QR':receipt?'PASS single receipt label QR at 60x40 mm':'PASS direct print actual batch page: selected printer, two 45x30 mm labels, QR and Code128 decoded.');
+    console.log(multi?'PASS two-column 92 mm roll, both codes readable in each column, partial final row':asset?'PASS approved asset layout at 45x30 mm with decodable asset QR':receipt?'PASS single receipt label QR at 60x40 mm':'PASS direct print actual batch page: selected printer, two 45x30 mm labels, QR and Code128 decoded.');
   }finally{clearTimeout(timer);child.kill();server.close();server.closeAllConnections();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

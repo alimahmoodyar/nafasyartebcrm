@@ -9,7 +9,7 @@ export function directLabelPanel(width:number,height:number,selector:string){
  <details><summary>تنظیم نقطهٔ شروع چاپ</summary><label>جابه‌جایی به راست (میلی‌متر)<input type="number" data-x step="0.125" min="-15" max="15" value="0"></label>
  <label>جابه‌جایی به پایین (میلی‌متر)<input type="number" data-y step="0.125" min="-15" max="15" value="0"></label></details></span>
  <span data-status role="status"></span> <details data-install><summary>نصب رابط چاپ برای ویندوز</summary>
- <p>روی کامپیوتری که چاپگر به آن وصل است، فایل نسخهٔ ۱٫۰٫۰ را دریافت و اجرا کنید. سپس به همین صفحه برگردید و «چاپ مستقیم لیبل» را بزنید.</p>
- <a href="/label-printer/HamnafasLabelSetup-1.0.0.exe" download>دریافت نصب‌کنندهٔ ویندوز · نسخهٔ ۱٫۰٫۰</a></details>
+ <p>روی کامپیوتری که چاپگر به آن وصل است، فایل نسخهٔ ۱٫۱٫۰ را دریافت کنید، از حالت فشرده خارج کنید و HamnafasPrintSetup.exe را اجرا کنید. سپس به همین صفحه برگردید و «چاپ مستقیم لیبل» را بزنید.</p>
+ <a href="/label-printer/HamnafasPrint-1.1.0.zip" download>دریافت نصب‌کنندهٔ ویندوز · نسخهٔ ۱٫۱٫۰</a></details>
  </section><script defer src="/label-printer/direct.js"></script>`;
 }

@@ -64,12 +64,10 @@ async function verifyViewer(markup){
  const probe = `<script>
  const panel=document.getElementById('batch-pdf-viewer');
  const report=body=>fetch('/viewer-result',{method:'POST',body});
- window.print=()=>{
-  const images=document.querySelectorAll('#batch-pdf-print-pages img');
-  const size=document.getElementById('batch-pdf-page-style').textContent;
-  void report(images.length===2&&size.includes('45.0000mm 30.0000mm;margin:0')?'PASS':'Print geometry failed');
-  window.dispatchEvent(new Event('afterprint'));
- };
+ window.print=()=>report('Unexpected browser print');
+ document.querySelector('.direct-label [data-connect]').addEventListener('click',()=>{
+  void report(panel.hidden?'PASS':'PDF viewer did not return to the label printer');
+ });
  new MutationObserver(()=>{
   if(panel.hidden)return;
   const canvas=panel.querySelector('canvas');
@@ -177,7 +175,7 @@ window.addEventListener('load',async()=>{
  }
  const viewerQuery = new URLSearchParams('layout=thermal&width=45&height=30&copies=2');
  await verifyViewer(await batchLabelHtml(batch,batchLabelOptions(viewerQuery),true));
- console.log('PASS print request opens the generated PDF in the site viewer and prepares both pages at 45×30 mm');
+ console.log('PASS print request opens the generated PDF in the site viewer and routes printing to the direct thermal printer');
  console.log('PASS Code 128 and QR at 203 dpi from the actual 45×30 PDF. Footer is blank.');
  console.log(output);
 })().catch(error=>{console.error(error);process.exitCode=1});

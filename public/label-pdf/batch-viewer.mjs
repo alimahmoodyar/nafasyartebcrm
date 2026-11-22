@@ -55,6 +55,8 @@ export async function openBatchPdf(file,filename,printDpi){
  next.onclick = ()=>changePage(1);
 
  print.onclick = async()=>{
+  const labelPanel=document.querySelector('.direct-label');
+  if(labelPanel){close.click();labelPanel.querySelector('[data-connect]').click();labelPanel.scrollIntoView({block:'center'});return;}
   print.disabled = close.disabled = true;
   try{
    const printCanvas = document.createElement('canvas');
@@ -78,13 +80,10 @@ export async function openBatchPdf(file,filename,printDpi){
     await img.decode();
     printPages.append(img);
    }
-   document.body.classList.add('batch-pdf-printing');
-   window.addEventListener('afterprint',()=>{
-    document.body.classList.remove('batch-pdf-printing');
-    clearPrintPages();
-   },{once:true});
-   status.textContent = '';
-   window.print();
+   const first=printPages.firstElementChild;
+   status.textContent='';
+   await window.hamnafasDocuments.open({source:printPages,width:parseFloat(first.style.width),height:parseFloat(first.style.height),extraCss:
+    '#batch-pdf-print-pages{display:block!important}#batch-pdf-print-pages img{display:block;break-after:page}#batch-pdf-print-pages img:last-child{break-after:auto}body{padding:0;margin:0}'});
   }catch{
    clearPrintPages();
    status.textContent = 'آماده‌سازی چاپ انجام نشد. فایل PDF برای دریافت در دسترس است.';

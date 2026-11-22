@@ -77,7 +77,19 @@ function contractorClient(){
  async function call(mode,extra={}){const r=await fetch('/api/subcontract-handover',{method:'POST',credentials:'omit',headers:{'Content-Type':'application/json'},body:JSON.stringify({...key,mode,...extra})}),j=await r.json();if(!r.ok)throw Error(j.error);return j;}
  function show(data){info=data;$('details').replaceChildren();for(const text of [data.title,'پیمانکار: '+data.supplierName,'ماده: '+data.materialName,'مقدار حواله: '+data.quantity+' '+data.unit]){const p=document.createElement('p');p.textContent=text;$('details').append(p);}for(const item of data.items||[]){const p=document.createElement('p');p.textContent='بچ '+item.code+' · '+item.quantity+' '+item.unit;$('details').append(p);}if(!$('quantity').value)$('quantity').value=String(data.quantity);$('done').hidden=!data.received;$('form').hidden=data.received;if(data.received)stop();}
  const refresh=()=>call('read').then(show);void refresh().catch(e=>error(e.message));
- $('print').onclick=()=>{const page=window.open('','_blank');if(!page){error('برای چاپ اجازه بازشدن پنجره را بدهید.');return;}const h=page.document.createElement('h1');h.textContent='رسید دریافت مواد امانی نفس‌یار';page.document.body.dir='rtl';page.document.body.append(h,$('details').cloneNode(true));const p=page.document.createElement('p');p.textContent='اینجانب دریافت مواد فوق به امانت را تأیید می‌کنم. نام و سمت: ............ تاریخ: ............ امضا و مهر: ............';page.document.body.append(p);page.print();};
+ $('print').onclick=()=>{
+  if(!info){error('ابتدا اطلاعات حواله را بارگذاری کنید.');return;}
+  const origin='https://newcrm.nafasyar.com', page=window.open(origin+'/api/print/contractor-receipt','_blank');
+  if(!page){error('برای رسید اجازهٔ باز شدن پنجره را بدهید.');return;}
+  const timer=setTimeout(()=>{window.removeEventListener('message',onReady);error('صفحهٔ چاپ هم‌نفس پاسخ نداد.');},20000);
+  function onReady(event){
+   if(event.origin!==origin||event.source!==page||event.data?.type!=='hamnafas.receipt.ready')return;
+   clearTimeout(timer);window.removeEventListener('message',onReady);
+   page.postMessage({type:'hamnafas.receipt',text:$('details').innerText},origin);
+  }
+  window.addEventListener('message',onReady);
+ };
+
  $('camera').onclick=async()=>{try{stop();stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});$('video').srcObject=stream;$('video').hidden=false;$('capture').hidden=false;await $('video').play();}catch{stop();error('دسترسی دوربین ممکن نشد؛ مجوز را بررسی یا فایل موجود را انتخاب کنید.');}};
  $('capture').onclick=async()=>{const v=$('video'),c=$('preview');if(!v.videoWidth)return;const scale=Math.min(1,1600/v.videoWidth);c.width=Math.round(v.videoWidth*scale);c.height=Math.round(v.videoHeight*scale);c.getContext('2d').drawImage(v,0,0,c.width,c.height);photo=await new Promise(resolve=>c.toBlob(resolve,'image/jpeg',.9));fileId='';$('submit').disabled=true;c.hidden=false;stop();};
  $('file').onchange=()=>{photo=$('file').files[0]||null;fileId='';$('submit').disabled=true;$('photoState').textContent='';};

@@ -109,5 +109,5 @@ savePreset?.addEventListener('click',async()=>{
 `;
 
 export function printOnLoad(requested:boolean){
- return requested?"window.addEventListener('load',()=>{const url=new URL(window.location.href);url.searchParams.delete('print');window.history.replaceState(null,'',url);document.fonts.ready.then(()=>window.print());});":"";
+ return requested?"window.addEventListener('load',()=>{const url=new URL(window.location.href);url.searchParams.delete('print');window.history.replaceState(null,'',url);document.fonts.ready.then(()=>(document.querySelector('.direct-label [data-connect]')||document.querySelector('[data-office-print]'))?.click());});":"";
 }

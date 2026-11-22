@@ -45,6 +45,7 @@ async function buildAssetPdf(){
 }
 
 async function showAssetPdf(download=false){
- if(assetPdfBusy)return;assetPdfBusy=true;try{const blob=await buildAssetPdf(),url=URL.createObjectURL(blob);if(download){const link=document.createElement('a');link.href=url;link.download='asset-labels.pdf';link.click();setTimeout(()=>URL.revokeObjectURL(url),60000);assetPdfStatus('PDF لیبل آماده و دریافت شد.');}else{assetPdfStatus('PDF آماده شد؛ چاپ را از نمایشگر PDF انجام دهید.');window.location.assign(url);}}catch(error){assetPdfStatus('ساخت PDF انجام نشد؛ دوباره تلاش کنید. '+error.message);}finally{assetPdfBusy=false;}
+ if(!download){(document.querySelector('.direct-label [data-connect]')||document.querySelector('[data-office-print]'))?.click();return;}
+ if(assetPdfBusy)return;assetPdfBusy=true;try{const blob=await buildAssetPdf(),url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download='asset-labels.pdf';link.click();setTimeout(()=>URL.revokeObjectURL(url),60000);assetPdfStatus('PDF لیبل آماده و دریافت شد.');}catch(error){assetPdfStatus('ساخت PDF انجام نشد؛ دوباره تلاش کنید. '+error.message);}finally{assetPdfBusy=false;}
 }
 `;}
