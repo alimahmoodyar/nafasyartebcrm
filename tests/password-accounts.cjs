@@ -71,13 +71,13 @@ async function enter(pass='Test-password-123'){return login.POST(request('/api/a
  let actor=await auth.session();assert.equal(actor.isAdmin,false);assert.equal(actor.username,'worker01');assert.equal(actor.permissions.write.length,0);assert.equal((await userApi.GET()).status,403);
  cookie='';identity=owner;r=await userApi.PATCH(request('/api/users','PATCH',{...m,password:'Changed-password-123'}));assert.equal(r.status,200);m=(await r.json()).member;
  cookie=oldCookie;await assert.rejects(()=>auth.session(),e=>e.status===401);cookie='';identity=null;assert.equal((await enter()).status,401);r=await enter('Changed-password-123');assert.equal(r.status,200);cookie=r.headers.get('set-cookie').split(';')[0].split('=')[1];
- assert.equal((await logout.POST(request('/api/auth/logout','POST'))).status,200);await assert.rejects(()=>auth.session(),e=>e.status===401);cookie='';
+ r=await logout.POST(request('/api/auth/logout','POST'));assert.equal(r.status,200);assert.ok(r.headers.getSetCookie().some(value=>value.startsWith('__Host-nafasyar-profile-review=;')&&value.includes('Max-Age=0')));await assert.rejects(()=>auth.session(),e=>e.status===401);cookie='';
  identity=owner;r=await userApi.PATCH(request('/api/users','PATCH',{...m,status:'disabled'}));assert.equal(r.status,200);identity=null;assert.equal((await enter('Changed-password-123')).status,401);
  for(let i=0;i<11;i++)r=await enter('bad');assert.equal(r.status,429);
  assert.ok(!JSON.stringify(sql.prepare('SELECT * FROM access_audit').all()).includes('Changed-password-123'));
  cookie='';identity=null;env.INITIAL_ADMIN_PASSWORD='Install-test-password-123';
  r=await login.POST(request('/api/auth/login','POST',{username:'admin',password:'wrong'}));assert.equal(r.status,401);assert.equal(sql.prepare("SELECT subject FROM app_identity WHERE id='local_admin'").get(),undefined);
- r=await login.POST(request('/api/auth/login','POST',{username:'admin',password:env.INITIAL_ADMIN_PASSWORD}));assert.equal(r.status,200);cookie=r.headers.get('set-cookie').split(';')[0].split('=')[1];assert.equal((await auth.session()).isAdmin,true);
+ r=await login.POST(request('/api/auth/login','POST',{username:'admin',password:env.INITIAL_ADMIN_PASSWORD}));assert.equal(r.status,200);cookie=r.headers.get('set-cookie').split(';')[0].split('=')[1];assert.equal((await auth.session()).isAdmin,true);assert.ok(r.headers.getSetCookie().some(value=>value.startsWith('__Host-nafasyar-profile-review=;')&&value.includes('Max-Age=0')));
  token=(await mint()).token;assert.equal((await load('lib/mcp/auth.ts').tokenPrincipal(token)).user.isAdmin,true);
  let admin=(await (await userApi.GET()).json()).members.find(x=>x.username==='admin');
  r=await userApi.PATCH(request('/api/users','PATCH',{...admin,password:'Replacement-admin-password'}));assert.equal(r.status,200);await assert.rejects(()=>auth.session(),e=>e.status===401);cookie='';

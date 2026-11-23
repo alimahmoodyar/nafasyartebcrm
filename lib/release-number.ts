@@ -1,1 +1,1 @@
-export const releaseNumber = 23;
+export const releaseNumber = 25;

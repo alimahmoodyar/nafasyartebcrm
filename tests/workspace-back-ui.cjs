@@ -1,8 +1,10 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),ts=require('typescript'),React=require('react');
 const root=path.resolve(__dirname,'..'),cache={},values=new Map();let slots=[],cursor=0,effects=[],events=[];
 const changed=(previous,next)=>!previous||next.some((value,i)=>value!==previous[i]);
-const react={...React,useContext:context=>values.has(context)?values.get(context):context._currentValue,useRef:value=>{const i=cursor++;return slots[i]||(slots[i]={current:value})},useState:value=>{const i=cursor++,bucket=slots;if(!(i in bucket))bucket[i]=typeof value==='function'?value():value;return[bucket[i],next=>bucket[i]=typeof next==='function'?next(bucket[i]):next]},useCallback:(callback,deps)=>{const i=cursor++;if(!slots[i]||changed(slots[i].deps,deps))slots[i]={callback,deps};return slots[i].callback},useMemo:fn=>fn(),useLayoutEffect:(fn,deps)=>{const i=cursor++,bucket=slots,old=bucket[i];if(!old||changed(old.deps,deps))effects.push(()=>{old?.cleanup?.();bucket[i]={deps,cleanup:fn()}})},useEffect(){}};
-function load(relative){const file=path.resolve(root,relative);if(cache[file])return cache[file];const output={};cache[file]=output;vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText,{exports:output,require:name=>{if(name==='react')return react;if(name==='react/jsx-runtime')return require(name);if(name==='lucide-react')return new Proxy({},{get:()=>()=>null});if(name==='react-dom')return{createPortal:()=>null};if(name==='./personal-home')return{PersonalHome:()=>null};if(name.startsWith('@/'))return load(name.slice(2)+'.ts');return require(name)},window:{getComputedStyle:()=>({visibility:'visible'}),dispatchEvent:event=>events.push(event)},CustomEvent:class{constructor(type,options){this.type=type;this.detail=options.detail;}},Map,Set,console},{filename:file});return output;}
+const react={...React,useContext:context=>values.has(context)?values.get(context):context._currentValue,useRef:value=>{const i=cursor++;return slots[i]||(slots[i]={current:value})},useState:value=>{const i=cursor++,bucket=slots;if(!(i in bucket))bucket[i]=typeof value==='function'?value():value;return[bucket[i],next=>bucket[i]=typeof next==='function'?next(bucket[i]):next]},useCallback:(callback,deps)=>{const i=cursor++;if(!slots[i]||changed(slots[i].deps,deps))slots[i]={callback,deps};return slots[i].callback},useMemo:fn=>fn(),useLayoutEffect:(fn,deps)=>{const i=cursor++,bucket=slots,old=bucket[i];if(!old||changed(old.deps,deps))effects.push(()=>{old?.cleanup?.();bucket[i]={deps,cleanup:fn()}})},useEffect(fn,deps){return react.useLayoutEffect(fn,deps)}};
+const browserEvents=new Map(),stack=[{outside:true},{}];let position=1;
+const history={get state(){return stack[position]},replaceState(s){stack[position]=s},pushState(s){stack.splice(++position,Infinity,s)},back(){if(position>0)browserEvents.get('popstate')?.({state:stack[--position]})}};
+function load(relative){const file=path.resolve(root,relative);if(cache[file])return cache[file];const output={};cache[file]=output;vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText,{exports:output,require:name=>{if(name==='react')return react;if(name==='react/jsx-runtime')return require(name);if(name==='lucide-react')return new Proxy({},{get:()=>()=>null});if(name==='react-dom')return{createPortal:()=>null};if(name==='./personal-home')return{PersonalHome:()=>null};if(name.startsWith('@/'))return load(name.slice(2)+'.ts');return require(name)},window:{history,addEventListener:(type,fn)=>browserEvents.set(type,fn),removeEventListener:(type,fn)=>{if(browserEvents.get(type)===fn)browserEvents.delete(type)},getComputedStyle:()=>({visibility:'visible'}),dispatchEvent:event=>events.push(event)},CustomEvent:class{constructor(type,options){this.type=type;this.detail=options.detail;}},Map,Set,console},{filename:file});return output;}
 const {LayoutAccountProvider,useWorkspaceBack,useWorkspaceModalBack}=load('components/trace/program-workspace.tsx'),{currentWorkspaceBack}=load('lib/workspace-back.ts');
 let rootBack=0;
 cursor=0;const provider=LayoutAccountProvider({accountId:'test',onBack:()=>rootBack++,children:null});
@@ -36,3 +38,15 @@ directRegistry.run();
 const removeModal=directRegistry.register({element:()=>node,handler:()=>directCalls.push('modal'),priority:1000,modal:true});
 directRegistry.run();removeModal();directRegistry.run();
 assert.deepEqual(directCalls,['role','modal','role']);
+
+values.clear();slots=[];cursor=0;
+let backs=0,tree=LayoutAccountProvider({accountId:'browser-test',onBack:()=>backs++,children:null});
+while(React.isValidElement(tree)){values.set(tree.type,tree.props.value);tree=tree.props.children;}
+const {WorkspaceBackButton}=load('components/trace/program-workspace.tsx');
+slots=[];
+function header(visible){cursor=0;WorkspaceBackButton({visible});flush();}
+header(false);assert.equal(stack.length,2);
+header(true);assert.equal(stack.length,3);
+history.back();assert.equal(backs,1);
+history.back();assert.equal(backs,2);assert.equal(stack.length,3);
+header(false);history.back();assert.equal(backs,2);assert.equal(history.state.outside,true);

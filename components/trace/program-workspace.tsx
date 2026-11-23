@@ -37,6 +37,30 @@ export function WorkspaceBackButton({visible=true}:{visible?:boolean}){
  const registry=useContext(BackRegistryContext),back=useContext(RootBackContext),anchor=useRef<HTMLButtonElement|null>(null),[position,setPosition]=useState({left:16,top:16,width:100,height:48});
  const modal=registry?currentWorkspaceBack([...registry.entries.values()].filter(entry=>entry.modal))?.element():null;
  useLayoutEffect(()=>{if(!modal)return;const update=()=>{const rect=anchor.current?.getBoundingClientRect();if(!rect)return;const next={left:Math.max(8,Math.min(rect.left,window.innerWidth-rect.width-8)),top:Math.max(8,Math.min(rect.top,window.innerHeight-rect.height-8)),width:rect.width,height:rect.height};setPosition(old=>Object.keys(next).every(k=>old[k as keyof typeof old]===next[k as keyof typeof next])?old:next);};update();const observer=typeof ResizeObserver==='undefined'?null:new ResizeObserver(update);if(anchor.current)observer?.observe(anchor.current);window.addEventListener('resize',update);window.addEventListener('scroll',update,true);return()=>{observer?.disconnect();window.removeEventListener('resize',update);window.removeEventListener('scroll',update,true);};},[modal]);
+
+ const accountId=useContext(AccountContext);
+ const canGoBack=!!accountId&&!!(back||registry)&&!!(visible||modal||registry&&currentWorkspaceBack([...registry.entries.values()]));
+ const browserBack=useRef({enabled:canGoBack,run:()=>registry?registry.run():back?.()});
+ browserBack.current={enabled:canGoBack,run:()=>registry?registry.run():back?.()};
+ useEffect(()=>{
+  if(!accountId)return;
+  const history=window.history;
+  const key='nafasyarWorkspaceBack';
+  function arm(){
+   history.replaceState({...history.state,[key]:{accountId,step:'base'}},'');
+   history.pushState({...history.state,[key]:{accountId,step:'inside'}},'');
+  }
+  if(canGoBack&&!(history.state?.[key]?.accountId===accountId&&history.state[key].step==='inside'))arm();
+  function onPop(event:PopStateEvent){
+   const marker=event.state?.[key];
+   if(marker?.accountId!==accountId||marker.step!=='base')return;
+   if(!browserBack.current.enabled){history.back();return;}
+   arm();
+   browserBack.current.run();
+  }
+  window.addEventListener('popstate',onPop);
+  return ()=>window.removeEventListener('popstate',onPop);
+ },[accountId,canGoBack]);
  if(!back&&!registry||!visible&&!modal)return null;
  const run=()=>registry?registry.run():back?.(),content=<><ArrowRight size={18}/>بازگشت</>;
  return <><button data-pair-open="program-workspace:000000000002" ref={anchor} data-workspace-header-back type="button" className="btn" onClick={run} aria-hidden={modal?true:undefined} disabled={!!modal} style={modal?{visibility:'hidden'}:undefined}>{content}</button>{modal&&createPortal(<button data-pair-open="program-workspace:000000000002" data-workspace-header-back type="button" className="btn workspace-modal-back" style={{position:'fixed',...position,zIndex:60,pointerEvents:'auto'}} onClick={run}>{content}</button>,modal)}</>;
