@@ -3,7 +3,7 @@ import {PayrollSlipReview} from './payroll-slip-review';
 import {PayrollPaymentList} from './payroll-payment-list';
 import {useEffect,useRef,useState} from 'react';
 import {SolarDate} from './solar-date';
-import {formatDate,localDay} from '@/lib/persian-date';
+import {formatDate,fridayWeekday,iranWeekdays,localDay} from '@/lib/persian-date';
 import {payrollComponentKinds} from '@/lib/personnel-payroll-contract';
 import {normalizeContractSalary} from '@/lib/personnel-contract-salary';
 import {ContractPayFields} from './personnel-payroll-fields';
@@ -11,7 +11,6 @@ const numbers=['fullDayMinutes','hourlyPaidOffMinutes','insuranceRequiredDays'];
 const rates=['insuranceBps','employerBps','unemploymentBps','taxInsuranceDeductionBps'];
 const policyLabels:Record<string,string>={minimumDaily:'حداقل مزد روزانه ریال',fullDayMinutes:'دقایق مبنای روز کامل',hourlyPaidOffMinutes:'دقایق مزد استراحت فرد ساعتی',insuranceRequiredDays:'سابقه بیمه لازم برای حق اولاد به روز',insuranceDailyCap:'سقف روزانه مبنای بیمه ریال',insuranceBps:'درصد بیمه سهم فرد',employerBps:'درصد بیمه کارفرما',unemploymentBps:'درصد بیمه بیکاری',taxExemption:'معافیت ماهانه مالیات ریال',taxInsuranceDeductionBps:'درصد بیمه فرد که از مبنای مالیات کم می‌شود'};
 const money=(v:unknown)=>typeof v==='string'&&/^\d+$/.test(v)?BigInt(v).toLocaleString('fa-IR')+' ریال':'—';
-const weekNames=['یکشنبه','دوشنبه','سه‌شنبه','چهارشنبه','پنجشنبه','جمعه','شنبه'];
 const blankPolicy=()=>({title:'',start:'',end:'',source:'',taxSource:'',taxConfirmed:false,allowanceDivisor:'30',restPay:'paid',baseInsured:true,baseTaxable:true,jobInsured:true,jobTaxable:true,welfareInsured:false,welfareTaxable:false,components:[],taxBands:[{upper:'',bps:''}],...Object.fromEntries(Object.keys(policyLabels).map(k=>[k,'']))});
 export function PayrollWorkspace({data,onSaved,onBack,initialPeriodId='',initialSlipId=''}:{data:any;initialPeriodId?:string;initialSlipId?:string;onSaved:()=>Promise<any>;onBack:()=>void}){
  const has=(r:string)=>data.roles.includes(r),records=data.records||[],employees=records.filter((r:any)=>r.type==='hr_employee'&&r.data.state==='active');
@@ -27,7 +26,7 @@ export function PayrollWorkspace({data,onSaved,onBack,initialPeriodId='',initial
  const selector=(key:string,title:string,options:any[],required=true)=><label className="field" key={key}>{title} *<select required={required} value={form[key]||''} onChange={e=>setForm({...form,[key]:e.target.value})}><option value="">انتخاب کنید</option>{options.map(r=><option key={r.id} value={r.id}>{r.data?.name||r.data?.title||r.title}</option>)}</select></label>;
  const period=periods.find((r:any)=>r.id===periodId);
  const updateComponent=(i:number,k:string,v:any)=>setForm({...form,components:form.components.map((c:any,j:number)=>j===i?{...c,[k]:v}:c)});
- function newForm(k:string){setKind(k);setError('');if(k==='policy')setForm(blankPolicy());else if(k==='shift')setForm({title:'',dayRules:weekNames.map((title,weekday)=>({weekday,title,working:false,startTime:'08:00',endTime:'16:00',breakMinutes:0,paidBreak:true})),holidays:'',notes:''});else if(k==='period')setForm({title:'',start:'',end:'',deadline:'',memberIds:[]});else setForm({start:'',end:'',effective:'',memberId:'',contractId:'',shiftId:'',baseSalary:'',salaryBasis:'monthly',notes:''});}
+ function newForm(k:string){setKind(k);setError('');if(k==='policy')setForm(blankPolicy());else if(k==='shift')setForm({title:'',dayRules:iranWeekdays.map(({id:weekday,label:title})=>({weekday,title,working:weekday!==fridayWeekday,startTime:'08:00',endTime:'16:00',breakMinutes:0,paidBreak:true})),holidays:'',notes:''});else if(k==='period')setForm({title:'',start:'',end:'',deadline:'',memberIds:[]});else setForm({start:'',end:'',effective:'',memberId:'',contractId:'',shiftId:'',baseSalary:'',salaryBasis:'monthly',notes:''});}
  const menus=[...(has('hr')?[['work','کارکرد و تقویم']]:[]),...(has('payroll')||has('approver')?[['policy','قواعد دوره']]:[]),...(has('payroll')?[['calculate','محاسبه حقوق']]:[]),...(has('payroll')||has('approver')||has('finance')?[['slips','کنترل و فیش‌ها']]:[]),...(has('treasury')||has('finance')?[['payments','فهرست پرداخت']]:[])];
  return <section className="hr-payroll-workspace" dir="rtl"><header className="panel inside"><div className="tools"><h2>حقوق و کارکرد پرسنل</h2><button className="btn" onClick={onBack}>بازگشت</button></div><p>قرارداد مؤثر ← کارکرد تأییدشده ← قواعد مصوب ← کنترل مالی ← فیش و حسابداری ← تطبیق پرداخت</p><nav className="tools">{menus.map(([k,t])=><button type="button" className={'btn '+(tab===k?'primary':'')} key={k} onClick={()=>{setTab(k);setKind('');setSelectedSlip('')}}>{t}</button>)}</nav></header>
  {error&&<p role="alert" className="notice error">{error}</p>}{message&&<p role="status" className="notice">{message}</p>}

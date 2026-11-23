@@ -1,12 +1,11 @@
 'use client';
 import {useState} from 'react';
-import {formatDate,isIsoDay,localDay,solarMonths,solarMonthDays,solarParts,solarToIso} from '@/lib/persian-date';
+import {formatDate,iranWeekdays,isIsoDay,localDay,solarMonths,solarMonthDays,solarParts,solarToIso} from '@/lib/persian-date';
 
 export type LeaveCalendarDay={day:string;working:boolean;minutes:number|null;status:'working'|'off'|'unavailable'};
 export type LeaveCalendarMonth={year:number;month:number;start:string;end:string;days:LeaveCalendarDay[]};
 type Props={start:string;end:string;singleDay?:boolean;calendar?:LeaveCalendarMonth;disabled?:boolean;loading?:boolean;today?:string;onChange:(start:string,end:string)=>void;onMonthChange?:(monthStart:string)=>void};
 const nf=new Intl.NumberFormat('fa-IR',{useGrouping:false});
-const weekdays=['شنبه','یکشنبه','دوشنبه','سه‌شنبه','چهارشنبه','پنجشنبه','جمعه'];
 
 /** The API remains a contiguous ISO range; holidays inside that range consume no leave. */
 export function LeaveCalendar({start,end,singleDay=false,calendar,disabled=false,loading=false,today=localDay(),onChange,onMonthChange}:Props){
@@ -23,7 +22,7 @@ export function LeaveCalendar({start,end,singleDay=false,calendar,disabled=false
   <legend>انتخاب روزهای مرخصی</legend>
   <div className="leave-calendar-heading"><button className="btn" type="button" aria-label="ماه قبل" disabled={disabled||loading} onClick={()=>move(-1)}>ماه قبل</button><strong aria-live="polite">{solarMonths[visible.month-1]} {nf.format(visible.year)}</strong><button className="btn" type="button" aria-label="ماه بعد" disabled={disabled||loading} onClick={()=>move(1)}>ماه بعد</button></div>
   <p className="muted">{singleDay?'یک روز را برای مرخصی ساعتی انتخاب کنید.':awaitingEnd?'روز پایان را انتخاب کنید؛ برای یک روز، همان روز را دوباره بزنید.':'ابتدا روز شروع و سپس روز پایان را انتخاب کنید.'}</p>
-  <table className="leave-calendar-table" aria-label={'تقویم '+solarMonths[visible.month-1]+' '+nf.format(visible.year)}><thead><tr>{weekdays.map(day=><th scope="col" key={day}><abbr title={day}>{day==='شنبه'?'ش':day==='جمعه'?'ج':day[0]}</abbr></th>)}</tr></thead><tbody>{Array.from({length:cells.length/7},(_,week)=><tr key={week}>{cells.slice(week*7,week*7+7).map((number,column)=>{
+  <table className="leave-calendar-table" aria-label={'تقویم '+solarMonths[visible.month-1]+' '+nf.format(visible.year)}><thead><tr>{iranWeekdays.map(({label:day})=><th scope="col" key={day}><abbr title={day}>{day==='شنبه'?'ش':day==='جمعه'?'ج':day[0]}</abbr></th>)}</tr></thead><tbody>{Array.from({length:cells.length/7},(_,week)=><tr key={week}>{cells.slice(week*7,week*7+7).map((number,column)=>{
    if(!number)return <td key={column}/>;
    const iso=solarToIso(visible.year,visible.month,number),day=availability.get(iso),off=day?.status==='off',selected=isIsoDay(start)&&isIsoDay(selectedEnd)&&iso>=start&&iso<=selectedEnd;
    const status=off?'روز غیرکاری':day?.status==='working'?'روز کاری':'برنامه کاری مشخص نشده';

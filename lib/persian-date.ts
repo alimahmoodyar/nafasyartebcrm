@@ -1,6 +1,17 @@
 /** Calendar boundary: stored days stay ISO; people see the Persian calendar in Tehran. */
 export const calendarLocale='fa-IR-u-ca-persian-nu-arabext';
 export const calendarTimeZone='Asia/Tehran';
+// Display order is Iranian. IDs retain JavaScript's Sunday=0 through Saturday=6 convention.
+export const iranWeekdays=[
+ {id:6,label:'شنبه'},
+ {id:0,label:'یکشنبه'},
+ {id:1,label:'دوشنبه'},
+ {id:2,label:'سه‌شنبه'},
+ {id:3,label:'چهارشنبه'},
+ {id:4,label:'پنجشنبه'},
+ {id:5,label:'جمعه'}
+] as const;
+export const fridayWeekday=5;
 export const solarMonths=['فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور','مهر','آبان','آذر','دی','بهمن','اسفند'];
 const partsFormatter=new Intl.DateTimeFormat('en-US-u-ca-persian-nu-latn',{year:'numeric',month:'2-digit',day:'2-digit',timeZone:calendarTimeZone});
 const dayFormatter=new Intl.DateTimeFormat(calendarLocale,{year:'numeric',month:'2-digit',day:'2-digit',timeZone:calendarTimeZone});

@@ -9,7 +9,8 @@ function tree(){cursor=0;return component(props)}
 async function settle(){for(let i=0;i<3;i++){tree();const f=effects;effects=[];f.forEach(fn=>fn());await new Promise(r=>setImmediate(r))}return tree()}
 function button(t,label){const b=nodes(t).find(n=>n.type==='button'&&text(n).includes(label));assert.ok(b,label);return b}
 function reset(c,p){slots=[];effects=[];cursor=0;calls=[];component=c;props=p}
-const {PayrollSlipReview}=load('components/trace/payroll-slip-review.tsx'),{PayrollPaymentList}=load('components/trace/payroll-payment-list.tsx'),{PayrollWorkspace}=load('components/trace/payroll-workspace.tsx');
+const dates=load('lib/persian-date.ts');
+const {PayrollSlipReview}=load('components/trace/payroll-slip-review.tsx'),{PayrollPaymentList}=load('components/trace/payroll-payment-list.tsx'),{PayrollWorkspace}=load('components/trace/payroll-workspace.tsx',{'@/lib/persian-date':dates});
 (async()=>{
  slip={id:'slip',revision:4,type:'hr_payroll',data:{memberId:'employee',name:'پرسنل',title:'آبان',engine:'contract-v2',state:'review',createdBy:'other',missionAmountStatus:'pending_policy',gross:'400',insurance:'40',tax:'50',net:'310',work:{credited:1920,overtime:60,days:[]},components:[{key:'base',title:'حقوق پایه',amount:'400',insured:true,taxable:true,sources:[{day:'2026-10-25'}]},{key:'mission',title:'حق مأموریت',amount:'0',insured:false,taxable:false,sources:[]}],loanDeductions:[],missions:[]}};
  reset(PayrollSlipReview,{id:'slip',data:{accountId:'local:approver',me:'approver',roles:['approver']},onBack(){},onChanged(){}});let t=await settle();assert.equal(button(t,'تأیید حقوق').props.disabled,true);assert.match(text(t),/زمان واقعی یا مبنای محاسبه مأموریت/);button(t,'اصلاح فیش').props.onClick();t=tree();assert.equal(nodes(t).filter(n=>n.type==='form').length,1);assert.ok(nodes(t).find(n=>n.type==='textarea'&&n.props.required),'overall reason mandatory');assert.ok(nodes(t).some(n=>n.type==='input'&&n.props.type==='checkbox'&&n.props.required),'unknown mission requires explicit review');
@@ -18,5 +19,14 @@ const {PayrollSlipReview}=load('components/trace/payroll-slip-review.tsx'),{Payr
  reset(PayrollPaymentList,{periodId:'period',accountId:'local:treasury',version:1});t=await settle();assert.equal(nodes(t).filter(n=>n.type==='th').length,3);assert.match(text(t),/قالب بانک هنوز دریافت/);assert.equal(nodes(t).filter(n=>n.type==='a').length,2);assert.ok(!text(t).includes('اصلاح فیش'));
  reset(PayrollWorkspace,{data:{accountId:'local:treasury',me:'treasury',roles:['treasury'],records:[]},onSaved:async()=>{},onBack(){}});t=await settle();assert.ok(!nodes(t).some(n=>n.type==='button'&&text(n).includes('کنترل و فیش')));assert.ok(nodes(t).some(n=>n.type==='button'&&text(n)==='فهرست پرداخت'));assert.equal(calls.filter(c=>c.options.method==='POST').length,0,'navigation never writes');
  reset(PayrollWorkspace,{data:{accountId:'local:hr',me:'hr',roles:['hr'],records:[]},onSaved:async()=>{},onBack(){}});t=await settle();assert.ok(nodes(t).some(n=>n.type==='button'&&text(n)==='کارکرد و تقویم'));assert.ok(!text(t).includes('فهرست پرداخت'));assert.ok(!text(t).includes('کنترل و فیش‌ها'));
- console.log('payroll-approved-ui: PASS — one correction form, required reason, unknown mission, server preview/save, lock, three-column treasury and role menus');
+ button(t,'تعریف برنامه کاری').props.onClick();t=tree();
+ const weekdays=nodes(t).filter(n=>n.type==='input'&&n.props['aria-label']?.endsWith(' working'));
+ assert.deepEqual(weekdays.map(n=>n.props['aria-label'].split(' ')[0]),['شنبه','یکشنبه','دوشنبه','سه‌شنبه','چهارشنبه','پنجشنبه','جمعه']);
+ assert.deepEqual(weekdays.map(n=>n.props.checked),[true,true,true,true,true,true,false]);
+ nodes(t).find(n=>n.type==='label'&&text(n).includes('نام برنامه')).props.children.find(n=>n?.type==='input').props.onChange({target:{value:'شیفت واحد اداری'}});t=tree();
+ nodes(t).find(n=>n.type==='form').props.onSubmit({preventDefault(){}});await settle();
+ const shift=JSON.parse(calls.find(c=>c.options.method==='POST').options.body);
+ assert.deepEqual(shift.weekdays,[6,0,1,2,3,4]);
+ assert.deepEqual(shift.dayRules.map(({weekday,working})=>[weekday,working]),[[6,true],[0,true],[1,true],[2,true],[3,true],[4,true],[5,false]]);
+ console.log('payroll-approved-ui: PASS — approvals, role menus and Saturday-first shift with stable weekday IDs and Friday off');
 })().catch(e=>{console.error(e);process.exitCode=1});
