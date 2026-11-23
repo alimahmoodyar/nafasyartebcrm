@@ -27,10 +27,23 @@ async function step(u,id,mode,extra={}){const r=entity(id),body={id:crypto.rando
 async function wfget(u,q=''){const r=await ctx.run(u,()=>wf.GET(req('/api/assets/workflow'+q)));return {status:r.status,data:await r.json()};}
 function seed(id,type,data){sql.prepare('INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?)').run(id,type,JSON.stringify(data),now,now);}
 (async()=>{
+const mistaken=await post(keeper,{...reg,name:'Duplicate unused asset',category:'office',assetKind:'office'});assert.equal(mistaken.status,200);
+const mistakenId=mistaken.data.id,mistakenCode=entity(mistakenId).data.code;
+assert.ok(!(await wfget(keeper,'?id='+mistakenId)).data.actions.includes('archive_mistake'));
+assert.equal((await step(keeper,mistakenId,'archive_mistake')).status,403);
+assert.ok((await wfget(owner,'?id='+mistakenId)).data.actions.includes('archive_mistake'));
+assert.equal((await step(owner,mistakenId,'archive_mistake',{revision:0})).status,409);
+const archived=await step(owner,mistakenId,'archive_mistake');assert.equal(archived.status,200,JSON.stringify(archived));
+assert.equal(entity(mistakenId).type,'asset_archived');assert.equal(entity(mistakenId).data.code,mistakenCode);
+assert.equal(entity(mistakenId).data.archiveReason,'Actual test evidence');
+assert.ok(!(await wfget(owner)).data.records.some(item=>item.id===mistakenId));
+assert.equal((await ctx.run(owner,()=>wf.POST(req('/api/assets/workflow',archived.body)))).status,200);
 let r=await post(keeper,{...reg,code:'OFFICE',name:'Chair',category:'office',assetKind:'office'});assert.equal(r.status,200);const id=r.data.id;
+assert.notEqual(entity(id).data.code,mistakenCode);
 assert.equal((await step(keeper,id,'group',{name:'office',controlled:false})).status,200);
 assert.equal((await step(keeper,id,'passport',{category:'office',assetKind:'office',technicalId:'tech'})).status,200);
 assert.equal((await step(keeper,id,'transfer',{holderKind:'employee',holderId:'alice',location:'desk',condition:'good'})).status,200);
+assert.equal((await step(owner,id,'archive_mistake')).status,409,'An open custody transfer must remain intact.');
 assert.equal(entity(id).data.holderKind,'stock','request never changes custody');
 assert.equal((await step(bob,id,'accept_transfer',{scan:qr.assetQrText(id),condition:'good'})).status,404);
 assert.equal((await step(alice,id,'accept_transfer',{scan:'NAFASYAR-ASSET/1:'+crypto.randomUUID(),condition:'good'})).status,400);

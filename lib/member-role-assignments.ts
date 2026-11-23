@@ -153,6 +153,10 @@ export async function saveMemberRoles(ctx:Context,b:any){
   ...(p.record?[ctx.db.prepare('UPDATE flow_entities SET data=?,revision=revision+1,updated=? WHERE id=? AND revision=?').bind(JSON.stringify(data),now,p.record.id,p.record.revision)]:[ctx.db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'member_role_assignment',?,1,?,?)").bind(entityId(p.member.id),JSON.stringify(data),now,now)]),
   ctx.db.prepare('INSERT INTO access_audit(id,actor,target,action,before,after,at) VALUES(?,?,?,?,?,?,?)').bind(b.requestId,ctx.actor.userId,p.member.id,'assign_member_profiles',JSON.stringify({storedPermissions:validatePermissions(JSON.parse(p.member.permissions)),permissions:p.before,bindings:p.record?.data.bindings||[]}),JSON.stringify({permissions:p.after,bindings:p.bindings,reason:p.reason,legacyMode:b.legacyMode,policyVersion}),now)
  ])}catch(e){const repeat:any=await ctx.db.prepare('SELECT actor,payload FROM inventory_operations WHERE id=?').bind(b.requestId).first();if(repeat?.actor===ctx.actor.userId&&repeat.payload===signature)return {saved:true,repeated:true,memberId:p.member.id};if(/guard|UNIQUE/.test(String(e)))fail('اطلاعات حساب، نقش یا کارهای باز هم‌زمان تغییر کرد؛ فهرست را تازه کنید.',409);throw e;}
- return {saved:true,memberId:p.member.id};
+ let followupPending=false;
+ if(p.before.assetRoles?.includes('custodian')!==p.after.assetRoles?.includes('custodian')){
+  try{const {syncAssetTasks}=await import('./assets-tasks');await syncAssetTasks();const {syncAssetWorkflowTasks}=await import('./asset-workflow-tasks');await syncAssetWorkflowTasks();}catch{followupPending=true;}
+ }
+ return {saved:true,memberId:p.member.id,followupPending};
 }
 export function publicRolePreview(p:Awaited<ReturnType<typeof previewMemberRoles>>){return {previewToken:p.previewToken,removed:p.removed,added:p.added,openWork:p.openWork,blocked:p.blocked,hasLegacy:p.hasLegacy,programs:p.programs,bindings:p.bindings,before:p.before,after:p.after,policyVersion};}

@@ -9,6 +9,7 @@ import {syncReceiptTemplates} from '@/lib/receipt-template-sync';
 import {syncMaterialTasks} from '@/lib/material-tasks';
 import {syncInventoryCounts} from '@/lib/inventory-counts';
 import {guidanceOutline} from '@/lib/workflow-guidance';
+import {syncDeclarationTasks} from '@/lib/asset-declaration-tasks';
 import {syncForeignTasks} from '@/lib/foreign-purchase-tasks';
 import {installForeignPosition} from '@/lib/foreign-purchase';
 import {session,requireAccess,checkOrigin,accessResponse,AccessError} from '@/lib/authorization';
@@ -34,10 +35,15 @@ async function get(request?:Request){try{const u=await requireAccess(),db=storag
  const purchaseServices=await import('@/lib/purchase-services');await purchaseServices.syncServiceFinanceTasks();
  const canPurchaseServices=await purchaseServices.purchaseServicesAvailable(u);
  const processView=request&&new URL(request.url).searchParams.get('view')==='process-history';
+ if(!processView&&!u.profileReview&&!u.isAdmin){
+  const keeper=u.permissions.assetRoles?.includes('custodian')===true;
+  const missingDeclaration=await db.prepare("SELECT 1 FROM flow_entities a WHERE a.type='asset_declaration' AND ((json_extract(a.data,'$.state')='returned' AND json_extract(a.data,'$.memberId')=?) OR (?=1 AND json_extract(a.data,'$.state')='submitted' AND json_extract(a.data,'$.memberId')<>?)) AND NOT EXISTS(SELECT 1 FROM duty_runs t WHERE t.id='asset-declaration-task:'||a.id||':'||a.revision||':'||? AND t.state NOT IN ('completed','cancelled')) LIMIT 1").bind(mid,keeper?1:0,mid,mid).first();
+  if(missingDeclaration){try{await syncDeclarationTasks();}catch{ /* The next cartable refresh retries synchronization. */ }}
+ }
  const tasks=u.profileReview?[]:(await db.prepare(processView
   ?"SELECT * FROM duty_runs WHERE (?=1 OR assignee=? OR supervisor=?) AND state IN ('completed','cancelled','submitted') ORDER BY updated DESC,id"
   :"SELECT * FROM duty_runs WHERE ?=1 OR assignee=? OR supervisor=? ORDER BY CASE WHEN state IN ('completed','cancelled') THEN 1 ELSE 0 END,due,id LIMIT 300").bind(u.isAdmin?1:0,mid,mid).all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}));
- const allowedTasks:any[]=[];for(const t of tasks){if(!dutyVisible(u,t.data))continue;if(t.data.materialWorkflow||t.data.purchaseServiceWorkflow||t.data.purchaseInvoiceWorkflow||t.data.assetWorkflow||t.data.qmsWorkflow||t.data.foreignPurchaseWorkflow||t.data.staffMissionWorkflow||t.data.personnelWorkflow||t.data.salesLeadWorkflow||t.data.treasuryWorkflow||t.data.guaranteeWorkflow||t.data.replenishmentWorkflow||t.data.buildIntakeWorkflow||t.data.projectDailyWorkflow){try{await taskAccess(t.id,u);}catch{continue;}}if(t.data.transportWorkflow){try{const {transportAccess}=await import('@/lib/transport');await transportAccess(u,t.data.transportMissionId);}catch{continue;}}allowedTasks.push(t);}
+ const allowedTasks:any[]=[];for(const t of tasks){if(!dutyVisible(u,t.data))continue;if(t.data.materialWorkflow||t.data.purchaseServiceWorkflow||t.data.purchaseInvoiceWorkflow||t.data.assetWorkflow||t.data.assetWorkflowV2||t.data.qmsWorkflow||t.data.foreignPurchaseWorkflow||t.data.staffMissionWorkflow||t.data.personnelWorkflow||t.data.salesLeadWorkflow||t.data.treasuryWorkflow||t.data.guaranteeWorkflow||t.data.replenishmentWorkflow||t.data.buildIntakeWorkflow||t.data.projectDailyWorkflow){try{await taskAccess(t.id,u);}catch{continue;}}if(t.data.transportWorkflow){try{const {transportAccess}=await import('@/lib/transport');await transportAccess(u,t.data.transportMissionId);}catch{continue;}}allowedTasks.push(t);}
  if(processView){
   const roles=u.permissions.flowRoles||[], profile=u.profileReview?.id;
   const central=profile?profile==='central-store':u.isAdmin||roles.includes('inventory')||!!u.permissions.warehouseResponsibilities?.some(w=>w.role==='inventory');

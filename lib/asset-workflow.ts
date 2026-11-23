@@ -29,6 +29,7 @@ export async function canReadAsset(u:Session,r:any,a:Actor){const d=r.data;if(a.
 export async function accessWorkflowAsset(u:Session,id:string){const a=await assetIdentity(u),r=await assetRow(id);if(!r||r.type!=='asset_item'||!await canReadAsset(u,r,a))afail('مال در دسترسی شما نیست.',404);return {a,r};}
 export function assetPublic(r:any,a:Actor){const d={...r.data};if(d.servicePlan?.blockWhenDue&&assetServiceDue(d))d.useState='stopped';if(!a.custodian&&!a.ceo&&!technicalAsset(d,a)){delete d.specifications;delete d.contractorContact;delete d.mobile;delete d.disposal;if(d.service)d.service={...d.service,cost:undefined};d.history=undefined;if(d.pending)d.pending={...d.pending,initiator:undefined,linkId:undefined};}return {...r,data:d};}
 export async function assetActions(u:Session,r:any,a:Actor){const d=r.data,actions:string[]=[];if(d.lifecycle==='disposed')return a.finance&&d.financeFollowup?.state==='open'?['finance_close']:actions;
+ if(a.admin&&!a.external&&!u.profileReview)actions.push('archive_mistake');
  if(a.custodian){actions.push('passport','transfer');if(['contractor','sales','service'].includes(d.holderKind)||['contractor','sales','service'].includes(d.pending?.kind))actions.push('create_link');if(d.signatureRequired&&!d.signedReceiptId||['contractor','sales','service'].includes(d.holderKind))actions.push('attach_receipt');}else if(ownsAsset(d,a))actions.push('transfer');
  if(d.pending){if(a.custodian&&d.pending.state==='awaiting_approval')actions.push('approve_transfer');if(a.custodian||d.pending.initiator===u.userId)actions.push('cancel_transfer');if(d.pending.state==='awaiting_receipt'&&await receives(u,d.pending,a))actions.push('accept_transfer','reject_transfer');}
  if(ownsAsset(d,a))actions.push('confirm_presence');if(ownsAsset(d,a)||a.custodian||technicalAsset(d,a)||!a.external&&d.holderKind==='stock'&&await warehouseAsset(u,d.warehouseId))actions.push('report_fault','attach_photo');
@@ -56,6 +57,16 @@ export async function applyAssetWorkflow(u:Session,b:any){if(!b||b.confirmed!==t
  const r=await assetRow(req(b.recordId)),d=r?structuredClone(r.data):null;if(!r||r.type!=='asset_item')afail('مال پیدا نشد.',404);if(!await canReadAsset(u,r,a)&&!(b.mode==='accept_transfer'&&await receives(u,d.pending||{},a)))afail('مال در دسترسی شما نیست.',404);if(b.revision!==r.revision)afail('اطلاعات تغییر کرده؛ تازه‌سازی کنید.',409);if(d.lifecycle==='disposed'&&b.mode!=='finance_close')afail('مال از چرخه خارج شده است.',409);
  const now=new Date().toISOString(),guards:D1PreparedStatement[]=[],extras:D1PreparedStatement[]=[];
  guards.push(assetMemberGuard(db,b.id,a.members));
+ if(b.mode==='archive_mistake'){
+  if(!a.admin||a.external||u.profileReview)afail('حذف ثبت اشتباه فقط از حساب مدیر سامانه مجاز است.',403);
+  if(d.holderKind!=='stock'||d.pending||d.openingDeclarationId||d.lastTransfer||d.lastConfirmationId||d.disposal||d.financeFollowup||d.service||d.servicePlan||d.issue||d.signatureRequired||d.signedReceiptId||d.meters?.hours||d.meters?.cycles||(d.history||[]).some((entry:any)=>!['register','edit'].includes(entry.mode)))afail('این شناسنامه سابقه یا فرایند عملیاتی دارد؛ ابتدا مغایرت را در پرونده اموال بررسی کنید.',409);
+  const unused="NOT EXISTS(SELECT 1 FROM flow_entities WHERE type='asset_event' AND json_extract(data,'$.assetId')=? AND coalesce(json_extract(data,'$.mode'),'') NOT IN ('register','passport','attach_photo'))";
+  const eligible:any=await db.prepare('SELECT '+unused+' AS ok').bind(r.id).first();
+  if(!eligible?.ok)afail('این شناسنامه سابقهٔ عملیاتی دارد و قابل حذف از دفتر جاری نیست.',409);
+  guards.push(db.prepare('UPDATE inventory_operations SET guard=CASE WHEN '+unused+' THEN guard ELSE 0 END WHERE id=?').bind(r.id,b.id));
+  extras.push(db.prepare("UPDATE flow_entities SET type='asset_archived' WHERE id=? AND type='asset_item' AND revision=?").bind(r.id,r.revision+1));
+  return commitAssetEvent(u,b,r,{...d,archivedAt:now,archivedBy:u.userId,archiveReason:b.notes},extras,guards);
+ }
  const transferPhotos=await bindTransferPhotos(u,b,r,guards,extras);
  const need=(ok:any,msg='این اقدام در اختیار شما نیست.')=>{if(!ok)afail(msg,403);};
  if(b.mode==='finance_close'){need(a.finance);if(d.financeFollowup?.state!=='open')afail('پیگیری مالی بازی وجود ندارد.');d.financeFollowup={...d.financeFollowup,state:'completed',reference:req(b.reference),notes:b.notes,at:now,by:u.userId};

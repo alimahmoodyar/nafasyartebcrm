@@ -1,4 +1,4 @@
-import {assetLabelId} from './asset-label';
+import {assetLabelId,generatedAssetCode} from './asset-label';
 import {assetActor,assetMembers,assetRows,assetFail,commitAssets,assetInternal} from './assets';
 import {assetConditions} from './assets-contract';
 import {assetCategory,nextAssetCode} from './asset-categories';
@@ -15,7 +15,33 @@ const text=(v:unknown,n=300)=>taskText(v??'',n);
 const owner=(r:any,a:any)=>r.data.memberId===a.id;
 async function context(u:Session){const members=await assetMembers(),a=await assetActor(u,members),rows=await assetRows();return {members,a,rows};}
 function access(rows:any[],id:string,a:any){const r=rows.find(r=>r.id===id&&r.type==='asset_declaration');if(!r||!a.custodian&&!owner(r,a))assetFail('اعلام اموال در دسترسی شما نیست.',404);return r;}
-function publicRecord(r:any,rows:any[]){return {...r,files:rows.filter(f=>f.type==='asset_file'&&f.data.declarationId===r.id).map(f=>({id:f.id,number:f.data.registrationNumber,filename:f.data.filename,url:'/api/assets/declarations/files?id='+encodeURIComponent(f.id)}))};}
+function codeIndex(rows:any[]){
+ const byId=new Map<string,any>(),byCode=new Map<string,any[]>();
+ for(const row of rows){
+  if(!['asset_item','asset_archived'].includes(row.type))continue;
+  byId.set(row.id.toLowerCase(),row);
+  const code=generatedAssetCode(String(row.data.code||''));
+  if(code)byCode.set(code,[...(byCode.get(code)||[]),row]);
+ }
+ return {byId,byCode};
+}
+function matchCode(raw:string,index:ReturnType<typeof codeIndex>){
+ const id=assetLabelId(raw).toLowerCase(),code=generatedAssetCode(raw);
+ const candidates=id?[index.byId.get(id)].filter(Boolean):index.byCode.get(code)||[];
+ if(candidates.length>1)return {state:'conflict'} as const;
+ const asset=candidates[0];
+ if(!asset)return {state:raw?'legacy':'empty'} as const;
+ if(asset.type==='asset_archived'||asset.data.lifecycle==='disposed')return {state:'inactive'} as const;
+ return {state:'existing',asset} as const;
+}
+function assetOption(r:any){return {id:r.id,revision:r.revision,name:r.data.name,code:r.data.code,holderName:r.data.holderName,holderKind:r.data.holderKind,holderId:r.data.holderId};}
+function publicRecord(r:any,rows:any[],index?:ReturnType<typeof codeIndex>){
+ const codeMatches=index?(r.data.items||[]).map((item:any)=>{
+  const result=matchCode(String(item.existingCode||''),index);
+  return result.state==='existing'?{state:result.state,asset:assetOption(result.asset)}:{state:result.state};
+ }):undefined;
+ return {...r,...(codeMatches?{codeMatches}:{}),files:rows.filter(f=>f.type==='asset_file'&&f.data.declarationId===r.id).map(f=>({id:f.id,number:f.data.registrationNumber,filename:f.data.filename,url:'/api/assets/declarations/files?id='+encodeURIComponent(f.id)}))};
+}
 function entries(input:any,strict:boolean,noAssets:boolean){
  if(noAssets){if(input?.length)assetFail('در اعلام نداشتن مال نباید ردیف مال وجود داشته باشد.');return [];}
  if(!Array.isArray(input)||input.length<1||input.length>20)assetFail('هر اعلام باید بین یک تا بیست مال داشته باشد.');
@@ -32,7 +58,8 @@ export async function readAssetDeclarations(u:Session,q:URLSearchParams){
  const {a,rows,members}=await context(u),review=q.get('review')==='true';if(review&&!a.custodian)assetFail('بررسی اعلام‌ها فقط برای اموالدار است.',403);
  if(q.has('assetSearch')){if(!a.custodian)assetFail('جست‌وجوی دفتر اموال فقط برای اموالدار است.',403);const term=text(q.get('assetSearch'),100).toLocaleLowerCase();return {accountId:u.userId,assets:term?rows.filter(r=>r.type==='asset_item'&&r.data.lifecycle!=='disposed'&&(r.data.code+' '+r.data.name+' '+(r.data.serial||'')).toLocaleLowerCase().includes(term)).slice(0,30).map(r=>({id:r.id,revision:r.revision,name:r.data.name,code:r.data.code,holderName:r.data.holderName,holderKind:r.data.holderKind,holderId:r.data.holderId})):[]};}
  const records=q.get('id')?[access(rows,q.get('id')!,a)]:rows.filter(r=>r.type==='asset_declaration'&&(review?['submitted','returned','approved'].includes(r.data.state):owner(r,a))).sort((x,y)=>y.updated.localeCompare(x.updated)).slice(0,100);
- return {accountId:u.userId,me:a.id,custodian:a.custodian,review,records:records.map(r=>publicRecord(r,rows)),conditions:assetConditions,personName:members.find(m=>m.id===a.id)?.name||u.name};
+ const index=review?codeIndex(rows):undefined;
+ return {accountId:u.userId,me:a.id,custodian:a.custodian,review,records:records.map(r=>publicRecord(r,rows,index)),conditions:assetConditions,personName:members.find(m=>m.id===a.id)?.name||u.name};
 }
 export async function applyAssetDeclaration(u:Session,b:any){
  if(!b||!uuid(b.id)||b.confirmed!==true||!['save','submit','approve','return'].includes(b.mode)||!Number.isSafeInteger(b.revision)||b.revision<0)assetFail('شناسه، نسخه و تأیید عملیات لازم است.');
@@ -70,17 +97,19 @@ export async function applyAssetDeclaration(u:Session,b:any){
   const source=entries(old.data.items,true,!!old.data.noAssets);checkPhotos(source,old,rows);
   const edits=b.reviewItems===undefined?source.map((r:any)=>({...r,existingAssetId:'',assetRevision:0,copies:1})):b.reviewItems;
   if(!Array.isArray(edits)||edits.length!==source.length)assetFail('همه ردیف‌های اعلام باید یکجا بررسی شوند.');
-  const assigned=new Set<string>(),serials=new Set<string>(),approvedItems:any[]=[],groupId=assetRegistrationId(b.id);
+  const assigned=new Set<string>(),serials=new Set<string>(),approvedItems:any[]=[],groupId=assetRegistrationId(b.id),indexByCode=codeIndex(rows);
   for(let index=0;index<source.length;index++){
    const original=source[index],edit=edits[index];if(!edit||Object.keys(edit).some(k=>!['number','name','category','location','brand','model','serial','condition','existingCode','notes','photoFileIds','existingAssetId','assetRevision','copies'].includes(k)))assetFail('جزئیات بررسی معتبر نیست.');
    const item=entries([{...original,...edit,photoFileIds:original.photoFileIds}],true,false)[0];item.number=index+1;
    if(['name','category','location','brand','model','serial','condition'].some(k=>(item as any)[k]!==original[k])&&!notes)assetFail('دلیل تغییر مشخصات اعلام‌شده لازم است.');
    const copies=Number(edit.copies??1);if(!Number.isInteger(copies)||copies<1||copies>20)assetFail('تعداد لیبل هر مال بین یک و بیست باشد.');
-   const expected=original.existingCode?rows.find(r=>r.type==='asset_item'&&(String(r.data.code).toLocaleLowerCase()===original.existingCode.toLocaleLowerCase()||r.id===assetLabelId(original.existingCode))):null;
+   const codeMatch=matchCode(original.existingCode,indexByCode);
+   if(codeMatch.state==='conflict')assetFail('برای این کد بیش از یک شناسنامه ثبت شده است؛ ابتدا مغایرت کد را بررسی کنید.',409);
+   if(codeMatch.state==='inactive')assetFail('این کد هم‌نفس متعلق به مال بایگانی‌شده یا خارج‌شده است؛ ابتدا مغایرت را بررسی کنید.',409);
+   const expected=codeMatch.state==='existing'?codeMatch.asset:null;
    let existing=edit.existingAssetId?rows.find(r=>r.id===edit.existingAssetId&&r.type==='asset_item'):expected;
    if(edit.existingAssetId&&!existing)assetFail('مال انتخاب‌شده یافت نشد.',404);
    if(expected&&existing?.id!==expected.id)assetFail('کد اعلام‌شده باید با همان شناسنامه تطبیق داده شود.',409);
-   if(original.existingCode&&!expected)assetFail('کد اعلام‌شده پیدا نشد؛ اعلام را برای اصلاح برگردانید.',409);
    if(existing&&(existing.revision!==Number(edit.assetRevision)||assigned.has(existing.id)))assetFail('شناسنامه تغییر کرده یا دو بار انتخاب شده است.',409);
    if(existing&&(existing.data.lifecycle==='disposed'||existing.data.pending||existing.data.holderKind!=='stock'&&!(existing.data.holderKind==='employee'&&existing.data.holderId===person.id)))assetFail('مال نزد دارنده دیگری است یا انتقال باز دارد؛ ابتدا تعارض را تعیین تکلیف کنید.',409);
    const serial=item.serial.trim().toLocaleLowerCase();if(serial&&(serials.has(serial)||rows.some(r=>r.type==='asset_item'&&r.id!==existing?.id&&String(r.data.serial||'').trim().toLocaleLowerCase()===serial)))assetFail('این سریال قبلاً ثبت شده است؛ شناسنامه موجود را تطبیق دهید.',409);if(serial)serials.add(serial);
