@@ -6,7 +6,7 @@ import {requiredPersonnel} from '@/lib/personnel-employment';
 import {materialWarehouses,warehouseProfilePermissions,warehouseResponsibilityGuards} from '@/lib/material-warehouses';
 import {syncMaterialTasks} from '@/lib/material-tasks';
 import {storedAccessPermissions} from '@/lib/permissions';
-import {username,password,hashPassword} from "@/lib/password-auth";
+import {username,password,hashPassword,digest} from "@/lib/password-auth";
 import {env} from "cloudflare:workers";
 import {storage} from "@/lib/storage";
 import {requireAdmin, checkOrigin, accessResponse, AccessError} from "@/lib/authorization";
@@ -168,6 +168,25 @@ export async function POST(request: Request) {
     return Response.json({member: present({...row,personnelLink:accountPersonnelLink(row,await hrRows()),...contact,contactRevision:1})}, {status: 201});
   } catch (error) {return failure(error, localAccount ? 'username' : 'email');}
 }
+async function resetMemberPassword(body:any,actor:{userId:string}){
+  const db=storage();
+  const account=await db.prepare("SELECT m.*,a.username,a.version AS credentialVersion FROM app_members m JOIN password_accounts a ON a.member_id=m.id WHERE m.id=? AND m.status='active'").bind(body.id).first<any>();
+  if(!account)throw new AccessError('حساب فعال با رمز ورود پیدا نشد.',404);
+  if(await protectedAccount(account,actor))throw new AccessError('این حساب محافظت‌شده است.',403);
+  if(account.revision!==body.revision)return conflict();
+  const hash=await hashPassword(password(body.temporaryPassword)),now=new Date().toISOString(),op=crypto.randomUUID();
+  await db.batch([
+    db.prepare("INSERT INTO inventory_operations(id,kind,payload,actor,created,guard) VALUES(?,'admin_reset_password','{}',?,?,CASE WHEN EXISTS(SELECT 1 FROM password_accounts a JOIN app_members m ON m.id=a.member_id WHERE m.id=? AND m.status='active' AND m.revision=? AND a.version=?) THEN 1 ELSE 0 END)").bind(op,actor.userId,now,account.id,account.revision,account.credentialVersion),
+    db.prepare('UPDATE password_accounts SET password_hash=?,password_ciphertext=NULL,must_change=1,version=version+1,password_changed_at=? WHERE member_id=?').bind(hash,now,account.id),
+    db.prepare('UPDATE app_members SET revision=revision+1,updated=? WHERE id=?').bind(now,account.id),
+    db.prepare('DELETE FROM password_sessions WHERE member_id=?').bind(account.id),
+    db.prepare('DELETE FROM login_attempts WHERE key IN (?,?)').bind(await digest('user:'+account.username),await digest('credentials:'+account.id)),
+    db.prepare('UPDATE mcp_tokens SET revoked=1 WHERE subject IN (?,?,?)').bind('local:'+account.id,account.id,account.subject||account.id),
+    db.prepare('DELETE FROM mcp_streams WHERE token_id IN (SELECT id FROM mcp_tokens WHERE subject IN (?,?,?))').bind('local:'+account.id,account.id,account.subject||account.id),
+    db.prepare("INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,'admin_reset_password','{}',?)").bind(op,actor.userId,account.id,now)
+  ]);
+  return Response.json({saved:true},{headers:{'Cache-Control':'no-store'}});
+}
 export async function PATCH(request: Request) {
   let localAccount = false;
   try {
@@ -176,6 +195,7 @@ export async function PATCH(request: Request) {
     if(body.mode==='restore')return await restoreAccount(body,actor);
     if(body.mode==='link_personnel')return await linkExistingPersonnel(body,actor);
     if(typeof body.id!=='string'||!Number.isInteger(body.revision)||body.revision<1)throw new Error('نسخه حساب معتبر نیست.');
+    if(body.mode==='reset_password')return await resetMemberPassword(body,actor);
     const db=storage(); const old=await db.prepare('SELECT * FROM app_members WHERE id=?').bind(body.id).first<any>();
     if(!old||old.status==='deleted')return Response.json({error:'حساب یافت نشد یا حذف شده است.'},{status:404});
     const protectedUser=await protectedAccount(old,actor);

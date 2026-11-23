@@ -137,5 +137,28 @@ const op=(mode,extra={})=>({id:crypto.randomUUID(),mode,confirmed:true,revision:
  const report=await context.run(hr,()=>onboarding.GET());assert.equal(report.status,200);assert.ok(!(await report.text()).includes('password_hash'));
  const principal={user:staff,scope:'read_write',tokenId:null};const ownMcp=await catalog.executeTool('get_asset_declarations',{},base,principal);assert.ok(ownMcp.records.some(r=>r.id===record.id));await assert.rejects(()=>catalog.executeTool('asset_declaration_apply',approveDecl,base,principal));
  assert.equal(sql.prepare('PRAGMA foreign_key_check').all().length,0);assert.ok(!JSON.stringify(sql.prepare('SELECT * FROM access_audit').all()).includes('New-private-password-123'));
+ let mine=await call(multiKeeper,op('submit',{items:[],noAssets:true,holderConfirmed:true}));
+ assert.equal(mine.status,200);let myRecord=(await mine.json()).record;
+ const correction=await call(custodian,op('return',{recordId:myRecord.id,revision:myRecord.revision,notes:'Check again'}));assert.equal(correction.status,200);myRecord=(await correction.json()).record;
+ mine=await call(multiKeeper,op('submit',{recordId:myRecord.id,revision:myRecord.revision,items:[],noAssets:true,holderConfirmed:true}));assert.equal(mine.status,200);
+ for(const scope of ['custodian','personnel-hr','personal']){
+  const response=await context.run(multiKeeper,()=>tasks.GET(req('/api/tasks?workspace='+scope)));
+  assert.equal(response.status,200);const result=await response.json();
+  assert.equal(result.positionWork.filter(w=>w.target==='asset-declaration:'+myRecord.id).length,scope==='custodian'?1:0);
+  if(scope==='custodian'){const follow=result.positionWork.find(w=>w.sourceId===myRecord.id);assert.equal(follow.state,'awaiting_other_reviewer');assert.match(follow.title,/اصلاح‌شده/);}
+  assert.ok(!result.tasks.some(t=>t.state==='open'&&t.data.sourceId===myRecord.id));
+ }
+ const resetRequest={mode:'reset_password',id:mid,revision:sql.prepare('SELECT revision FROM app_members WHERE id=?').get(mid).revision,temporaryPassword:'Temporary-key-123'};
+ const resetCall=actor=>context.run(actor,()=>userApi.PATCH(req('/api/users','PATCH',resetRequest)));
+ assert.equal((await resetCall(other)).status,403);
+ let resetResponse=await resetCall(admin);assert.equal(resetResponse.status,200,await resetResponse.clone().text());
+ assert.equal((await resetCall(admin)).status,409);
+ cookie='';identity=null;
+ assert.equal((await login.POST(req('/api/auth/login','POST',{username:form.nationalId,password:'New-private-password-123'}))).status,401);
+ const temporaryLogin=await login.POST(req('/api/auth/login','POST',{username:form.nationalId,password:resetRequest.temporaryPassword}));
+ assert.equal(temporaryLogin.status,200);cookie=temporaryLogin.headers.get('set-cookie').split(';')[0].split('=')[1];
+ assert.equal((await auth.session(true)).mustChangePassword,true);
+ const finishReset=await credentials.POST(req('/api/auth/credentials','POST',{username:form.nationalId,currentPassword:resetRequest.temporaryPassword,newPassword:'My-own-fresh-password',confirmed:true},{'x-profile-account':'local:'+mid}));
+ assert.equal(finishReset.status,200,await finishReset.clone().text());
  console.log('PASS staff onboarding + assets: atomic personal account after HR approval with missing docs, no duplicate/collision/reset or role grants, forced first password and old-session revocation, self-only draft/photos and private read, numbered independent photos, staff/HR/custodian separation, review return/inbox, serial/holder guards, atomic official opening inventory and labels, retry, no-assets conflict, HTTP/MCP/FK parity.');
 })().catch(e=>{console.error(e);process.exitCode=1});

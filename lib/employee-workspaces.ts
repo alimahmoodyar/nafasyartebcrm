@@ -16,8 +16,11 @@ export type EmployeeWorkspace={
 export function employeeWorkspaces(user:Session,assignedIds:string[]):EmployeeWorkspace[]{
  if(user.isAdmin||user.profileReview||user.mustChangePassword)return [];
  const p=accessPermissions(user.permissions);
- if(p.hospitalCenterId||p.salesAgentId||p.serviceAgentId)return [];
+ if(p.hospitalCenterId)return [];
+ const representative=p.salesAgentId?'sales-representative':p.serviceAgentId?'home-service-representative':'';
+ const externalRoles=['sales-representative','home-service-representative'];
  return roleProfiles.filter(profile=>assignedIds.includes(profile.id)&&profile.operational)
+  .filter(profile=>representative?profile.id===representative:!externalRoles.includes(profile.id))
   .filter(profile=>profile.id!=='personnel-hr'||p.personnelRoles?.includes('hr'))
   .filter(profile=>profile.id!=='custodian'||p.assetRoles?.includes('custodian'))
   .filter(profile=>profile.links.some(link=>canAccessSection(user,link.section)))

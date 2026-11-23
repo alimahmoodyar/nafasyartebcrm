@@ -9,7 +9,7 @@ export function cartableTarget(target:string){
 export const cartableSearch=(value:unknown)=>String(value??'').normalize('NFKC').replace(/[يى]/g,'ی').replace(/ك/g,'ک').replace(/[۰-۹]/g,c=>String(c.charCodeAt(0)-1776)).replace(/[٠-٩]/g,c=>String(c.charCodeAt(0)-1632)).replace(/[\s\u200c]+/g,' ').trim().toLowerCase();
 export type CartableRow={id:string;title:string;subtitle:string;context:string;instructions:string;due:string;review:boolean;kind:'position'|'task';source:any;canOpen?:boolean};
 export function cartableRows(data:any):CartableRow[]{
- const positions=(data?.positionWork||[]).map((w:any)=>({id:'position:'+w.id,title:w.title||'کار فرایندی',subtitle:w.sourceId||'',context:'کار فرایندی',instructions:'',due:w.due||'',review:false,kind:'position',source:w}));
+ const positions=(data?.positionWork||[]).map((w:any)=>({id:'position:'+w.id,title:w.title||'کار فرایندی',subtitle:w.state==='awaiting_other_reviewer'?'بررسی با اموال‌دار دیگر یا مدیر سامانه است.':w.sourceId||'',context:w.state==='awaiting_other_reviewer'?'اعلام اموال من':'کار فرایندی',instructions:'',due:w.due||'',review:false,kind:'position',source:w}));
  const tasks=(data?.tasks||[]).filter((t:any)=>!!data.memberId&&!['completed','cancelled'].includes(t.state)&&((t.assignee===data.memberId&&(t.state!=='submitted'||t.supervisor===data.memberId))||t.supervisor===data.memberId&&t.state==='submitted')).map((t:any)=>({id:'task:'+t.id,title:t.data.title||'وظیفه',subtitle:t.data.sourceId||t.id,context:t.data.positionName||'وظیفه سازمانی',instructions:t.data.instructions||'',due:t.due||'',review:t.state==='submitted',kind:'task',source:t}));
  return [...positions,...tasks];
 }

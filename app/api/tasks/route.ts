@@ -47,7 +47,7 @@ async function get(request?:Request){try{const u=await requireAccess(),db=storag
   ?"SELECT * FROM duty_runs WHERE (?=1 OR assignee=? OR supervisor=?) AND state IN ('completed','cancelled','submitted') ORDER BY updated DESC,id"
   :"SELECT * FROM duty_runs WHERE (?=1 OR assignee=? OR supervisor=?)"+(workspace?" AND state NOT IN ('completed','cancelled')":"")+" ORDER BY CASE WHEN state IN ('completed','cancelled') THEN 1 ELSE 0 END,due,id"+(workspace?"":" LIMIT 300")).bind(u.isAdmin?1:0,mid,mid).all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}));
  const allowedTasks:any[]=[];for(const t of tasks){if(workspace){
-  const roles=taskRoles(t.data,workspace.roles);
+  const roles=taskRoles(t.data,workspace.roles,workspace.bindings);
   if(workspace.scope==='personal'?roles.some(id=>workspace.roles.some(p=>p.id===id)):!roles.includes(workspace.scope))continue;
  }if(!dutyVisible(u,t.data))continue;if(t.data.materialWorkflow||t.data.purchaseServiceWorkflow||t.data.purchaseInvoiceWorkflow||t.data.assetWorkflow||t.data.assetWorkflowV2||t.data.qmsWorkflow||t.data.foreignPurchaseWorkflow||t.data.staffMissionWorkflow||t.data.personnelWorkflow||t.data.salesLeadWorkflow||t.data.treasuryWorkflow||t.data.guaranteeWorkflow||t.data.replenishmentWorkflow||t.data.buildIntakeWorkflow||t.data.projectDailyWorkflow){try{await taskAccess(t.id,u);}catch{continue;}}if(t.data.transportWorkflow){try{const {transportAccess}=await import('@/lib/transport');await transportAccess(u,t.data.transportMissionId);}catch{continue;}}allowedTasks.push(t);}
  if(processView){

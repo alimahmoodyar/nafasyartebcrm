@@ -26,7 +26,9 @@ export async function requireInboxAccess(request?:Request){
 export async function inboxMailbox(u:Session){
  if(u.mailboxRole){
   const role=roleProfiles.find(p=>p.id===u.mailboxRole)!;
-  return {id:'@role:'+role.id,name:role.title,profileTitle:role.title};
+  const external=u.permissions.salesAgentId||u.permissions.serviceAgentId;
+  const id='@role:'+role.id+(external?':'+await inboxIdentity(u):'');
+  return {id,name:external?u.name+' · '+role.title:role.title,profileTitle:role.title};
  }
  const preview=u.profileReview;
  if(!preview)return {id:await inboxIdentity(u),name:u.name,profileTitle:null};
@@ -66,7 +68,16 @@ export async function inboxDirectory(u:Session){
  if(!u.profileReview){
   const directory=await accountInboxDirectory(u);
   const internal=!u.permissions.salesAgentId&&!u.permissions.serviceAgentId&&!u.permissions.hospitalCenterId;
-  const roles=internal?roleProfiles.filter(p=>p.operational&&'@role:'+p.id!==mailbox.id).map(p=>({id:'@role:'+p.id,name:p.title,unit:'صندوق نقش',avatarUrl:null,positions:['صندوق نقش']})):[];
+  const roles=internal?roleProfiles.filter(p=>!['sales-representative','home-service-representative'].includes(p.id)&&p.operational&&'@role:'+p.id!==mailbox.id).map(p=>({id:'@role:'+p.id,name:p.title,unit:'صندوق نقش',avatarUrl:null,positions:['صندوق نقش']})):[];
+  if(internal){
+   const bindings=(await storage().prepare("SELECT m.id,m.name,m.permissions,b.value AS binding FROM app_members m JOIN flow_entities a ON a.id='member-role-assignment:'||m.id AND a.type='member_role_assignment' JOIN json_each(a.data,'$.bindings') b WHERE m.status='active' AND json_extract(b.value,'$.profileId') IN ('sales-representative','home-service-representative')").all()).results;
+   for(const row of bindings as {id:string;name:string;permissions:string;binding:string}[]){
+    const b=JSON.parse(row.binding),p=storedAccessPermissions(row.permissions),agent=b.profileId==='sales-representative'?p.salesAgentId:p.serviceAgentId;
+    if(!agent||agent!==b.agentId)continue;
+    const title=roleProfiles.find(role=>role.id===b.profileId)!.title;
+    roles.push({id:'@role:'+b.profileId+':'+row.id,name:row.name+' · '+title,unit:'صندوق نقش',avatarUrl:null,positions:[title]});
+   }
+  }
   return {...directory,people:[...directory.people,...roles],me:mailbox.id,mailboxName:mailbox.name,profileTitle:mailbox.profileTitle};
  }
  const people=roleProfiles
@@ -107,6 +118,8 @@ export async function prepareInboxCreate(u:Session,b:any,now=new Date(),mailboxD
  return {data,body:req(b.body,12000),recipient,me};
 }
 export function inboxCreateGuards(db:D1Database,op:string,recipientType:string,recipientId:string){
+ const external=/^@role:(sales-representative|home-service-representative):(.+)$/.exec(recipientId);
+ if(external&&recipientType==='person')return [db.prepare("UPDATE inventory_operations SET guard=CASE WHEN EXISTS(SELECT 1 FROM app_members m JOIN flow_entities a ON a.id='member-role-assignment:'||m.id JOIN json_each(a.data,'$.bindings') b WHERE m.id=? AND m.status='active' AND json_extract(b.value,'$.profileId')=?) THEN guard ELSE 0 END WHERE id=?").bind(external[2],external[1],op)];
  const sql=recipientType==='position'?"EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND type='position' AND json_extract(data,'$.active')=1)":"EXISTS(SELECT 1 FROM app_members WHERE id=? AND status='active')";
  // The preview directory validates fixed profile addresses. They have no mutable member row.
  if(recipientType==='person'&&(recipientId==='@owner'||roleProfiles.some(p=>profileAddress(p.id)===recipientId||p.operational&&'@role:'+p.id===recipientId)))return [];

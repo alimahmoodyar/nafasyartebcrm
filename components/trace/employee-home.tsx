@@ -9,7 +9,9 @@ import {ServiceOfficeWorkspace} from './service-office-workspace';
 import {CentralWarehouseMenu} from './central-warehouse-menu';
 import {PersonalHome} from './personal-home';
 import {RoleTaskTools} from './role-task-tools';
-import {personnelWorkEntry} from './employee-home-policy';
+import {ServiceRepresentativeDashboard} from './service-representative-dashboard';
+import {SalesPanel} from './sales-panel';
+import {selectedEmployeeWorkspace,personnelWorkEntry} from './employee-home-policy';
 import './employee-self-service.css';
 type App={key:string;title:string;shortTitle?:string;icon:LucideIcon};
 type WorkspaceSelection={accountId:string;id:string};
@@ -17,8 +19,8 @@ type Snapshot={accessKey:string;accountId:string;tasks:CartableRow[];unread:numb
 export function EmployeeHome({user,apps,onNavigate,workspace,onWorkspaceChange,warehouseMenu='',onWarehouseMenuChange}:{user:Session;apps:App[];onNavigate:(section:string,target?:string)=>void;workspace?:WorkspaceSelection|null;onWorkspaceChange?:(next:WorkspaceSelection|null)=>void;warehouseMenu?:string;onWarehouseMenuChange?:(id:string)=>void}){
  const [localWorkspace,setLocalWorkspace]=useState<WorkspaceSelection|null>(null);
  const workspaces=user.assignedWorkspaces||[],selection=onWorkspaceChange?workspace:localWorkspace;
- const selectWorkspace=(id:string)=>{const next=id?{accountId:user.userId,id}:null;if(onWorkspaceChange)onWorkspaceChange(next);else setLocalWorkspace(next)};
- const active=selection?.accountId===user.userId?workspaces.find(w=>w.id===selection.id):undefined;
+ const selectWorkspace=(id:string)=>{const next={accountId:user.userId,id:id||'personal'};if(onWorkspaceChange)onWorkspaceChange(next);else setLocalWorkspace(next)};
+ const active=selectedEmployeeWorkspace(user,selection);
  const warehouseMenus=active?.menus;
  const warehouseTools=warehouseMenus?.length&&onWarehouseMenuChange?<CentralWarehouseMenu menus={warehouseMenus} activeId={warehouseMenu} onSelect={onWarehouseMenuChange} onNavigate={onNavigate}/>:null;
  const scope=active?.id||'personal';
@@ -47,8 +49,8 @@ export function EmployeeHome({user,apps,onNavigate,workspace,onWorkspaceChange,w
  const profile=active&&roleProfiles.find(p=>p.id===active.id);
  if(active&&profile)return <section dir="rtl">
   <button type="button" className="btn" onClick={()=>selectWorkspace('')}>بازگشت به خانهٔ من</button>
-  <RoleTestingPanel assigned={{profile:{...profile,links:active.links},count:current?.tasks.length||0,exit:()=>selectWorkspace('')}} targetId={active.id} onNavigate={onNavigate} onProfile={()=>{}} centralWarehouseTools={warehouseTools} officeServiceDashboard={<ServiceOfficeWorkspace user={user} onNavigate={onNavigate}/>}/>
-  {['personnel-hr','home-service','home-service-customer-support','home-service-technician','driver'].includes(active.id)&&<button className="btn primary" onClick={()=>onNavigate('tasks')}>کارتابل {active.title}</button>}
+  <RoleTestingPanel assigned={{profile:{...profile,links:active.links},count:current?.tasks.length||0,exit:()=>selectWorkspace('')}} targetId={active.id} onNavigate={onNavigate} onProfile={()=>{}} representativeDashboard={<SalesPanel demo={false} targetId="rep-dashboard" onNavigate={onNavigate}/>} serviceRepresentativeDashboard={<ServiceRepresentativeDashboard user={user} onNavigate={onNavigate}/>} centralWarehouseTools={warehouseTools} officeServiceDashboard={<ServiceOfficeWorkspace user={user} onNavigate={onNavigate}/>}/>
+  {['personnel-hr','home-service','home-service-customer-support','home-service-technician','driver','sales-representative','home-service-representative'].includes(active.id)&&<button className="btn primary" onClick={()=>onNavigate('tasks')}>کارتابل {active.title}</button>}
   <RoleTaskTools accountId={user.userId} workspace={active.id} onNavigate={onNavigate}/>
  </section>;
  return <section className="employee-home" dir="rtl" aria-label="خانهٔ شخصی کارکنان">

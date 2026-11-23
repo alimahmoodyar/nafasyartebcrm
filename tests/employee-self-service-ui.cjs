@@ -18,8 +18,9 @@ let render;async function mount(fn){slots=[];cursor=0;effects=[];calls=[];naviga
  const hrWorkspace={id:'personnel-hr',title:'مسئول اداری',group:'اداری و اموال',programs:['personnel'],links:[{title:'پرسنل، مدارک و قراردادها',section:'personnel',target:'hr-admin:'}]};
  const assetWorkspace={id:'custodian',title:'اموال‌دار',group:'اداری و اموال',programs:['assets'],links:[{title:'مدیریت اموال، تحویل و پیگیری',section:'assets'}]};
  const assigned={...hrUser,assignedWorkspaces:[hrWorkspace]};
- t=await mount(()=>EmployeeHome({user:assigned,apps,onNavigate:go}));assert.match(text(t),/مسئول اداری/);assert.equal(nodes(t).filter(n=>n.props.className==='employee-home-card').length,2);assert.ok(nodes(t).some(n=>n.props.className==='employee-workspaces'));assert.ok(!nodes(t).some(n=>n.type===leaves.PersonalHome),'role launcher must not duplicate the HR app');
- nodes(t).find(n=>n.props.className==='employee-workspace-tile').props.onClick();t=render();assert.equal(nodes(t).find(n=>n.type===leaves.RoleTestingPanel).props.assigned.profile.id,'personnel-hr');
+ t=await mount(()=>EmployeeHome({user:assigned,apps,onNavigate:go}));assert.equal(nodes(t).find(n=>n.type===leaves.RoleTestingPanel).props.assigned.profile.id,'personnel-hr');
+ assert.ok(calls.some(c=>c.url==='/api/tasks?workspace=personnel-hr'));
+ nodes(t).find(n=>n.type==='button'&&text(n)==='بازگشت به خانهٔ من').props.onClick();t=render();assert.equal(nodes(t).filter(n=>n.props.className==='employee-home-card').length,2);
  const multi={...assigned,assignedWorkspaces:[hrWorkspace,assetWorkspace]};
  t=await mount(()=>EmployeeHome({user:multi,apps,onNavigate:go}));assert.equal(nodes(t).filter(n=>n.props.className==='employee-workspace-tile').length,2);assert.equal(nodes(t).filter(n=>n.props.className==='employee-home-card').length,2);
  nodes(t).find(n=>n.type==='button'&&text(n)==='مسئول اداریاداری و اموال').props.onClick();t=render();assert.ok(!nodes(t).some(n=>n.props.className==='employee-home-card'),'role page has no duplicate cartable/personnel tiles');assert.ok(!nodes(t).some(n=>n.props.className==='employee-home-summary'));assert.equal(nodes(t).find(n=>n.type===leaves.RoleTestingPanel).props.assigned.profile.id,'personnel-hr');

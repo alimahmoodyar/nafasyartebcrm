@@ -24,8 +24,8 @@ export async function custodianProfileWork(user:Session){
   OR (json_type(data,'$.assetKind') IS NULL AND json_extract(data,'$.holderKind')='contractor')
  ) ORDER BY id LIMIT 101`).bind(today,today,today).all()).results as any[];
  const work:ProfileWork[]=[];
- const declarations=(await db.prepare("SELECT id,data FROM flow_entities WHERE type='asset_declaration' AND json_extract(data,'$.state')='submitted' AND json_extract(data,'$.memberId')<>? ORDER BY updated,id LIMIT 101").bind(actor.id).all()).results as any[];
- for(const r of declarations){const d=JSON.parse(r.data);work.push({id:'asset-declaration:'+r.id,title:'بررسی اعلام موجودی · '+d.memberName,section:'assets',target:'asset-declaration:'+r.id,sourceId:r.id,state:'open'});}
+ const declarations=(await db.prepare("SELECT id,data FROM flow_entities WHERE type='asset_declaration' AND json_extract(data,'$.state')='submitted' ORDER BY updated,id LIMIT 101").all()).results as any[];
+ for(const r of declarations){const d=JSON.parse(r.data),own=d.memberId===actor.id||d.createdBy===user.userId;work.push({id:'asset-declaration:'+r.id,title:own?(d.reviewedAt?'اعلام اصلاح‌شدهٔ من':'اعلام موجودی من')+' · در انتظار تأیید':'بررسی اعلام موجودی · '+d.memberName,section:'assets',target:'asset-declaration:'+r.id,sourceId:r.id,state:own?'awaiting_other_reviewer':'open'});}
 
  for(const r of rows){const d=JSON.parse(r.data);
   for(const step of assetCustodianSteps(d,r.revision))work.push({id:'asset-work:'+r.id+':'+step.stage,title:step.title+' · '+d.name,section:'assets',target:r.id,sourceId:r.id,state:'open'});

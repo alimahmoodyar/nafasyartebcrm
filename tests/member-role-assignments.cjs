@@ -84,6 +84,10 @@ const record=()=>JSON.parse(sql.prepare("SELECT data FROM flow_entities WHERE id
  b=await draft([{profileId:'personnel-hr'},{profileId:'custodian'}],'replace');p=await preview(b);assert.deepEqual(Array.from(homePolicy.employeeWorkspaces({...target,permissions:p.after},['personnel-hr','custodian']),w=>w.id),['personnel-hr','custodian']);
  // Real external accounts remain organization-bound; preview/sample agents never become real scopes.
  const ext=actor('external',{salesRoles:['agent'],salesAgentId:'real-agent'});seed('real-agent','sales_agent',{name:'Real agency',kind:'representative',active:true});seed('second-agent','sales_agent',{name:'Other agency',kind:'representative',active:true});
+ assert.deepEqual(Array.from(homePolicy.employeeWorkspaces(ext,['sales-representative','custodian']),w=>w.id),['sales-representative']);
+ const extInbox=load('lib/inbox.ts'),externalRole={...ext,mailboxRole:'sales-representative'};
+ assert.equal((await extInbox.inboxMailbox(externalRole)).id,'@role:sales-representative:external');
+ assert.notEqual((await extInbox.inboxMailbox(ext)).id,(await extInbox.inboxMailbox(externalRole)).id);
  const er=await ctx.run(admin,()=>roles.GET(request('GET','/api/users/roles?memberId=external'))),ed=(await er.json()).selected,eb={mode:'preview',memberId:'external',revision:ed.memberRevision,assignmentRevision:0,bindings:[{profileId:'sales-representative',agentId:'real-agent'}],legacyMode:'replace',reason:'Same organization'};
  assert.equal((await post(admin,eb)).status,200);assert.equal((await post(admin,{...eb,bindings:[{profileId:'sales-representative',agentId:'second-agent'}]})).status,400);assert.equal((await post(admin,{...eb,bindings:[{profileId:'sales-representative',agentId:'real-agent'},{profileId:'custodian'}]})).status,400);
  // A newly created process task between preview and save must invalidate even an unchanged account.
