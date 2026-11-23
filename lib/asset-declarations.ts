@@ -73,7 +73,8 @@ export async function applyAssetDeclaration(u:Session,b:any){
  const changes:any[]=[];
  if(b.mode==='save'||b.mode==='submit'){
   if(!a.id||!members.some(m=>m.id===a.id&&assetInternal(m)))assetFail('حساب کارکنان فعال لازم است.',403);
-  if(old&&(!owner(old,a)||!editable(old)))assetFail('فقط پیش‌نویس یا اعلام برگشتی خودتان قابل ویرایش است.',403);
+  const reopen=old?.data.state==='submitted'&&b.mode==='save';
+  if(old&&(!owner(old,a)||(!editable(old)&&!reopen)))assetFail('فقط اعلام خودتان تا پیش از تأیید اموال‌دار قابل ویرایش است.',403);
   const hr:any=await db.prepare("SELECT data,revision,id FROM flow_entities WHERE type='hr_employee' AND json_extract(data,'$.memberId')=?").bind(a.id).first();if(!hr||JSON.parse(hr.data).state!=='active')assetFail('ابتدا اطلاعات پرونده پرسنلی باید تأیید شود.',409);
   const noAssets=b.noAssets===true,items=entries(b.items,b.mode==='submit',noAssets);
   if(b.mode==='submit'){if(b.holderConfirmed!==true)assetFail('تأیید موجودی نزد خودتان لازم است.');checkPhotos(items,old||{id:recordId,data:{createdBy:u.userId}},rows);}

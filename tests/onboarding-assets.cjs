@@ -53,6 +53,14 @@ const op=(mode,extra={})=>({id:crypto.randomUUID(),mode,confirmed:true,revision:
  const badItems=structuredClone(record.data.items);badItems[1].photoFileIds=badItems[0].photoFileIds;assert.equal((await call(staff,op('submit',{recordId:record.id,revision:record.revision,items:badItems,holderConfirmed:true}))).status,400);
  let submit=op('submit',{recordId:record.id,revision:record.revision,items:record.data.items,holderConfirmed:true});result=await call(staff,submit);assert.equal(result.status,200);record=(await result.json()).record;assert.equal(record.data.state,'submitted');assert.equal(sql.prepare("SELECT count(*) n FROM flow_entities WHERE type='asset_item'").get().n,0,'nothing official until review');await load('lib/asset-declaration-tasks.ts').syncDeclarationTasks();assert.ok(sql.prepare("SELECT id FROM duty_runs WHERE template_id='asset-declarations' AND assignee=?").get((await load('lib/assets.ts').assetActor(custodian)).id),'custodian task');
  assert.equal((await read(other,'?id='+record.id)).status,404);assert.equal((await call(staff,op('approve',{recordId:record.id,revision:record.revision,matched:true}))).status,403);assert.equal((await call(hr,op('approve',{recordId:record.id,revision:record.revision,matched:true}))).status,404);
+ const reopen=op('save',{recordId:record.id,revision:record.revision,items:record.data.items});
+ assert.equal((await call(custodian,reopen)).status,403);
+ result=await call(staff,reopen);assert.equal(result.status,200);
+ const reopened=(await result.json()).record;assert.equal(reopened.data.state,'draft');
+ assert.equal((await call(custodian,op('approve',{recordId:record.id,revision:record.revision,matched:true}))).status,409);
+ const amended=reopened.data.items.map((item,i)=>i?item:{...item,model:'updated before review'});
+ result=await call(staff,op('submit',{recordId:record.id,revision:reopened.revision,items:amended,holderConfirmed:true}));
+ assert.equal(result.status,200);record=(await result.json()).record;assert.equal(record.data.items[0].model,'updated before review');
  const tasks=load('app/api/tasks/route.ts');
  const inbox=async (u,scope='')=>{const res=await context.run(u,()=>tasks.GET(req('/api/tasks'+(scope?'?workspace='+scope:''))));assert.equal(res.status,200,await res.clone().text());return (await res.json()).tasks;};
  const assignedTask=(await inbox(custodian)).find(t=>t.data.sourceId===record.id&&t.state==='open');
