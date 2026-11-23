@@ -114,6 +114,52 @@ let chain=Promise.resolve();const batch=db.batch.bind(db);db.batch=s=>{const p=c
  assert.equal((await run(store,()=>api.GET(request(bobContact.avatarUrl)))).status,404);
  assert.equal((await run(agent,()=>api.GET(request(bobContact.avatarUrl)))).status,404);
 
+ // A personal inbox remains the same from every assigned role, while old role-addressed history is still scoped.
+ seed('member-role-assignment:bob','member_role_assignment',{bindings:[{profileId:'custodian'},{profileId:'technical'}]});
+ const bobWithRoles={...b,permissions:load('lib/permissions.ts').resolveRoleAssignment({roles:['custodian','engineering','product_manager']})};
+ const directDirectory=(await get(a,'','&view=directory&channel=direct')).data;
+ const matches=directDirectory.people.filter(person=>person.id==='bob');
+ assert.equal(matches.length,1);
+ assert.ok(matches[0].positions.includes('اموال‌دار'));
+ assert.ok(matches[0].positions.includes('مسئول فنی تحقیق و توسعه'));
+ assert.ok(directDirectory.people.every(person=>!person.id.startsWith('@role:')));
+ const avatar=await run(a,()=>api.GET(request(matches[0].avatarUrl)));
+ assert.equal(avatar.status,200);
+ assert.deepEqual(Buffer.from(await avatar.arrayBuffer()),Buffer.from('/9j/2Q==','base64'));
+ sql.prepare("UPDATE flow_entities SET revision=2 WHERE id='profile:bob'").run();
+ assert.match((await get(a,'','&view=directory&channel=direct')).data.people.find(p=>p.id==='bob').avatarUrl,/v=2$/);
+ const directPost=(actor,scope,body)=>run(actor,()=>api.POST(request('/api/inbox?channel=direct&workspace='+scope,'POST',{id:crypto.randomUUID(),...body})));
+ const sharedMessage={mode:'create',title:'Same conversation',body:'Visible from every role',recipientType:'person',recipientId:'bob',kind:'message',priority:'normal'};
+ assert.equal((await directPost(a,'personal',{...sharedMessage,recipientId:'@role:custodian'})).status,400);
+ const shared=await directPost(a,'personal',sharedMessage);
+ assert.equal(shared.status,200,await shared.clone().text());
+ const sharedId=(await shared.json()).threadId;
+ for(const scope of ['personal','technical','custodian']){
+  const inbox=await get(bobWithRoles,'','&channel=direct&workspace='+scope);
+  assert.equal(inbox.status,200,JSON.stringify(inbox.data));
+  assert.equal(inbox.data.me,'bob');
+  assert.equal(inbox.data.threads.find(t=>t.id===sharedId).unread,true);
+  assert.ok(inbox.data.threads.every(t=>t.kind==='message'&&t.recipientType==='person'));
+ }
+ assert.equal((await get(c,sharedId,'&channel=direct')).status,404);
+ assert.equal((await directPost(bobWithRoles,'technical',{mode:'read',threadId:sharedId,revision:1,expectedMailbox:'bob'})).status,200);
+ assert.equal((await get(bobWithRoles,sharedId,'&channel=direct&workspace=custodian')).data.thread.unread,false);
+ assert.equal((await directPost(bobWithRoles,'custodian',{mode:'reply',threadId:sharedId,revision:1,expectedMailbox:'bob',body:'Reply from custodian workspace'})).status,200);
+ assert.equal(entity(sharedId).data.recipientId,'bob');
+ assert.equal((await get(bobWithRoles,sharedId,'&channel=direct&workspace=personal')).data.messages.at(-1).author,'bob');
+ assert.equal((await get(a,sharedId,'&channel=direct')).data.peerReadRevision,2);
+ const letter=new FormData();letter.set('file',new Blob(['item,value\nX,1']),'shared.csv');
+ const attached=await run(bobWithRoles,()=>files.POST(new Request(base+'/api/inbox/files?channel=direct&workspace=technical&thread='+sharedId+'&requestId='+crypto.randomUUID(),{method:'POST',headers:{origin:base,'x-inbox-mailbox':'bob'},body:letter})));
+ assert.equal(attached.status,201,await attached.clone().text());
+ const attachmentId=(await attached.json()).file.id;
+ assert.equal((await run(bobWithRoles,()=>files.GET(request('/api/inbox/files?channel=direct&workspace=custodian&thread='+sharedId+'&id='+attachmentId)))).status,200);
+ const legacy=await post(a,{...sharedMessage,recipientId:'@role:custodian'});
+ assert.equal(legacy.status,200,JSON.stringify(legacy.data));
+ assert.ok(!(await get(bobWithRoles,'','&channel=direct&workspace=custodian')).data.threads.some(t=>t.id===legacy.data.threadId));
+ assert.equal((await get(bobWithRoles,legacy.data.threadId,'&channel=history&workspace=custodian')).status,200);
+ assert.equal((await get(bobWithRoles,legacy.data.threadId,'&channel=history&workspace=technical')).status,404);
+ console.log('PASS shared direct messages, role search metadata, profile photos, cross-role read/reply/attachments, and scoped history.');
+
  assert.equal((await get(admin,'','&view=directory')).data.people.some(p=>p.id===qualityBox.me),false);
  assert.ok((await get(admin)).data.threads.length>0,'Existing administrator mailbox still has its sent message');
  assert.equal((await get(store)).data.threads.length,0,'Administrator messages do not enter the preview');

@@ -1,0 +1,93 @@
+.technical-design .shell {
+  width: min(1200px, calc(100% - 32px));
+  padding-block: 20px;
+}
+
+.technical-design .technical-role-home {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  border-radius: 16px;
+}
+
+.technical-role-home > .panelhead {
+  margin: 0;
+  padding: 24px;
+  background: linear-gradient(105deg, #fff, #eef0fc);
+  border-bottom: 1px solid #dfe5f0;
+  border-radius: 16px 16px 0 0;
+}
+
+.technical-role-home > .panelhead h2 {
+  font-size: clamp(20px, 3vw, 30px);
+  color: #283751;
+}
+
+.technical-role-home > :is(.notice, p, h3, .technical-tool-grid, .technical-cartable, details) {
+  margin-inline: clamp(12px, 2.25vw, 24px) !important;
+}
+
+.technical-role-home > h3 {
+  margin-block: 0;
+  font-size: 17px;
+  color: #283751;
+}
+
+.technical-role-home .technical-tool-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.technical-role-home .technical-tool-grid > button {
+  gap: 10px;
+  min-height: 64px;
+  justify-content: flex-end;
+  flex-direction: row-reverse;
+  text-align: start;
+  padding: 12px;
+  white-space: normal;
+  background: #fff;
+  border-color: #dae2ef;
+  border-radius: 11px;
+}
+
+.technical-role-home .technical-tool-grid > button:hover {
+  background: #f2f4ff;
+  border-color: #7884c2;
+}
+
+.technical-role-home .technical-tool-grid svg {
+  color: #414c96;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  padding: 8px;
+  background: #eef0fc;
+  border-radius: 9px;
+}
+
+.technical-role-home .technical-cartable {
+  width: auto !important;
+  margin-bottom: 18px;
+  background: #eef0fc;
+  color: #323a80;
+  border-color: #cfd6ef;
+}
+
+.technical-design .shell > .notice {
+  border-radius: 10px;
+}
+
+.technical-design .panelhead .btn.primary {
+  min-height: 40px;
+}
+
+@media (max-width: 770px) {
+  .technical-role-home .technical-tool-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 450px) {
+  .technical-design .shell { width: calc(100% - 20px); }
+  .technical-role-home .technical-tool-grid { grid-template-columns: minmax(0,1fr) !important; }
+}

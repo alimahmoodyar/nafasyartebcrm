@@ -25,7 +25,17 @@ async function previewPOST(request:Request){try{checkOrigin(request);const u=awa
  if(mode==='bom'){if(!can(u,'product','write'))fail('دسترسی ویرایش محصول ندارید.',403);const id=uuid(body.id),productId=str(body.productId,200),submitted=Array.isArray(body.lines)?body.lines.map((l:any)=>({...l,name:typeof l?.name==='string'&&l.name.trim()?l.name:'کالا',unit:typeof l?.unit==='string'&&l.unit?l.unit:'عدد'})):body.lines,validated=validateBom(submitted),lines:BomLine[]=[];for(const l of validated){const m:any=await db.prepare("SELECT data FROM flow_entities WHERE id=? AND type='material'").bind('material:'+l.partCode).first();if(!m)fail('قطعه با کد '+l.partCode+' در شناسنامهٔ مواد اولیه یافت نشد. ابتدا شناسنامهٔ کالا را تکمیل کنید.');const passport=JSON.parse(m.data);lines.push({...l,name:passport.name,unit:passport.unit});}
  const product:any=await db.prepare("SELECT payload FROM records WHERE id=? AND kind='product'").bind(productId).first();if(!product)fail('محصول پیدا نشد.');const old:any=await db.prepare('SELECT * FROM bom_versions WHERE id=?').bind(id).first();if(old){if(old.product_id!==productId||old.lines!==JSON.stringify(lines))fail('شناسه درخواست تکراری است.',409);return respond({saved:true});}const max:any=await db.prepare('SELECT COALESCE(MAX(version),0) AS n FROM bom_versions WHERE product_id=?').bind(productId).first();if(body.previousVersion!==max.n)fail('نسخه BOM تغییر کرده است؛ تازه‌سازی کنید.',409);
  const formStatements=await captureForm(id,'production.bom',{...body,lines},u,productId);
- await db.batch([...formStatements,db.prepare('INSERT INTO bom_versions(id,product_id,version,lines,created,actor) VALUES(?,?,?,?,?,?)').bind(id,productId,max.n+1,JSON.stringify(lines),now,u.userId),db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,productId,'save_bom',JSON.stringify({id,lines,version:max.n+1}),now)]);
+ const materialGuard=db.prepare(`
+  INSERT INTO inventory_operations(id,kind,payload,actor,created,guard)
+  SELECT ?,'bom_catalog_check','{}',?,?,CASE WHEN NOT EXISTS (
+   SELECT 1 FROM json_each(?) line WHERE NOT EXISTS (
+    SELECT 1 FROM flow_entities material WHERE material.id='material:'||json_extract(line.value,'$.partCode')
+    AND material.type='material' AND json_extract(material.data,'$.name')=json_extract(line.value,'$.name')
+    AND json_extract(material.data,'$.unit')=json_extract(line.value,'$.unit')
+   )
+  ) THEN 1 ELSE 0 END
+ `).bind(crypto.randomUUID(),u.userId,now,JSON.stringify(lines));
+ await db.batch([materialGuard,...formStatements,db.prepare('INSERT INTO bom_versions(id,product_id,version,lines,created,actor) VALUES(?,?,?,?,?,?)').bind(id,productId,max.n+1,JSON.stringify(lines),now,u.userId),db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),u.userId,productId,'save_bom',JSON.stringify({id,lines,version:max.n+1}),now)]);
  await drainAccountingQueue().catch(()=>{});return respond({saved:true});}
  if(['order','finish'].includes(mode)&&!productionWrite)fail('دسترسی ثبت تولید ندارید.',403);if(['opening','move'].includes(mode)&&!can(u,'batch','write'))fail('دسترسی ثبت انبار ندارید.',403);
  const id=uuid(body.id);const signature=JSON.stringify(body);

@@ -1,6 +1,6 @@
 import {withServiceRolePreview} from '@/lib/service-role-preview';
 import {productProductionMode,productWarrantyMonths} from '@/lib/model';
-import {requireAccess, requireAdmin, can, checkOrigin, accessResponse, AccessError} from "@/lib/authorization";
+import {requireAccess, requireCatalogDeletionAdmin, can, checkOrigin, accessResponse, AccessError} from "@/lib/authorization";
 import {asciiDigits} from "@/lib/batch-number";
 import {storage} from "@/lib/storage";
 import {validateProductFamily} from '@/lib/product-family-catalog';
@@ -25,13 +25,14 @@ async function previewPATCH(request:Request){
 // SQL predicates are evaluated again inside the write transaction to prevent races.
 const unreferenced="NOT EXISTS (SELECT 1 FROM records child WHERE json_extract(child.payload,'$.batch')=records.id OR json_extract(child.payload,'$.replacement')=records.id OR json_extract(child.payload,'$.product')=records.id)";
 const salesReferenced=" AND NOT EXISTS(SELECT 1 FROM flow_entities f WHERE (f.type='sales_price' AND json_extract(f.data,'$.productId')=records.id) OR (f.type IN ('sales_order','sales_invoice') AND EXISTS(SELECT 1 FROM json_each(f.data,'$.lines') l WHERE json_extract(l.value,'$.productId')=records.id)) OR (f.type='sales_target' AND EXISTS(SELECT 1 FROM json_each(f.data,'$.productIds') l WHERE l.value=records.id)))";
-const deletable=unreferenced+salesReferenced+" AND NOT EXISTS(SELECT 1 FROM flow_entities WHERE type='qms_record' AND json_extract(data,'$.productId')=records.id)"+" AND NOT EXISTS(SELECT 1 FROM inventory_batches WHERE batch_id=records.id) AND NOT EXISTS(SELECT 1 FROM production_materials WHERE batch_id=records.id) AND NOT EXISTS(SELECT 1 FROM bom_versions WHERE product_id=records.id)"+" AND NOT EXISTS (SELECT 1 FROM batch_files WHERE batch_id=records.id) AND NOT EXISTS (SELECT 1 FROM quality_templates WHERE product_id=records.id) AND NOT EXISTS (SELECT 1 FROM serial_runs WHERE product_id=records.id) AND NOT EXISTS (SELECT 1 FROM serial_reservations WHERE product_id=records.id)";
+const productReferences=" AND (records.kind<>'product' OR NOT EXISTS(SELECT 1 FROM flow_entities f, json_tree(f.data) v WHERE v.type='text' AND v.value=records.id))";
+const deletable=unreferenced+salesReferenced+productReferences+" AND NOT EXISTS(SELECT 1 FROM flow_entities WHERE type='qms_record' AND json_extract(data,'$.productId')=records.id)"+" AND NOT EXISTS(SELECT 1 FROM inventory_batches WHERE batch_id=records.id) AND NOT EXISTS(SELECT 1 FROM production_materials WHERE batch_id=records.id) AND NOT EXISTS(SELECT 1 FROM bom_versions WHERE product_id=records.id)"+" AND NOT EXISTS (SELECT 1 FROM batch_files WHERE batch_id=records.id) AND NOT EXISTS (SELECT 1 FROM quality_templates WHERE product_id=records.id) AND NOT EXISTS (SELECT 1 FROM serial_runs WHERE product_id=records.id) AND NOT EXISTS (SELECT 1 FROM serial_reservations WHERE product_id=records.id)";
 async function previewDELETE(request:Request){try{
- checkOrigin(request);const actor=await requireAdmin();const body=await request.json() as any;
+ checkOrigin(request);const actor=await requireCatalogDeletionAdmin();const body=await request.json() as any;
  if(!body||typeof body.id!=="string"||typeof body.previous!=="string"||body.confirmed!==true)throw new AccessError("شناسه، نسخه رکورد و تأیید حذف لازم است.",400);
  const db=storage(),old=await db.prepare("SELECT * FROM records WHERE id=?").bind(body.id).first<any>();
  if(!old)throw new AccessError("این مورد قبلاً حذف شده یا پیدا نشد.",404);
- if(!["batch","product"].includes(old.kind))throw new AccessError("حذف فقط برای محصول و بچ مجاز است.",403);
+ if(!["batch","product"].includes(old.kind)||(!actor.isAdmin&&old.kind!=="product"))throw new AccessError("حذف فقط برای محصول و بچ مجاز است.",403);
  if(old.payload!==body.previous)throw new AccessError("اطلاعات تغییر کرده است؛ صفحه را تازه کنید.",409);
  const canDelete=await db.prepare("SELECT id FROM records WHERE id=? AND "+deletable).bind(body.id).first();
  if(!canDelete)throw new AccessError("حذف ممکن نیست: این مورد دارای سابقه مصرف، خدمات، اقدام اصلاحی، دستگاه، سریال رزروشده، فرم کیفیت یا فایل پیوست است. سوابق باید حفظ شوند.",409);
@@ -45,6 +46,6 @@ async function previewDELETE(request:Request){try{
 
 export const GET=withServiceRolePreview(previewGET);
 export const POST=withServiceRolePreview(previewPOST);
-export const DELETE=withServiceRolePreview(previewDELETE);
+export const DELETE=previewDELETE;
 
 export const PATCH=withServiceRolePreview(previewPATCH);

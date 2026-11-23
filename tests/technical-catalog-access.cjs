@@ -3,9 +3,9 @@ const {DatabaseSync}=require('node:sqlite');const root=path.resolve(__dirname,'.
 let beforeBatch=null;
 const db={prepare(q){let args=[];return{bind(...a){args=a;return this},async first(){return sql.prepare(q).get(...args)||null},async all(){return {results:sql.prepare(q).all(...args)}},async run(){return {meta:{changes:sql.prepare(q).run(...args).changes}}}}},async batch(stmts){if(beforeBatch){const hook=beforeBatch;beforeBatch=null;hook();}sql.exec('BEGIN');try{const r=[];for(const s of stmts)r.push(await s.run());sql.exec('COMMIT');return r;}catch(e){sql.exec('ROLLBACK');throw e;}}};
 const objects=new Map();const bucket={async put(k,b){objects.set(k,b.slice(0));return {key:k}},async get(k){const b=objects.get(k);return b?{arrayBuffer:async()=>b.slice(0)}:null},async delete(k){objects.delete(k)}};
-let identity=null;const env={TRACE_OWNER_EMAIL:'owner@example.com',LLM_CONFIG_ENCRYPTION_KEY:require('node:crypto').randomBytes(32).toString('base64'),DB:db,BUCKET:bucket};
+let identity=null,selectedProfile='';const env={TRACE_OWNER_EMAIL:'owner@example.com',LLM_CONFIG_ENCRYPTION_KEY:require('node:crypto').randomBytes(32).toString('base64'),DB:db,BUCKET:bucket};
 const cache={};function load(file){file=path.resolve(root,file);if(cache[file])return cache[file];const exports={};cache[file]=exports;const source=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
-vm.runInNewContext(source,{exports,require:n=>{if(n==='cloudflare:workers')return {env};if(n==='@/app/chatgpt-auth')return {getChatGPTUser:async()=>identity};if(n.startsWith('@/')||n.startsWith('.')){const p=n.startsWith('@/')?path.join(root,n.slice(2)):path.resolve(path.dirname(file),n);return load(p+(path.extname(p)?'':'.ts'));}return require(n)},Response,Request,URL,URLSearchParams,Error,crypto:globalThis.crypto,structuredClone,Date,Intl,Set,Map,FormData,Blob,File,TextEncoder,TextDecoder,Uint8Array,ArrayBuffer,AbortController,ReadableStream,btoa,atob,setTimeout:(f,n)=>setTimeout(f,Math.min(n,10)),clearTimeout,console},{filename:file});return exports;}
+vm.runInNewContext(source,{exports,require:n=>{if(n==='cloudflare:workers')return {env};if(n==='@/app/chatgpt-auth')return {getChatGPTUser:async()=>identity};if(n==='next/headers')return {cookies:async()=>({get:name=>name==='__Host-nafasyar-profile-review'&&selectedProfile?{value:selectedProfile}:undefined})};if(n.startsWith('@/')||n.startsWith('.')){const p=n.startsWith('@/')?path.join(root,n.slice(2)):path.resolve(path.dirname(file),n);return load(p+(path.extname(p)?'':'.ts'));}return require(n)},Response,Request,URL,URLSearchParams,Error,crypto:globalThis.crypto,structuredClone,Date,Intl,Set,Map,FormData,Blob,File,TextEncoder,TextDecoder,Uint8Array,ArrayBuffer,AbortController,ReadableStream,btoa,atob,setTimeout:(f,n)=>setTimeout(f,Math.min(n,10)),clearTimeout,console},{filename:file});return exports;}
 
 
 
@@ -39,5 +39,33 @@ const current=row(mid);sql.prepare('UPDATE flow_entities SET data=?,revision=rev
 user={...engineer,userId:'local:external',permissions:{...engineer.permissions,serviceAgentId:'outside'}};employee('external',user.permissions);assert.equal((await ctx.run(user,()=>flow.GET(new Request('https://test.local/api/flow')))).status,403);assert.equal((await ctx.run(user,()=>photoApi.GET(new Request('https://test.local/api/material-photos?materialId='+mid)))).status,403);await post(flow,{...edit,id:crypto.randomUUID(),revision:row(mid).revision},403);
 user={...engineer,permissions:{read:[],write:[],eventStages:[]}};assert.equal((await ctx.run(user,()=>photoApi.GET(new Request('https://test.local/api/material-photos?materialId='+mid)))).status,403);await post(flow,{...edit,id:crypto.randomUUID(),revision:row(mid).revision},403);
 user=engineer;sql.exec("UPDATE reset_control SET phase='maintenance'");await post(flow,{...edit,id:crypto.randomUUID(),revision:row(mid).revision,specs:row(mid).data.specs},423);sql.exec("UPDATE reset_control SET phase='testing'");assert.equal(sql.prepare('SELECT COUNT(*) n FROM inventory_entries').get().n,1,'Only original warehouse receipt moved physical stock');
+const records=load('app/api/records/route.ts');
+const deleteRequest=(data)=>new Request('https://test.local/api/test',{method:'DELETE',headers:{origin:'https://test.local','Content-Type':'application/json'},body:JSON.stringify({...data,confirmed:true})});
+entity('material:9981','material',{code:'9981',name:'Unused sample'});
+entity('material:9982','material',{code:'9982',name:'Linked during delete'});
+const sampleProduct=JSON.stringify({code:'SAMPLE-1',name:'Sample'});
+const insertRecord=sql.prepare("INSERT INTO records(id,kind,payload,created) VALUES (?,'product',?,'now')");
+insertRecord.run('test-product',sampleProduct);insertRecord.run('used-product',sampleProduct.replace('SAMPLE-1','SAMPLE-2'));
+entity('product-link','custom_product_config',{productId:'used-product'});
+const deleteMaterial=(materialId,revision=1)=>flow.DELETE(deleteRequest({materialId,revision}));
+const deleteProduct=(id,previous=sampleProduct)=>records.DELETE(deleteRequest({id,previous}));
+assert.equal((await ctx.run(engineer,()=>deleteMaterial('material:9981'))).status,403);
+assert.equal((await ctx.run(engineer,()=>deleteProduct('test-product'))).status,403);
+identity={userId:admin.userId,email:env.TRACE_OWNER_EMAIL,displayName:admin.name};selectedProfile='quality';
+assert.equal((await deleteMaterial('material:9981')).status,403);
+assert.equal((await deleteProduct('test-product')).status,403);
+selectedProfile='technical';
+let response=await load('app/api/tasks/route.ts').GET(new Request('https://test.local/api/tasks'));
+assert.equal(response.status,200,await response.clone().text());
+assert.equal((await response.json()).profileReview.id,'technical');
+assert.equal((await deleteMaterial('material:9981',2)).status,409);
+assert.equal((await deleteMaterial(mid,row(mid).revision)).status,409);
+beforeBatch=()=>entity('late-material-link','routine_route',{steps:[{bom:[{materialId:'material:9982'}]}]});
+assert.equal((await deleteMaterial('material:9982')).status,409);
+assert.equal((await deleteProduct('used-product',sampleProduct.replace('SAMPLE-1','SAMPLE-2'))).status,409);
+assert.equal((await deleteMaterial('material:9981')).status,200);
+assert.equal((await deleteProduct('test-product')).status,200);
+assert.equal(sql.prepare("SELECT COUNT(*) n FROM access_audit WHERE actor=? AND target IN ('test-product','material:9981') AND action IN ('delete_record','delete_material')").get(admin.userId).n,2);
+assert.equal(sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE id IN ('material:9981','material:9982')").get().n,1);
 console.log('PASS technical catalog role: full existing-master/QC-template edit, photo and drawing upload/read/removal, default address, MCP parity, real actor audit, revision/held-design/unit guards, no new stock/QC/finance access, external/removed-role denial and reset freeze.');
 })().catch(e=>{console.error(e);process.exit(1)});

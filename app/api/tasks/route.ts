@@ -5,6 +5,8 @@ import {serviceRead} from '@/lib/service-access';
 import {syncServiceContractTasks} from '@/lib/service-contract-tasks';
 import {serviceContractRights} from '@/lib/service-contracts-contract';
 import {withRepresentativeSample} from '@/lib/representative-sample';
+import {runServiceRolePreview} from '@/lib/service-role-preview';
+import {staffMissionProfileWork} from '@/lib/staff-mission-tasks';
 import {profileWork,handoffShortageWork} from '@/lib/profile-work';
 import {materialHistory} from '@/lib/process-history';
 import {syncReceiptTemplates} from '@/lib/receipt-template-sync';
@@ -22,7 +24,7 @@ import {boundedBody} from '@/lib/firmware-storage';
 import {dutyVisible,memberId,taskAccess,taskText as text,taskRequired as required,validDay,dayAt,notice} from '@/lib/duties';
 const json=(x:unknown)=>Response.json(x,{headers:{'Cache-Control':'private, no-store','Vary':'Cookie, Authorization'}});
 const fail=(m:string,s=400):never=>{throw new AccessError(m,s)};
-async function get(request?:Request){try{const u=await requireAccess(),db=storage(),mid=await memberId(u);
+async function get(request?:Request,missions?:Awaited<ReturnType<typeof staffMissionProfileWork>>){try{const u=await requireAccess(),db=storage(),mid=await memberId(u);
  if(request&&new URL(request.url).searchParams.get('view')==='positions'){
   const positionId=new URL(request.url).searchParams.get('position')||'';
   const roles=(await db.prepare("SELECT * FROM flow_entities WHERE type='position' AND (?=1 OR EXISTS(SELECT 1 FROM json_each(data,'$.members') WHERE value=?)) ORDER BY created,id").bind(u.isAdmin?1:0,mid).all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}));
@@ -85,7 +87,7 @@ async function get(request?:Request){try{const u=await requireAccess(),db=storag
  const scheduler:any=u.isAdmin?await db.prepare("SELECT data FROM flow_entities WHERE id='duty_scheduler'").first():null;
  const activeTaskIds=new Set(allowedTasks.filter(t=>!['completed','cancelled'].includes(t.state)).map(t=>t.id));
  const templateSync=await syncReceiptTemplates(u);if(templateSync.needsTaskSync)await syncMaterialTasks();
- const positionQueue:Awaited<ReturnType<typeof profileWork>>=u.profileReview?await profileWork(u):{work:[],pendingQuality:0};
+ const positionQueue:Awaited<ReturnType<typeof profileWork>>=u.profileReview?await profileWork(u,missions):{work:[],pendingQuality:0};
  if(workspace?.scope==='custodian'){
   const current=await custodianProfileWork(u);
   const represented=new Set(allowedTasks.filter(t=>!['completed','cancelled'].includes(t.state)).map(t=>t.data.assetDeclaration?'asset-declaration:'+t.data.sourceId:t.data.assetWorkflowV2?'asset-work:'+t.data.sourceId+':'+t.data.stage:t.id));
@@ -137,6 +139,11 @@ async function post(request:Request){try{checkOrigin(request);const u=await requ
 const getWithSample=withRepresentativeSample(get);
 export async function GET(request?:Request){try{
  const u=await session();
+ if(u.profileReview?.id==='technical'){
+  // Mission lookup verifies the signed-in administrator before entering the narrowed preview scope.
+  const missions=await staffMissionProfileWork(u);
+  return runServiceRolePreview(u,()=>get(request,missions));
+ }
  if(u.profileReview?.id==='home-service-representative'&&!u.profileReview.buyerId)return json({profileReview:u.profileReview,positionWork:[],pendingQuality:0,accountId:u.userId,memberId:null,isAdmin:false,receiptNotesAvailable:false,canPurchaseServices:false,tasks:[],limited:false,notifications:[],managementNotifications:[],definitions:[],ownPositions:[],starterInstalled:true,members:[],scheduler:null,requiresServiceScope:true});
  return getWithSample(request);
 }catch(e){return accessResponse(e)||Response.json({error:'دریافت کارتابل انجام نشد.'},{status:500});}}

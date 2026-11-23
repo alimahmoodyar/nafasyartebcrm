@@ -1,5 +1,5 @@
 'use client';
-import {cartableUrl} from '@/lib/cartable-url';
+import {cartableUrl,directInboxUrl} from '@/lib/cartable-url';
 import {useEffect,useState} from 'react';
 import {Bell} from 'lucide-react';
 
@@ -17,8 +17,8 @@ export function TaskNotifier({workspace='',accountId,profile,onOpen}:{workspace?
  useEffect(()=>{
   const controller=new AbortController();
   let generation=0;
-  async function read<T>(path:string):Promise<{data:T;isolated:boolean}>{
-   const response=await fetch(cartableUrl(path,workspace),{cache:'no-store',signal:controller.signal});
+  async function read<T>(path:string,scope=workspace):Promise<{data:T;isolated:boolean}>{
+   const response=await fetch(cartableUrl(path,scope),{cache:'no-store',signal:controller.signal});
    if(!response.ok)throw Error('Cartable unavailable');
    return {data:await response.json() as T,isolated:response.headers.get('X-Training-Workspace')==='isolated'};
   }
@@ -27,7 +27,7 @@ export function TaskNotifier({workspace='',accountId,profile,onOpen}:{workspace?
    const current=++generation;
    if(!profileId)await fetch('/api/tasks/tick',{method:'POST',signal:controller.signal}).catch(()=>{});
    if(controller.signal.aborted||current!==generation)return;
-   const [tasks,inbox]=await Promise.allSettled([read<TaskSummary>('/api/tasks'),read<InboxSummary>('/api/inbox')]);
+   const [tasks,inbox]=await Promise.allSettled([read<TaskSummary>('/api/tasks'),read<InboxSummary>(directInboxUrl('/api/inbox'),'')]);
    if(controller.signal.aborted||current!==generation)return;
    const taskSummary=tasks.status==='fulfilled'?tasks.value.data:null;
    const scope=taskSummary?.profileReview;
@@ -41,7 +41,7 @@ export function TaskNotifier({workspace='',accountId,profile,onOpen}:{workspace?
      .map(task=>({title:task.data.title,hint:task.guidance?.steps?.[0],...(task.data.sourceId&&(task.data.sourceSection==='sales'&&['sales-view:calls:','sales-view:custody:'].some(prefix=>task.data.sourceId!.startsWith(prefix))||task.data.sourceSection==='sales-bank'&&task.data.sourceId.startsWith('sales-bank-gap:'))?{section:task.data.sourceSection,target:task.data.sourceId}:{})}))]);
    }else setWork([]);
    if(inbox.status==='fulfilled'&&inbox.value.data.accountId===accountId&&
-    (profileId?inbox.value.data.me==='@profile:'+profileId:workspace&&workspace!=='personal'?(inbox.value.data.me==='@role:'+workspace||inbox.value.data.me.startsWith('@role:'+workspace+':')):!inbox.value.data.me.startsWith('@profile:'))){
+    (profileId?inbox.value.data.me==='@profile:'+profileId:!/^@(profile|role):/.test(inbox.value.data.me))){
     setMessages(inbox.value.data.threads.filter(thread=>thread.kind==='message'&&thread.recipientType==='person'&&thread.isRecipient&&thread.unread).length);
    }else setMessages(0);
   }
@@ -56,7 +56,7 @@ export function TaskNotifier({workspace='',accountId,profile,onOpen}:{workspace?
    window.removeEventListener('nafasyar-tasks-changed',wake);
    document.removeEventListener('visibilitychange',wake);
   };
- },[accountId,profileId,buyerId,missionId]);
+ },[accountId,profileId,buyerId,missionId,workspace]);
  if(!work.length&&!messages)return null;
  const first=work[0];
  return <div className="task-nudge">

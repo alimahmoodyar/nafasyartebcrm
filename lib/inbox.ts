@@ -11,17 +11,20 @@ export const inboxDecode=(r:any)=>r?({...r,data:JSON.parse(r.data)}):null;
 export async function inboxIdentity(u:Session){const id=await memberId(u);if(id)return id;if(u.isAdmin||u.profileReview)return '@owner';throw new AccessError('حساب فعال برای مکاتبه یافت نشد.',403);}
 // Operational notices still use the authenticated account. Interactive previews use a separate mailbox.
 const profileAddress=(id:string)=>'@profile:'+id;
+type InboxSession=Session & {inboxChannel?:'direct'|'history'};
 const representativeInboxProfiles=new Set(['sales','home-sales','sales-manager','sales-finance','logistics','home-service']);
 export async function requireInboxAccess(request?:Request){
  const user=await session();
  if(user.permissions.hospitalCenterId)throw new AccessError('این حساب فقط به پنل مرکز بیمارستانی دسترسی دارد.',403);
- const scope=request&&new URL(request.url).searchParams.get('workspace');
+ const params=request&&new URL(request.url).searchParams;
+ const scope=params?.get('workspace'),channel=params?.get('channel');
+ const inboxChannel=channel==='direct'||channel==='history'?channel:undefined;
  if(scope&&scope!=='personal'){
   const {memberCartable}=await import('./member-cartable');
   await memberCartable(user,request);
-  return {...user,mailboxRole:scope};
+  if(inboxChannel!=='direct')return {...user,mailboxRole:scope,inboxChannel};
  }
- return user;
+ return {...user,inboxChannel};
 }
 export async function inboxMailbox(u:Session){
  if(u.mailboxRole){
@@ -39,7 +42,7 @@ export async function inboxMailbox(u:Session){
 export function checkInboxMailbox(expected:unknown,actual:string){
  if(expected!=null&&expected!==actual)throw new AccessError('صندوق پیام عوض شده است. صفحه را دوباره باز کنید.',409);
 }
-export async function accountInboxDirectory(u:Session){const me=await inboxIdentity(u),db=storage();let users=(await db.prepare("SELECT m.id,m.name,m.unit,m.permissions,EXISTS(SELECT 1 FROM flow_entities f WHERE f.type='account_profile' AND f.id='profile:'||CASE WHEN EXISTS(SELECT 1 FROM password_accounts a WHERE a.member_id=m.id) THEN 'local:'||m.id ELSE m.subject END AND COALESCE(json_extract(f.data,'$.image'),'')<>'') AS hasPhoto FROM app_members m WHERE m.status='active' ORDER BY m.name,m.id").all()).results as any[];
+export async function accountInboxDirectory(u:InboxSession){const me=await inboxIdentity(u),db=storage();let users=(await db.prepare("SELECT m.id,m.name,m.unit,m.permissions,(SELECT f.revision FROM flow_entities f WHERE f.type='account_profile' AND f.id='profile:'||CASE WHEN EXISTS(SELECT 1 FROM password_accounts a WHERE a.member_id=m.id) THEN 'local:'||m.id ELSE m.subject END AND COALESCE(json_extract(f.data,'$.image'),'')<>'') AS hasPhoto FROM app_members m WHERE m.status='active' ORDER BY m.name,m.id").all()).results as any[];
  if(!u.isAdmin&&u.permissions.serviceAgentId)users=users.filter(r=>{const p=storedAccessPermissions(r.permissions);return !p.serviceAgentId&&p.serviceRoles?.some((x:string)=>['manager','coordinator'].includes(x))&&p.serviceDomains?.some((x:string)=>u.permissions.serviceDomains?.includes(x));});
  if(!u.isAdmin&&u.permissions.salesAgentId){
   await salesScope(u,u.permissions.salesAgentId);
@@ -52,21 +55,34 @@ export async function accountInboxDirectory(u:Session){const me=await inboxIdent
     p.serviceDomains?.includes('home')&&p.serviceRoles?.some(role=>['manager','coordinator','support','intake'].includes(role));
   });
  }
- const photoUrl=(id:string)=>'/api/inbox?avatar='+encodeURIComponent(id);
- const people=users.map(({id,name,unit,hasPhoto})=>({id,name,unit,avatarUrl:hasPhoto?photoUrl(id):null}));
- const owner=await db.prepare("SELECT EXISTS(SELECT 1 FROM flow_entities f WHERE f.type='account_profile' AND f.id='profile:'||i.subject AND COALESCE(json_extract(f.data,'$.image'),'')<>'') AS hasPhoto FROM app_identity i WHERE i.id='owner'").first<{hasPhoto:number}>();
- if(owner)people.unshift({id:'@owner',name:'مدیر سامانه',unit:'مدیریت',avatarUrl:owner.hasPhoto?photoUrl('@owner'):null});
+ const photoUrl=(id:string,revision:number)=>'/api/inbox?avatar='+encodeURIComponent(id)+(u.inboxChannel==='direct'?'&channel=direct&v='+revision:'');
+ const people=users.map(({id,name,unit,hasPhoto})=>({id,name,unit,avatarUrl:hasPhoto?photoUrl(id,hasPhoto):null}));
+ const owner=await db.prepare("SELECT (SELECT f.revision FROM flow_entities f WHERE f.type='account_profile' AND f.id='profile:'||i.subject AND COALESCE(json_extract(f.data,'$.image'),'')<>'') AS hasPhoto FROM app_identity i WHERE i.id='owner'").first<{hasPhoto:number}>();
+ if(owner)people.unshift({id:'@owner',name:'مدیر سامانه',unit:'مدیریت',avatarUrl:owner.hasPhoto?photoUrl('@owner',owner.hasPhoto):null});
  const positions=(await db.prepare("SELECT * FROM flow_entities WHERE type='position' AND json_extract(data,'$.active')=1 ORDER BY created,id").all()).results.map(inboxDecode).filter((r:any)=>!u.permissions.serviceAgentId||r.data.members.some((id:string)=>people.some(p=>p.id===id))).map((r:any)=>({id:r.id,name:r.data.name,unit:r.data.unit,members:r.data.members.filter((id:string)=>people.some(p=>p.id===id))}));
  const titles=new Map<string,string[]>();
  for(const position of positions)for(const id of position.members){
   const names=titles.get(id)||[];
   if(position.name&&!names.includes(position.name))titles.set(id,[...names,position.name]);
  }
+ if(u.inboxChannel==='direct'){
+  const visible=new Set(people.map(person=>person.id));
+  const roleNames=new Map(roleProfiles.map(role=>[role.id,role.title]));
+  const assigned=(await db.prepare("SELECT m.id AS memberId,json_extract(b.value,'$.profileId') AS profileId FROM app_members m JOIN flow_entities a ON a.id='member-role-assignment:'||m.id AND a.type='member_role_assignment' JOIN json_each(a.data,'$.bindings') b WHERE m.status='active'").all()).results as {memberId:string;profileId:string}[];
+  for(const {memberId,profileId} of assigned){
+   const title=roleNames.get(profileId);
+   if(!title||!visible.has(memberId))continue;
+   const names=titles.get(memberId)||[];
+   if(!names.includes(title))titles.set(memberId,[...names,title]);
+  }
+ }
  return {me,people:people.map(person=>({...person,positions:titles.get(person.id)||[]})),positions:!u.isAdmin&&(u.permissions.serviceAgentId||u.permissions.salesAgentId)?[]:positions};}
-export async function inboxDirectory(u:Session){
+export async function inboxDirectory(u:InboxSession){
  const mailbox=await inboxMailbox(u);
+ if(u.inboxChannel==='history')return {me:mailbox.id,mailboxName:mailbox.name,profileTitle:mailbox.profileTitle,people:[],positions:[]};
  if(!u.profileReview){
   const directory=await accountInboxDirectory(u);
+  if(u.inboxChannel==='direct')return {...directory,mailboxName:mailbox.name,profileTitle:null,positions:[]};
   const internal=!u.permissions.salesAgentId&&!u.permissions.serviceAgentId&&!u.permissions.hospitalCenterId;
   const roles=internal?roleProfiles.filter(p=>!['sales-representative','home-service-representative'].includes(p.id)&&p.operational&&'@role:'+p.id!==mailbox.id).map(p=>({id:'@role:'+p.id,name:p.title,unit:'صندوق نقش',avatarUrl:null,positions:['صندوق نقش']})):[];
   if(internal){
@@ -85,7 +101,7 @@ export async function inboxDirectory(u:Session){
   .map(p=>({id:profileAddress(p.id),name:p.title,unit:'آزمایشی'}));
  return {me:mailbox.id,mailboxName:mailbox.name,profileTitle:mailbox.profileTitle,people,positions:[]};
 }
-export async function inboxContactAvatar(u:Session,id:string){
+export async function inboxContactAvatar(u:InboxSession,id:string){
  const directory=await inboxDirectory(u);
  if(directory.profileTitle||!directory.people.some(p=>p.id===id&&'avatarUrl' in p&&p.avatarUrl))throw new AccessError('عکس مخاطب در دسترس نیست.',404);
  const db=storage();
@@ -97,13 +113,22 @@ export async function inboxContactAvatar(u:Session,id:string){
  return Uint8Array.from(atob(row.image),c=>c.charCodeAt(0));
 }
 export async function positionMembers(id:string){const p:any=await storage().prepare("SELECT data FROM flow_entities WHERE id=? AND type='position' AND json_extract(data,'$.active')=1").bind(id).first();if(!p)return [];const ids=JSON.parse(p.data).members||[];const active=(await storage().prepare("SELECT id FROM app_members WHERE status='active'").all()).results as any[];return ids.filter((id:string)=>active.some(a=>a.id===id));}
-export async function inboxAccess(id:string,u:Session){const row=inboxDecode(await storage().prepare("SELECT * FROM flow_entities WHERE id=? AND type='inbox_thread'").bind(id).first()),mailbox=await inboxMailbox(u),me=mailbox.id;if(!row)throw new AccessError('گفت‌وگو یافت نشد.',404);const d=row.data,recipients=d.recipientType==='position'?await positionMembers(d.recipientId):[d.recipientId];if(d.sender!==me&&!recipients.includes(me))throw new AccessError('گفت‌وگو یافت نشد.',404);const responsible=d.recipientType==='person'?d.recipientId:recipients.includes(d.assignee)?d.assignee:'';return {...row,me,mailboxName:mailbox.name,profileTitle:mailbox.profileTitle,isSender:d.sender===me,isRecipient:recipients.includes(me),responsible,canWork:recipients.includes(me)&&responsible===me};}
+const legacyDirect=(data:any)=>[data.sender,data.recipientId].some(value=>typeof value==='string'&&value.startsWith('@role:'));
+const matchesInboxChannel=(u:InboxSession,data:any)=>!u.inboxChannel||data.kind==='message'&&data.recipientType==='person'&&(u.inboxChannel==='history'?legacyDirect(data):!legacyDirect(data));
+export async function inboxAccess(id:string,u:InboxSession){const row=inboxDecode(await storage().prepare("SELECT * FROM flow_entities WHERE id=? AND type='inbox_thread'").bind(id).first()),mailbox=await inboxMailbox(u),me=mailbox.id;if(!row||!matchesInboxChannel(u,row.data))throw new AccessError('گفت‌وگو یافت نشد.',404);const d=row.data,recipients=d.recipientType==='position'?await positionMembers(d.recipientId):[d.recipientId];if(d.sender!==me&&!recipients.includes(me))throw new AccessError('گفت‌وگو یافت نشد.',404);const responsible=d.recipientType==='person'?d.recipientId:recipients.includes(d.assignee)?d.assignee:'';return {...row,me,mailboxName:mailbox.name,profileTitle:mailbox.profileTitle,isSender:d.sender===me,isRecipient:recipients.includes(me),responsible,canWork:recipients.includes(me)&&responsible===me};}
 export async function inboxLink(u:Session,link:any){if(!link?.id||!link?.section)return null;const db=storage();if(link.reminderKind){const {reminderSources}=await import('./reminder-sources'),{reminderNavigation}=await import('./reminder-contract');if(!Object.hasOwn(reminderNavigation,link.reminderKind)||!(await reminderSources(u,link.reminderKind,link.id)).some(r=>r.id===link.id))throw new AccessError('دسترسی پرونده مرتبط ندارید.',404);return {section:reminderNavigation[link.reminderKind],id:link.id,reminderKind:link.reminderKind};}if(link.section==='tasks'&&link.id.startsWith('receipt-note:'))await (await import('./receipt-observations')).receiptObservationAccess(u,link.id.slice('receipt-note:'.length));else if(link.section==='tasks')await taskAccess(link.id,u);else if(link.section==='assets'){await (await import('./assets')).assetAccess(u,link.id);}else if(link.section==='transport'){await (await import('./transport')).transportAccess(u,link.id);}else if(link.section==='after-sales'){await (await import('./after-sales')).caseAccess(link.id,u);}else if(link.section==='sourcing'){if(!u.isAdmin&&!u.permissions.supplyRoles?.length)throw new AccessError('دسترسی ندارید.',403);if(!await db.prepare("SELECT id FROM flow_entities WHERE id=? AND type='sourcing_plan'").bind(link.id).first())throw new AccessError('برنامه یافت نشد.',404);}else{const r:any=await db.prepare('SELECT kind FROM records WHERE id=?').bind(link.id).first();if(!r||r.kind!==link.section||!can(u,r.kind,'read'))throw new AccessError('دسترسی پرونده ندارید.',404);}return {section:link.section,id:link.id};}
 export const inboxClosed=(state:string)=>['completed','closed','cancelled'].includes(state);
 export async function inboxState(thread:string,me:string){const row:any=await storage().prepare("SELECT data FROM flow_entities WHERE id=? AND type='inbox_state'").bind('inbox-state:'+thread+':'+me).first();return row?JSON.parse(row.data):{readRevision:0,snoozeUntil:''};}
 export async function inboxView(t:any,savedState?:any){const state=savedState||await inboxState(t.id,t.me),d=t.data,needsReview=t.isSender&&d.state==='submitted',needsWork=d.kind==='request'&&t.isRecipient&&(!t.responsible||t.canWork)&&!inboxClosed(d.state)&&d.state!=='submitted',unread=state.readRevision<t.revision;
  return {id:t.id,revision:t.revision,created:t.created,updated:t.updated,...d,isSender:t.isSender,isRecipient:t.isRecipient,canWork:t.canWork,responsible:t.responsible,unread,snoozeUntil:state.snoozeUntil,needsReview,overdue:!!d.due&&Date.parse(d.due)<Date.now()&&!inboxClosed(d.state),needsAttention:(!state.snoozeUntil||Date.parse(state.snoozeUntil)<=Date.now())&&(unread||needsReview||needsWork)};}
-export async function inboxList(u:Session){const me=(await inboxMailbox(u)).id,rows=(await storage().prepare("SELECT t.* FROM flow_entities t WHERE t.type='inbox_thread' AND (json_extract(t.data,'$.sender')=? OR (json_extract(t.data,'$.recipientType')='person' AND json_extract(t.data,'$.recipientId')=?) OR (json_extract(t.data,'$.recipientType')='position' AND EXISTS(SELECT 1 FROM flow_entities p,json_each(p.data,'$.members') m WHERE p.type='position' AND p.id=json_extract(t.data,'$.recipientId') AND json_extract(p.data,'$.active')=1 AND m.value=?))) ORDER BY t.updated DESC,t.id LIMIT 301").bind(me,me,me).all()).results;const positions=(await storage().prepare("SELECT id,data FROM flow_entities WHERE type='position' AND json_extract(data,'$.active')=1").all()).results as any[],active=(await storage().prepare("SELECT id FROM app_members WHERE status='active'").all()).results as any[],states=(await storage().prepare("SELECT id,data FROM flow_entities WHERE type='inbox_state' AND substr(id,-length(?))=?").bind(':'+me,':'+me).all()).results as any[],stateMap=new Map(states.map(r=>[r.id,JSON.parse(r.data)]));const threads=[];for(const row of rows.slice(0,300) as any[]){const t=inboxDecode(row),d=t.data,p=positions.find(p=>p.id===d.recipientId),recipients=d.recipientType==='person'?[d.recipientId]:(p?JSON.parse(p.data).members.filter((id:string)=>active.some(a=>a.id===id)):[]),responsible=d.recipientType==='person'?d.recipientId:recipients.includes(d.assignee)?d.assignee:'';threads.push(await inboxView({...t,me,isSender:d.sender===me,isRecipient:recipients.includes(me),responsible,canWork:recipients.includes(me)&&responsible===me},stateMap.get('inbox-state:'+t.id+':'+me)||{readRevision:0,snoozeUntil:''}));}return {threads,limited:rows.length>300};}
+export async function inboxList(u:InboxSession){
+ const me=(await inboxMailbox(u)).id;
+ const direct=" AND json_extract(t.data,'$.kind')='message' AND json_extract(t.data,'$.recipientType')='person'";
+ const roleAddress="(json_extract(t.data,'$.sender') LIKE '@role:%' OR json_extract(t.data,'$.recipientId') LIKE '@role:%')";
+ const channel=u.inboxChannel==='history'?direct+' AND '+roleAddress:u.inboxChannel==='direct'?direct+' AND NOT '+roleAddress:'';
+ const rows=(await storage().prepare("SELECT t.* FROM flow_entities t WHERE t.type='inbox_thread' AND (json_extract(t.data,'$.sender')=? OR (json_extract(t.data,'$.recipientType')='person' AND json_extract(t.data,'$.recipientId')=?) OR (json_extract(t.data,'$.recipientType')='position' AND EXISTS(SELECT 1 FROM flow_entities p,json_each(p.data,'$.members') m WHERE p.type='position' AND p.id=json_extract(t.data,'$.recipientId') AND json_extract(p.data,'$.active')=1 AND m.value=?)))" + channel + " ORDER BY t.updated DESC,t.id LIMIT 301").bind(me,me,me).all()).results;
+ if(!rows.length)return {threads:[],limited:false};
+ const positions=(await storage().prepare("SELECT id,data FROM flow_entities WHERE type='position' AND json_extract(data,'$.active')=1").all()).results as any[],active=(await storage().prepare("SELECT id FROM app_members WHERE status='active'").all()).results as any[],states=(await storage().prepare("SELECT id,data FROM flow_entities WHERE type='inbox_state' AND substr(id,-length(?))=?").bind(':'+me,':'+me).all()).results as any[],stateMap=new Map(states.map(r=>[r.id,JSON.parse(r.data)]));const threads=[];for(const row of rows.slice(0,300) as any[]){const t=inboxDecode(row),d=t.data,p=positions.find(p=>p.id===d.recipientId),recipients=d.recipientType==='person'?[d.recipientId]:(p?JSON.parse(p.data).members.filter((id:string)=>active.some(a=>a.id===id)):[]),responsible=d.recipientType==='person'?d.recipientId:recipients.includes(d.assignee)?d.assignee:'';threads.push(await inboxView({...t,me,isSender:d.sender===me,isRecipient:recipients.includes(me),responsible,canWork:recipients.includes(me)&&responsible===me},stateMap.get('inbox-state:'+t.id+':'+me)||{readRevision:0,snoozeUntil:''}));}return {threads,limited:rows.length>300};}
 
 /** Shared authenticated create preparation for immediate and scheduled requests. Caller commits atomically. */
 export async function prepareInboxCreate(u:Session,b:any,now=new Date(),mailboxDirectory?:Awaited<ReturnType<typeof inboxDirectory>>){

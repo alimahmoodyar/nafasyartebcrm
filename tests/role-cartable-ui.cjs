@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),ts=require('typescript'),React=require('react');
 const root=path.resolve(__dirname,'..'),leaves={};let slots=[],cursor=0,effects=[],response,inboxResponse,navigation=[],profileRequests=[];
 const leaf=n=>leaves[n]||(leaves[n]=function Leaf(){}),react={...React,useState:init=>{const i=cursor++;if(!(i in slots))slots[i]=typeof init==='function'?init():init;return[slots[i],v=>slots[i]=typeof v==='function'?v(slots[i]):v]},useRef:init=>{const i=cursor++;if(!(i in slots))slots[i]={current:init};return slots[i]},useEffect:(fn,deps)=>{const i=cursor++,old=slots[i];if(!old||deps.some((v,j)=>v!==old[j]))effects.push(fn);slots[i]=deps}};
-function load(file){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(root,file),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText,{exports,require:n=>n==='react'?react:n==='react/jsx-runtime'?require(n):n==='@/lib/cartable-view'?load('lib/cartable-view.ts'):new Proxy({},{get:(_,key)=>leaf(key)}),fetch:async(url,options)=>{profileRequests.push({url,options});return {ok:true,headers:{get:()=>null},json:async()=>url==='/api/inbox'?inboxResponse:response}},crypto:globalThis.crypto,Date,Intl,console,window:{addEventListener(){},removeEventListener(){},dispatchEvent(){}},Event,CustomEvent:class{},AbortController,document:{hidden:false,addEventListener(){},removeEventListener(){}},setInterval:()=>0,clearInterval(){},setTimeout,clearTimeout});return exports;}
+function load(file){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(root,file),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText,{exports,require:n=>n==='react'?react:n==='react/jsx-runtime'?require(n):n==='@/lib/cartable-view'?load('lib/cartable-view.ts'):n==='@/lib/cartable-url'?load('lib/cartable-url.ts'):new Proxy({},{get:(_,key)=>leaf(key)}),fetch:async(url,options)=>{profileRequests.push({url,options});return {ok:true,headers:{get:()=>null},json:async()=>url.startsWith('/api/inbox')?inboxResponse:response}},crypto:globalThis.crypto,Date,Intl,console,window:{addEventListener(){},removeEventListener(){},dispatchEvent(){}},Event,CustomEvent:class{},AbortController,document:{hidden:false,addEventListener(){},removeEventListener(){}},setInterval:()=>0,clearInterval(){},setTimeout,clearTimeout});return exports;}
 const nodes=x=>Array.isArray(x)?x.flatMap(nodes):React.isValidElement(x)?[x,...nodes(x.props.children)]:[],text=x=>Array.isArray(x)?x.map(text).join(''):React.isValidElement(x)?text(x.props.children):x==null?'':String(x);
 async function mount(render){slots=[];effects=[];render();for(let i=0;i<5;i++){for(const fn of effects.splice(0))fn();await new Promise(r=>setImmediate(r));render();}}
 const navigate=(...args)=>navigation.push(args),{RoleTestingPanel}=load('components/trace/role-testing-panel.tsx'),{TasksPanel}=load('components/trace/tasks-panel.tsx');
@@ -102,6 +102,17 @@ assert.deepEqual(navigation.pop(),['tasks','inbox']);
 const renderOtherNotice=()=>{cursor=0;return TaskNotifier({accountId:'admin',profile:{id:'central-store'},onOpen:navigate})};
 await mount(renderOtherNotice);
 assert.equal(renderOtherNotice(),null,'A different role cannot display the sales work or message count');
+response={accountId:'bob',profileReview:null,positionWork:[],tasks:[],memberId:'bob'};
+inboxResponse={accountId:'bob',me:'bob',threads:[{kind:'message',recipientType:'person',isRecipient:true,unread:true}]};
+for(const workspace of ['personal','technical','custodian']){
+ profileRequests=[];
+ const renderAssignedNotice=()=>{cursor=0;return TaskNotifier({accountId:'bob',workspace,onOpen:navigate})};
+ await mount(renderAssignedNotice);
+ assert.ok(nodes(renderAssignedNotice()).some(n=>n.type==='button'&&n.props['aria-label']==='باز کردن پیام‌های مستقیم'));
+ assert.ok(profileRequests.some(r=>r.url==='/api/tasks?workspace='+workspace));
+ assert.ok(profileRequests.some(r=>r.url==='/api/inbox?channel=direct'));
+}
+
 
 // Root remounts its children when refreshed permissions change. It must already
 // point at the selected role, or the catalog mount exits the selected cookie.

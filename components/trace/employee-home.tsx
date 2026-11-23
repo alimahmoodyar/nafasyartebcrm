@@ -33,7 +33,7 @@ export function EmployeeHome({user,apps,onNavigate,workspace,onWorkspaceChange,w
  useEffect(()=>{
   const abort=new AbortController();setSummary(null);setError('');
   const read=async(url:string)=>{const r=await fetch(url,{cache:'no-store',headers:{'x-assistant-account':user.userId},signal:abort.signal}),d=await r.json() as any;if(!r.ok)throw Error(d.error||'دریافت خلاصه انجام نشد.');if(d.accountId&&d.accountId!==user.userId)throw Error('حساب ورود تغییر کرده است؛ صفحه را تازه کنید.');return d};
-  void Promise.allSettled([read('/api/tasks'+query),read('/api/inbox'+query)]).then(([tasks,inbox])=>{
+  void Promise.allSettled([read('/api/tasks'+query),read('/api/inbox?channel=direct')]).then(([tasks,inbox])=>{
    if(abort.signal.aborted)return;
    if(tasks.status==='rejected'){setError(tasks.reason.message);return;}
    setSummary({accessKey,accountId:user.userId,tasks:cartableRows(tasks.value),unread:inbox.status==='fulfilled'&&Number.isFinite(inbox.value.summary?.unread)?inbox.value.summary.unread:null,limited:!!tasks.value.limited||!!tasks.value.positionWorkHasMore});

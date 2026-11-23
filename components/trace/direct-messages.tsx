@@ -1,5 +1,5 @@
 'use client';
-import {cartableUrl} from '@/lib/cartable-url';
+import {cartableUrl,directInboxUrl} from '@/lib/cartable-url';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {Paperclip,Search,ArrowRight,FileText,MessageCircle} from 'lucide-react';
 import {VoiceMessageRecorder} from './voice-message-recorder';
@@ -14,7 +14,7 @@ const clock=new Intl.DateTimeFormat('fa-IR',{timeZone:'Asia/Tehran',hour:'2-digi
 const direct=(t:Thread)=>t.kind==='message'&&t.recipientType==='person';
 const peer=(t:Thread)=>t.isSender?t.recipientId:t.sender;
 const open=(t:Thread)=>!['closed','cancelled','completed'].includes(t.state);
-const searchKey=(value:string)=>value.replace(/ي/g,'ی').replace(/ك/g,'ک').toLocaleLowerCase('fa').trim();
+const searchKey=(value:string)=>value.normalize('NFKC').replace(/[يى]/g,'ی').replace(/ك/g,'ک').replace(/[\u064B-\u065F\u0670\u0640\u200c\u200d]/g,'').toLocaleLowerCase('fa').trim();
 function ContactIdentity({contact}:{contact:Contact}){
  const [failed,setFailed]=useState(false);
  useEffect(()=>setFailed(false),[contact.avatarUrl]);
@@ -25,8 +25,22 @@ function ContactIdentity({contact}:{contact:Contact}){
  </span>;
 }
 export function DirectMessages({workspace=''}:{workspace?:string}={}){
-async function request<T>(url:string,options?:RequestInit):Promise<T>{
- const response=await fetch(cartableUrl(url,workspace),{cache:'no-store',...options});
+ const [history,setHistory]=useState(false),[available,setAvailable]=useState(false);
+ useEffect(()=>{
+  const abort=new AbortController();
+  setHistory(false);setAvailable(false);
+  fetch(cartableUrl(directInboxUrl('/api/inbox?view=availability','history'),workspace),{cache:'no-store',signal:abort.signal})
+   .then(response=>response.ok?response.json():null)
+   .then(result=>{if(!abort.signal.aborted)setAvailable(result?.available===true);}).catch(()=>{});
+  return()=>abort.abort();
+ },[workspace]);
+ return <>{available&&<div className="tools"><button type="button" className="btn" onClick={()=>setHistory(value=>!value)}>{history?'بازگشت به پیام‌های مستقیم':'سوابق پیام‌های صندوق نقش'}</button></div>}
+ <DirectInbox key={history?'history':'direct'} workspace={workspace} history={history}/></>;
+}
+function DirectInbox({workspace,history}:{workspace:string;history:boolean}){
+ const route=(path:string)=>history?cartableUrl(directInboxUrl(path,'history'),workspace):directInboxUrl(path);
+ async function request<T>(url:string,options?:RequestInit):Promise<T>{
+ const response=await fetch(route(url),{cache:'no-store',...options});
  const result:unknown=await response.json();
  if(!response.ok){
   const message=result&&typeof result==='object'&&'error' in result&&typeof result.error==='string'?result.error:'';
@@ -56,7 +70,11 @@ const post=(body:object)=>request<{threadId:string}>('/api/inbox',{method:'POST'
  }
  const threads=grouped.get(contactId)||[], visible=threads.slice(0,limit);
  const signature=visible.map(t=>t.id+':'+t.revision).join(',');
- const ordered=[...contacts.values()].filter(c=>searchKey([c.name,...(c.positions||[])].join(" ")).includes(searchKey(query))).sort((a,b)=>(grouped.get(b.id)?.[0]?.updated||'').localeCompare(grouped.get(a.id)?.[0]?.updated||'')||a.name.localeCompare(b.name,'fa'));
+ const terms=searchKey(query).split(/\s+/).filter(Boolean);
+ const ordered=[...contacts.values()].filter(contact=>{
+  const label=searchKey([contact.name,...(contact.positions||[])].join(' '));
+  return terms.every(term=>label.includes(term));
+ }).sort((a,b)=>(grouped.get(b.id)?.[0]?.updated||'').localeCompare(grouped.get(a.id)?.[0]?.updated||'')||a.name.localeCompare(b.name,'fa'));
  async function refresh(){
   const version=++refreshVersion.current;
   const result=await request<Mailbox>('/api/inbox');
@@ -65,13 +83,18 @@ const post=(body:object)=>request<{threadId:string}>('/api/inbox',{method:'POST'
  useEffect(()=>{
   let active=true;
   const failed=(e:Error)=>{if(active)setError(e.message)};
-  const wake=()=>{if(!document.hidden)void refresh().catch(failed)};
+  const refreshContacts=()=>{
+   if(!history)void request<{me:string;people:Contact[]}>('/api/inbox?view=directory').then(result=>{
+    if(active)setDirectory(result.people.filter(c=>c.id!==result.me).map(c=>({...c,active:true})));
+   }).catch(failed);
+  };
+  const wake=()=>{if(!document.hidden){void refresh().catch(failed);refreshContacts();}};
   wake();
-  void request<{me:string;people:Contact[]}>('/api/inbox?view=directory').then(result=>{if(active)setDirectory(result.people.filter(c=>c.id!==result.me).map(c=>({...c,active:true})))}).catch(failed);
   window.addEventListener('focus',wake);
+  window.addEventListener('nafasyar-profile-photo-changed',refreshContacts);
   document.addEventListener('visibilitychange',wake);
   const timer=setInterval(wake,15000);
-  return()=>{active=false;refreshVersion.current++;clearInterval(timer);window.removeEventListener('focus',wake);document.removeEventListener('visibilitychange',wake)};
+  return()=>{active=false;refreshVersion.current++;clearInterval(timer);window.removeEventListener('focus',wake);window.removeEventListener('nafasyar-profile-photo-changed',refreshContacts);document.removeEventListener('visibilitychange',wake)};
  },[]);
  useEffect(()=>{
   let active=true;
@@ -148,10 +171,10 @@ const post=(body:object)=>request<{threadId:string}>('/api/inbox',{method:'POST'
   });
  }
  return <div dir="rtl" className={'direct-messenger'+(contact?' has-thread':'')}>
-  <div className="direct-chat-brand"><img src="/brand/nafasyar-icon.svg" alt=""/><strong>نفس‌یار</strong><span>پیام‌ها</span></div>
+  <div className="direct-chat-brand"><img src="/brand/nafasyar-icon.svg" alt=""/><strong>نفس‌یار</strong><span>{history?'سوابق صندوق نقش':'پیام‌های مستقیم'}</span></div>
   {error&&<p className="notice error" role="alert">{error} <button type="button" className="btn" onClick={()=>void refresh().catch(e=>setError(e.message))}>تلاش دوباره</button></p>}
   <div className={'inbox-layout direct-chat'+(contact?' has-thread':'')}>
-   <aside className="inbox-list"><h3>گفت‌وگوها</h3><label className="field">جست‌وجوی نام یا سمت<input placeholder="جست‌وجوی همکار…" type="search" value={query} onChange={event=>setQuery(event.target.value)}/></label>
+   <aside className="inbox-list"><h3>گفت‌وگوها</h3><label className="field">جست‌وجوی نام یا نقش<input placeholder="جست‌وجوی همکار…" type="search" value={query} onChange={event=>setQuery(event.target.value)}/></label>
     {ordered.map(c=>{
      const items=grouped.get(c.id)||[],unread=items.filter(t=>t.unread).length;
      return <button data-pair-open="direct-messages:397ee31dba32" data-pair-item={JSON.stringify([c.id])} type="button" key={c.id} className={'inbox-thread '+(c.id===contactId?'selected ':'')+(unread?'unread':'')} aria-pressed={c.id===contactId} onClick={()=>select(c.id)}><ContactIdentity contact={c}/>{items[0]?.lastMessage&&<span className="direct-chat-preview">{items[0].lastMessage}</span>}{items[0]&&<small>{formatDate(items[0].updated)} · {clock.format(new Date(items[0].updated))}</small>}{unread>0&&<small><span className="direct-chat-unread">{unread.toLocaleString('fa-IR')}</span> گفت‌وگوی خوانده‌نشده</small>}</button>;
@@ -169,7 +192,7 @@ const post=(body:object)=>request<{threadId:string}>('/api/inbox',{method:'POST'
       {shownTimeline.map(({m,d},i)=>{
        const own=m.author===d.me,day=formatDate(m.created),read=own?(m.sentRevision!==undefined?d.peerReadRevision>=m.sentRevision:d.peerReadRevision>=d.thread.revision?true:null):null;
        const file=m.mode==='attachment'?d.files.find(f=>m.id==='inbox-upload:'+f.id):null;
-       return <div data-pair-row={JSON.stringify(m.id)} key={m.id} className={'direct-chat-row'+(own?' own':'')}>{(!i||formatDate(shownTimeline[i-1].m.created)!==day)&&<time className="direct-chat-day">{day}</time>}<article className={'inbox-message'+(own?' own':'')}>{file?<div className="direct-chat-file">{file.purpose==='voice'?<><audio controls preload="none" src={cartableUrl('/api/inbox/files?thread='+encodeURIComponent(d.thread.id)+'&id='+encodeURIComponent(file.id)+'&view=play',workspace)} aria-label="پیام صوتی"/><a href={cartableUrl('/api/inbox/files?thread='+encodeURIComponent(d.thread.id)+'&id='+encodeURIComponent(file.id),workspace)}>دریافت پیام صوتی</a></>:<a href={cartableUrl('/api/inbox/files?thread='+encodeURIComponent(d.thread.id)+'&id='+encodeURIComponent(file.id),workspace)}><FileText size={28}/><span>{file.filename}{file.byteSize&&<small>{Math.ceil(file.byteSize/1024).toLocaleString('fa-IR')} کیلوبایت</small>}</span></a>}</div>:<p>{m.body}</p>}<small><time dateTime={m.created}>{clock.format(new Date(m.created))}</time>{read!==null&&(read?' · خوانده شده ✓✓':' · خوانده نشده ✓')}</small></article></div>;
+       return <div data-pair-row={JSON.stringify(m.id)} key={m.id} className={'direct-chat-row'+(own?' own':'')}>{(!i||formatDate(shownTimeline[i-1].m.created)!==day)&&<time className="direct-chat-day">{day}</time>}<article className={'inbox-message'+(own?' own':'')}>{file?<div className="direct-chat-file">{file.purpose==='voice'?<><audio controls preload="none" src={route('/api/inbox/files?thread='+encodeURIComponent(d.thread.id)+'&id='+encodeURIComponent(file.id)+'&view=play')} aria-label="پیام صوتی"/><a href={route('/api/inbox/files?thread='+encodeURIComponent(d.thread.id)+'&id='+encodeURIComponent(file.id))}>دریافت پیام صوتی</a></>:<a href={route('/api/inbox/files?thread='+encodeURIComponent(d.thread.id)+'&id='+encodeURIComponent(file.id))}><FileText size={28}/><span>{file.filename}{file.byteSize&&<small>{Math.ceil(file.byteSize/1024).toLocaleString('fa-IR')} کیلوبایت</small>}</span></a>}</div>:<p>{m.body}</p>}<small><time dateTime={m.created}>{clock.format(new Date(m.created))}</time>{read!==null&&(read?' · خوانده شده ✓✓':' · خوانده نشده ✓')}</small></article></div>;
       })}
      </div>
      {showSearch&&!shownTimeline.length&&<p className="direct-search-empty">در پیام‌های بارگذاری‌شده نتیجه‌ای پیدا نشد.</p>}

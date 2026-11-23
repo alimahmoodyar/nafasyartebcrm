@@ -64,6 +64,12 @@ export async function requireAccess(kind?: Kind, operation: "read" | "write" = "
   return user;
 }
 export async function requireAdmin() {const user = await session(); if (!user.isAdmin) throw new AccessError("مدیریت کاربران فقط برای مدیر سامانه مجاز است.", 403); return user;}
+export async function requireCatalogDeletionAdmin(){
+ const user=await session();
+ if(user.isAdmin)return user;
+ if(user.profileReview?.id==='technical'&&(await realSession()).isAdmin)return user;
+ throw new AccessError('حذف شناسنامه فقط برای مدیر سامانه مجاز است.',403);
+}
 export async function requireRealAdmin(){const user=await currentSession();if(!user.isAdmin)throw new AccessError('این بخش فقط برای مدیر سامانه مجاز است.',403);return user;}
 export function checkOrigin(request: Request) {
   const origin = request.headers.get("origin");

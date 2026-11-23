@@ -11,6 +11,7 @@ export async function GET(request:Request){try{const u=await requireInboxAccess(
  }catch(e){return accessResponse(e)||Response.json({error:'دریافت پیوست انجام نشد.'},{status:503})}}
 export async function POST(request:Request){let key='',id='';try{
  checkOrigin(request);const u=await requireInboxAccess(request),q=new URL(request.url).searchParams,db=storage(),mailbox=await inboxMailbox(u);checkInboxMailbox(request.headers.get('x-inbox-mailbox'),mailbox.id);
+ if(u.inboxChannel==='history')throw new AccessError('سوابق صندوق نقش فقط برای مشاهده در دسترس است.',403);
  id=q.get('requestId')||'';if(!/^[a-f0-9-]{36}$/i.test(id))throw new AccessError('شناسه فایل معتبر نیست.',400);
  const suppliedThread=q.get('thread')||'',recipientId=q.get('recipientId')||'',purpose=q.get('purpose')||'document';
  if(!['voice','document'].includes(purpose)||!!suppliedThread===!!recipientId)throw new AccessError('یک گفت‌وگو یا یک گیرنده مشخص کنید.',400);
