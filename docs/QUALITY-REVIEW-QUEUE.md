@@ -1,3 +1,7 @@
+## 2026-11-23 — Profile photo and personnel document feedback
+
+Isolated checks cover the legacy photo flow, account isolation of original files, saved crop and source retention, confirmed removal, direct-message photo compatibility, and the employee's upload and review feedback. The personnel document approval process and permissions are unchanged.
+
 ## 2026-11-22 · Single-column GoDEX label printing
 
 The owner approved the physical 45×30 mm sample on G500. The integrated data-driven rendering passed the direct-label browser test with a decoded asset QR. Company deployment is pending.
