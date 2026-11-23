@@ -12,12 +12,22 @@ export async function inboxIdentity(u:Session){const id=await memberId(u);if(id)
 // Operational notices still use the authenticated account. Interactive previews use a separate mailbox.
 const profileAddress=(id:string)=>'@profile:'+id;
 const representativeInboxProfiles=new Set(['sales','home-sales','sales-manager','sales-finance','logistics','home-service']);
-export async function requireInboxAccess(){
+export async function requireInboxAccess(request?:Request){
  const user=await session();
  if(user.permissions.hospitalCenterId)throw new AccessError('این حساب فقط به پنل مرکز بیمارستانی دسترسی دارد.',403);
+ const scope=request&&new URL(request.url).searchParams.get('workspace');
+ if(scope&&scope!=='personal'){
+  const {memberCartable}=await import('./member-cartable');
+  await memberCartable(user,request);
+  return {...user,mailboxRole:scope};
+ }
  return user;
 }
 export async function inboxMailbox(u:Session){
+ if(u.mailboxRole){
+  const role=roleProfiles.find(p=>p.id===u.mailboxRole)!;
+  return {id:'@role:'+role.id,name:role.title,profileTitle:role.title};
+ }
  const preview=u.profileReview;
  if(!preview)return {id:await inboxIdentity(u),name:u.name,profileTitle:null};
  const profile=roleProfiles.find(p=>p.id===preview.id);
@@ -53,7 +63,12 @@ export async function accountInboxDirectory(u:Session){const me=await inboxIdent
  return {me,people:people.map(person=>({...person,positions:titles.get(person.id)||[]})),positions:!u.isAdmin&&(u.permissions.serviceAgentId||u.permissions.salesAgentId)?[]:positions};}
 export async function inboxDirectory(u:Session){
  const mailbox=await inboxMailbox(u);
- if(!mailbox.profileTitle)return {...await accountInboxDirectory(u),mailboxName:mailbox.name,profileTitle:null};
+ if(!u.profileReview){
+  const directory=await accountInboxDirectory(u);
+  const internal=!u.permissions.salesAgentId&&!u.permissions.serviceAgentId&&!u.permissions.hospitalCenterId;
+  const roles=internal?roleProfiles.filter(p=>p.operational&&'@role:'+p.id!==mailbox.id).map(p=>({id:'@role:'+p.id,name:p.title,unit:'صندوق نقش',avatarUrl:null,positions:['صندوق نقش']})):[];
+  return {...directory,people:[...directory.people,...roles],me:mailbox.id,mailboxName:mailbox.name,profileTitle:mailbox.profileTitle};
+ }
  const people=roleProfiles
   .filter(p=>profileAddress(p.id)!==mailbox.id&&(u.profileReview?.id!=='sales-representative'||representativeInboxProfiles.has(p.id)))
   .map(p=>({id:profileAddress(p.id),name:p.title,unit:'آزمایشی'}));
@@ -94,6 +109,6 @@ export async function prepareInboxCreate(u:Session,b:any,now=new Date(),mailboxD
 export function inboxCreateGuards(db:D1Database,op:string,recipientType:string,recipientId:string){
  const sql=recipientType==='position'?"EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND type='position' AND json_extract(data,'$.active')=1)":"EXISTS(SELECT 1 FROM app_members WHERE id=? AND status='active')";
  // The preview directory validates fixed profile addresses. They have no mutable member row.
- if(recipientType==='person'&&(recipientId==='@owner'||roleProfiles.some(p=>profileAddress(p.id)===recipientId)))return [];
+ if(recipientType==='person'&&(recipientId==='@owner'||roleProfiles.some(p=>profileAddress(p.id)===recipientId||p.operational&&'@role:'+p.id===recipientId)))return [];
  return [db.prepare('UPDATE inventory_operations SET guard=CASE WHEN '+sql+' THEN guard ELSE 0 END WHERE id=?').bind(recipientId,op)];
 }

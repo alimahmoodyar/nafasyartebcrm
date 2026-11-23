@@ -54,7 +54,7 @@ const op=(mode,extra={})=>({id:crypto.randomUUID(),mode,confirmed:true,revision:
  let submit=op('submit',{recordId:record.id,revision:record.revision,items:record.data.items,holderConfirmed:true});result=await call(staff,submit);assert.equal(result.status,200);record=(await result.json()).record;assert.equal(record.data.state,'submitted');assert.equal(sql.prepare("SELECT count(*) n FROM flow_entities WHERE type='asset_item'").get().n,0,'nothing official until review');await load('lib/asset-declaration-tasks.ts').syncDeclarationTasks();assert.ok(sql.prepare("SELECT id FROM duty_runs WHERE template_id='asset-declarations' AND assignee=?").get((await load('lib/assets.ts').assetActor(custodian)).id),'custodian task');
  assert.equal((await read(other,'?id='+record.id)).status,404);assert.equal((await call(staff,op('approve',{recordId:record.id,revision:record.revision,matched:true}))).status,403);assert.equal((await call(hr,op('approve',{recordId:record.id,revision:record.revision,matched:true}))).status,404);
  const tasks=load('app/api/tasks/route.ts');
- const inbox=async u=>{const res=await context.run(u,()=>tasks.GET(req('/api/tasks')));assert.equal(res.status,200,await res.clone().text());return (await res.json()).tasks;};
+ const inbox=async (u,scope='')=>{const res=await context.run(u,()=>tasks.GET(req('/api/tasks'+(scope?'?workspace='+scope:''))));assert.equal(res.status,200,await res.clone().text());return (await res.json()).tasks;};
  const assignedTask=(await inbox(custodian)).find(t=>t.data.sourceId===record.id&&t.state==='open');
  assert.ok(assignedTask,'A submitted declaration appears in the actual custodian cartable.');
  assert.equal(assignedTask.data.recordId,'asset-declaration:'+record.id);
@@ -63,7 +63,7 @@ const op=(mode,extra={})=>({id:crypto.randomUUID(),mode,confirmed:true,revision:
  const newCustodian=await asRole('new-custodian@test.local','New Custodian',{});const newKeeperId=(await load('lib/assets.ts').assetActor(newCustodian)).id;
  const roleContext=load('lib/member-role-assignments.ts'),admin={...custodian,userId:owner.userId,isAdmin:true};
  const roleCtx=await roleContext.memberRoleContext(admin,newKeeperId),editor=(await roleContext.memberRoleEditor(roleCtx,newKeeperId)).selected;
- const selection={memberId:newKeeperId,revision:editor.memberRevision,assignmentRevision:editor.assignmentRevision,bindings:[{profileId:'custodian'}],legacyMode:'keep',reason:'Assign the new custodian'};
+ const selection={memberId:newKeeperId,revision:editor.memberRevision,assignmentRevision:editor.assignmentRevision,bindings:[{profileId:'custodian'},{profileId:'personnel-hr'}],legacyMode:'keep',reason:'Assign the new custodian'};
  const preview=await roleContext.previewMemberRoles(roleCtx,selection);
  const grant=await roleContext.saveMemberRoles(roleCtx,{...selection,confirmed:true,requestId:crypto.randomUUID(),previewToken:preview.previewToken});
  assert.equal(grant.followupPending,false);
@@ -78,6 +78,22 @@ const op=(mode,extra={})=>({id:crypto.randomUUID(),mode,confirmed:true,revision:
  assert.ok((await inbox(staff)).some(t=>t.id===returnedTask.id&&t.state==='open'),'The employee cartable recovers a missing open correction.');
  assert.ok(!(await inbox(other)).some(t=>t.data.sourceId===record.id));
  result=await call(staff,op('submit',{recordId:record.id,revision:record.revision,items:record.data.items,holderConfirmed:true}));assert.equal(result.status,200);record=(await result.json()).record;
+ const multiKeeper={...newCustodian,permissions:preview.after};
+ const isOpenReview=t=>t.data.sourceId===record.id&&t.state==='open';
+ assert.equal((await inbox(multiKeeper,'custodian')).filter(isOpenReview).length,1);
+ assert.ok(!(await inbox(multiKeeper,'personal')).some(isOpenReview));
+ assert.ok(!(await inbox(multiKeeper,'personnel-hr')).some(isOpenReview));
+ assert.equal((await context.run(other,()=>tasks.GET(req('/api/tasks?workspace=custodian')))).status,403);
+ const messages=load('app/api/inbox/route.ts');
+ const send=await context.run(staff,()=>messages.POST(req('/api/inbox','POST',{id:crypto.randomUUID(),mode:'create',kind:'message',priority:'normal',recipientType:'person',recipientId:'@role:custodian',title:'Role message',body:'Review this laptop'})));
+ assert.equal(send.status,200,await send.clone().text());
+ const sent=(await send.json()).threadId;
+ for(const scope of ['custodian','personal','personnel-hr']){
+  const response=await context.run(multiKeeper,()=>messages.GET(req('/api/inbox?workspace='+scope)));
+  assert.equal(response.status,200);
+  assert.equal((await response.json()).threads.some(t=>t.id===sent),scope==='custodian');
+ }
+ assert.equal((await context.run(other,()=>messages.GET(req('/api/inbox?workspace=custodian&thread='+sent)))).status,403);
  const reviewItems=record.data.items.map((r,i)=>({...r,existingAssetId:'',assetRevision:0,copies:i?1:2}));
  const codesToReview=(await (await read(custodian,'?review=true&id='+record.id)).json()).records[0].codeMatches;
  assert.deepEqual(codesToReview.map(match=>match.state),['legacy','legacy'],'Both a legacy number and an AM code absent from the ledger can proceed as new assets.');

@@ -1,3 +1,5 @@
+import {custodianProfileWork} from '@/lib/asset-profile-work';
+import {memberCartable,taskRoles} from '@/lib/member-cartable';
 import {syncServiceTasks} from '@/lib/after-sales';
 import {serviceRead} from '@/lib/service-access';
 import {syncServiceContractTasks} from '@/lib/service-contract-tasks';
@@ -40,10 +42,14 @@ async function get(request?:Request){try{const u=await requireAccess(),db=storag
   const missingDeclaration=await db.prepare("SELECT 1 FROM flow_entities a WHERE a.type='asset_declaration' AND ((json_extract(a.data,'$.state')='returned' AND json_extract(a.data,'$.memberId')=?) OR (?=1 AND json_extract(a.data,'$.state')='submitted' AND json_extract(a.data,'$.memberId')<>?)) AND NOT EXISTS(SELECT 1 FROM duty_runs t WHERE t.id='asset-declaration-task:'||a.id||':'||a.revision||':'||? AND t.state NOT IN ('completed','cancelled')) LIMIT 1").bind(mid,keeper?1:0,mid,mid).first();
   if(missingDeclaration){try{await syncDeclarationTasks();}catch{ /* The next cartable refresh retries synchronization. */ }}
  }
+ const workspace=await memberCartable(u,request);
  const tasks=u.profileReview?[]:(await db.prepare(processView
   ?"SELECT * FROM duty_runs WHERE (?=1 OR assignee=? OR supervisor=?) AND state IN ('completed','cancelled','submitted') ORDER BY updated DESC,id"
-  :"SELECT * FROM duty_runs WHERE ?=1 OR assignee=? OR supervisor=? ORDER BY CASE WHEN state IN ('completed','cancelled') THEN 1 ELSE 0 END,due,id LIMIT 300").bind(u.isAdmin?1:0,mid,mid).all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}));
- const allowedTasks:any[]=[];for(const t of tasks){if(!dutyVisible(u,t.data))continue;if(t.data.materialWorkflow||t.data.purchaseServiceWorkflow||t.data.purchaseInvoiceWorkflow||t.data.assetWorkflow||t.data.assetWorkflowV2||t.data.qmsWorkflow||t.data.foreignPurchaseWorkflow||t.data.staffMissionWorkflow||t.data.personnelWorkflow||t.data.salesLeadWorkflow||t.data.treasuryWorkflow||t.data.guaranteeWorkflow||t.data.replenishmentWorkflow||t.data.buildIntakeWorkflow||t.data.projectDailyWorkflow){try{await taskAccess(t.id,u);}catch{continue;}}if(t.data.transportWorkflow){try{const {transportAccess}=await import('@/lib/transport');await transportAccess(u,t.data.transportMissionId);}catch{continue;}}allowedTasks.push(t);}
+  :"SELECT * FROM duty_runs WHERE (?=1 OR assignee=? OR supervisor=?)"+(workspace?" AND state NOT IN ('completed','cancelled')":"")+" ORDER BY CASE WHEN state IN ('completed','cancelled') THEN 1 ELSE 0 END,due,id"+(workspace?"":" LIMIT 300")).bind(u.isAdmin?1:0,mid,mid).all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}));
+ const allowedTasks:any[]=[];for(const t of tasks){if(workspace){
+  const roles=taskRoles(t.data,workspace.roles);
+  if(workspace.scope==='personal'?roles.some(id=>workspace.roles.some(p=>p.id===id)):!roles.includes(workspace.scope))continue;
+ }if(!dutyVisible(u,t.data))continue;if(t.data.materialWorkflow||t.data.purchaseServiceWorkflow||t.data.purchaseInvoiceWorkflow||t.data.assetWorkflow||t.data.assetWorkflowV2||t.data.qmsWorkflow||t.data.foreignPurchaseWorkflow||t.data.staffMissionWorkflow||t.data.personnelWorkflow||t.data.salesLeadWorkflow||t.data.treasuryWorkflow||t.data.guaranteeWorkflow||t.data.replenishmentWorkflow||t.data.buildIntakeWorkflow||t.data.projectDailyWorkflow){try{await taskAccess(t.id,u);}catch{continue;}}if(t.data.transportWorkflow){try{const {transportAccess}=await import('@/lib/transport');await transportAccess(u,t.data.transportMissionId);}catch{continue;}}allowedTasks.push(t);}
  if(processView){
   const roles=u.permissions.flowRoles||[], profile=u.profileReview?.id;
   const central=profile?profile==='central-store':u.isAdmin||roles.includes('inventory')||!!u.permissions.warehouseResponsibilities?.some(w=>w.role==='inventory');
@@ -80,8 +86,14 @@ async function get(request?:Request){try{const u=await requireAccess(),db=storag
  const activeTaskIds=new Set(allowedTasks.filter(t=>!['completed','cancelled'].includes(t.state)).map(t=>t.id));
  const templateSync=await syncReceiptTemplates(u);if(templateSync.needsTaskSync)await syncMaterialTasks();
  const positionQueue:Awaited<ReturnType<typeof profileWork>>=u.profileReview?await profileWork(u):{work:[],pendingQuality:0};
- positionQueue.work.push(...await handoffShortageWork(u));
- return json({profileReview:u.profileReview||null,positionWork:positionQueue.work,positionWorkHasMore:!!positionQueue.workHasMore,pendingQuality:positionQueue.pendingQuality,accountId:u.userId,memberId:mid,isAdmin:u.isAdmin,receiptNotesAvailable:!u.permissions.salesAgentId&&!u.permissions.serviceAgentId&&!u.permissions.hospitalCenterId,canPurchaseServices,tasks:allowedTasks.map(t=>{const g=guidanceOutline(t);return {...t,guidance:{kind:g.kind,steps:g.steps,evidence:g.evidence}};}),limited:tasks.length===300,notifications:notifications.filter((n:any)=>activeTaskIds.has(n.task_id)),managementNotifications:managementNotifications.filter((n:any)=>activeTaskIds.has(n.task_id)),definitions:definitions.filter((p:any)=>!p.data.mergedInto),ownPositions:u.profileReview?[]:ownPositions,starterInstalled,members,scheduler:scheduler?JSON.parse(scheduler.data):null});
+ if(workspace?.scope==='custodian'){
+  const current=await custodianProfileWork(u);
+  const represented=new Set(allowedTasks.filter(t=>!['completed','cancelled'].includes(t.state)).map(t=>t.data.assetDeclaration?'asset-declaration:'+t.data.sourceId:t.data.assetWorkflowV2?'asset-work:'+t.data.sourceId+':'+t.data.stage:t.id));
+  positionQueue.work.push(...current.work.filter(w=>!represented.has(w.id)));
+  positionQueue.workHasMore=current.workHasMore;
+ }
+ if(!workspace||workspace.scope==='central-store'||workspace.scope==='personal'&&!workspace.roles.some(p=>p.id==='central-store'))positionQueue.work.push(...await handoffShortageWork(u));
+ return json({workspaceTitle:workspace?.roles.find(p=>p.id===workspace.scope)?.title,profileReview:u.profileReview||null,positionWork:positionQueue.work,positionWorkHasMore:!!positionQueue.workHasMore,pendingQuality:positionQueue.pendingQuality,accountId:u.userId,memberId:mid,isAdmin:u.isAdmin,receiptNotesAvailable:!u.permissions.salesAgentId&&!u.permissions.serviceAgentId&&!u.permissions.hospitalCenterId,canPurchaseServices,tasks:allowedTasks.map(t=>{const g=guidanceOutline(t);return {...t,guidance:{kind:g.kind,steps:g.steps,evidence:g.evidence}};}),limited:!workspace&&tasks.length===300,notifications:notifications.filter((n:any)=>activeTaskIds.has(n.task_id)),managementNotifications:managementNotifications.filter((n:any)=>activeTaskIds.has(n.task_id)),definitions:definitions.filter((p:any)=>!p.data.mergedInto),ownPositions:u.profileReview?[]:ownPositions,starterInstalled,members,scheduler:scheduler?JSON.parse(scheduler.data):null});
  }catch(e){return accessResponse(e)||Response.json({error:'کارتابل در دسترس نیست؛ نصب مهاجرت 0013 را بررسی کنید.'},{status:503})}}
 async function post(request:Request){try{checkOrigin(request);const u=await requireAccess(),db=storage(),b=JSON.parse(new TextDecoder().decode(await boundedBody(request,80000))),mode=required(b.mode),id=required(b.id),now=new Date().toISOString();if(!/^[a-f0-9-]{36}$/i.test(id))fail('شناسه عملیات معتبر نیست.');const signature=JSON.stringify(b),oldOp:any=await db.prepare('SELECT payload,actor FROM inventory_operations WHERE id=?').bind(id).first();if(oldOp){if(oldOp.actor!==u.userId||oldOp.payload!==signature)fail('شناسه عملیات تکراری است.',409);return json({saved:true,repeated:true});}
  if(mode==='install_starter')return json(await installDutyStarter(u,id,signature));

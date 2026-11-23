@@ -1,4 +1,5 @@
 'use client';
+import {cartableUrl} from '@/lib/cartable-url';
 import {CartableRows} from './cartable-frame';
 import {useEffect,useState} from 'react';
 import {materialProcesses,type ProcessRow} from '@/lib/process-history';
@@ -18,14 +19,14 @@ const fields:Record<string,[keyof Row,string][]>={
  quality:[['material','کالا'],['batches','بچ'],['actor','بازرس']],
  placement:[['material','کالا'],['batches','بچ'],['place','انبار یا قفسه']],
 };
-export function ProcessHistory({waiting,revision,onOpen,cartable=false}:{waiting:boolean;revision:unknown;onOpen:(row:Row)=>void;cartable?:boolean}){
+export function ProcessHistory({workspace='',waiting,revision,onOpen,cartable=false}:{workspace?:string;waiting:boolean;revision:unknown;onOpen:(row:Row)=>void;cartable?:boolean}){
  const [rows,setRows]=useState<Row[]>([]),[error,setError]=useState(''),[loading,setLoading]=useState(true);
  const [dateBasis,setDateBasis]=useState('sent');
  const [process,setProcess]=useState(''),[query,setQuery]=useState(''),[start,setStart]=useState(''),[end,setEnd]=useState(''),[status,setStatus]=useState(''),[extra,setExtra]=useState<Record<string,string>>({}),[page,setPage]=useState(0);
  useEffect(()=>{
   const abort=new AbortController();
   setLoading(true);setError('');setRows([]);
-  void fetch('/api/tasks?view=process-history',{cache:'no-store',signal:abort.signal}).then(async response=>{
+  void fetch(cartableUrl('/api/tasks?view=process-history',workspace),{cache:'no-store',signal:abort.signal}).then(async response=>{
    const result=await response.json() as {rows?:Row[];error?:string};
    if(!response.ok)throw new Error(result.error||'دریافت سوابق انجام نشد.');
    if(!abort.signal.aborted)setRows(result.rows||[]);

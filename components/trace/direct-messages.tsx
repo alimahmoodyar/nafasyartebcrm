@@ -1,4 +1,5 @@
 'use client';
+import {cartableUrl} from '@/lib/cartable-url';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {Paperclip,Search,ArrowRight,FileText,MessageCircle} from 'lucide-react';
 import {VoiceMessageRecorder} from './voice-message-recorder';
@@ -14,17 +15,6 @@ const direct=(t:Thread)=>t.kind==='message'&&t.recipientType==='person';
 const peer=(t:Thread)=>t.isSender?t.recipientId:t.sender;
 const open=(t:Thread)=>!['closed','cancelled','completed'].includes(t.state);
 const searchKey=(value:string)=>value.replace(/ي/g,'ی').replace(/ك/g,'ک').toLocaleLowerCase('fa').trim();
-async function request<T>(url:string,options?:RequestInit):Promise<T>{
- const response=await fetch(url,{cache:'no-store',...options});
- const result:unknown=await response.json();
- if(!response.ok){
-  const message=result&&typeof result==='object'&&'error' in result&&typeof result.error==='string'?result.error:'';
-  throw Error(message||'ارتباط با صندوق پیام انجام نشد.');
- }
- return result as T;
-}
-const post=(body:object)=>request<{threadId:string}>('/api/inbox',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-
 function ContactIdentity({contact}:{contact:Contact}){
  const [failed,setFailed]=useState(false);
  useEffect(()=>setFailed(false),[contact.avatarUrl]);
@@ -34,7 +24,19 @@ function ContactIdentity({contact}:{contact:Contact}){
   <span><strong>{contact.name}</strong>{title&&<small>{title}</small>}</span>
  </span>;
 }
-export function DirectMessages(){
+export function DirectMessages({workspace=''}:{workspace?:string}={}){
+async function request<T>(url:string,options?:RequestInit):Promise<T>{
+ const response=await fetch(cartableUrl(url,workspace),{cache:'no-store',...options});
+ const result:unknown=await response.json();
+ if(!response.ok){
+  const message=result&&typeof result==='object'&&'error' in result&&typeof result.error==='string'?result.error:'';
+  throw Error(message||'ارتباط با صندوق پیام انجام نشد.');
+ }
+ return result as T;
+}
+const post=(body:object)=>request<{threadId:string}>('/api/inbox',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+
+
  const [box,setBox]=useState<Mailbox|null>(null),[directory,setDirectory]=useState<Contact[]>([]),[contactId,setContactId]=useState(''),[query,setQuery]=useState(''),[body,setBody]=useState(''),[details,setDetails]=useState<Conversation[]>([]),[limit,setLimit]=useState(8),[busy,setBusy]=useState(false),[loading,setLoading]=useState(false),[error,setError]=useState('');
  const [voiceActive,setVoiceActive]=useState(false),[messageQuery,setMessageQuery]=useState(''),[showSearch,setShowSearch]=useState(false);
  const voiceChange=useCallback((active:boolean)=>setVoiceActive(active),[]);
@@ -167,7 +169,7 @@ export function DirectMessages(){
       {shownTimeline.map(({m,d},i)=>{
        const own=m.author===d.me,day=formatDate(m.created),read=own?(m.sentRevision!==undefined?d.peerReadRevision>=m.sentRevision:d.peerReadRevision>=d.thread.revision?true:null):null;
        const file=m.mode==='attachment'?d.files.find(f=>m.id==='inbox-upload:'+f.id):null;
-       return <div data-pair-row={JSON.stringify(m.id)} key={m.id} className={'direct-chat-row'+(own?' own':'')}>{(!i||formatDate(shownTimeline[i-1].m.created)!==day)&&<time className="direct-chat-day">{day}</time>}<article className={'inbox-message'+(own?' own':'')}>{file?<div className="direct-chat-file">{file.purpose==='voice'?<><audio controls preload="none" src={'/api/inbox/files?thread='+encodeURIComponent(d.thread.id)+'&id='+encodeURIComponent(file.id)+'&view=play'} aria-label="پیام صوتی"/><a href={'/api/inbox/files?thread='+encodeURIComponent(d.thread.id)+'&id='+encodeURIComponent(file.id)}>دریافت پیام صوتی</a></>:<a href={'/api/inbox/files?thread='+encodeURIComponent(d.thread.id)+'&id='+encodeURIComponent(file.id)}><FileText size={28}/><span>{file.filename}{file.byteSize&&<small>{Math.ceil(file.byteSize/1024).toLocaleString('fa-IR')} کیلوبایت</small>}</span></a>}</div>:<p>{m.body}</p>}<small><time dateTime={m.created}>{clock.format(new Date(m.created))}</time>{read!==null&&(read?' · خوانده شده ✓✓':' · خوانده نشده ✓')}</small></article></div>;
+       return <div data-pair-row={JSON.stringify(m.id)} key={m.id} className={'direct-chat-row'+(own?' own':'')}>{(!i||formatDate(shownTimeline[i-1].m.created)!==day)&&<time className="direct-chat-day">{day}</time>}<article className={'inbox-message'+(own?' own':'')}>{file?<div className="direct-chat-file">{file.purpose==='voice'?<><audio controls preload="none" src={cartableUrl('/api/inbox/files?thread='+encodeURIComponent(d.thread.id)+'&id='+encodeURIComponent(file.id)+'&view=play',workspace)} aria-label="پیام صوتی"/><a href={cartableUrl('/api/inbox/files?thread='+encodeURIComponent(d.thread.id)+'&id='+encodeURIComponent(file.id),workspace)}>دریافت پیام صوتی</a></>:<a href={cartableUrl('/api/inbox/files?thread='+encodeURIComponent(d.thread.id)+'&id='+encodeURIComponent(file.id),workspace)}><FileText size={28}/><span>{file.filename}{file.byteSize&&<small>{Math.ceil(file.byteSize/1024).toLocaleString('fa-IR')} کیلوبایت</small>}</span></a>}</div>:<p>{m.body}</p>}<small><time dateTime={m.created}>{clock.format(new Date(m.created))}</time>{read!==null&&(read?' · خوانده شده ✓✓':' · خوانده نشده ✓')}</small></article></div>;
       })}
      </div>
      {showSearch&&!shownTimeline.length&&<p className="direct-search-empty">در پیام‌های بارگذاری‌شده نتیجه‌ای پیدا نشد.</p>}
