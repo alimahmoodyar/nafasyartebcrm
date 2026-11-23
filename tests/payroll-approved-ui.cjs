@@ -3,13 +3,15 @@ let slots=[],cursor=0,effects=[],calls=[],component,props={},slip;
 const react={...React,useState:init=>{const i=cursor++;if(!(i in slots))slots[i]=typeof init==='function'?init():init;return [slots[i],v=>slots[i]=typeof v==='function'?v(slots[i]):v]},useRef:init=>{const i=cursor++;return slots[i]??(slots[i]={current:init})},useEffect:(fn,deps)=>{const i=cursor++,old=slots[i];if(!old||deps.some((v,j)=>v!==old.deps[j]))effects.push(()=>{old?.cleanup?.();slots[i]={deps,cleanup:fn()}})}};
 const leaf=()=>null;
 const fetch=async(url,options={})=>{calls.push({url,options});if(options.method==='POST'){const b=JSON.parse(options.body);return {ok:true,json:async()=>b.preview?{preview:{gross:'500',insurance:'50',tax:'70',net:'380'}}:{saved:true}}}const q=new URL(url,'https://test.local').searchParams,view=q.get('view');return {ok:true,json:async()=>view==='slip'?{item:slip,editable:['review','approved'].includes(slip.data.state)}:view==='payments'?{items:[{id:'one',name:'پرسنل',amount:'380',iban:'IR220000000000000000000001'}],total:'380',count:1,invalid:0,hasMore:false,bankFormatPending:'قالب بانک هنوز دریافت نشده است.'}:{items:[],hasMore:false}}};
-function load(file,extra={}){const exports={},imports={react,'react/jsx-runtime':require('react/jsx-runtime'),'./receipt-attachment':{ReceiptAttachment:leaf},'./solar-date':{SolarDate:leaf},'@/lib/persian-date':{formatDateTime:String,formatDate:String,localDay:()=> '2026-11-19'},'./payroll-slip-review':{PayrollSlipReview:leaf},'./payroll-payment-list':{PayrollPaymentList:leaf},'./personnel-payroll-fields':{ContractPayFields:leaf},'@/lib/personnel-payroll-contract':{payrollComponentKinds:{}},'@/lib/personnel-contract-salary':{normalizeContractSalary:String},...extra};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText,{exports,require:n=>{assert.ok(n in imports,n);return imports[n]},fetch,crypto:globalThis.crypto,URLSearchParams,BigInt,Date,console});return exports;}
+function load(file,extra={}){const exports={},imports={react,'react/jsx-runtime':require('react/jsx-runtime'),'./receipt-attachment':{ReceiptAttachment:leaf},'./solar-date':{SolarDate:leaf},'@/lib/persian-date':{formatDateTime:String,formatDate:String,localDay:()=> '2026-11-19'},'./payroll-slip-review':{PayrollSlipReview:leaf},'./payroll-payment-list':{PayrollPaymentList:leaf},'./personnel-payroll-fields':{ContractPayFields:leaf},'./personnel-holidays':{PersonnelHolidays:leaf},'@/lib/personnel-payroll-contract':{payrollComponentKinds:{}},'@/lib/personnel-contract-salary':{normalizeContractSalary:String},...extra};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText,{exports,require:n=>{assert.ok(n in imports,n);return imports[n]},fetch,crypto:globalThis.crypto,URLSearchParams,BigInt,Date,console});return exports;}
 const nodes=x=>Array.isArray(x)?x.flatMap(nodes):React.isValidElement(x)?[x,...nodes(x.props.children)]:[],text=x=>Array.isArray(x)?x.map(text).join(''):React.isValidElement(x)?text(x.props.children):x==null?'':String(x);
 function tree(){cursor=0;return component(props)}
 async function settle(){for(let i=0;i<3;i++){tree();const f=effects;effects=[];f.forEach(fn=>fn());await new Promise(r=>setImmediate(r))}return tree()}
 function button(t,label){const b=nodes(t).find(n=>n.type==='button'&&text(n).includes(label));assert.ok(b,label);return b}
 function reset(c,p){slots=[];effects=[];cursor=0;calls=[];component=c;props=p}
 const dates=load('lib/persian-date.ts');
+const holidayData=load('lib/personnel-holiday-calendar.ts',{'./persian-date':dates});
+const {PersonnelHolidays}=load('components/trace/personnel-holidays.tsx',{'@/lib/persian-date':dates,'@/lib/personnel-holiday-calendar':holidayData});
 const {PayrollSlipReview}=load('components/trace/payroll-slip-review.tsx'),{PayrollPaymentList}=load('components/trace/payroll-payment-list.tsx'),{PayrollWorkspace}=load('components/trace/payroll-workspace.tsx',{'@/lib/persian-date':dates});
 (async()=>{
  slip={id:'slip',revision:4,type:'hr_payroll',data:{memberId:'employee',name:'پرسنل',title:'آبان',engine:'contract-v2',state:'review',createdBy:'other',missionAmountStatus:'pending_policy',gross:'400',insurance:'40',tax:'50',net:'310',work:{credited:1920,overtime:60,days:[]},components:[{key:'base',title:'حقوق پایه',amount:'400',insured:true,taxable:true,sources:[{day:'2026-10-25'}]},{key:'mission',title:'حق مأموریت',amount:'0',insured:false,taxable:false,sources:[]}],loanDeductions:[],missions:[]}};
@@ -28,5 +30,13 @@ const {PayrollSlipReview}=load('components/trace/payroll-slip-review.tsx'),{Payr
  const shift=JSON.parse(calls.find(c=>c.options.method==='POST').options.body);
  assert.deepEqual(shift.weekdays,[6,0,1,2,3,4]);
  assert.deepEqual(shift.dayRules.map(({weekday,working})=>[weekday,working]),[[6,true],[0,true],[1,true],[2,true],[3,true],[4,true],[5,false]]);
+ t=tree();button(t,'تقویم تعطیلی‌ها').props.onClick();t=tree();
+ assert.ok(nodes(t).some(n=>n.type.name==='leaf'&&n.props.onSave&&n.props.today),'HR reaches the holiday calendar from attendance');
+ let holiday;
+ reset(PersonnelHolidays,{records:[],today:'2026-11-23',busy:false,onSave:async fields=>{holiday=fields;return true;}});
+ t=tree();assert.match(text(t),/۲۶ روز تعطیل رسمی/);
+ nodes(t).find(n=>n.type==='form').props.onSubmit({preventDefault(){}});
+ assert.equal(holiday.holidayYear,1405);assert.equal(holiday.holidayEffective,'2026-11-23');
+ assert.equal(holiday.holidaySource,holidayData.officialCalendar1405.source);
  console.log('payroll-approved-ui: PASS — approvals, role menus and Saturday-first shift with stable weekday IDs and Friday off');
 })().catch(e=>{console.error(e);process.exitCode=1});
