@@ -8,7 +8,7 @@ import {AccessError} from './authorization';
 import {liveSalesUser,salesVisible,salesLock,publicSalesFile} from './sales';
 import {buildIntakeRoles} from './build-intake-access';
 import {customerOrderForms,snapshotCustomerOrderForm} from './build-order-forms';
-import {productProductionMode} from './model';
+import {productProductionIssue,productProductionMode} from './model';
 import {leadMembers,leadMemberGuard} from './sales-leads';
 import {memberId,notice} from './duties';
 import {storedAccessPermissions} from './permissions';
@@ -84,7 +84,7 @@ export async function buildIntakeApply(user:Session,b:any){
    if(!Number.isSafeInteger(i.lineIndex)||i.lineIndex<0)fail('ردیف سفارش معتبر انتخاب کنید.');const line=order.data.lines[i.lineIndex];
    if(!line||line.productId!==i.productId)fail('محصول باید متعلق به همین ردیف سفارش فروش باشد.');
    const product=s.products.find((p:any)=>p.id===i.productId);
-   if(!product||productProductionMode(product)!=='project')fail('برای این محصول مسیر ساخت سفارشی بیمارستانی تعریف نشده است.');
+   if(!product||productProductionMode(product)!=='project')fail('برای این محصول مسیر ساخت سفارشی بیمارستانی تعریف نشده است.');const issue=productProductionIssue(product,'project');if(issue)fail(issue);
    guard("EXISTS(SELECT 1 FROM records WHERE id=? AND kind='product' AND payload=?)",product.id,product.payload);
    if(!Number.isSafeInteger(i.quantity)||i.quantity<1||i.quantity>100)fail('تعداد تجهیز بین ۱ تا ۱۰۰ باشد.');
    sums.set(i.lineIndex,(sums.get(i.lineIndex)||0)+i.quantity);if((sums.get(i.lineIndex)||0)>line.quantity)fail('جمع تعداد فرم‌ها بیشتر از تعداد سفارش فروش است.');
@@ -121,7 +121,7 @@ export async function buildIntakeApply(user:Session,b:any){
   if(['submit','approve','technical_accept','technical_resolve','finalize','accept_customer'].includes(b.mode)){
    if(!['sales_approved','approved'].includes(order.data.state))fail('ابتدا پیش‌فاکتور فروش تأیید شود.');
    if(!contract||contract.data.agentId&&contract.data.agentId!==agent.id||!contract.data.agentId&&normalize(contract.data.party||'')!==normalize(agent.data.name||''))fail('قرارداد همین خریدار را انتخاب کنید.');rowGuard(contract);if(!d.customWorkflow)date(d.due,true);if(contractWarranty(d.warrantyMonths)===null)fail('مدت گارانتی توافق‌شده در قرارداد این پروژه را مشخص کنید؛ صفر یعنی بدون گارانتی.');
-   for(const i of d.items){const product=s.products.find((p:any)=>p.id===i.productId),line=order.data.lines[i.lineIndex];if(!product||productProductionMode(product)!=='project'||line?.productId!==i.productId)fail('محصول یا ردیف سفارش تغییر کرده است.',409);guard("EXISTS(SELECT 1 FROM records WHERE id=? AND payload=?)",product.id,product.payload);if(i.configuration){const config=custom.rows.find(r=>r.id===i.configuration.id&&r.type==='custom_product_config'&&r.data.published);if(!config)fail('نسخه منتشرشده در دسترس نیست.',409);rowGuard(config);continue;}const checked=snapshotCustomerOrderForm(s.rows,i.templateId,i.productId,i.values,true);if(JSON.stringify(checked.template)!==JSON.stringify(i.template))fail('نسخه فرم محصول تغییر کرده است؛ پیش‌نویس را بازبینی کنید.',409);rowGuard(s.rows.find((r:any)=>r.id===i.templateId));}
+   for(const i of d.items){const product=s.products.find((p:any)=>p.id===i.productId),line=order.data.lines[i.lineIndex];if(!product||productProductionMode(product)!=='project'||line?.productId!==i.productId)fail('محصول یا ردیف سفارش تغییر کرده است.',409);const issue=productProductionIssue(product,'project');if(issue)fail(issue);guard("EXISTS(SELECT 1 FROM records WHERE id=? AND payload=?)",product.id,product.payload);if(i.configuration){const config=custom.rows.find(r=>r.id===i.configuration.id&&r.type==='custom_product_config'&&r.data.published);if(!config)fail('نسخه منتشرشده در دسترس نیست.',409);rowGuard(config);continue;}const checked=snapshotCustomerOrderForm(s.rows,i.templateId,i.productId,i.values,true);if(JSON.stringify(checked.template)!==JSON.stringify(i.template))fail('نسخه فرم محصول تغییر کرده است؛ پیش‌نویس را بازبینی کنید.',409);rowGuard(s.rows.find((r:any)=>r.id===i.templateId));}
    for(const index of new Set(d.items.map((i:any)=>i.lineIndex))){const count=d.items.filter((i:any)=>i.lineIndex===index).reduce((n:number,i:any)=>n+i.quantity,0),other=s.rows.filter((r:any)=>r.type==='build_intake'&&r.id!==id&&r.data.orderId===d.orderId&&(r.data.projectId||['technical_review','commercial_review','approved'].includes(r.data.state))).flatMap((r:any)=>r.data.items).filter((i:any)=>i.lineIndex===index).reduce((n:number,i:any)=>n+i.quantity,0);if(count+other>order.data.lines[index as number].quantity)fail('این تعداد قبلاً در فرم یا پروژه دیگری از همین سفارش تخصیص یافته است.',409);}
    for(const fId of d.fileIds||[]){const f=s.rows.find((r:any)=>r.type==='sales_file'&&r.id===fId&&r.data.agentId===agent.id);if(!f)fail('پیوست سفارش در دسترس نیست.',409);rowGuard(f);}
   }

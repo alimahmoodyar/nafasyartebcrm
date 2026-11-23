@@ -12,6 +12,7 @@ import {boundedBody} from '@/lib/firmware-storage';
 import {flowRole,warehouseAccess} from '@/lib/material-flow';
 import {tehranDay,serialPrefix,nextSerials} from '@/lib/serials';
 import {supplyLock,holdChecks} from '@/lib/sourcing';
+import {productSerialIssue} from '@/lib/model';
 const fail=(m:string,s=400):never=>{throw new AccessError(m,s)};
 const text=(v:any,max=200)=>{if(typeof v!=='string'||!v.trim()||v.length>max)fail('اطلاعات معتبر لازم است.');return v.trim()};
 const zero=(v:any)=>String(v)==='0'?0:scaled(v);
@@ -36,7 +37,11 @@ export async function POST(request:Request){try{
   foreman();if(!unit.approved)fail('BOM پروژه باید تأیید شده باشد.');if(unit.finalized)fail('تجهیز نهایی شده است.');const base=s.boms.find((v:any)=>v.id===unit.bomId),product=s.records.find((r:any)=>r.kind==='product'&&r.id===(unit.productId||base?.product_id));if(!product)fail('محصول مبنای تجهیز باید مشخص باشد.');const productData=JSON.parse(product.payload),template:any=b.templateId?await db.prepare('SELECT * FROM quality_templates WHERE id=? AND product_id=?').bind(text(b.templateId),product.id).first():await db.prepare('SELECT * FROM quality_templates WHERE product_id=? ORDER BY version DESC LIMIT 1').bind(product.id).first();
   if(!template){unit.executionState='awaiting_template';unit.qualityRequested=stamp;}
   else{const allocations=p.workerAllocations.filter((a:any)=>a.unitId===unit.id);if(!allocations.length)fail('قطعات پروژه باید به جایگاه‌های تولید تحویل شده باشند.');const day=tehranDay();let deviceId=unit.deviceId;
-   if(!deviceId){const prefix=serialPrefix(productData.code,day),serial=nextSerials(prefix,s.records.filter((r:any)=>r.kind==='device').map((r:any)=>JSON.parse(r.payload).code),1)[0],planId='project-plan:'+unit.id;deviceId='device:'+serial;unit.deviceId=deviceId;unit.serial=serial;unit.planId=planId;
+   if(!deviceId){
+    const issue=productSerialIssue(productData,'project');if(issue)fail(issue);
+    if(productData.createdAsDraft==='true'&&(p.warranty?.months===undefined||p.warranty?.months===null||p.warranty?.months===''))fail('پیش از صدور سریال، مدت گارانتی را در قرارداد همین پروژه مشخص کنید.');
+    guard('EXISTS(SELECT 1 FROM records WHERE id=? AND payload=?)',product.id,product.payload);
+    const prefix=serialPrefix(productData.code,day),serial=nextSerials(prefix,s.records.filter((r:any)=>r.kind==='device').map((r:any)=>JSON.parse(r.payload).code),1)[0],planId='project-plan:'+unit.id;deviceId='device:'+serial;unit.deviceId=deviceId;unit.serial=serial;unit.planId=planId;
     stmts.push(db.prepare('INSERT INTO serial_runs(id,product_id,actor,day,payload,created) VALUES(?,?,?,?,?,?)').bind(planId,product.id,actor.userId,day,JSON.stringify({name:productData.name,model:productData.model,code:productData.code,count:1,smallLabels:0,operator:actor.name}),now),db.prepare('INSERT INTO serial_reservations(serial,run_id,product_id) VALUES(?,?,?)').bind(serial,planId,product.id),db.prepare("INSERT INTO records(id,kind,payload,created) VALUES(?,'device',?,?)").bind(deviceId,JSON.stringify({product:product.id,productName:productData.name,productCode:productData.code,code:serial,model:productData.model,date:day,projectId:source.id,projectUnitId:unit.id,warrantyMonths:p.warranty?.months,warrantyBasis:'project'}),now));put(planId,'plan',{productId:product.id,count:1,day,bomId:unit.bomId,templateId:template.id,projectId:source.id,projectUnitId:unit.id});}
    const oldBuild=s.entities.find((e:any)=>e.id===deviceId&&e.type==='build');if(oldBuild?.data.lineReceived)fail('محصول قبلاً دریافت شده است.');put(deviceId,'build',{...(oldBuild?.data||{}),deviceId,planId:unit.planId,projectId:source.id,projectUnitId:unit.id,workflowVersion:4,bomId:unit.bomId,templateId:template.id,state:'prepared',assembler:'تیم پروژه '+p.title,materials:allocations.map((a:any)=>({batchId:a.batchId,partCode:a.partCode,quantity:a.quantity,positionId:a.positionId})),latestQc:null});unit.executionState='awaiting_quality';unit.qualityRequested=stamp;
   }

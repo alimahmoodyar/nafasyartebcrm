@@ -2,6 +2,7 @@ import {requireAccess,can,checkOrigin,accessResponse,AccessError} from "@/lib/au
 import {storage} from "@/lib/storage";
 import {receiptDay} from "@/lib/batch-number";
 import {tehranDay,serialPrefix,nextSerials,parseRun} from "@/lib/serials";
+import {productSerialIssue} from "@/lib/model";
 const headers={"Cache-Control":"no-store"};
 export async function GET(request:Request){try{
  await requireAccess("device");const db=storage(),url=new URL(request.url),id=url.searchParams.get("id");
@@ -17,7 +18,7 @@ export async function POST(request:Request){try{
  const db=storage();
  for(let attempt=0;attempt<4;attempt++){
  const prior:any=await db.prepare("SELECT * FROM serial_runs WHERE id=?").bind(requestId).first();if(prior){if(prior.actor!==actor.userId||prior.product_id!==productId||JSON.parse(prior.payload).count!==count)throw new AccessError("شناسه درخواست قبلاً برای اطلاعات دیگری استفاده شده است.",409);return Response.json({run:parseRun(prior),replayed:true},{headers});}
- const product:any=await db.prepare("SELECT payload FROM records WHERE id=? AND kind='product'").bind(productId).first();if(!product)throw new AccessError("محصول پیدا نشد.",400);const p=JSON.parse(product.payload);if(p.status!=="فعال")throw new AccessError("محصول متوقف شده است؛ محصول فعال انتخاب کنید.",400);
+ const product:any=await db.prepare("SELECT payload FROM records WHERE id=? AND kind='product'").bind(productId).first();if(!product)throw new AccessError("محصول پیدا نشد.",400);const p=JSON.parse(product.payload);const issue=productSerialIssue(p,'routine');if(issue)throw new AccessError(issue,400);if(p.status!=="فعال")throw new AccessError("محصول متوقف شده است؛ محصول فعال انتخاب کنید.",400);
  const day=tehranDay(),prefix=serialPrefix(p.code,day);
  // Range scan uses the reservation PK; device IDs use the existing records PK.
  const existing=await db.prepare("SELECT serial FROM serial_reservations WHERE serial>=? AND serial<? UNION ALL SELECT substr(id,8) AS serial FROM records WHERE id>=? AND id<? AND kind='device'").bind(prefix,prefix+'\uffff','device:'+prefix,'device:'+prefix+'\uffff').all<{serial:string}>();

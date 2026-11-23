@@ -4,6 +4,7 @@ import {boundedBody} from '@/lib/firmware-storage';
 import {taskRequired as required,taskText as text,validDay} from '@/lib/duties';
 import {requireInboxAccess,prepareInboxCreate,inboxCreateGuards,inboxAccess,inboxAssistantExecution,inboxClosed,inboxDecode,inboxDirectory,inboxContactAvatar,inboxMailbox,checkInboxMailbox,inboxLink,inboxList,inboxState,inboxView} from '@/lib/inbox';
 import {inboxModes,inboxStates,inboxHelp} from '@/lib/inbox-contract';
+import {inboxReplyGuards,prepareInboxReply} from '@/lib/inbox-reply';
 const json=(x:unknown)=>Response.json(x,{headers:{'Cache-Control':'private, no-store','Vary':'Cookie, Authorization'}});
 const fail=(s:string,status=400):never=>{throw new AccessError(s,status)};
 function due(v:any){const s=required(v,40);if(!/^\d{4}-\d\d-\d\dT([01]\d|2[0-3]):[0-5]\d:00\+03:30$/.test(s)||!validDay(s.slice(0,10))||Date.parse(s)<=Date.now())fail('مهلت آینده با ساعت تهران انتخاب کنید.');return new Date(s).toISOString();}
@@ -15,6 +16,7 @@ export async function GET(request:Request){try{const u=await requireInboxAccess(
 export async function POST(request:Request){try{checkOrigin(request);const u=await requireInboxAccess(request),db=storage(),mailbox=await inboxMailbox(u),me=mailbox.id,b=JSON.parse(new TextDecoder().decode(await boundedBody(request,80000))),id=required(b.id,100),mode=required(b.mode,40),now=new Date().toISOString();if(!/^[a-f0-9-]{36}$/i.test(id)||!inboxModes[mode])fail('عملیات معتبر نیست.');checkInboxMailbox(b.expectedMailbox,me);
  if(u.inboxChannel==='history'&&mode!=='read')fail('سوابق صندوق نقش فقط برای مشاهده در دسترس است.',403);
  if(u.inboxChannel==='direct'&&(!['create','read','reply'].includes(mode)||mode==='create'&&(b.kind!=='message'||b.recipientType!=='person'||b.link?.id)))fail('این بخش برای پیام مستقیم به اشخاص است.',400);
+ if(b.replyToMessageId!==undefined&&mode!=='reply'&&mode!=='create')fail('برای پاسخ به پیام، عملیات ارسال را انتخاب کنید.');
  const viaAssistant=inboxAssistantExecution.getStore()===true;if(mailbox.profileTitle&&viaAssistant&&b.expectedMailbox!==me)fail('پیام را در صندوق همین پروفایل دوباره آماده کنید.',409);
  const signature=JSON.stringify(mailbox.profileTitle?{mailbox:me,operation:b}:b);let t:any=null;if(mode!=='create')t=await inboxAccess(required(b.threadId,200),u);const previous:any=await db.prepare('SELECT payload,actor FROM inventory_operations WHERE id=?').bind(id).first();if(previous){if(previous.actor!==u.userId||previous.payload!==signature)fail('شناسه عملیات تکراری است.',409);return json({saved:true,repeated:true,threadId:t?.id||id});}
  const statements:D1PreparedStatement[]=[],target=t?.id||id;let d:any=t?{...t.data}:null;let body=typeof b.body==='string'?text(b.body,12000):'';
@@ -50,9 +52,11 @@ export async function POST(request:Request){try{checkOrigin(request);const u=awa
    }
    if(d.recipientType==='position'&&t.isRecipient&&!t.isSender)guard("EXISTS(SELECT 1 FROM flow_entities p,json_each(p.data,'$.members') m WHERE p.id=? AND p.type='position' AND json_extract(p.data,'$.active')=1 AND m.value=?)",d.recipientId,me);
   }
+  const reply=await prepareInboxReply(db,u,d,b.replyToMessageId);
+  statements.push(...inboxReplyGuards(db,id,target,reply));
   if(d.kind==='message'&&d.recipientType==='person')d.lastMessage=body.slice(0,160);
   statements.push(t?db.prepare('UPDATE flow_entities SET data=?,revision=revision+1,updated=? WHERE id=? AND revision=?').bind(JSON.stringify(d),now,target,t.revision):db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'inbox_thread',?,1,?,?)").bind(target,JSON.stringify(d),now,now));
-  statements.push(db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'inbox_message',?,1,?,?)").bind('inbox-msg:'+id,JSON.stringify({thread:target,body,mode,author:me,authorName:mailbox.name,viaAssistant,sentRevision:(t?.revision||0)+1}),now,now));
+  statements.push(db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'inbox_message',?,1,?,?)").bind('inbox-msg:'+id,JSON.stringify({thread:target,body,mode,author:me,authorName:mailbox.name,viaAssistant,sentRevision:(t?.revision||0)+1,...(reply?{replyTo:reply.quote}:{})}),now,now));
   // The sender has seen this exact action; other participants stay unread.
   statements.push(db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'inbox_state',?,1,?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data,revision=flow_entities.revision+1,updated=excluded.updated").bind('inbox-state:'+target+':'+me,JSON.stringify({readRevision:(t?.revision||0)+1,snoozeUntil:''}),now,now));
  }

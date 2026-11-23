@@ -118,7 +118,7 @@ export const resetTables:Record<string,string>={
 };
 // Member contacts are preserved account identity data, keyed by app_members.id.
 // Existing 0016 generic flow_entities freeze protects their atomic writes; no new migration.
-export const resetFlowPreserved=['personnel_code','personnel_code_claim','personnel_code_sequence','member_role_assignment','representative_identity','representative_identity_file','hospital_center','account_profile','member_contact','position','duty_template','duty_catalog_install','transport_migration','development_request','as_agent','sales_agent'];
+export const resetFlowPreserved=['product_code_sequence','personnel_code','personnel_code_claim','personnel_code_sequence','member_role_assignment','representative_identity','representative_identity_file','hospital_center','account_profile','member_contact','position','duty_template','duty_catalog_install','transport_migration','development_request','as_agent','sales_agent'];
 const personnelDossierTypes="'hr_employee','hr_contract','hr_document','hr_ruling','hr_link_archive','hr_shift','hr_assignment','hr_policy','hr_holiday_calendar'";
 // Family approvals contribute to the current dossier. Other requests are operational history.
 const personnelDossier=(row:string)=>`(${row}.type IN (${personnelDossierTypes}) OR (${row}.type='hr_request' AND CASE WHEN json_valid(${row}.data) THEN COALESCE(json_extract(${row}.data,'$.kind')='family' AND json_extract(${row}.data,'$.state')='approved',0) ELSE 0 END))`;

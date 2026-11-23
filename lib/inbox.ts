@@ -13,7 +13,7 @@ export async function inboxIdentity(u:Session){const id=await memberId(u);if(id)
 const profileAddress=(id:string)=>'@profile:'+id;
 type InboxSession=Session & {inboxChannel?:'direct'|'history'};
 const representativeInboxProfiles=new Set(['sales','home-sales','sales-manager','sales-finance','logistics','home-service']);
-export async function requireInboxAccess(request?:Request){
+export async function requireInboxAccess(request?:Request):Promise<InboxSession>{
  const user=await session();
  if(user.permissions.hospitalCenterId)throw new AccessError('این حساب فقط به پنل مرکز بیمارستانی دسترسی دارد.',403);
  const params=request&&new URL(request.url).searchParams;

@@ -1,0 +1,56 @@
+.direct-reply-quote {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  margin: 0 0 6px;
+  padding: 5px 10px;
+  border-inline-start: 3px solid #4980a9;
+  border-radius: 7px;
+  background: #e8f3fb;
+  color: #234462;
+  font-size: 12px;
+}
+
+.direct-reply-quote strong,
+.direct-reply-quote span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.direct-reply-message-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.direct-reply-button {
+  display: inline-grid;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #315778;
+  cursor: pointer;
+}
+
+.direct-reply-button:hover,
+.direct-reply-button:focus-visible { background: #d4e8f7; }
+.direct-reply-button:disabled { opacity: 0.5; cursor: default; }
+
+.direct-reply-draft {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.direct-reply-draft .direct-reply-quote {
+  flex: 1;
+  margin: 0;
+}

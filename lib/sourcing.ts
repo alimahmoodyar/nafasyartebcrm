@@ -5,7 +5,7 @@ import {hasDeliveryDays,needsPurchaseConfirmation,purchaseDeliveryStatus} from '
 import {supplyAssignment,supplyRoleMember} from './sourcing-workflow';
 import {stockQuality} from './stock-quality';
 import {accessPermissions} from './permissions';
-import {productProductionMode} from './model';
+import {productProductionIssue,productProductionMode} from './model';
 import {supplierWork,rfqComplete} from './suppliers';
 import {replenishSteps,replenishmentPolicy,replenishTasks} from './replenishment';
 import {storage} from './storage';
@@ -26,6 +26,8 @@ export function productionRequestAccess(u:Session){
 }
 export function needProductionRequest(u:Session,product:any){
  const access=productionRequestAccess(u);if(!access.canCreate)throw new AccessError('فروش خانگی پیش‌فاکتور ثبت می‌کند؛ درخواست تولید با فروش بیمارستانی یا واحد تولید است.',403);
+ const issue=productProductionIssue(product);
+ if(issue)throw new AccessError(issue,400);
  if(access.internal)return access;
  const mode=productProductionMode(product);
  if(!mode)throw new AccessError('روش تولید این محصول هنوز مشخص نشده است؛ مسئول تعریف محصول ابتدا روتین یا ساخت سفارشی بیمارستانی را تعیین کند.',400);

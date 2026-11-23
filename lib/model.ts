@@ -7,12 +7,32 @@ export type Kind="product"|"batch"|"device"|"event"|"service"|"action"|"distribu
 export type Row={id:string;kind:Kind;created:string;data:Record<string,string>};
 export type Field={key:string;label:string;required?:boolean;type?:string;options?:string[];optionLabels?:Record<string,string>;ref?:Kind};
 export const productProductionModes:Record<string,string>={routine:'تولید روتین خانگی',project:'ساخت سفارشی بیمارستانی'};
+export const productDraftStatus='پیش‌نویس';
 // Legacy products are deliberately unclassified; names and free-text groups do
 // not establish a manufacturing workflow or permission.
 export function productProductionMode(data:any):'routine'|'project'|''{return data?.productionMode==='routine'||data?.productionMode==='project'?data.productionMode:'';}
+
+// Keep established workflows for products registered before draft setup was introduced.
+export function productProductionIssue(data:any,expectedMode?:'routine'|'project'){
+ if(data.createdAsDraft!=='true')return '';
+ if(data.status!=='فعال')return 'ابتدا محصول را در «تعریف محصولات» فعال کنید.';
+ const mode=productProductionMode(data);
+ if(!mode)return 'ابتدا روش تولید را در شناسنامه محصول مشخص کنید.';
+ if(expectedMode&&mode!==expectedMode)return 'روش تولید این محصول با مسیر انتخاب‌شده سازگار نیست.';
+ return '';
+}
+
+export function productSerialIssue(data:any,expectedMode?:'routine'|'project'){
+ const issue=productProductionIssue(data,expectedMode);
+ if(issue||data.createdAsDraft!=='true')return issue;
+ if(typeof data.model!=='string'||!data.model.trim())return 'پیش از صدور سریال، مدل را در شناسنامه محصول مشخص کنید.';
+ if(productProductionMode(data)==='routine'&&!String(data.warrantyMonths??'').trim())
+  return 'پیش از صدور سریال، مدت گارانتی را در شناسنامه محصول مشخص کنید. صفر یعنی بدون گارانتی.';
+ return '';
+}
 export const names:Record<Kind,string>={product:"محصول",batch:"بچ قطعات",device:"دستگاه",event:"رویداد تولید و تحویل",service:"گزارش خدمات",action:"اقدام اصلاحی",distribution:"نماینده و مشتری",firmware:"نسخه‌های نرم‌افزار"};
 export const fields:Record<Kind,Field[]>={
-product:[{key:"code",label:"کد یکتای محصول",required:true},{key:"name",label:"نام محصول",required:true},{key:"group",label:"خانواده محصول",required:true,options:defaultProductFamilies},{key:"model",label:"مدل محصول",required:true},{key:"productionMode",label:"روش تولید محصول",options:Object.keys(productProductionModes),optionLabels:productProductionModes},{key:"packageCapacity",label:"ظرفیت هر بسته (تعداد دستگاه؛ پیش‌فرض ۱)",type:"number"},{key:"warrantyMonths",label:"مدت گارانتی (ماه؛ صفر یعنی بدون گارانتی)",type:"number",required:true},{key:"status",label:"وضعیت محصول",options:["فعال","توقف تولید"],required:true},{key:"notes",label:"توضیحات",type:"textarea"}],
+product:[{key:"code",label:"کد داخلی هم‌نفس"},{key:"name",label:"نام محصول",required:true},{key:"accountingCode",label:"کد کالا در نرم‌افزار حسابداری"},{key:"group",label:"خانواده محصول",options:defaultProductFamilies},{key:"model",label:"مدل محصول"},{key:"productionMode",label:"روش تولید محصول",options:Object.keys(productProductionModes),optionLabels:productProductionModes},{key:"packageCapacity",label:"ظرفیت هر بسته (تعداد دستگاه؛ پیش‌فرض ۱)",type:"number"},{key:"warrantyMonths",label:"مدت گارانتی (ماه؛ صفر یعنی بدون گارانتی)",type:"number"},{key:"status",label:"وضعیت محصول",options:[productDraftStatus,"فعال","توقف تولید"]},{key:"notes",label:"توضیحات",type:"textarea"}],
 distribution:distributionFields,
 firmware:[{key:"name",label:"نام نرم‌افزار",required:true},{key:"version",label:"شماره نسخه",required:true},{key:"deviceModel",label:"مدل دستگاه"},{key:"board",label:"نسخه / مدل برد"},{key:"notes",label:"توضیحات و تغییرات این نسخه",type:"textarea"}],
 batch:[{key:"partCode",label:"کد ثابت قطعه / کد انبار (برای پیشنهاد بچ)"},{key:"part",label:"نام و مدل قطعه / ماده",required:true},{key:"date",label:"تاریخ ورود",type:"date",required:true},{key:"code",label:"کد یکتای بچ",required:true},{key:"manufacturerLot",label:"شماره لات سازنده (عین برچسب؛ در صورت وجود)"},{key:"supplier",label:"تأمین‌کننده",required:true},{key:"maker",label:"سازنده"},{key:"purchase",label:"شماره خرید در همکاران سیستم"},{key:"quantity",label:"مقدار ورودی",type:"number",required:true},{key:"unit",label:"واحد",options:materialUnits,required:true},{key:"status",label:"کنترل ورودی",options:["در انتظار بررسی","تأیید","قرنطینه","رد"],required:true},{key:"test",label:"نتیجه آزمون ورودی",type:"textarea"},{key:"notes",label:"توضیحات و تفاوت با بچ قبلی",type:"textarea"}],
@@ -28,7 +48,9 @@ export function validate(kind:Kind,d:Record<string,string>){
  // handler validates that augmented catalog rather than rewriting old groups.
  if(!fields[kind])throw new Error("نوع رکورد معتبر نیست.");
  for(const f of recordFields(kind,d)){const v=d[f.key];if(f.required&&!v?.trim())throw new Error(f.label+" الزامی است.");if(v&&v.length>4000)throw new Error("متن بیش از حد طولانی است.");if(v&&f.options&&!(kind==="product"&&f.key==="group")&&!f.options.includes(v))throw new Error(f.label+" معتبر نیست.");if(v&&f.type==="number"&&(!Number.isFinite(Number(v))||Number(v)<0))throw new Error(f.label+" باید عدد نامنفی باشد.");if(v&&f.type==="date"&&(!/^\d{4}-\d{2}-\d{2}$/.test(v)||Number.isNaN(Date.parse(v))))throw new Error("تاریخ معتبر نیست.");}
- if(kind==="product"&&(!/^[A-Z0-9][A-Z0-9._-]{0,79}$/.test(d.code)||productProductionMode(d)!=='project'&&!Number.isSafeInteger(Number(d.warrantyMonths))))throw new Error("کد محصول باید حداکثر ۸۰ نویسه و شامل حروف انگلیسی، عدد، نقطه، خط تیره یا زیرخط باشد؛ مدت گارانتی باید تعداد ماه صحیح باشد.");
+ if(kind==="product"&&d.code&&!/^[A-Z0-9][A-Z0-9._-]{0,79}$/.test(d.code))throw new Error("کد محصول باید حداکثر ۸۰ نویسه و شامل حروف انگلیسی، عدد، نقطه، خط تیره یا زیرخط باشد.");
+ if(kind==="product"&&d.accountingCode&&(d.accountingCode.length>120||/[\u0000-\u001F\u007F]/.test(d.accountingCode.trim())))throw new Error("کد کالا در نرم‌افزار حسابداری باید متن تک‌خطی و حداکثر ۱۲۰ نویسه باشد.");
+ if(kind==="product"&&productProductionMode(d)!=='project'&&d.warrantyMonths?.trim()&&!Number.isSafeInteger(Number(d.warrantyMonths)))throw new Error("مدت گارانتی باید تعداد ماه صحیح باشد.");
  if(kind==="batch")validateBatchIdentity(d);
  if(kind==="batch"&&Number(d.quantity)<=0)throw new Error("مقدار ورودی باید مثبت باشد.");
  if(kind==="event"&&d.stage==="مصرف قطعه"&&(!d.batch||!d.quantity||Number(d.quantity)<=0))throw new Error("بچ و مقدار مثبت مصرف را وارد کنید.");
@@ -40,7 +62,7 @@ export function validate(kind:Kind,d:Record<string,string>){
 }
 export function label(r:Row){if(r.kind==="product")return r.data.code+" — "+r.data.name+" · "+r.data.model;if(r.kind==="firmware")return r.data.name+" — "+r.data.version;return r.data.code||r.data.title||r.data.complaint||r.data.stage||r.id;}
 
-export const editable:Partial<Record<Kind,string[]>>={product:["packageCapacity","name","group","model","productionMode","warrantyMonths","status","notes"],batch:["status","test","notes"],service:["status","diagnosis","cause","notes","cost","operator"],action:["title","cause","plan","owner","due","status","effectiveness"]};
+export const editable:Partial<Record<Kind,string[]>>={product:["packageCapacity","name","accountingCode","group","model","productionMode","warrantyMonths","status","notes"],batch:["status","test","notes"],service:["status","diagnosis","cause","notes","cost","operator"],action:["title","cause","plan","owner","due","status","effectiveness"]};
 
 // Admin may correct batch business details with audit history; identifiers remain stable.
 export const adminBatchEditable=[...editable.batch!,"part","supplier","maker","purchase","manufacturerLot","quantity","unit"];

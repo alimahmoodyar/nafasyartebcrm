@@ -1,13 +1,15 @@
 'use client';
 import {cartableUrl,directInboxUrl} from '@/lib/cartable-url';
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {Paperclip,Search,ArrowRight,FileText,MessageCircle} from 'lucide-react';
+import {Paperclip,Search,ArrowRight,FileText,MessageCircle,Reply,X} from 'lucide-react';
 import {VoiceMessageRecorder} from './voice-message-recorder';
 import {formatDate} from '@/lib/persian-date';
+import {inboxQuotableMessage,inboxQuotableThread,inboxReplyExcerpt,type InboxReplyQuote} from '@/lib/inbox-contract';
+import './direct-message-reply.css';
 
 type Contact={id:string;name:string;active:boolean;positions?:string[];avatarUrl?:string|null};
 type Thread={id:string;title:string;kind:string;recipientType:string;sender:string;senderName:string;recipientId:string;recipientName:string;isSender:boolean;state:string;updated:string;revision:number;unread:boolean;lastMessage?:string;link?:unknown};
-type Message={id:string;author:string;created:string;body:string;mode:string;sentRevision?:number};
+type Message={id:string;author:string;authorName?:string;created:string;body:string;mode:string;sentRevision?:number;replyTo?:InboxReplyQuote};
 type Conversation={me:string;thread:Thread;messages:Message[];nextOffset:number|null;peerReadRevision:number;files:{id:string;filename:string;purpose?:string;audioMime?:string;byteSize?:number;durationMs?:number}[]};
 type Mailbox={me:string;threads:Thread[];limited:boolean};
 const clock=new Intl.DateTimeFormat('fa-IR',{timeZone:'Asia/Tehran',hour:'2-digit',minute:'2-digit'});
@@ -15,6 +17,12 @@ const direct=(t:Thread)=>t.kind==='message'&&t.recipientType==='person';
 const peer=(t:Thread)=>t.isSender?t.recipientId:t.sender;
 const open=(t:Thread)=>!['closed','cancelled','completed'].includes(t.state);
 const searchKey=(value:string)=>value.normalize('NFKC').replace(/[يى]/g,'ی').replace(/ك/g,'ک').replace(/[\u064B-\u065F\u0670\u0640\u200c\u200d]/g,'').toLocaleLowerCase('fa').trim();
+function ReplyExcerpt({quote}:{quote:InboxReplyQuote}){
+ return <blockquote className="direct-reply-quote" aria-label="پیام اصلی">
+  <strong dir="auto">{quote.authorName||'پیام اصلی'}</strong>
+  <span dir="auto">{quote.excerpt}</span>
+ </blockquote>;
+}
 function ContactIdentity({contact}:{contact:Contact}){
  const [failed,setFailed]=useState(false);
  useEffect(()=>setFailed(false),[contact.avatarUrl]);
@@ -30,7 +38,7 @@ export function DirectMessages({workspace=''}:{workspace?:string}={}){
   const abort=new AbortController();
   setHistory(false);setAvailable(false);
   fetch(cartableUrl(directInboxUrl('/api/inbox?view=availability','history'),workspace),{cache:'no-store',signal:abort.signal})
-   .then(response=>response.ok?response.json():null)
+   .then(response=>response.ok?response.json() as Promise<{available?:boolean}>:null)
    .then(result=>{if(!abort.signal.aborted)setAvailable(result?.available===true);}).catch(()=>{});
   return()=>abort.abort();
  },[workspace]);
@@ -53,8 +61,9 @@ const post=(body:object)=>request<{threadId:string}>('/api/inbox',{method:'POST'
 
  const [box,setBox]=useState<Mailbox|null>(null),[directory,setDirectory]=useState<Contact[]>([]),[contactId,setContactId]=useState(''),[query,setQuery]=useState(''),[body,setBody]=useState(''),[details,setDetails]=useState<Conversation[]>([]),[limit,setLimit]=useState(8),[busy,setBusy]=useState(false),[loading,setLoading]=useState(false),[error,setError]=useState('');
  const [voiceActive,setVoiceActive]=useState(false),[messageQuery,setMessageQuery]=useState(''),[showSearch,setShowSearch]=useState(false);
+ const [replyTo,setReplyTo]=useState<InboxReplyQuote|null>(null);
  const voiceChange=useCallback((active:boolean)=>setVoiceActive(active),[]);
- const uploadOperation=useRef<{file:File;recipient:string;mailbox:string;id:string;query:Record<string,string>}|null>(null);
+ const uploadOperation=useRef<{file:File;recipient:string;mailbox:string;replyToMessageId?:string;id:string;query:Record<string,string>}|null>(null);
  const composer=useRef<HTMLTextAreaElement>(null),list=useRef<HTMLDivElement>(null),contactRef=useRef(''),operation=useRef(false),refreshVersion=useRef(0);
  const conversations=(box?.threads||[]).filter(direct);
  const contacts=new Map(directory.map(contact=>[contact.id,contact]));
@@ -122,7 +131,7 @@ const post=(body:object)=>request<{threadId:string}>('/api/inbox',{method:'POST'
  function select(id:string){
   if(contactRef.current===id)return;
   contactRef.current=id;
-  setMessageQuery('');setShowSearch(false);setVoiceActive(false);setContactId(id);setBody('');setDetails([]);setLimit(8);setError('');
+  setMessageQuery('');setShowSearch(false);setVoiceActive(false);setContactId(id);setBody('');setReplyTo(null);setDetails([]);setLimit(8);setError('');
  }
  const timeline=details.flatMap(d=>d.messages.map(m=>({m,d}))).sort((a,b)=>a.m.created.localeCompare(b.m.created)||a.m.id.localeCompare(b.m.id));
  const shownTimeline=messageQuery.trim()?timeline.filter(({m,d})=>searchKey(m.body+' '+(d.files.find(f=>m.id==='inbox-upload:'+f.id)?.filename||'')).includes(searchKey(messageQuery))):timeline;
@@ -130,10 +139,20 @@ const post=(body:object)=>request<{threadId:string}>('/api/inbox',{method:'POST'
  useEffect(()=>{const input=composer.current;if(input){input.style.height='auto';input.style.height=Math.min(140,input.scrollHeight)+'px';}},[body,contactId]);
  useEffect(()=>{if(list.current)list.current.scrollTop=list.current.scrollHeight},[contactId,lastMessage]);
  const target=threads.find(t=>open(t)&&!t.link);
+ function chooseReply(message:Message,thread:Thread){
+  const authorName=message.authorName||(message.author===thread.sender?thread.senderName:thread.recipientName);
+  setReplyTo({messageId:message.id,authorName,excerpt:inboxReplyExcerpt(message.body)});
+  composer.current?.focus();
+ }
  async function act(run:()=>Promise<void>){
   if(operation.current)return;
   operation.current=true;setBusy(true);setError('');
-  try{await run();await refresh();window.dispatchEvent(new Event('nafasyar-tasks-changed'));return true;}
+  try{
+   await run();
+   await refresh().catch(e=>setError(e.message));
+   window.dispatchEvent(new Event('nafasyar-tasks-changed'));
+   return true;
+  }
   catch(e){setError((e as Error).message);void refresh().catch(()=>{});return false;}
   finally{operation.current=false;setBusy(false)}
  }
@@ -141,19 +160,23 @@ const post=(body:object)=>request<{threadId:string}>('/api/inbox',{method:'POST'
   const text=body.trim();
   if(!contact?.active||!box||!text)return;
   await act(async()=>{
-   const id=crypto.randomUUID(),expectedMailbox=box.me;
-   if(target)await post({id,mode:'reply',threadId:target.id,revision:target.revision,body:text,expectedMailbox});
-   else await post({id,mode:'create',recipientId:contact.id,recipientType:'person',kind:'message',priority:'normal',title:contact.name,body:text,expectedMailbox});
-   if(contactRef.current===contact.id)setBody('');
+   const id=crypto.randomUUID(),expectedMailbox=box.me,replyToMessageId=replyTo?.messageId;
+   if(target)await post({id,mode:'reply',threadId:target.id,revision:target.revision,body:text,expectedMailbox,replyToMessageId});
+   else await post({id,mode:'create',recipientId:contact.id,recipientType:'person',kind:'message',priority:'normal',title:contact.name,body:text,expectedMailbox,replyToMessageId});
+   if(contactRef.current===contact.id){setBody('');setReplyTo(null);}
   });
  }
  async function attach(file:File,durationMs?:number){
   if(!contact?.active||!box)throw Error('مخاطب فعال انتخاب کنید.');
-  const recipient=contact.id,mailbox=box.me;
-  if(uploadOperation.current?.file!==file||uploadOperation.current.recipient!==recipient||uploadOperation.current.mailbox!==mailbox)uploadOperation.current={file,recipient,mailbox,id:crypto.randomUUID(),query:target?{thread:target.id}:{recipientId:recipient}};
+  const recipient=contact.id,mailbox=box.me,replyToMessageId=replyTo?.messageId;
+  if(uploadOperation.current?.file!==file||uploadOperation.current.recipient!==recipient||uploadOperation.current.mailbox!==mailbox||uploadOperation.current.replyToMessageId!==replyToMessageId)
+   uploadOperation.current={file,recipient,mailbox,replyToMessageId,id:crypto.randomUUID(),query:target?{thread:target.id}:{recipientId:recipient}};
   const operation=uploadOperation.current,voice=durationMs!==undefined,form=new FormData();form.set('file',file);if(voice)form.set('durationMs',String(durationMs));
-  const q=new URLSearchParams({...operation.query,requestId:operation.id,...(voice?{purpose:'voice',confirmed:'true'}:{})});
-  const saved=await act(async()=>{await request('/api/inbox/files?'+q,{method:'POST',headers:{'x-inbox-mailbox':mailbox},body:form})});
+  const q=new URLSearchParams({...operation.query,requestId:operation.id,...(replyToMessageId?{replyToMessageId}:{}),...(voice?{purpose:'voice',confirmed:'true'}:{})});
+  const saved=await act(async()=>{
+   await request('/api/inbox/files?'+q,{method:'POST',headers:{'x-inbox-mailbox':mailbox},body:form});
+   if(contactRef.current===recipient)setReplyTo(null);
+  });
   if(!saved)throw Error('ارسال انجام نشد؛ فایل محفوظ است و می‌توانید دوباره ارسال کنید.');
   if(uploadOperation.current===operation)uploadOperation.current=null;
  }
@@ -192,11 +215,26 @@ const post=(body:object)=>request<{threadId:string}>('/api/inbox',{method:'POST'
       {shownTimeline.map(({m,d},i)=>{
        const own=m.author===d.me,day=formatDate(m.created),read=own?(m.sentRevision!==undefined?d.peerReadRevision>=m.sentRevision:d.peerReadRevision>=d.thread.revision?true:null):null;
        const file=m.mode==='attachment'?d.files.find(f=>m.id==='inbox-upload:'+f.id):null;
-       return <div data-pair-row={JSON.stringify(m.id)} key={m.id} className={'direct-chat-row'+(own?' own':'')}>{(!i||formatDate(shownTimeline[i-1].m.created)!==day)&&<time className="direct-chat-day">{day}</time>}<article className={'inbox-message'+(own?' own':'')}>{file?<div className="direct-chat-file">{file.purpose==='voice'?<><audio controls preload="none" src={route('/api/inbox/files?thread='+encodeURIComponent(d.thread.id)+'&id='+encodeURIComponent(file.id)+'&view=play')} aria-label="پیام صوتی"/><a href={route('/api/inbox/files?thread='+encodeURIComponent(d.thread.id)+'&id='+encodeURIComponent(file.id))}>دریافت پیام صوتی</a></>:<a href={route('/api/inbox/files?thread='+encodeURIComponent(d.thread.id)+'&id='+encodeURIComponent(file.id))}><FileText size={28}/><span>{file.filename}{file.byteSize&&<small>{Math.ceil(file.byteSize/1024).toLocaleString('fa-IR')} کیلوبایت</small>}</span></a>}</div>:<p>{m.body}</p>}<small><time dateTime={m.created}>{clock.format(new Date(m.created))}</time>{read!==null&&(read?' · خوانده شده ✓✓':' · خوانده نشده ✓')}</small></article></div>;
+       const canReply=!history&&contact.active&&inboxQuotableThread(d.thread)&&inboxQuotableMessage(m.mode);
+       return <div data-pair-row={JSON.stringify(m.id)} key={m.id} className={'direct-chat-row'+(own?' own':'')}>
+        {(!i||formatDate(shownTimeline[i-1].m.created)!==day)&&<time className="direct-chat-day">{day}</time>}
+        <article className={'inbox-message'+(own?' own':'')}>
+         {m.replyTo&&<ReplyExcerpt quote={m.replyTo}/>}
+         {file?<div className="direct-chat-file">{file.purpose==='voice'?<><audio controls preload="none" src={route('/api/inbox/files?thread='+encodeURIComponent(d.thread.id)+'&id='+encodeURIComponent(file.id)+'&view=play')} aria-label="پیام صوتی"/><a href={route('/api/inbox/files?thread='+encodeURIComponent(d.thread.id)+'&id='+encodeURIComponent(file.id))}>دریافت پیام صوتی</a></>:<a href={route('/api/inbox/files?thread='+encodeURIComponent(d.thread.id)+'&id='+encodeURIComponent(file.id))}><FileText size={28}/><span>{file.filename}{file.byteSize&&<small>{Math.ceil(file.byteSize/1024).toLocaleString('fa-IR')} کیلوبایت</small>}</span></a>}</div>:<p>{m.body}</p>}
+         <div className="direct-reply-message-meta">
+          <small><time dateTime={m.created}>{clock.format(new Date(m.created))}</time>{read!==null&&(read?' · خوانده شده ✓✓':' · خوانده نشده ✓')}</small>
+          {canReply&&<button type="button" className="direct-reply-button" aria-label="پاسخ به این پیام" title="پاسخ به این پیام" disabled={busy||voiceActive} onClick={()=>chooseReply(m,d.thread)}><Reply size={16} aria-hidden="true"/></button>}
+         </div>
+        </article>
+       </div>;
       })}
      </div>
      {showSearch&&!shownTimeline.length&&<p className="direct-search-empty">در پیام‌های بارگذاری‌شده نتیجه‌ای پیدا نشد.</p>}
      {contact.active&&<div className={'direct-chat-composer'+(voiceActive?' voice-active':'')}>
+      {replyTo&&<div className="direct-reply-draft" role="group" aria-label="پیش‌نمایش پاسخ">
+       <ReplyExcerpt quote={replyTo}/>
+       <button type="button" className="direct-reply-button" aria-label="لغو پاسخ به پیام" title="لغو پاسخ به پیام" disabled={busy||voiceActive} onClick={()=>{setReplyTo(null);composer.current?.focus();}}><X size={18} aria-hidden="true"/></button>
+      </div>}
       <form className="inbox-compose direct-chat-compose" onSubmit={event=>{event.preventDefault();if(!voiceActive)void send()}}>
        <button type="submit" title="ارسال پیام" aria-label="ارسال پیام" className="btn direct-chat-send" disabled={busy||voiceActive||!body.trim()}><img src="/brand/nafasyar-icon.svg" alt=""/></button>
        <div className="direct-chat-input"><textarea ref={composer} aria-label="متن پیام" rows={1} placeholder="پیام بنویسید…" value={body} maxLength={12000} disabled={busy||voiceActive} onChange={event=>setBody(event.target.value)} onKeyDown={event=>{if(event.key!=='Enter'||event.shiftKey||event.nativeEvent.isComposing||event.keyCode===229)return;event.preventDefault();if(!busy&&!voiceActive&&body.trim())event.currentTarget.form?.requestSubmit();}}/>

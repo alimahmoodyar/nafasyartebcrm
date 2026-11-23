@@ -1,10 +1,15 @@
 import {productionEligible} from './production-people';
-import {productProductionMode} from './model';
+import {productProductionMode,productSerialIssue} from './model';
 import {planRoutine} from './routine-planning';
 
 // Same scheduler as intermediate production, bounded by the unallocated CEO order.
 export async function finishedPreview(input:any,source:any){
- const product=source.records.find((r:any)=>r.kind==='product'&&r.id===input.productId);if(!product||productProductionMode(JSON.parse(product.payload))==='project')throw Error('محصول نهایی سری‌ساخت را انتخاب کنید؛ تولید پروژه‌ای مسیر مستقل دارد.');
+ const product=source.records.find((r:any)=>r.kind==='product'&&r.id===input.productId);
+ if(!product)throw Error('محصول نهایی سری‌ساخت را انتخاب کنید.');
+ const productData=JSON.parse(product.payload);
+ const issue=productSerialIssue(productData,'routine');
+ if(issue)throw Error(issue);
+ if(productProductionMode(productData)==='project')throw Error('محصول نهایی سری‌ساخت را انتخاب کنید؛ تولید پروژه‌ای مسیر مستقل دارد.');
  const order=source.entities.find((e:any)=>e.type==='sourcing_plan'&&e.id===input.sourcingPlanId);
  if(!order||order.data.state!=='released'||!order.data.approvedBy||order.data.productId!==input.productId)throw Error('برنامه مصوب تحویل‌شده به تولید را انتخاب کنید.');
  const route=source.entities.find((e:any)=>e.type==='routine_route'&&e.id===input.routeId&&e.data.productId===input.productId);

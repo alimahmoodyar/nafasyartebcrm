@@ -208,6 +208,43 @@ let chain=Promise.resolve();const batch=db.batch.bind(db);db.batch=s=>{const p=c
  assert.equal(entity(scopedArgs.id),null);
  assert.equal((await run(store,confirmProfile)).status,200);
  assert.equal(entity(scopedArgs.id).data.sender,storeBox.me);
+
+ const original='متن خصوصی برای پاسخ\n'+('🌱'.repeat(150));
+ const directData={mode:'create',title:'Specific reply',kind:'message',priority:'normal',recipientType:'person'};
+ const originalId=crypto.randomUUID(),originalMessageId='inbox-msg:'+originalId;
+ assert.equal((await post(a,{...directData,id:originalId,recipientId:'bob',body:original})).status,200);
+ const directReplyId=crypto.randomUUID();
+ const directReply={...directData,id:directReplyId,recipientId:'alice',mode:'reply',threadId:originalId,revision:1,body:'Quoted reply',replyToMessageId:originalMessageId,replyTo:{excerpt:'Forged'}};
+ assert.equal((await post(b,directReply)).status,200);
+ assert.equal((await post(b,directReply)).data.repeated,true);
+ const actualQuote=(await get(a,originalId)).data.messages.find(m=>m.body==='Quoted reply').replyTo;
+ assert.equal(actualQuote.messageId,originalMessageId);assert.equal(actualQuote.authorName,'alice');
+ assert.match(actualQuote.excerpt,/^متن خصوصی برای پاسخ 🌱/);
+ assert.equal(Array.from(actualQuote.excerpt).length,141);
+ assert.equal((await post(a,{...directData,recipientId:'charlie',body:'Other conversation',replyToMessageId:originalMessageId})).status,404);
+ assert.equal((await post(c,{...directData,recipientId:'alice',body:'Cannot read',replyToMessageId:originalMessageId})).status,404);
+ assert.equal((await post(admin,{...directData,recipientId:'alice',body:'Cannot read either',replyToMessageId:originalMessageId})).status,404);
+ assert.equal((await post(a,{...directData,recipientId:'bob',kind:'request',due:future,body:'Workflow',replyToMessageId:originalMessageId})).status,400);
+ assert.equal((await post(a,{mode:'read',threadId:originalId,revision:entity(originalId).revision,replyToMessageId:originalMessageId})).status,400);
+ assert.equal((await act(a,originalId,'close')).status,200);
+ const followupId=crypto.randomUUID();
+ assert.equal((await post(b,{...directData,id:followupId,recipientId:'alice',body:'Refer to closed thread',replyToMessageId:originalMessageId})).status,200);
+ let followup=(await get(a,followupId)).data;
+ assert.equal(followup.messages.length,1);
+ assert.deepEqual(followup.messages[0].replyTo,actualQuote);
+ const quotedFileId=crypto.randomUUID();
+ async function sendQuotedFile(replyToMessageId){
+  const form=new FormData();form.set('file',new Blob(['col,value\nA,12']),'quoted.csv');
+  const q=new URLSearchParams({thread:followupId,requestId:quotedFileId,replyToMessageId});
+  return run(a,()=>files.POST(new Request(base+'/api/inbox/files?'+q,{method:'POST',headers:{origin:base},body:form})));
+ }
+ assert.equal((await sendQuotedFile(originalMessageId)).status,201);
+ assert.equal((await sendQuotedFile(originalMessageId)).status,200);
+ assert.equal((await sendQuotedFile('inbox-msg:'+followupId)).status,409);
+ followup=(await get(b,followupId)).data;
+ assert.deepEqual(followup.messages.find(m=>m.id==='inbox-upload:'+quotedFileId).replyTo,actualQuote);
+ console.log('PASS specific direct replies: stored excerpt, closed conversation reference, attachment retry, and exact participant privacy.');
+
  sql.exec("UPDATE reset_control SET phase='maintenance'");
  const frozenId=crypto.randomUUID();
  try{

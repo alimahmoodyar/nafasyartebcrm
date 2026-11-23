@@ -1,3 +1,15 @@
+## 2026-11-24 — Direct-message reply excerpts
+
+Reply excerpts are derived from the original message on the server and only shared within the same authorized pair. Existing inbox message JSON stores the excerpt and identifier, and the current inbox reset and maintenance safeguards continue to apply.
+
+## 2026-11-24 — Product code allocation and accounting export
+
+The sequence and draft record are written in one transaction together with the idempotency audit. The existing reset freeze covers both tables, and both reset scopes preserve the sequence. The scoped accounting preview and Excel export keep source values as text. Existing product codes and serial prefixes are retained.
+
+## 2026-11-24 — Product draft setup
+
+Draft creation, activation, optional family, and serial readiness are covered at the HTTP boundary. Existing products and warranty snapshots retain their original workflow. Manufacturing checks use the selected product and guard the product snapshot at write time.
+
 ## 2026-11-23 — Profile photo and personnel document feedback
 
 Isolated checks cover the legacy photo flow, account isolation of original files, saved crop and source retention, confirmed removal, direct-message photo compatibility, and the employee's upload and review feedback. The personnel document approval process and permissions are unchanged.

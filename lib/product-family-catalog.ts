@@ -6,5 +6,6 @@ export async function productFamilyCatalog(){
  return productFamilyValues(rows.results.map((row:any)=>row.family));
 }
 export async function validateProductFamily(value:unknown){
+ if(value===undefined||typeof value==='string'&&!value.trim())return;
  if(typeof value!=='string'||!(await productFamilyCatalog()).includes(value))throw new AccessError('خانواده محصول را از فهرست انتخاب کنید؛ در صورت تغییر فهرست، صفحه را تازه کنید.',400);
 }
