@@ -1,3 +1,11 @@
+## 2026-11-24 — Single account control in the top bar
+
+The account profile and development-request controls have distinct React keys scoped to the same account. The regression check counts visible controls after loading the profile photo and switching between the administrator home and role previews.
+
+## 2026-11-24 — Real direct contacts in internal role previews
+
+The direct channel reuses the verified signed-in administrator account during internal role preview. Workflow preview and external representative preview remain scoped. Contact cards keep the same member ID, assigned role subtitles and account avatar.
+
 ## 2026-11-24 — Legacy activation history import
 
 Preview and import use the same normalized activation identity. New histories and approved agency links use flow_entities, covered by the existing maintenance freeze and backups. Raw workbook/profile columns do not enter the server. Warranty and account creation remain outside the import.

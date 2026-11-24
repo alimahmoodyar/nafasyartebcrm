@@ -11,7 +11,7 @@ type Contact={id:string;name:string;active:boolean;positions?:string[];avatarUrl
 type Thread={id:string;title:string;kind:string;recipientType:string;sender:string;senderName:string;recipientId:string;recipientName:string;isSender:boolean;state:string;updated:string;revision:number;unread:boolean;lastMessage?:string;link?:unknown};
 type Message={id:string;author:string;authorName?:string;created:string;body:string;mode:string;sentRevision?:number;replyTo?:InboxReplyQuote};
 type Conversation={me:string;thread:Thread;messages:Message[];nextOffset:number|null;peerReadRevision:number;files:{id:string;filename:string;purpose?:string;audioMime?:string;byteSize?:number;durationMs?:number}[]};
-type Mailbox={me:string;threads:Thread[];limited:boolean};
+type Mailbox={me:string;threads:Thread[];limited:boolean;directAccountName?:string};
 const clock=new Intl.DateTimeFormat('fa-IR',{timeZone:'Asia/Tehran',hour:'2-digit',minute:'2-digit'});
 const direct=(t:Thread)=>t.kind==='message'&&t.recipientType==='person';
 const peer=(t:Thread)=>t.isSender?t.recipientId:t.sender;
@@ -195,6 +195,7 @@ const post=(body:object)=>request<{threadId:string}>('/api/inbox',{method:'POST'
  }
  return <div dir="rtl" className={'direct-messenger'+(contact?' has-thread':'')}>
   <div className="direct-chat-brand"><img src="/brand/nafasyar-icon.svg" alt=""/><strong>نفس‌یار</strong><span>{history?'سوابق صندوق نقش':'پیام‌های مستقیم'}</span></div>
+  {box?.directAccountName&&<p className="notice">پیام‌های مستقیم با حساب «{box.directAccountName}» خوانده و ارسال می‌شوند.</p>}
   {error&&<p className="notice error" role="alert">{error} <button type="button" className="btn" onClick={()=>void refresh().catch(e=>setError(e.message))}>تلاش دوباره</button></p>}
   <div className={'inbox-layout direct-chat'+(contact?' has-thread':'')}>
    <aside className="inbox-list"><h3>گفت‌وگوها</h3><label className="field">جست‌وجوی نام یا نقش<input placeholder="جست‌وجوی همکار…" type="search" value={query} onChange={event=>setQuery(event.target.value)}/></label>

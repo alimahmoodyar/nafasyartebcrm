@@ -2,9 +2,9 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
 const {DatabaseSync}=require('node:sqlite');const root=path.resolve(__dirname,'..');const sql=new DatabaseSync(':memory:');sql.exec('PRAGMA foreign_keys=ON');for(const f of fs.readdirSync(path.join(root,'drizzle')).filter(f=>f.endsWith('.sql')).sort())sql.exec(fs.readFileSync(path.join(root,'drizzle',f),'utf8'));
 const db={prepare(q){let args=[];return{bind(...a){args=a;return this},async first(){return sql.prepare(q).get(...args)||null},async all(){return {results:sql.prepare(q).all(...args)}},async run(){return {meta:{changes:sql.prepare(q).run(...args).changes}}}}},async batch(stmts){sql.exec('BEGIN');try{const r=[];for(const s of stmts)r.push(await s.run());sql.exec('COMMIT');return r;}catch(e){sql.exec('ROLLBACK');throw e;}}};
 const objects=new Map();const bucket={async put(k,b){objects.set(k,b.slice(0));return {key:k}},async get(k){const b=objects.get(k);return b?{arrayBuffer:async()=>b.slice(0)}:null},async delete(k){objects.delete(k)}};
-let identity=null;const env={TRACE_OWNER_EMAIL:'owner@example.com',LLM_CONFIG_ENCRYPTION_KEY:require('node:crypto').randomBytes(32).toString('base64'),DB:db,BUCKET:bucket};
+let identity=null,profileCookie='';const env={TRACE_OWNER_EMAIL:'owner@example.com',LLM_CONFIG_ENCRYPTION_KEY:require('node:crypto').randomBytes(32).toString('base64'),DB:db,BUCKET:bucket};
 const cache={};function load(file){file=path.resolve(root,file);if(cache[file])return cache[file];const exports={};cache[file]=exports;const source=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
-vm.runInNewContext(source,{exports,require:n=>{if(n==='cloudflare:workers')return {env};if(n==='@/app/chatgpt-auth')return {getChatGPTUser:async()=>identity};if(n.startsWith('@/')||n.startsWith('.')){const p=n.startsWith('@/')?path.join(root,n.slice(2)):path.resolve(path.dirname(file),n);return load(p+(path.extname(p)?'':'.ts'));}return require(n)},Response,Request,URL,URLSearchParams,Error,crypto:globalThis.crypto,Date,Intl,Set,Map,FormData,Blob,File,TextEncoder,TextDecoder,Uint8Array,ArrayBuffer,AbortController,ReadableStream,btoa,atob,setTimeout:(f,n)=>setTimeout(f,Math.min(n,10)),clearTimeout,console},{filename:file});return exports;}
+vm.runInNewContext(source,{exports,require:n=>{if(n==='next/headers')return {cookies:async()=>({get:name=>name==='__Host-nafasyar-profile-review'&&profileCookie?{value:profileCookie}:undefined})};if(n==='cloudflare:workers')return {env};if(n==='@/app/chatgpt-auth')return {getChatGPTUser:async()=>identity};if(n.startsWith('@/')||n.startsWith('.')){const p=n.startsWith('@/')?path.join(root,n.slice(2)):path.resolve(path.dirname(file),n);return load(p+(path.extname(p)?'':'.ts'));}return require(n)},Response,Request,URL,URLSearchParams,Error,crypto:globalThis.crypto,Date,Intl,Set,Map,FormData,Blob,File,TextEncoder,TextDecoder,Uint8Array,ArrayBuffer,AbortController,ReadableStream,btoa,atob,setTimeout:(f,n)=>setTimeout(f,Math.min(n,10)),clearTimeout,console},{filename:file});return exports;}
 const auth=load('lib/authorization.ts'),http=load('app/mcp/route.ts'),sse=load('lib/mcp/sse.ts'),tokens=load('app/api/mcp-tokens/route.ts'),configs=load('app/api/llm-config/route.ts'),secrets=load('lib/llm-secrets.ts'),catalog=load('lib/mcp/tools.ts');
 const base='https://test.local';const owner={userId:'owner',email:'owner@example.com',displayName:'Owner',fullName:null};
 const request=(path,method='GET',body,headers={})=>new Request(base+path,{method,headers:{origin:base,...(body?{'Content-Type':'application/json'}:{}),...headers},...(body?{body:JSON.stringify(body)}:{})});
@@ -115,8 +115,8 @@ let chain=Promise.resolve();const batch=db.batch.bind(db);db.batch=s=>{const p=c
  assert.equal((await run(agent,()=>api.GET(request(bobContact.avatarUrl)))).status,404);
 
  // A personal inbox remains the same from every assigned role, while old role-addressed history is still scoped.
- seed('member-role-assignment:bob','member_role_assignment',{bindings:[{profileId:'custodian'},{profileId:'technical'}]});
- const bobWithRoles={...b,permissions:load('lib/permissions.ts').resolveRoleAssignment({roles:['custodian','engineering','product_manager']})};
+ seed('member-role-assignment:bob','member_role_assignment',{bindings:[{profileId:'custodian'},{profileId:'technical'},{profileId:'personnel-hr'}]});
+ const bobWithRoles={...b,permissions:load('lib/permissions.ts').resolveRoleAssignment({roles:['custodian','engineering','product_manager','personnel_hr']})};
  const directDirectory=(await get(a,'','&view=directory&channel=direct')).data;
  const matches=directDirectory.people.filter(person=>person.id==='bob');
  assert.equal(matches.length,1);
@@ -158,6 +158,32 @@ let chain=Promise.resolve();const batch=db.batch.bind(db);db.batch=s=>{const p=c
  assert.ok(!(await get(bobWithRoles,'','&channel=direct&workspace=custodian')).data.threads.some(t=>t.id===legacy.data.threadId));
  assert.equal((await get(bobWithRoles,legacy.data.threadId,'&channel=history&workspace=custodian')).status,200);
  assert.equal((await get(bobWithRoles,legacy.data.threadId,'&channel=history&workspace=technical')).status,404);
+ identity=owner;
+ profileCookie='custodian';
+ try{
+  const previewDirectory=await (await api.GET(request('/api/inbox?view=directory&channel=direct'))).json();
+  assert.equal(previewDirectory.me,'@owner');
+  assert.equal(previewDirectory.people.filter(p=>p.id==='bob').length,1);
+  assert.ok(previewDirectory.people.find(p=>p.id==='bob').positions.includes('اموال‌دار'));
+  assert.ok(previewDirectory.people.find(p=>p.id==='bob').positions.includes('مسئول اداری'));
+  assert.ok(previewDirectory.people.every(p=>!p.id.startsWith('@profile:')));
+  const mailbox=await (await api.GET(request('/api/inbox?channel=direct'))).json();
+  assert.equal(mailbox.directAccountName,'Owner');
+  assert.equal((await api.GET(request('/api/inbox?channel=direct&thread='+sharedId))).status,404,'Admin preview does not read another account’s direct conversation');
+  const sent=await api.POST(request('/api/inbox?channel=direct','POST',{...sharedMessage,id:crypto.randomUUID(),expectedMailbox:'@owner'}));
+  assert.equal(sent.status,200);
+  const sentId=(await sent.json()).threadId;
+  assert.equal(entity(sentId).data.recipientId,'bob');
+  assert.equal(entity(sentId).data.sender,'@owner');
+  assert.equal((await get(bobWithRoles,sentId,'&channel=direct&workspace=custodian')).status,200);
+  const workflow=await (await api.GET(request('/api/inbox?view=directory'))).json();
+  assert.equal(workflow.me,'@profile:custodian');
+  assert.ok(workflow.people.every(p=>p.id.startsWith('@profile:')));
+  profileCookie='sales-representative';
+  const external=await (await api.GET(request('/api/inbox?view=directory&channel=direct'))).json();
+  assert.equal(external.me,'@profile:sales-representative');
+  assert.ok(external.people.every(p=>p.id.startsWith('@profile:')));
+ }finally{profileCookie='';identity=null;}
  console.log('PASS shared direct messages, role search metadata, profile photos, cross-role read/reply/attachments, and scoped history.');
 
  assert.equal((await get(admin,'','&view=directory')).data.people.some(p=>p.id===qualityBox.me),false);

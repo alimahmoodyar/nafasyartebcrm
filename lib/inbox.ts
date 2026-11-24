@@ -1,7 +1,7 @@
 import {isUnscopedRepresentative,storedAccessPermissions} from './permissions';
 import {salesScope,salesStaff,salesFinance} from './sales';
 import {storage} from './storage';
-import {AccessError,can,session} from './authorization';
+import {AccessError,can,realSession,session} from './authorization';
 import {memberId,taskAccess} from './duties';
 import type {Session} from './permissions';
 import {roleProfiles} from './role-profiles';
@@ -11,7 +11,7 @@ export const inboxDecode=(r:any)=>r?({...r,data:JSON.parse(r.data)}):null;
 export async function inboxIdentity(u:Session){const id=await memberId(u);if(id)return id;if(u.isAdmin||u.profileReview)return '@owner';throw new AccessError('حساب فعال برای مکاتبه یافت نشد.',403);}
 // Operational notices still use the authenticated account. Interactive previews use a separate mailbox.
 const profileAddress=(id:string)=>'@profile:'+id;
-type InboxSession=Session & {inboxChannel?:'direct'|'history'};
+type InboxSession=Session & {inboxChannel?:'direct'|'history';directAccountFromPreview?:boolean};
 const representativeInboxProfiles=new Set(['sales','home-sales','sales-manager','sales-finance','logistics','home-service']);
 export async function requireInboxAccess(request?:Request):Promise<InboxSession>{
  const user=await session();
@@ -23,6 +23,11 @@ export async function requireInboxAccess(request?:Request):Promise<InboxSession>
   const {memberCartable}=await import('./member-cartable');
   await memberCartable(user,request);
   if(inboxChannel!=='direct')return {...user,mailboxRole:scope,inboxChannel};
+ }
+ if(inboxChannel==='direct'&&user.profileReview&&!['sales-representative','home-service-representative'].includes(user.profileReview.id)){
+  const authenticated=await realSession();
+  if(authenticated.isAdmin&&authenticated.userId===user.userId)
+   return {...authenticated,inboxChannel,directAccountFromPreview:true};
  }
  return {...user,inboxChannel};
 }
