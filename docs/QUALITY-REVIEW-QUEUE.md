@@ -1,3 +1,15 @@
+## 2026-11-24 — Legacy activation history import
+
+Preview and import use the same normalized activation identity. New histories and approved agency links use flow_entities, covered by the existing maintenance freeze and backups. Raw workbook/profile columns do not enter the server. Warranty and account creation remain outside the import.
+
+## 2026-11-24 — Customer support workspace
+
+The office scan checks assigned position, domain, receipt stage and current office case. Receiving keeps its existing confirmation and case creation transaction. Existing cases open their current allowed form or the case history as applicable.
+
+## 2026-11-24 — Home service agency workspace
+
+The shared scanner checks current agency-role assignment and service grants. Carton lookup delegates to custody/review, and a device serial resolves to the current agency case and available forms. Opening a form refreshes the record and the owning service API still validates every write.
+
 ## 2026-11-24 — Direct-message reply excerpts
 
 Reply excerpts are derived from the original message on the server and only shared within the same authorized pair. Existing inbox message JSON stores the excerpt and identifier, and the current inbox reset and maintenance safeguards continue to apply.

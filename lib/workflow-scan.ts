@@ -8,11 +8,15 @@ import {incomingQcForLabel} from './incoming-qc';
 import {warehouseTarget} from './warehouse-workspace';
 import {readReturnParcels} from './service-return-parcels';
 import {driverReceiptAccess,canReceiveDriverReceipt} from './driver-receipts';
+import {driverReceiptId,driverReceiptQr} from './driver-receipt-contract';
 import {readOfficeService,officeServiceAccess} from './service-office';
 import {transportDriver} from './transport';
 import {GET as packages} from '@/app/api/finished-packages/route';
 import {GET as driverWorkspace} from '@/app/api/transport/driver-workspace/route';
-import {parseWorkflowLabel,type ScanAction,type ScanResult} from './workflow-scan-contract';
+import {agencyScanWorkspace,customerScanWorkspace,agencyCaseForms,agencyCaseFormAvailable,customerCaseForm,parseWorkflowLabel,type ScanAction,type ScanResult} from './workflow-scan-contract';
+import {memberId} from './duties';
+import {domainWriteAccess} from './service-access';
+import {serviceActions} from './after-sales-labels';
 
 const external=(u:Session)=>!internalWarehouseUser(u);
 const nav=(id:string,title:string,section:string,target:string):ScanAction=>({id,title,kind:'navigate',section,target});
@@ -24,9 +28,103 @@ async function transferActions(u:Session,itemId:string,kind:string):Promise<Scan
  if(rows.length>20)throw new AccessError('انتقال‌های متعدد وجود دارد؛ از فهرست انتقال‌ها انتخاب کنید.',409);
  return rows.map(r=>({id:'transfer:'+r.id,title:ids.includes(JSON.parse(r.data).toWarehouseId)?'دریافت انتقال از انبار دیگر':'پیگیری انتقال به انبار دیگر',kind:'transfer',target:r.id}));
 }
+async function hasServiceWorkspace(u:Session,workspace:string){
+ if(u.profileReview)return u.profileReview.id===workspace;
+ const member=await memberId(u);
+ const assignment=member?await storage().prepare("SELECT data FROM flow_entities WHERE id=? AND type='member_role_assignment'").bind('member-role-assignment:'+member).first<{data:string}>():null;
+ return !!assignment&&JSON.parse(assignment.data).bindings.some((binding:{profileId:string})=>binding.profileId===workspace);
+}
+async function resolveAgencyScan(u:Session,label:ReturnType<typeof parseWorkflowLabel>):Promise<ScanResult>{
+ const db=storage();
+ if(!await hasServiceWorkspace(u,agencyScanWorkspace)||u.isAdmin||u.permissions.serviceAgentId||u.permissions.salesAgentId||u.permissions.hospitalCenterId||
+    !domainWriteAccess(u,'home')||!u.permissions.serviceRoles?.includes('coordinator'))
+  throw new AccessError('دسترسی نقش مسئول نمایندگی‌ها در این نشست فعال نیست.',403);
+
+ if(label.kind==='return'){
+  const d:any=await readReturnParcels(u,new URLSearchParams({code:label.code}));
+  if(!d.canReview)throw new AccessError('کارتن در دسترسی این نقش نیست.',404);
+  const carton=d.parcel.data.cartons[0];
+  const title=d.canReceive&&['sent','with_driver','office_partial'].includes(carton?.state)?'دریافت کارتن در شرکت':
+   d.claims.some((c:{state:string;reviewAllowed:boolean})=>c.state==='received'&&c.reviewAllowed)?'بررسی قطعات کارتن':'وضعیت و سابقهٔ کارتن';
+  return {kind:label.kind,message:'کارتن داغی شناسایی شد.',actions:[{id:'return',kind:'return',title,code:label.code,expert:true}]};
+ }
+ if(label.kind==='device'||label.kind==='unknown'&&!/[:/\n]/.test(label.code)){
+  const active="json_extract(data,'$.state') NOT IN ('closed','resolved','returned','declined')";
+  const rows=await db.prepare(`SELECT id,data FROM flow_entities WHERE type='as_case' AND json_extract(data,'$.domain')='home'
+   AND COALESCE(json_extract(data,'$.agentId'),'')<>'' AND json_extract(data,'$.serial')=? ORDER BY ${active} DESC,created DESC,id LIMIT 9`)
+   .bind(label.code).all<{id:string;data:string}>();
+  const cases=rows.results.map(row=>({...row,data:JSON.parse(row.data)}));
+  const openCases=cases.filter(c=>!['closed','resolved','returned','declined'].includes(c.data.state));
+  if(openCases.length>8)throw new AccessError('چند پروندهٔ باز وجود دارد. از فهرست پرونده‌ها انتخاب کنید.',409);
+  const chosen=cases[0];
+  const pendingClaim=chosen?.data.reportSubmittedAt&&!chosen.data.laborApproved?await db.prepare("SELECT id FROM flow_entities WHERE type='as_claim' AND json_extract(data,'$.caseId')=? AND COALESCE(json_extract(data,'$.state'),'')<>'credited' LIMIT 1").bind(chosen.id).first():null;
+  const actions=openCases.length>1?openCases.map(c=>nav(c.id,'پروندهٔ '+c.id,'after-sales','service-case:'+c.id)):
+   cases.length?agencyCaseForms.filter(mode=>agencyCaseFormAvailable(mode,cases[0].data,!pendingClaim)).map(mode=>
+    nav(mode,serviceActions[mode],'after-sales','service-case-action:'+mode+':'+cases[0].id)):[];
+  if(cases.length&&!actions.length)actions.push(nav(cases[0].id,'سابقهٔ پرونده دستگاه','after-sales','service-case:'+cases[0].id));
+  if(actions.length)return {kind:label.kind,message:actions.length>1?'کار مرتبط با این کد را انتخاب کنید.':'پروندهٔ نمایندگی شناسایی شد.',actions};
+ }
+ throw new AccessError('برای این کد در نقش مسئول نمایندگی‌ها کاری در دسترس نیست.',404);
+}
+async function resolveCustomerScan(u:Session,label:ReturnType<typeof parseWorkflowLabel>):Promise<ScanResult>{
+ const support=!!u.permissions.serviceRoles?.includes('support');
+ const intake=!!u.permissions.serviceRoles?.includes('intake')&&canReceiveDriverReceipt(u,'home');
+ if(!officeServiceAccess(u)||(!support&&!intake)||!await hasServiceWorkspace(u,customerScanWorkspace))
+  throw new AccessError('دسترسی نقش پاسخ‌گویی مشتری در این نشست فعال نیست.',403);
+ const db=storage();
+ const officeCases="type='as_case' AND json_extract(data,'$.domain')='home' AND COALESCE(json_extract(data,'$.agentId'),'')=''";
+ const open="json_extract(data,'$.state') NOT IN ('closed','resolved','returned')";
+ const inaccessible=()=>new AccessError('برای این کد در نقش پاسخ‌گویی مشتری کاری در دسترس نیست.',404);
+ const currentCase=(row:{id:string;data:string}):ScanAction=>{
+  const mode=customerCaseForm(JSON.parse(row.data),{support,intake});
+  return nav(row.id,mode?serviceActions[mode]:'مشاهدهٔ وضعیت پرونده','after-sales',
+   mode?'service-office:action:'+mode+':'+row.id:'service-office:case:'+row.id);
+ };
+ const result=(kind:string,actions:ScanAction[]):ScanResult=>({kind,actions,message:actions.length>1?'پروندهٔ مرتبط را انتخاب کنید.':'کار مرتبط شناسایی شد.'});
+ const shortReceipt=label.kind==='unknown'&&/^DR-[A-F0-9]{8}$/i.test(label.code);
+ let receiptId=label.kind==='receipt'?label.code:label.kind==='unknown'?driverReceiptId(label.raw):'';
+ if(shortReceipt){
+  if(!intake)throw inaccessible();
+  const matches=await db.prepare("SELECT id FROM flow_entities WHERE type='transport_receipt' AND json_extract(data,'$.domain')='home' AND json_extract(data,'$.code')=? LIMIT 2").bind(label.code.toUpperCase()).all<{id:string}>();
+  if(matches.results.length>1)throw new AccessError('کد کوتاه یکتا نیست. QR کامل رسید را اسکن کنید.',409);
+  if(!matches.results.length)throw inaccessible();
+  receiptId=matches.results[0].id;
+ }
+ if(receiptId){
+  if(!intake)throw inaccessible();
+  const receipt=await driverReceiptAccess(u,receiptId);
+  if(receipt.data.domain!=='home')throw inaccessible();
+  if(receipt.data.state==='linked'){
+   const row=await db.prepare('SELECT id,data FROM flow_entities WHERE '+officeCases+' AND id=?').bind(receipt.data.caseId||'').first<{id:string;data:string}>();
+   if(!row)throw inaccessible();
+   return result('receipt',[currentCase(row)]);
+  }
+  if(!['with_driver','received_office'].includes(receipt.data.state))throw inaccessible();
+  const received=receipt.data.state==='received_office';
+  return result('receipt',[{id:'receipt',kind:'receipt',title:received?'تکمیل پذیرش دستگاه':'تأیید تحویل دستگاه از راننده',
+   code:driverReceiptQr(receiptId),intake:true,startOfficeIntake:received,domain:'home'}]);
+ }
+ if(label.kind!=='device'&&(label.kind!=='unknown'||label.code.length>160||/[:/\n]/.test(label.code)))throw inaccessible();
+ const candidates=await db.prepare('SELECT id,data FROM flow_entities WHERE '+officeCases+" AND json_extract(data,'$.serial')=? ORDER BY ("+open+") DESC,created DESC,id LIMIT 9").bind(label.code).all<{id:string;data:string}>();
+ const caseHistory=candidates.results;
+ const active=caseHistory.filter(row=>!['closed','resolved','returned'].includes(JSON.parse(row.data).state));
+ if(active.length>8)throw new AccessError('چند پروندهٔ باز برای دستگاه وجود دارد. پرونده را از فهرست تعمیرات انتخاب کنید.',409);
+ if(active.length)return result(label.kind,active.length===1?[currentCase(active[0])]:active.map(row=>nav(row.id,'پروندهٔ '+row.id,'after-sales','service-office:case:'+row.id)));
+ const device=caseHistory.length?null:await db.prepare("SELECT id FROM records WHERE kind='device' AND json_extract(payload,'$.code')=? LIMIT 1").bind(label.code).first();
+ if(!caseHistory.length&&!device)throw inaccessible();
+ if(intake){
+  const otherActive=await db.prepare("SELECT id FROM flow_entities WHERE type='as_case' AND json_extract(data,'$.serial')=? AND "+open+" LIMIT 1").bind(label.code).first();
+  if(otherActive)throw new AccessError('برای این دستگاه پروندهٔ بازی وجود دارد. پیش از پذیرش دوباره، پیگیری کنید.',409);
+  return result(label.kind,[nav('intake','پذیرش نوبت جدید دستگاه','after-sales','service-office:intake:'+encodeURIComponent(label.code))]);
+ }
+ if(caseHistory.length)return result(label.kind,[currentCase(caseHistory[0])]);
+ throw inaccessible();
+}
 /** Read-only resolution. All subsequent writes still execute the owning domain's guards. */
-export async function resolveWorkflowScan(u:Session,raw:string,origin:string):Promise<ScanResult>{
+export async function resolveWorkflowScan(u:Session,raw:string,origin:string,workspace=''):Promise<ScanResult>{
  let label:ReturnType<typeof parseWorkflowLabel>;try{label=parseWorkflowLabel(raw,origin)}catch(e){throw new AccessError((e as Error).message,400)}
+ if(workspace===agencyScanWorkspace)return resolveAgencyScan(u,label);
+ if(workspace===customerScanWorkspace)return resolveCustomerScan(u,label);
  const db=storage(),actions:ScanAction[]=[];
  if(label.kind==='asset'){
   const {accessWorkflowAsset}=await import('./asset-workflow');const {r}=await accessWorkflowAsset(u,label.code);

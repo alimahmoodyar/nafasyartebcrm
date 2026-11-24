@@ -19,7 +19,7 @@ const entity=(id,type,data)=>sql.prepare('INSERT INTO flow_entities(id,type,data
 const record=(id,kind,payload)=>sql.prepare('INSERT INTO records(id,kind,payload,created) VALUES(?,?,?,?)').run(id,kind,JSON.stringify(payload),'2026-11-13');
 function actor(id,p){const u={userId:'local:'+id,name:id,isAdmin:false,permissions:{read:[],write:[],eventStages:[],...p}};sql.prepare("INSERT INTO app_members(id,email,name,unit,status,permissions,created,updated) VALUES(?,?,?,'test','active',?,?,?)").run(id,id+'@example.test',id,JSON.stringify(u.permissions),'2026-11-13','2026-11-13');return u;}
 const snapshot=()=>JSON.stringify(sql.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all().map(({name})=>[name,sql.prepare('SELECT * FROM "'+name+'" ORDER BY rowid').all()]));
-async function scan(code,status=200){const before=snapshot(),r=await ctx.run(user,()=>api.GET(new Request('https://test.local/api/workflow-scan?'+new URLSearchParams({code})))),d=await r.json();assert.equal(r.status,status,JSON.stringify(d));assert.equal(snapshot(),before,'Resolution never writes');assert.match(r.headers.get('cache-control'),/no-store/);return d;}
+async function scan(code,status=200,workspace=''){const before=snapshot(),r=await ctx.run(user,()=>api.GET(new Request('https://test.local/api/workflow-scan?'+new URLSearchParams({code,workspace})))),d=await r.json();assert.equal(r.status,status,JSON.stringify(d));assert.equal(snapshot(),before,'Resolution never writes');assert.match(r.headers.get('cache-control'),/no-store/);return d;}
 (async()=>{
  const wh=require('./helpers/receiving-warehouse.cjs')(sql),inv=actor('inv',{flowRoles:['inventory'],warehouses:['raw','quarantine','finished'],warehouseResponsibilities:[{warehouseId:wh.id,role:'inventory'}]}),other=actor('other',{flowRoles:['inventory'],warehouses:['raw','quarantine','finished'],warehouseResponsibilities:[]}),qc={userId:'local:'+wh.qcId,name:'QC',isAdmin:false,permissions:JSON.parse(sql.prepare('SELECT permissions FROM app_members WHERE id=?').get(wh.qcId).permissions)},driver=actor('driver',{transportRoles:['driver']}),outsider=actor('outsider',{serviceAgentId:'foreign',serviceRoles:['agent'],serviceDomains:['home']}),support=actor('support',{serviceRoles:['intake','support'],serviceDomains:['home']});
  const code='11100001-14050822-001';record('batch','batch',{code,part:'Valve'});entity('batch','receipt',{batchId:'batch',materialId:'mat',warehouseId:wh.id,quarantineWarehouseId:wh.quarantineId,state:'pending_qc',fields:[{key:'x',label:'check'}],quantity:1000});sql.prepare("INSERT INTO inventory_balances(id,item_id,warehouse,quantity) VALUES('b','batch','quarantine',1000)").run();
@@ -33,6 +33,42 @@ async function scan(code,status=200){const before=snapshot(),r=await ctx.run(use
 
  const pkg=crypto.randomUUID();entity('sale','sale',{carrierId:'driver',carrierSubject:'local:driver',state:'in_transit',shippingPackages:[{id:pkg,number:1,model:'Model',deviceIds:['dev'],serials:['NF-02']}],acknowledgedDeviceIds:[],deviceIds:['dev'],packageRecipient:{name:'Receiver'}});const ship=load('lib/shipping-packages.ts').shippingQr('sale',pkg);user=driver;assert.equal((await scan(ship)).actions[0].driver,true);assert.equal((await scan('NF-02')).actions[0].kind,'shipping');user=other;await scan(ship,404);
  const parcel=crypto.randomUUID(),carton=crypto.randomUUID();entity(parcel,'as_return_parcel',{domain:'home',state:'sent',agentId:'a',cartons:[{id:carton,number:1,state:'sent',items:[]}],sender:{name:'Sender'},recipient:{name:'Company'}});const ret=load('lib/service-return-parcel-contract.ts').returnCartonQr(parcel,carton);user=driver;assert.equal((await scan(ret)).actions[0].driver,true);user=other;await scan(ret,404);user=admin;assert.equal((await scan(ret)).actions[0].expert,true);
+ const expert=actor('expert',{serviceRoles:['coordinator'],serviceDomains:['home'],flowRoles:['inventory'],warehouses:['raw']});
+ entity('member-role-assignment:expert','member_role_assignment',{bindings:[{profileId:'home-service'}]});
+ entity('agency-case','as_case',{domain:'home',agentId:'a',serial:'NF-AGENCY',state:'diagnosed'});
+ const agencyQr=load('lib/service-device-contract.ts').serviceDeviceQr('NF-AGENCY');
+ user=expert;
+ assert.match((await scan(ret,200,'home-service')).actions[0].title,/دریافت/);
+ assert.deepEqual((await scan(agencyQr,200,'home-service')).actions.map(a=>a.target),['service-case-action:authorize:agency-case','service-case-action:followup:agency-case']);
+ await scan(device,404,'home-service');
+ await scan(code,404,'home-service');
+ sql.prepare("UPDATE flow_entities SET data=json_set(data,'$.state','closed') WHERE id='agency-case'").run();
+ assert.equal((await scan(agencyQr,200,'home-service')).actions[0].target,'service-case:agency-case');
+ user=support;await scan(agencyQr,403,'home-service');
+ const customerWorkspace='home-service-customer-support';
+ const customer=actor('customer-reception',{serviceRoles:['support','intake'],serviceDomains:['home','hospital'],flowRoles:['inventory'],warehouses:['raw']});
+ entity('member-role-assignment:customer-reception','member_role_assignment',{bindings:[{profileId:customerWorkspace}]});
+ user=customer;
+ const setCase=(state,extra={})=>sql.prepare("UPDATE flow_entities SET data=json_patch(data,?) WHERE id='case'").run(JSON.stringify({state,...extra}));
+ setCase('diagnosed',{customerTotal:'2450000'});
+ assert.equal((await scan(device,200,customerWorkspace)).actions[0].target,'service-office:action:consent:case');
+ setCase('tested');
+ assert.equal((await scan(device,200,customerWorkspace)).actions[0].target,'service-office:action:deliver:case');
+ setCase('delivered',{confirmation:{result:'no_answer'}});
+ assert.equal((await scan(device,200,customerWorkspace)).actions[0].target,'service-office:action:confirm:case');
+ assert.equal((await scan(receiptQr,200,customerWorkspace)).actions[0].startOfficeIntake,false);
+ const setReceipt=(state,extra={})=>sql.prepare("UPDATE flow_entities SET data=json_patch(data,?) WHERE id=?").run(JSON.stringify({state,...extra}),receiptId);
+ setReceipt('received_office',{code:'DR-1234ABCD'});
+ assert.equal((await scan('DR-1234ABCD',200,customerWorkspace)).actions[0].startOfficeIntake,true);
+ setReceipt('linked',{caseId:'case'});
+ assert.equal((await scan(receiptQr,200,customerWorkspace)).actions[0].target,'service-office:action:confirm:case');
+ const hospitalReceipt=crypto.randomUUID();entity(hospitalReceipt,'transport_receipt',{domain:'hospital',state:'with_driver'});
+ await scan(load('lib/driver-receipt-contract.ts').driverReceiptQr(hospitalReceipt),404,customerWorkspace);
+ assert.equal((await scan('NF-02',200,customerWorkspace)).actions[0].target,'service-office:intake:NF-02');
+ await scan('unrecognized',404,customerWorkspace);await scan(agencyQr,404,customerWorkspace);await scan(code,404,customerWorkspace);
+ setCase('closed');
+ assert.equal((await scan(device,200,customerWorkspace)).actions[0].target,'service-office:intake:NF-01');
+ user=support;await scan(device,403,customerWorkspace);
  const parser=load('lib/workflow-scan-contract.ts').parseWorkflowLabel;for(const [value,kind] of [[rich,'batch'],[device,'device'],[ship,'shipping'],[ret,'return'],[receiptQr,'receipt']])assert.equal(parser(value,'https://test.local').kind,kind);
 
  user=admin;const flow=load('app/api/flow/route.ts');entity('material','material',{code:'11223344',name:'Supplier part',unit:'عدد',specs:'Check',fields:[{key:'check',label:'Check',type:'result',required:true}],sourcingRoutes:['domestic']});const body={id:crypto.randomUUID(),mode:'receipt',receiptVersion:2,confirmed:true,materialId:'material',warehouseId:wh.id,quantity:'2',day:'2026-11-13',externalLabel:'https://supplier.test/lot/123'};async function receive(){const r=await ctx.run(user,()=>flow.POST(new Request('https://test.local/api/flow',{method:'POST',headers:{origin:'https://test.local','content-type':'application/json'},body:JSON.stringify(body)})));const d=await r.json();assert.equal(r.status,200,JSON.stringify(d));return d;}

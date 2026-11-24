@@ -23,6 +23,7 @@ import {hasRepresentativePrice,representativeTariffValue,selectConsumerPartTarif
 import {consumerPriceSnapshot} from '@/lib/service-consumer-prepare';
 import {serviceSupervisor,domainWriteAccess} from '@/lib/service-access';
 import {requireAccess,checkOrigin,accessResponse} from '@/lib/authorization';
+import {officeServiceAccess} from '@/lib/service-office-access';
 import {storage} from '@/lib/storage';
 import {boundedBody} from '@/lib/firmware-storage';
 import {dayAt} from '@/lib/duties';
@@ -42,7 +43,9 @@ async function get(request:Request){try{
  const agent=await entity(account,'as_agent');if(agent.data.domain!==domain)fail('نماینده پیدا نشد.',404);
   return json({ownAgent:own||'',collection:serviceSchedulePage(await serviceCollection(account),schedulePage)});
  }
- const cases=(await list('as_case')).filter(filter).filter(c=>!q.get('serial')||c.data.serial===normalizeSerial(q.get('serial')!)).map(c=>operational?c:{...c,data:{...c.data,internalPartsCost:undefined,repairs:c.data.repairs?.map((r:any)=>({...r,costRial:undefined}))}}),agents=(await list('as_agent')).filter(filter),tariffs=(await list('as_tariff')).filter(r=>r.data.domain===domain).map(r=>own||!operational?{...r,data:{...r.data,costRial:undefined}}:r);
+ const office=q.get('office')==='1';
+ if(office&&(domain!=='home'||!officeServiceAccess(u)))fail('دسترسی خدمات دفتر شرکت لازم است.',403);
+ const cases=(await list('as_case')).filter(filter).filter(c=>!office||!c.data.agentId).filter(c=>!q.get('serial')||c.data.serial===normalizeSerial(q.get('serial')!)).map(c=>operational?c:{...c,data:{...c.data,internalPartsCost:undefined,repairs:c.data.repairs?.map((r:any)=>({...r,costRial:undefined}))}}),agents=(await list('as_agent')).filter(filter),tariffs=(await list('as_tariff')).filter(r=>r.data.domain===domain).map(r=>own||!operational?{...r,data:{...r.data,costRial:undefined}}:r);
  if(q.get('suggestAgents')==='1')return json({suggestions:suggestedServiceAgents(agents,domain,serviceProvince(q.get('province')||''),txt(q.get('city')||'',200)),automaticAssignment:false});
  if(q.get('report')==='1'){const from=date(q.get('from')),to=date(q.get('to'));if(from>to)fail('ابتدای بازه بعد از انتهاست.');const report=serviceReport(cases,from,to);return json({...report,...(!operational?{partsCostRial:undefined}:{})});}
  const orders=(await list('as_order')).filter(filter),shipments=(await list('as_shipment')).filter(filter),claims=(await list('as_claim')).filter(filter);
