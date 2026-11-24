@@ -75,11 +75,13 @@ const addAgent=(id,kind,active)=>sql.prepare("INSERT INTO flow_entities(id,type,
  const parsed=contract.parseLegacyWorkbook([header,sample,[...sample.slice(0,10),'املای متفاوت','0012345678'],[...sample.slice(0,8),'28']]);
  assert.equal(parsed.repeated,1);assert.equal(parsed.conflicts.size,1);assert.equal(parsed.events.length,0);
  assert.deepEqual(await preview([row]),{known:[]});
+ assert.equal((await get()).hasEvents,false);
  assert.equal(persisted(),0);
  await post({...importer([row]),confirmed:false},400);
  const [first,second]=await Promise.all([post(importer([row])),post(importer([row]))]);
  assert.equal(first.saved+second.saved,1);
  assert.equal(persisted(),1);
+ assert.equal((await get()).hasEvents,true);
  assert.equal((await preview([{...row,agencyName:'Current spelling'}])).known[0].status,'same');
  const richer={...row,details:{firstName:'نام نمونه',email:'fixture@example.test',mobile:'09120000000',issuedCode:'00421',agencyActive:'1',unknownColumn:'do not keep'}};
  assert.equal((await preview([richer])).known[0].status,'enrich');

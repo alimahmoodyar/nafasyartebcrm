@@ -42,11 +42,12 @@ export async function GET(request:Request){
     .all<{data:string;salesData:string|null}>();
    return json({rows:data.results.slice(0,40).map(row=>({...JSON.parse(row.data),salesName:row.salesData?JSON.parse(row.salesData).name:''})),more:data.results.length>40});
   }
-  const [sales,links]=await Promise.all([
+  const [sales,links,firstEvent]=await Promise.all([
    db.prepare("SELECT id,json_extract(data,'$.name') AS name,json_extract(data,'$.code') AS code,json_extract(data,'$.city') AS city FROM flow_entities WHERE "+availableSales+" ORDER BY name,id").all(),
    db.prepare("SELECT revision,json_extract(data,'$.legacyId') AS id,json_extract(data,'$.salesId') AS salesId FROM flow_entities WHERE type=? ORDER BY id").bind(legacyAgencyType).all(),
+   db.prepare("SELECT 1 AS found FROM flow_entities WHERE type=? LIMIT 1").bind(legacyActivationType).first(),
   ]);
-  return json({sales:sales.results,links:links.results});
+  return json({sales:sales.results,links:links.results,hasEvents:!!firstEvent});
  }catch(error){return accessResponse(error)||Response.json({error:'خواندن اطلاعات مهاجرت انجام نشد.'},{status:503});}
 }
 export async function POST(request:Request){

@@ -1,9 +1,10 @@
 'use client';
-import {useMemo,useState,type ChangeEvent} from 'react';
+import {useMemo,useRef,useState,type ChangeEvent} from 'react';
 import {formatDateTime} from '@/lib/persian-date';
 import {legacyActivationChunkSize,legacyActivationWarnings,legacyCustomerName,parseLegacyWorkbook,type LegacyActivation,type LegacyAgency,type LegacyPreview,type LegacySalesAgent} from '@/lib/legacy-activation-import';
 
 type Parsed=ReturnType<typeof parseLegacyWorkbook>;
+type PreviewWork={input:Parsed;packs:LegacyActivation[][];next:number;matches:Map<string,LegacyPreview>;directoryReady:boolean};
 type SavedRow={event:LegacyActivation;file:string;importedAt:string;salesName:string};
 type ResultRow={row:LegacyActivation;comparison:LegacyPreview|undefined;alternatives?:LegacyActivation[]};
 const displayCount=(n:number)=>n.toLocaleString('fa-IR');
@@ -30,6 +31,7 @@ export function LegacyActivationPanel({accountId}:{accountId:string}){
  const [filter,setFilter]=useState<'conflicts'|'warnings'|'new'|'same'|'enrich'>('conflicts'),[page,setPage]=useState(1);
  const [history,setHistory]=useState<{rows:SavedRow[];more:boolean}|null>(null),[historyQuery,setHistoryQuery]=useState(''),[historyPage,setHistoryPage]=useState(1);
  const [checked,setChecked]=useState(false),[committed,setCommitted]=useState(0);
+ const pendingPreview=useRef<PreviewWork|null>(null);
  const salesById=useMemo(()=>new Map(sales.map(item=>[item.id,item])),[sales]);
  const linksById=useMemo(()=>new Map(links.map(item=>[item.id,item])),[links]);
  const agencies=useMemo(()=>{
@@ -60,16 +62,42 @@ export function LegacyActivationPanel({accountId}:{accountId:string}){
  const choices=stats[filter],pages=Math.max(1,Math.ceil(choices.length/25));
  const currentPage=Math.min(page,pages);
 
- async function request<T>(suffix='',body?:unknown):Promise<T>{
-  const r=await fetch('/api/legacy-activations'+suffix,{cache:'no-store',headers:{'x-assistant-account':accountId,...(body?{'Content-Type':'application/json'}:{})},
-   ...(body?{method:'POST',body:JSON.stringify(body)}:{})});
-  const d=await r.json() as T&{error?:string};
-  if(!r.ok)throw Error(d.error||'درخواست انجام نشد.');
+ async function request<T>(stage:string,suffix='',body?:unknown):Promise<T>{
+  let r:Response;
+  try{
+   r=await fetch('/api/legacy-activations'+suffix,{cache:'no-store',headers:{Accept:'application/json','x-assistant-account':accountId,...(body?{'Content-Type':'application/json'}:{})},
+    ...(body?{method:'POST',body:JSON.stringify(body)}:{})});
+  }catch(e){throw Error(stage+' — '+(e instanceof TypeError?'ارتباط با سرور قطع شد.':e instanceof Error?e.message:'درخواست کامل نشد.'));}
+  const id=r.headers.get('x-request-id');
+  const context=stage+' (HTTP '+r.status+(id&&/^[a-z\d-]{1,80}$/i.test(id)?'، شناسهٔ پیگیری '+id:'')+')';
+  let d:T&{error?:string};
+  try{d=await r.json();}catch{
+   throw Error(context+' — '+(r.status===429?'سرور تعداد درخواست‌ها را محدود کرده است. کمی بعد دوباره تلاش کنید.':r.status===401?'دوباره وارد حساب مدیر شوید.':'پاسخ مورد انتظار از سامانه دریافت نشد. این کد را به پشتیبانی بدهید.'));
+  }
+  if(!r.ok)throw Error(context+' — '+(d?.error||'درخواست انجام نشد.'));
   return d as T;
  }
  async function readDirectory(){
-  const directory=await request<{sales:LegacySalesAgent[];links:LegacyAgency[]}>();
+  const directory=await request<{sales:LegacySalesAgent[];links:LegacyAgency[];hasEvents?:boolean}>('خواندن فهرست نمایندگی‌ها');
   setSales(directory.sales);setLinks(directory.links);
+  return directory.hasEvents;
+ }
+ async function preview(work:PreviewWork){
+  const {input,matches,packs}=work;
+  if(!work.directoryReady){
+   setWorking('در حال خواندن فهرست نمایندگی‌ها…');
+   if(await readDirectory()===false)work.next=packs.length;
+   work.directoryReady=true;
+  }
+  while(work.next<packs.length){
+   const stage='تطبیق سوابق · بستهٔ '+displayCount(work.next+1)+' از '+displayCount(packs.length);
+   setWorking(stage);
+   const result=await request<{known:LegacyPreview[]}>(stage,'',{mode:'preview',rows:packs[work.next]});
+   for(const key of result.known)matches.set(key.activeId,key);
+   work.next++;
+  }
+  setKnown(matches);setParsed(input);setFilter(input.conflicts.size||[...matches.values()].some(row=>row.status==='conflict')?'conflicts':input.events.some(row=>!matches.has(row.activeId))?'new':[...matches.values()].some(row=>row.status==='enrich')?'enrich':'same');setChecked(true);
+  pendingPreview.current=null;
  }
  async function run(task:()=>Promise<void>){
   if(busy)return;
@@ -83,22 +111,14 @@ export function LegacyActivationPanel({accountId}:{accountId:string}){
   if(!upload)return;
   void run(async()=>{
    setChecked(false);setParsed(null);setKnown(new Map());setCommitted(0);setAgency('');setSale('');setPage(1);
+   pendingPreview.current=null;setFile(upload.name);
    if(!/\.xlsx$/i.test(upload.name))throw Error('فایل XLSX خروجی سیستم قبلی را انتخاب کنید.');
    setWorking('در حال خواندن اکسل…');
    const {readSheet}=await import('read-excel-file/browser');
    const input=parseLegacyWorkbook(await readSheet(upload,'ActivationFull'));
    if(!input.total)throw Error('در برگهٔ ActivationFull هیچ ردیفی برای بررسی پیدا نشد.');
-   const packs=split(input.events),matches=new Map<string,LegacyPreview>();
-   let done=0;
-   setWorking('در حال تطبیق با سوابق ثبت‌شده…');
-   await readDirectory();
-   for(let start=0;start<packs.length;start+=5){
-    const results=await Promise.all(packs.slice(start,start+5).map(rows=>request<{known:LegacyPreview[]}>('',{mode:'preview',rows})));
-    for(const result of results)for(const key of result.known)matches.set(key.activeId,key);
-    done=Math.min(start+5,packs.length);
-    setWorking('بررسی فایل · '+displayCount(done)+' از '+displayCount(packs.length)+' بسته');
-   }
-   setKnown(matches);setParsed(input);setFile(upload.name);setFilter(input.conflicts.size||[...matches.values()].some(row=>row.status==='conflict')?'conflicts':input.events.some(row=>!matches.has(row.activeId))?'new':[...matches.values()].some(row=>row.status==='enrich')?'enrich':'same');setChecked(true);
+   pendingPreview.current={input,packs:split(input.events),matches:new Map(),next:0,directoryReady:false};
+   await preview(pendingPreview.current);
   });
  }
  async function saveRecords(){
@@ -108,8 +128,9 @@ export function LegacyActivationPanel({accountId}:{accountId:string}){
    const results=new Map(known);
    let saved=0,enriched=0;
    for(const [index,rows] of packs.entries()){
-    setWorking('ثبت و تکمیل سوابق · '+displayCount(index+1)+' از '+displayCount(packs.length)+' بسته');
-    const response=await request<{saved:number;enriched:number;known:LegacyPreview[]}>('',{mode:'import',confirmed:true,rows,file});
+    const stage='ثبت و تکمیل سوابق · بستهٔ '+displayCount(index+1)+' از '+displayCount(packs.length);
+    setWorking(stage);
+    const response=await request<{saved:number;enriched:number;known:LegacyPreview[]}>(stage,'',{mode:'import',confirmed:true,rows,file});
     const current=new Map(response.known.map(row=>[row.activeId,row]));
     for(const row of rows)results.set(row.activeId,current.get(row.activeId)||{activeId:row.activeId,status:'same'});
     saved+=response.saved;enriched+=response.enriched;
@@ -122,14 +143,14 @@ export function LegacyActivationPanel({accountId}:{accountId:string}){
  }
  function linkAgency(){
   void run(async()=>{
-   const result=await request<LegacyAgency>('',{mode:'link',confirmed:true,legacyId:agency,salesId:sale,revision:activeLink?.revision||0});
+   const result=await request<LegacyAgency>('اتصال نمایندگی','',{mode:'link',confirmed:true,legacyId:agency,salesId:sale,revision:activeLink?.revision||0});
    setLinks(previous=>[...previous.filter(link=>link.id!==result.id),result]);setSale('');
    setMessage('اتصال نمایندگی ثبت شد.');
   });
  }
  function readHistory(next=1){
   void run(async()=>{
-   const result=await request<{rows:SavedRow[];more:boolean}>('?'+new URLSearchParams({view:'history',q:historyQuery,page:String(next)}));
+   const result=await request<{rows:SavedRow[];more:boolean}>('خواندن سوابق','?'+new URLSearchParams({view:'history',q:historyQuery,page:String(next)}));
    setHistory(result);setHistoryPage(next);
   });
  }
@@ -139,6 +160,7 @@ export function LegacyActivationPanel({accountId}:{accountId:string}){
    <input type="file" accept=".xlsx" disabled={busy} onChange={chooseFile}/>
   </label>
   {working&&<p role="status">{working}</p>}{message&&<p role="status">{message}</p>}{error&&<p className="notice error" role="alert">{error}</p>}
+  {!!pendingPreview.current&&!busy&&<button type="button" className="btn primary" onClick={()=>void run(async()=>{if(pendingPreview.current)await preview(pendingPreview.current);})}>ادامهٔ بررسی فایل {file}</button>}
   {checked&&parsed&&<>
    <h4>پیش‌نمایش ورود سوابق</h4>
    <p>{file} · {displayCount(parsed.total)} ردیف · {displayCount(parsed.repeated)} ردیف تکراری داخل فایل{committed>0?' · '+displayCount(committed)+' ثبت‌شده در این نوبت':''}</p>
