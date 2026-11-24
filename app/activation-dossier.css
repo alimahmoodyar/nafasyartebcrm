@@ -1,0 +1,167 @@
+.activation-dossier {
+  --dossier-ink: #1c2843;
+  --dossier-muted: #51617b;
+  --dossier-edge: #dce3ef;
+  --dossier-mint: #e9f5ef;
+  --dossier-green: #186646;
+  container: activation-dossier / inline-size;
+  display: grid;
+  gap: 14px;
+  margin-block: 12px;
+  padding: clamp(12px, 2.5vw, 24px);
+  border: 1px solid var(--dossier-edge);
+  border-radius: 22px;
+  background: #f3f6fb;
+  color: var(--dossier-ink);
+  line-height: 1.65;
+}
+
+.activation-dossier :is(h3, h4, p, dl, dd) { margin: 0; }
+.activation-dossier h4 { font-size: 16px; font-weight: 700; }
+.activation-dossier dt { color: var(--dossier-muted); font-size: 13px; }
+.activation-dossier dd { overflow-wrap: anywhere; font-weight: 600; }
+
+.activation-dossier-hero {
+  padding: clamp(16px, 3vw, 26px);
+  border-radius: 17px;
+  background: linear-gradient(117deg, #25365b, #223f4c);
+  color: #fff;
+}
+
+.activation-dossier-hero h3 { font-size: clamp(22px, 3vw, 30px); line-height: 1.35; }
+.activation-dossier-hero :is(dt, p) { color: #e3eeff; font-size: 13px; }
+
+.activation-dossier-heading,
+.activation-dossier-archive summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.activation-dossier-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  inline-size: 34px;
+  block-size: 34px;
+  border-radius: 10px;
+  background: var(--dossier-mint);
+  color: var(--dossier-green);
+}
+
+.activation-dossier-hero .activation-dossier-icon {
+  inline-size: 46px;
+  block-size: 46px;
+  background: #ffffff1d;
+  border: 1px solid #ffffff35;
+  color: #d5ffed;
+}
+
+.activation-dossier-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 14px;
+}
+
+.activation-dossier-fields > div {
+  padding-block: 8px;
+  border-block-start: 1px solid var(--dossier-edge);
+}
+
+.activation-dossier-fields dd { margin-block-start: 2px; }
+.activation-dossier .activation-dossier-overview {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 142px), 1fr));
+  row-gap: 12px;
+  margin-block-start: 20px;
+  padding-block-start: 14px;
+  border-block-start: 1px solid #ffffff40;
+}
+
+.activation-dossier-overview > div { padding: 0; border: 0; }
+.activation-dossier-overview > div:first-child dd {
+  font-size: clamp(20px, 3vw, 26px);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
+}
+
+.activation-dossier-warranty {
+  --dossier-warranty-edge: #badccd;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+  align-items: center;
+  gap: 12px 20px;
+  padding: 14px 16px;
+  border: 1px solid var(--dossier-warranty-edge);
+  border-radius: 16px;
+  background: var(--dossier-mint);
+}
+
+.activation-dossier-warranty[data-expired="true"] {
+  --dossier-warranty-edge: #e4d5be;
+  --dossier-green: #875513;
+  background: #fcf5e9;
+}
+
+.activation-dossier-warranty .activation-dossier-icon { background: #fff; }
+.activation-dossier-warranty .activation-dossier-heading p { color: var(--dossier-green); font-size: 13px; }
+.activation-dossier-warranty-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
+  gap: 12px;
+}
+
+.activation-dossier-warranty-facts > div {
+  border-inline-start: 1px solid var(--dossier-warranty-edge);
+  padding-inline-start: 14px;
+}
+
+.activation-dossier-balance { color: var(--dossier-green); }
+.activation-dossier-balance strong { font-size: 24px; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.activation-dossier-balance small { display: block; font-size: 13px; }
+.activation-dossier-warranty-note { font-size: 14px; }
+
+.activation-dossier-columns {
+  display: grid;
+  gap: 14px;
+}
+
+.activation-dossier-columns.has-customer { grid-template-columns: minmax(0, 1.22fr) minmax(0, 1fr); }
+.activation-dossier-section,
+.activation-dossier-archive {
+  border: 1px solid var(--dossier-edge);
+  border-radius: 16px;
+  background: #fff;
+}
+
+.activation-dossier-section { padding: 16px; }
+.activation-dossier-section header { margin-block-end: 12px; }
+.activation-dossier-section dl > div:first-child { grid-column: 1 / -1; }
+.activation-dossier-section dl > div:first-child dd { font-size: 17px; }
+
+.activation-dossier-archive summary {
+  min-block-size: 52px;
+  padding: 9px 16px;
+  list-style: none;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.activation-dossier-archive summary::-webkit-details-marker { display: none; }
+.activation-dossier-chevron { margin-inline-start: auto; color: var(--dossier-muted); }
+.activation-dossier-archive[open] .activation-dossier-chevron { transform: rotate(180deg); }
+.activation-dossier-archive dl { grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 0 16px 10px; }
+
+@container activation-dossier (max-width: 620px) {
+  .activation-dossier-columns.has-customer { grid-template-columns: minmax(0, 1fr); }
+  .activation-dossier-archive dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@container activation-dossier (max-width: 460px) {
+  .activation-dossier-warranty { grid-template-columns: minmax(0, 1fr); }
+  .activation-dossier-warranty-facts {
+    border-block-start: 1px solid var(--dossier-warranty-edge);
+    padding-block-start: 10px;
+  }
+  .activation-dossier-warranty-facts > div:first-child { padding-inline-start: 0; border-inline-start: 0; }
+}

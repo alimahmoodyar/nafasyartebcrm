@@ -3,7 +3,7 @@ const {DatabaseSync}=require('node:sqlite');const root=path.resolve(__dirname,'.
 const db={prepare(q){let args=[];return{bind(...a){args=a;return this},async first(){return sql.prepare(q).get(...args)||null},async all(){return {results:sql.prepare(q).all(...args)}},async run(){return {meta:{changes:sql.prepare(q).run(...args).changes}}}}},async batch(stmts){sql.exec('BEGIN');try{const r=[];for(const s of stmts)r.push(await s.run());sql.exec('COMMIT');return r;}catch(e){sql.exec('ROLLBACK');throw e;}}};
 const objects=new Map();const bucket={async put(k,b){objects.set(k,b.slice(0));return {key:k}},async get(k){const b=objects.get(k);return b?{arrayBuffer:async()=>b.slice(0)}:null},async delete(k){objects.delete(k)}};
 let identity=null;const env={TRACE_OWNER_EMAIL:'owner@example.com',LLM_CONFIG_ENCRYPTION_KEY:require('node:crypto').randomBytes(32).toString('base64'),DB:db,BUCKET:bucket};
-const cache={};function load(file){file=path.resolve(root,file);if(cache[file])return cache[file];const exports={};cache[file]=exports;const source=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+const cache={};function load(file){file=path.resolve(root,file);if(cache[file])return cache[file];const exports={};cache[file]=exports;const source=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
 vm.runInNewContext(source,{exports,require:n=>{if(n==='cloudflare:workers')return {env};if(n==='@/app/chatgpt-auth')return {getChatGPTUser:async()=>identity};if(n.startsWith('@/')||n.startsWith('.')){const p=n.startsWith('@/')?path.join(root,n.slice(2)):path.resolve(path.dirname(file),n);return load(p+(path.extname(p)?'':'.ts'));}return require(n)},Response,Request,URL,URLSearchParams,Error,crypto:globalThis.crypto,Date,Intl,Set,Map,FormData,Blob,File,TextEncoder,TextDecoder,Uint8Array,ArrayBuffer,AbortController,ReadableStream,btoa,atob,setTimeout:(f,n)=>setTimeout(f,Math.min(n,10)),clearTimeout,console},{filename:file});return exports;}
 const auth=load('lib/authorization.ts'),http=load('app/mcp/route.ts'),sse=load('lib/mcp/sse.ts'),tokens=load('app/api/mcp-tokens/route.ts'),configs=load('app/api/llm-config/route.ts'),secrets=load('lib/llm-secrets.ts'),catalog=load('lib/mcp/tools.ts');
 const base='https://test.local';const owner={userId:'owner',email:'owner@example.com',displayName:'Owner',fullName:null};
@@ -136,6 +136,37 @@ async function get(u){const r=await context.run(u,()=>api.GET(request('/api/acti
  assert.equal(matched.data.rows.length,1);
  assert.equal(matched.data.rows[0].dealer,'نمایندگی تصحیح‌شده');
  assert.equal(matched.data.rows[0].legacy.details.issuedCode,'08314');
+ const {importedActivationWarranty}=load('lib/phone-activation-contract.ts');
+ const {parseCalendarDay}=load('lib/persian-date.ts');
+ const oldActivation=matched.data.rows[0].legacy;
+ const today='2026-11-24';
+ const warranty=importedActivationWarranty(oldActivation,today);
+ assert.equal(warranty.endsOn,'2028-11-02','add two Persian calendar years without shifting a late Excel wall clock into the next day');
+ assert.equal(warranty.remainingDays,709);
+ assert.equal(importedActivationWarranty(oldActivation,warranty.endsOn).remainingDays,0);
+ assert.equal(importedActivationWarranty(oldActivation,'2029-01-01').remainingDays,0);
+ assert.equal(importedActivationWarranty({...oldActivation,status:'1'},today),null);
+ assert.equal(importedActivationWarranty({...oldActivation,activeDate:'1900-01-01T00:00:00.000Z'},today),null);
+ assert.equal(importedActivationWarranty({...oldActivation,activeDate:'2026-12-01T00:00:00.000Z'},today),null);
+ const leapDay=parseCalendarDay('1403/12/30');
+ assert.ok(leapDay);
+ const leapWarranty=importedActivationWarranty({...oldActivation,activeDate:leapDay+'T00:00:00.000Z'},today);
+ assert.equal(leapWarranty.endsOn,parseCalendarDay('1405/12/29'));
+
+ const {ActivationDossier}=load('components/trace/activation-dossier.tsx');
+ const {createElement}=require('react');
+ const {renderToStaticMarkup}=require('react-dom/server');
+ const record=matched.data.rows[0];
+ const dossier=props=>renderToStaticMarkup(createElement(ActivationDossier,{record,today,...props}));
+ const activeDossier=dossier();
+ assert.match(activeDossier,/<time dateTime="2028-11-02">۱۲ آبان ۱۴۰۷<\/time>/i);
+ assert.match(activeDossier,/<strong>۷۰۹<\/strong>/);
+ assert.doesNotMatch(activeDossier,/کد نمایندگی در سیستم قبلی|>0100</);
+ assert.match(activeDossier,/نمایندگی تصحیح‌شده|جزئیات ثبت قبلی/);
+ assert.match(dossier({today:'2029-01-01'}),/منقضی شده/);
+ assert.doesNotMatch(dossier({showCustomer:false}),/سارا احمدی|sample@example\.test|شناسهٔ پروفایل مشتری/);
+ assert.doesNotMatch(dossier({legacyDateConfirmed:false}),/تاریخ پایان گارانتی<\/dt>/);
+ assert.match(dossier({record:{...record,legacy:undefined,months:12}}),/۱۲ ماه/);
  assert.equal((await history(actors[1],{view:'history',q:'۰۰۷۷۷۰۰۲'})).data.rows.length,1);
  assert.equal((await history(actors[0],{...filters,to:'۱۴۰۵/۰۸/۱۱'})).status,400);
  assert.equal((await history(manager,filters)).status,403);

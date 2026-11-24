@@ -86,7 +86,6 @@ export function ActivationHistoryPanel({accountId}:{accountId:string}){
    <button className="btn" type="button" disabled={busy||!more} onClick={()=>void load(active,page+1)}>صفحهٔ بعد</button>
   </div>}
   {dossier&&<section className="panel inside" aria-label="شناسنامهٔ دستگاه">
-   <h2>شناسنامهٔ دستگاه <bdi>{dossier.serial}</bdi></h2>
    <ActivationDossier key={dossier.id} record={dossier}/>
   </section>}
  </section>;

@@ -24,6 +24,7 @@ export function PhoneActivationPanel({accountId}:{accountId:string}){
  const selectedProduct=products.find(product=>product.id===productId);
  const months=device?.months??selectedProduct?.months;
  const canSubmit=!!device&&device.state!=='review'&&(purpose==='activate'||device.devicesKnown);
+ const showDossier=device&&(device.state==='activated'||device.legacy||purpose==='board'&&device.devicesKnown);
  const today=found?.today;
 
  async function request<T>(query:string,body?:Record<string,unknown>):Promise<T>{
@@ -83,7 +84,7 @@ export function PhoneActivationPanel({accountId}:{accountId:string}){
   </form>
   {error&&<p role="alert" className="notice error">{error}</p>}
   {device&&<section aria-label="شناسنامهٔ دستگاه">
-   <h3>شناسنامهٔ دستگاه <bdi>{device.serial}</bdi></h3>
+   {!showDossier&&<h3>شناسنامهٔ دستگاه <bdi>{device.serial}</bdi></h3>}
    <fieldset disabled={busy}>
     <legend>نوع درخواست</legend>
     <div className="tools">
@@ -93,7 +94,8 @@ export function PhoneActivationPanel({accountId}:{accountId:string}){
    {device.state==='activated'&&<p className="notice">فعال‌سازی قبلی در {formatDate(device.activatedDay)} ثبت شده است. {device.basis}</p>}
    {device.state==='review'&&<p role="status" className="notice error">سوابق این سریال نیاز به بررسی دارند. تاریخ فعال‌سازی قبلی حفظ می‌شود.</p>}
    {purpose==='board'&&!device.devicesKnown&&<p role="status" className="notice">برای این سریال شناسنامه یا سابقه‌ای پیدا نشد. سریال روی بدنه را دوباره بررسی کنید.</p>}
-   {(device.state==='activated'||device.legacy||purpose==='board'&&device.devicesKnown)&&<ActivationDossier showCustomer={purpose==='activate'} record={{
+   {showDossier&&<ActivationDossier showCustomer={purpose==='activate'} today={today}
+    legacyDateConfirmed={device.state==='activated'&&device.activatedDay===device.legacy?.activeDate.slice(0,10)} record={{
     serial:device.serial,at:device.legacy?.activeDate||device.activatedDay,legacy:device.legacy,
     customer:device.customer,dealer:device.dealer,model:[device.productName,device.model].filter(Boolean).join(' · '),
     months:device.months??undefined,
