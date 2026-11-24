@@ -2,7 +2,7 @@ import {AccessError,accessResponse,checkOrigin,requireAdmin} from '@/lib/authori
 import {boundedBody} from '@/lib/firmware-storage';
 import {storage} from '@/lib/storage';
 import {trainingContext} from '@/lib/training-context';
-import {cleanLegacyActivation,legacyActivationChunkSize,legacyActivationKey,legacyActivationType,legacyAgencyType,type LegacyActivation,type LegacyPreview} from '@/lib/legacy-activation-import';
+import {cleanLegacyActivation,legacyActivationChunkSize,legacyDetailsComparison,legacyActivationType,legacyAgencyType,type LegacyActivation,type LegacyPreview} from '@/lib/legacy-activation-import';
 
 const json=(body:unknown)=>Response.json(body,{headers:{'Cache-Control':'private, no-store','Vary':'Cookie, Authorization'}});
 function fail(message:string,status=400):never{throw new AccessError(message,status);}
@@ -16,14 +16,14 @@ function scope(request:Request,userId:string){
 async function previousRows(rows:LegacyActivation[]){
  const found=await storage().prepare("SELECT id,data FROM flow_entities WHERE type=? AND id IN (SELECT value FROM json_each(?))")
   .bind(legacyActivationType,JSON.stringify(rows.map(row=>eventId(row.activeId)))).all<{id:string;data:string}>();
- return new Map(found.results.map(row=>[row.id,JSON.parse(row.data).event as LegacyActivation]));
+ return new Map(found.results.map(row=>[row.id,{raw:row.data,stored:JSON.parse(row.data) as {event:LegacyActivation}}]));
 }
-function compare(rows:LegacyActivation[],previous:Map<string,LegacyActivation>):LegacyPreview[]{
+function compare(rows:LegacyActivation[],previous:Awaited<ReturnType<typeof previousRows>>):LegacyPreview[]{
  return rows.flatMap<LegacyPreview>(row=>{
   const existing=previous.get(eventId(row.activeId));
   if(!existing)return [];
-  return legacyActivationKey(existing)===legacyActivationKey(row)?[{activeId:row.activeId,status:'same'}]:
-   [{activeId:row.activeId,status:'conflict',existing}];
+  const status=legacyDetailsComparison(existing.stored.event,row);
+  return [{activeId:row.activeId,status,...(status==='conflict'?{existing:existing.stored.event}:{})}];
  });
 }
 export async function GET(request:Request){
@@ -82,12 +82,23 @@ export async function POST(request:Request){
   const file=body.file;
   if(body.confirmed!==true||typeof file!=='string'||!file.trim()||file.length>300)fail('نام فایل و تأیید ثبت لازم است.');
   const pending=rows.filter(row=>!previous.has(eventId(row.activeId)));
-  if(!pending.length)return json({saved:0,known:compare(rows,previous)});
-  const values=pending.map(row=>[eventId(row.activeId),JSON.stringify({event:row,file,importedAt:now,actor:user.userId})]);
-  const inserted=await db.prepare(`INSERT INTO flow_entities(id,type,data,revision,created,updated)
-   SELECT json_extract(value,'$[0]'),?,json_extract(value,'$[1]'),1,?,? FROM json_each(?) WHERE 1
-   ON CONFLICT(id) DO NOTHING RETURNING id`).bind(legacyActivationType,now,now,JSON.stringify(values)).all<{id:string}>();
-  const newIds=new Set(inserted.results.map(row=>row.id)),remaining=rows.filter(row=>!newIds.has(eventId(row.activeId)));
-  return json({saved:newIds.size,known:remaining.length?compare(remaining,await previousRows(remaining)):[]});
+  const values=pending.map(row=>[eventId(row.activeId),null,JSON.stringify({event:row,file,importedAt:now,actor:user.userId})]);
+  for(const row of rows){
+   const id=eventId(row.activeId),existing=previous.get(id);
+   if(!existing||legacyDetailsComparison(existing.stored.event,row)!=='enrich')continue;
+   const event={...existing.stored.event,details:{...existing.stored.event.details,...row.details}};
+   values.push([id,existing.raw,JSON.stringify({...existing.stored,event})]);
+  }
+  const saved=values.length?await db.prepare(`WITH incoming AS (
+   SELECT json_extract(value,'$[0]') AS id,json_extract(value,'$[1]') AS prior,json_extract(value,'$[2]') AS after FROM json_each(?)
+  ) INSERT INTO flow_entities(id,type,data,revision,created,updated)
+   SELECT id,?,after,1,?,? FROM incoming
+   WHERE prior IS NULL OR EXISTS(SELECT 1 FROM flow_entities WHERE flow_entities.id=incoming.id AND flow_entities.data=incoming.prior)
+   ON CONFLICT(id) DO UPDATE SET data=excluded.data,revision=flow_entities.revision+1,updated=excluded.updated
+   WHERE flow_entities.type=excluded.type AND flow_entities.data=(SELECT prior FROM incoming WHERE incoming.id=excluded.id)
+   RETURNING id`).bind(JSON.stringify(values),legacyActivationType,now,now).all<{id:string}>():{results:[]};
+  const newIds=new Set(saved.results.filter(row=>!previous.has(row.id)).map(row=>row.id));
+  const remaining=rows.filter(row=>!newIds.has(eventId(row.activeId)));
+  return json({saved:newIds.size,enriched:saved.results.length-newIds.size,known:remaining.length?compare(remaining,await previousRows(remaining)):[]});
  }catch(error){return accessResponse(error)||Response.json({error:'عملیات ورود سوابق انجام نشد. دوباره تلاش کنید.'},{status:503});}
 }

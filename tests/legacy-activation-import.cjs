@@ -71,8 +71,8 @@ const addAgent=(id,kind,active)=>sql.prepare("INSERT INTO flow_entities(id,type,
 
 (async()=>{
  const header=['activeId','activeDate','activeStatus','activeChannel','DeviceFullSerial','DeviceSetSerial','SetId','SetSerial','AgencyId','AgencyCode','AgencyName','profileNatCode'];
- const sample=[12,new Date('2026-11-17T09:10:11Z'),0,1,'00123','','','','27','','نام قبلی','never-store'];
- const parsed=contract.parseLegacyWorkbook([header,sample,[...sample.slice(0,10),'املای متفاوت','ignored'],[...sample.slice(0,8),'28']]);
+ const sample=[12,new Date('2026-11-17T09:10:11Z'),0,1,'00123','','','','27','','نام قبلی','0012345678'];
+ const parsed=contract.parseLegacyWorkbook([header,sample,[...sample.slice(0,10),'املای متفاوت','0012345678'],[...sample.slice(0,8),'28']]);
  assert.equal(parsed.repeated,1);assert.equal(parsed.conflicts.size,1);assert.equal(parsed.events.length,0);
  assert.deepEqual(await preview([row]),{known:[]});
  assert.equal(persisted(),0);
@@ -81,6 +81,20 @@ const addAgent=(id,kind,active)=>sql.prepare("INSERT INTO flow_entities(id,type,
  assert.equal(first.saved+second.saved,1);
  assert.equal(persisted(),1);
  assert.equal((await preview([{...row,agencyName:'Current spelling'}])).known[0].status,'same');
+ const richer={...row,details:{firstName:'نام نمونه',email:'fixture@example.test',mobile:'09120000000',issuedCode:'00421',agencyActive:'1',unknownColumn:'do not keep'}};
+ assert.equal((await preview([richer])).known[0].status,'enrich');
+ assert.equal((await get('?view=history&q=123')).rows[0].event.details,undefined,'preview is read only');
+ const enrichment=await post(importer([richer]));
+ assert.equal(enrichment.saved,0);
+ assert.equal(enrichment.enriched,1);
+ assert.equal((await post(importer([richer]))).enriched,0);
+ const enriched=(await get('?view=history&q=123')).rows[0].event;
+ assert.equal(enriched.details.issuedCode,'00421');
+ assert.equal(enriched.details.firstName,'نام نمونه');
+ assert.equal(enriched.details.unknownColumn,undefined);
+ const differing={...richer,details:{email:'different@example.test'}};
+ assert.equal((await preview([differing])).known[0].status,'conflict');
+ assert.equal((await post(importer([differing]))).enriched,0);
  const conflict={...row,agencyId:'28'};
  assert.equal((await preview([conflict])).known[0].status,'conflict');
  assert.equal((await post(importer([conflict,{...row,activeId:'124'}]))).saved,1);

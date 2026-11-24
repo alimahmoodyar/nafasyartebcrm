@@ -1,7 +1,7 @@
 'use client';
 import {useMemo,useState,type ChangeEvent} from 'react';
 import {formatDateTime} from '@/lib/persian-date';
-import {legacyActivationChunkSize,legacyActivationWarnings,parseLegacyWorkbook,type LegacyActivation,type LegacyAgency,type LegacyPreview,type LegacySalesAgent} from '@/lib/legacy-activation-import';
+import {legacyActivationChunkSize,legacyActivationWarnings,legacyCustomerName,parseLegacyWorkbook,type LegacyActivation,type LegacyAgency,type LegacyPreview,type LegacySalesAgent} from '@/lib/legacy-activation-import';
 
 type Parsed=ReturnType<typeof parseLegacyWorkbook>;
 type SavedRow={event:LegacyActivation;file:string;importedAt:string;salesName:string};
@@ -17,6 +17,7 @@ const summary=(row:LegacyActivation)=>[
  row.setSerial?'سریال ساخت '+row.setSerial:'',
  row.deviceSetSerial?'سریال ست '+row.deviceSetSerial:'',
  row.agencyId?'شناسه نمایندگی '+row.agencyId:'',
+ legacyCustomerName(row.details),row.details?.mobile,row.details?.telephone,row.details?.nationalId,row.details?.email,row.details?.postalCode,row.details?.doctor,row.details?.agencyActive,row.details?.agencyCity,row.details?.issuedCode,row.details?.profileId,
 ].filter(Boolean).join(' · ');
 function nameKey(name:string){return name.replace(/ي/g,'ی').replace(/ك/g,'ک').replace(/[\s\u200c]+/g,'').toLowerCase();}
 
@@ -26,7 +27,7 @@ export function LegacyActivationPanel({accountId}:{accountId:string}){
  const [sales,setSales]=useState<LegacySalesAgent[]>([]),[links,setLinks]=useState<LegacyAgency[]>([]);
  const [agency,setAgency]=useState(''),[sale,setSale]=useState('');
  const [busy,setBusy]=useState(false),[working,setWorking]=useState(''),[error,setError]=useState(''),[message,setMessage]=useState('');
- const [filter,setFilter]=useState<'conflicts'|'warnings'|'new'|'same'>('conflicts'),[page,setPage]=useState(1);
+ const [filter,setFilter]=useState<'conflicts'|'warnings'|'new'|'same'|'enrich'>('conflicts'),[page,setPage]=useState(1);
  const [history,setHistory]=useState<{rows:SavedRow[];more:boolean}|null>(null),[historyQuery,setHistoryQuery]=useState(''),[historyPage,setHistoryPage]=useState(1);
  const [checked,setChecked]=useState(false),[committed,setCommitted]=useState(0);
  const salesById=useMemo(()=>new Map(sales.map(item=>[item.id,item])),[sales]);
@@ -46,12 +47,12 @@ export function LegacyActivationPanel({accountId}:{accountId:string}){
  const selected=agencies.find(item=>item.id===agency),activeLink=linksById.get(agency);
  const suggested=selected?sales.filter(item=>selected.codes.has(item.code)||[...selected.names].some(name=>nameKey(name)===nameKey(item.name))):[];
  const stats=useMemo(()=>{
-  const groups={conflicts:[] as ResultRow[],warnings:[] as ResultRow[],new:[] as ResultRow[],same:[] as ResultRow[]};
+  const groups={conflicts:[] as ResultRow[],warnings:[] as ResultRow[],new:[] as ResultRow[],same:[] as ResultRow[],enrich:[] as ResultRow[]};
   for(const alternatives of parsed?.conflicts.values()||[])
    groups.conflicts.push({row:alternatives[0],comparison:undefined,alternatives:alternatives.slice(1)});
   for(const row of parsed?.events||[]){
    const comparison=known.get(row.activeId),entry={row,comparison};
-   groups[comparison?.status==='conflict'?'conflicts':comparison?.status==='same'?'same':'new'].push(entry);
+   groups[comparison?.status==='conflict'?'conflicts':comparison?.status||'new'].push(entry);
    if(legacyActivationWarnings(row).length)groups.warnings.push(entry);
   }
   return groups;
@@ -97,26 +98,26 @@ export function LegacyActivationPanel({accountId}:{accountId:string}){
     done=Math.min(start+5,packs.length);
     setWorking('بررسی فایل · '+displayCount(done)+' از '+displayCount(packs.length)+' بسته');
    }
-   setKnown(matches);setParsed(input);setFile(upload.name);setFilter(input.conflicts.size||[...matches.values()].some(row=>row.status==='conflict')?'conflicts':'new');setChecked(true);
+   setKnown(matches);setParsed(input);setFile(upload.name);setFilter(input.conflicts.size||[...matches.values()].some(row=>row.status==='conflict')?'conflicts':input.events.some(row=>!matches.has(row.activeId))?'new':[...matches.values()].some(row=>row.status==='enrich')?'enrich':'same');setChecked(true);
   });
  }
  async function saveRecords(){
   await run(async()=>{
-   const candidates=stats.new.map(entry=>entry.row);
+   const candidates=[...stats.new,...stats.enrich].map(entry=>entry.row);
    const packs=split(candidates);
    const results=new Map(known);
-   let saved=0;
+   let saved=0,enriched=0;
    for(const [index,rows] of packs.entries()){
-    setWorking('ثبت رکوردهای جدید · '+displayCount(index+1)+' از '+displayCount(packs.length)+' بسته');
-    const response=await request<{saved:number;known:LegacyPreview[]}>('',{mode:'import',confirmed:true,rows,file});
+    setWorking('ثبت و تکمیل سوابق · '+displayCount(index+1)+' از '+displayCount(packs.length)+' بسته');
+    const response=await request<{saved:number;enriched:number;known:LegacyPreview[]}>('',{mode:'import',confirmed:true,rows,file});
     const current=new Map(response.known.map(row=>[row.activeId,row]));
     for(const row of rows)results.set(row.activeId,current.get(row.activeId)||{activeId:row.activeId,status:'same'});
-    saved+=response.saved;
+    saved+=response.saved;enriched+=response.enriched;
     setKnown(new Map(results));setCommitted(previous=>previous+response.saved);
    }
    const moved=[...results.values()].some(row=>row.status==='conflict');
    if(moved){setFilter('conflicts');setPage(1);}
-   setMessage(displayCount(saved)+' سابقهٔ جدید ثبت شد.'+(moved?' مغایرت‌ها برای بررسی در فهرست هستند.':''));
+   setMessage(displayCount(saved)+' سابقهٔ جدید ثبت شد و '+displayCount(enriched)+' شناسنامه تکمیل شد.'+(moved?' مغایرت‌ها برای بررسی در فهرست هستند.':''));
   });
  }
  function linkAgency(){
@@ -143,7 +144,7 @@ export function LegacyActivationPanel({accountId}:{accountId:string}){
    <p>{file} · {displayCount(parsed.total)} ردیف · {displayCount(parsed.repeated)} ردیف تکراری داخل فایل{committed>0?' · '+displayCount(committed)+' ثبت‌شده در این نوبت':''}</p>
    {!!parsed.invalid.length&&<p className="notice" role="status">{displayCount(parsed.invalid.length)} ردیف نامعتبر. شمارهٔ ردیف‌ها {parsed.invalid.slice(0,30).map(displayCount).join('، ')}{parsed.invalid.length>30?' و موارد دیگر':''}.</p>}
    <div className="tools" aria-label="وضعیت سوابق">
-    {([['new','جدید'],['same','ثبت‌شده'],['conflicts','مغایرت'],['warnings','نیازمند بررسی']] as const).map(([value,label])=><button className={'btn'+(filter===value?' primary':'')} key={value} type="button" aria-pressed={filter===value} onClick={()=>{setFilter(value);setPage(1)}}>{label} ({displayCount(stats[value].length)})</button>)}
+    {([['new','جدید'],['same','ثبت‌شده'],['enrich','قابل تکمیل'],['conflicts','مغایرت'],['warnings','نیازمند بررسی']] as const).map(([value,label])=><button className={'btn'+(filter===value?' primary':'')} key={value} type="button" aria-pressed={filter===value} onClick={()=>{setFilter(value);setPage(1)}}>{label} ({displayCount(stats[value].length)})</button>)}
    </div>
    {choices.length>0?<>
     <div className="as-table"><table><thead><tr><th>شناسهٔ قدیمی</th><th>سابقهٔ فایل</th><th>{filter==='conflicts'?'مقدار دیگر':'نمایندگی یا وضعیت'}</th></tr></thead>
@@ -155,7 +156,7 @@ export function LegacyActivationPanel({accountId}:{accountId:string}){
      <button className="btn" type="button" disabled={currentPage<=1} onClick={()=>setPage(currentPage-1)}>قبلی</button><span>{displayCount(currentPage)} از {displayCount(pages)}</span><button className="btn" type="button" disabled={currentPage>=pages} onClick={()=>setPage(currentPage+1)}>بعدی</button>
     </div>}
    </>:<p>ردیفی در این بخش نیست.</p>}
-   <button className="btn primary" type="button" disabled={busy||!stats.new.length} onClick={()=>void saveRecords()}>ثبت {displayCount(stats.new.length)} رکورد جدید</button>
+   <button className="btn primary" type="button" disabled={busy||!stats.new.length&&!stats.enrich.length} onClick={()=>void saveRecords()}>ثبت {displayCount(stats.new.length)} جدید و تکمیل {displayCount(stats.enrich.length)} سابقه</button>
    <h4>تطبیق نمایندگی‌های قبلی</h4>
    <p>{displayCount(agencies.filter(item=>linksById.has(item.id)).length)} وصل‌شده · {displayCount(agencies.filter(item=>!linksById.has(item.id)).length)} نیازمند تطبیق</p>
    <div className="formgrid">

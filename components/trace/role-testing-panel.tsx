@@ -80,7 +80,7 @@ export function RoleTestingPanel({assigned,targetId='',onNavigate,onProfile,onAc
  const salesScope=snapshot?.profile.id==='home-sales'||snapshot?.profile.id==='sales-representative';
  const scopedBuyer=snapshot?.buyerChoices?.find(choice=>choice.id===snapshot.buyerId)?.name;
  if(snapshot&&['home-service-customer-support','home-service-technician'].includes(snapshot.profile.id)&&officeServiceDashboard&&!choosing)return <>{officeServiceDashboard}</>;
- if(snapshot?.profile.id==='home-service'&&!choosing)return <ServiceExpertDashboard headerScan taskCount={assigned?.count??snapshot.work.length} taskTitles={assigned?.taskTitles} accountKey={snapshot.profile.id} onNavigate={onNavigate}/>;
+ if(snapshot?.profile.id==='home-service'&&!choosing)return <ServiceExpertDashboard headerScan phoneActivation={snapshot.profile.links.some(link=>link.section==='phone-activation')} taskCount={assigned?.count??snapshot.work.length} taskTitles={assigned?.taskTitles} accountKey={snapshot.profile.id} onNavigate={onNavigate}/>;
  if(id==='home-service'&&!snapshot&&!error&&!choosing)return <section className="panel inside" role="status">در حال دریافت پنل کارشناس…</section>;
  if(snapshot?.profile.id==='personnel-hr'&&!choosing)return <PersonnelAdminPanel onNavigate={onNavigate}/>;
  if(snapshot?.profile.id==='custodian'&&!choosing)return <AssetsPanel onNavigate={onNavigate} onExit={()=>void select(null)}/>;

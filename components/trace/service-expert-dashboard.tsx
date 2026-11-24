@@ -1,7 +1,7 @@
 'use client';
 import {openWorkflowScan} from './workflow-scan-button';
 import {useEffect,useRef,useState} from 'react';
-import {Camera,Clock,ClipboardList,History,ArrowRight,Boxes,FileText,Wallet,Store,BriefcaseBusiness,PackageCheck,Inbox,ChartNoAxesCombined} from 'lucide-react';
+import {Camera,Clock,ClipboardList,History,ArrowRight,Boxes,FileText,Wallet,Store,BriefcaseBusiness,PackageCheck,Inbox,ChartNoAxesCombined,KeyRound} from 'lucide-react';
 import {CameraCodeScanner} from './camera-code-scanner';
 import {ServiceReturnParcelsPanel} from './service-return-parcels-panel';
 import {parseReturnCarton,returnCartonQr} from '@/lib/service-return-parcel-contract';
@@ -9,7 +9,7 @@ import './driver-dashboard.css';
 import './employee-self-service.css';
 type View='home'|'scan'|'waiting'|'progress'|'history';
 const titles={waiting:'منتظر بررسی',progress:'بررسی ناتمام',history:'سوابق'};
-export function ServiceExpertDashboard({accountKey='',headerScan=false,taskCount,taskTitles=[],onNavigate}:{accountKey?:string;headerScan?:boolean;taskCount?:number;taskTitles?:string[];onNavigate:(section:string,target?:string)=>void}){
+export function ServiceExpertDashboard({accountKey='',headerScan=false,phoneActivation=false,taskCount,taskTitles=[],onNavigate}:{accountKey?:string;headerScan?:boolean;phoneActivation?:boolean;taskCount?:number;taskTitles?:string[];onNavigate:(section:string,target?:string)=>void}){
  const [view,setView]=useState<View>('home'),[query,setQuery]=useState(''),[search,setSearch]=useState(''),[page,setPage]=useState(1),[data,setData]=useState<any>(null),[code,setCode]=useState(''),[error,setError]=useState(''),[loading,setLoading]=useState(false),[reload,setReload]=useState(0);
  const sequence=useRef(0);
  useEffect(()=>{sequence.current++;setView('home');setCode('');setData(null);setError('');setPage(1);setQuery('');setSearch('');return()=>{sequence.current++}},[accountKey]);
@@ -42,6 +42,8 @@ export function ServiceExpertDashboard({accountKey='',headerScan=false,taskCount
    <section className="employee-workspaces" aria-label="ابزارهای نقش">
     <h3>ابزارهای نقش</h3>
     <div className="employee-workspace-grid">
+     {phoneActivation&&tile(KeyRound,'صدور کد فعال‌سازی','فعال‌سازی اولیه یا کد تعویض برد',()=>onNavigate('phone-activation'))}
+     {phoneActivation&&tile(ClipboardList,'سوابق فعال‌سازی','جست‌وجوی شناسنامهٔ دستگاه',()=>onNavigate('activation-history'))}
      {tile(PackageCheck,'کارتن‌های داغی','دریافت و بررسی کارتن‌های نمایندگان',()=>change('waiting'))}
      {tools.map(tool=>tile(tool.icon,tool.title,tool.detail,()=>onNavigate(tool.section||'after-sales',tool.target)))}
     </div>

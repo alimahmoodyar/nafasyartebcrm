@@ -6,6 +6,7 @@ import {programsForRoles,selfServicePrograms} from './workflow-programs';
 import {financialWorkflowRole} from './financial-workflow-roles';
 import {financialAccess} from './financial-access';
 import {canGenerateActivationCode} from './activation-code-access';
+import {canOpenPhoneActivation} from './phone-activation-policy';
 import {routineRoles} from './routine-production';
 import {projectRoles} from './build-projects';
 import {buildIntakeRoles} from './build-intake-access';
@@ -32,6 +33,7 @@ export function canOpenSection(user:Session,s:string):boolean{
  // The inbox is a shared workspace. Showing its entry does not grant access
  // to any task or conversation; the corresponding APIs scope each record.
  if(s==='tasks')return true;
+ if(s==='phone-activation'||s==='activation-history')return canOpenPhoneActivation(u);
  if(s==='oxygen-capacity'){
   const roles=buildIntakeRoles(u);
   return roles.sales||roles.engineering;

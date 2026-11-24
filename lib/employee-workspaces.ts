@@ -15,7 +15,7 @@ export type EmployeeWorkspace={
 /** Navigation only. Every form continues to enforce the account's current grants. */
 export function employeeWorkspaces(user:Session,assignedIds:string[]):EmployeeWorkspace[]{
  if(user.isAdmin||user.profileReview||user.mustChangePassword)return [];
- const p=accessPermissions(user.permissions);
+ const p=accessPermissions(user.permissions), scoped={...user,assignedProfileIds:assignedIds};
  if(p.hospitalCenterId)return [];
  const representative=p.salesAgentId?'sales-representative':p.serviceAgentId?'home-service-representative':'';
  const externalRoles=['sales-representative','home-service-representative'];
@@ -23,11 +23,11 @@ export function employeeWorkspaces(user:Session,assignedIds:string[]):EmployeeWo
   .filter(profile=>representative?profile.id===representative:!externalRoles.includes(profile.id))
   .filter(profile=>profile.id!=='personnel-hr'||p.personnelRoles?.includes('hr'))
   .filter(profile=>profile.id!=='custodian'||p.assetRoles?.includes('custodian'))
-  .filter(profile=>profile.links.some(link=>canAccessSection(user,link.section)))
+  .filter(profile=>profile.links.some(link=>canAccessSection(scoped,link.section)))
   .map(profile=>({
    id:profile.id,title:profile.title,group:profile.group,
-   programs:[...new Set(profile.links.filter(link=>canAccessSection(user,link.section)).map(link=>sectionDestination(user,link.section).section))],
+   programs:[...new Set(profile.links.filter(link=>canAccessSection(scoped,link.section)).map(link=>sectionDestination(user,link.section).section))],
    ...(profile.id==='central-store'?{menus:centralWarehouseMenus(user)}:{}),
-   links:profile.links.filter(link=>!link.taskOnly&&canAccessSection(user,link.section)),
+   links:profile.links.filter(link=>!link.taskOnly&&canAccessSection(scoped,link.section)),
   }));
 }

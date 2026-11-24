@@ -1,13 +1,14 @@
 'use client';
 import {openWorkflowScan} from './workflow-scan-button';
 import {useEffect,useRef,useState} from 'react';
-import {Camera,Plus,ClipboardList,History,ArrowRight,Inbox,BriefcaseBusiness} from 'lucide-react';
+import {Camera,Plus,ClipboardList,History,ArrowRight,Inbox,BriefcaseBusiness,KeyRound} from 'lucide-react';
 import {CameraCodeScanner} from './camera-code-scanner';
 import {AfterSalesPanel} from './after-sales-panel';
 import type {Session} from '@/lib/permissions';
 import {serviceMoment} from '@/lib/service-timing';
 import {caseStates} from '@/lib/after-sales-labels';
 import {officeServiceAccess} from '@/lib/service-office-access';
+import {canOpenPhoneActivation} from '@/lib/phone-activation-policy';
 import {parseServiceDeviceQr,serviceDeviceSerial} from '@/lib/service-device-contract';
 import type {CustomerCaseForm} from '@/lib/workflow-scan-contract';
 import './driver-dashboard.css';
@@ -26,6 +27,12 @@ export function ServiceOfficeWorkspace({user,onNavigate,caseId='',initialSerial=
   <section className="employee-workspaces" aria-label="ابزارهای نقش">
    <h3>ابزارهای نقش</h3>
    <div className="employee-workspace-grid">
+    {canOpenPhoneActivation(user)&&<button type="button" className="employee-workspace-tile" onClick={()=>onNavigate('phone-activation')}>
+     <span className="employee-service-icon"><KeyRound size={20}/></span><span><strong>صدور کد فعال‌سازی</strong><small>فعال‌سازی اولیه یا کد تعویض برد</small></span>
+    </button>}
+    {canOpenPhoneActivation(user)&&<button type="button" className="employee-workspace-tile" onClick={()=>onNavigate('activation-history')}>
+     <span className="employee-service-icon"><History size={20}/></span><span><strong>سوابق فعال‌سازی</strong><small>جست‌وجوی شناسنامهٔ دستگاه</small></span>
+    </button>}
     {canIntake&&<button type="button" className="employee-workspace-tile" onClick={()=>{setSerial('');change('new')}}>
      <span className="employee-service-icon"><Plus size={20}/></span><span><strong>پذیرش دستگاه</strong><small>ثبت دستگاه و علائم مراجعه</small></span>
     </button>}
