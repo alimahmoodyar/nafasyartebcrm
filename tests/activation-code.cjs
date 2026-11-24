@@ -75,7 +75,7 @@ async function get(u){const r=await context.run(u,()=>api.GET(request('/api/acti
  const serial='00540042';
  const nationalBase='001234567';
  const weighted=[...nationalBase].reduce((n,d,i)=>n+Number(d)*(10-i),0)%11;
- const customer={name:'آزمون شناسنامه',mobile:'۰۹۱۲۱۲۳۴۵۶۷',nationalId:nationalBase+(weighted<2?weighted:11-weighted),postalCode:'1234567890'};
+ const customer={name:'آزمون شناسنامه',mobile:'۰۹۱۲۱۲۳۴۵۶۷',nationalId:nationalBase+(weighted<2?weighted:11-weighted)};
  const pseed=sql.prepare("INSERT INTO records(id,kind,payload,created) VALUES(?,'product',?,?)");
  pseed.run('phone-oxygen',JSON.stringify({name:'محصول آزمایشی',model:'M-01',code:'T',status:'فعال',warrantyMonths:'24'}),now);
  assert.equal((await readPhone(manager,serial)).status,403,'legacy generator access does not grant customer file access');
@@ -85,6 +85,12 @@ async function get(u){const r=await context.run(u,()=>api.GET(request('/api/acti
  assert.equal(firstLookup.device.devicesKnown,false);
  assert.equal((await writePhone(actors[1],draft(firstLookup,'board'))).status,404);
  assert.equal((await writePhone(actors[0],draft(firstLookup))).status,400);
+ for(const postalCode of ['123', '1234567890123456', 1234567890]){
+  const invalid=await writePhone(actors[0],draft(firstLookup,'activate',{productId:'phone-oxygen',customer:{...customer,postalCode}}));
+  assert.equal(invalid.status,400);
+  assert.match(invalid.data.error,/کد پستی/);
+ }
+ assert.equal(sql.prepare('SELECT 1 FROM service_activations WHERE serial=?').get(serial),undefined);
  const firstBody=draft(firstLookup,'activate',{productId:'phone-oxygen',customer});
  const first=await writePhone(actors[0],firstBody);
  assert.equal(first.status,200,JSON.stringify(first));
@@ -98,6 +104,7 @@ async function get(u){const r=await context.run(u,()=>api.GET(request('/api/acti
  const existing=(await readPhone(actors[1],serial)).data;
  assert.equal(existing.device.state,'activated');
  assert.equal(existing.device.customer.name,customer.name);
+ assert.equal(existing.device.customer.postalCode,undefined);
  assert.equal(existing.device.model,'M-01');
  assert.equal(existing.device.activatedDay,firstLookup.today);
  const prior=sql.prepare('SELECT * FROM service_activations WHERE serial=?').get(serial);
@@ -174,6 +181,10 @@ async function get(u){const r=await context.run(u,()=>api.GET(request('/api/acti
  const boardRows=(await history(actors[1],{view:'history',q:serial,kind:'board'})).data.rows;
  assert.equal(boardRows.length,1);
  assert.equal(boardRows[0].serial,serial);
+ const importedBoard=await writePhone(actors[1],draft(older,'board'));
+ assert.equal(importedBoard.status,200);
+ assert.equal(importedBoard.data.activatedDay,'2021-03-23');
+ assert.equal(importedBoard.data.first,false);
  assert.equal((await writePhone(actors[0],draft(older))).status,200);
  assert.equal(sql.prepare("SELECT 1 FROM service_activations WHERE serial='00777001'").get(),undefined,'historical date is never replaced');
  put('hospital-asset-1','hospital_asset',{serial:'HOSP-123'});

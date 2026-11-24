@@ -1,0 +1,134 @@
+.phone-activation-form {
+  --phone-ink: #202c47;
+  --phone-muted: #516382;
+  --phone-surface: #f2f5fb;
+  --phone-border: #d5dfef;
+  --phone-green: #155637;
+  --phone-green-tint: #e9f6ed;
+  container: phone-activation / inline-size;
+  color: var(--phone-ink);
+}
+
+.phone-activation-form > form > fieldset,
+.phone-activation-first {
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.phone-activation-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-block-end: 18px;
+}
+
+.phone-activation-heading h2 { font-size: clamp(20px, 3vw, 26px); }
+.phone-activation-icon {
+  display: grid;
+  place-items: center;
+  inline-size: 44px;
+  block-size: 44px;
+  flex: none;
+  border-radius: 12px;
+  color: var(--phone-green);
+  background: var(--phone-green-tint);
+}
+
+.phone-activation-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+}
+
+.phone-activation-form .field { min-inline-size: 0; font-weight: 600; }
+.phone-activation-form .field :is(input, select) {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 46px;
+  padding: 8px 11px;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 400;
+  border: 1px solid var(--phone-border);
+  border-radius: 10px;
+  color: var(--phone-ink);
+  background: #fff;
+}
+
+.phone-activation-form .field input[dir="ltr"] { font-variant-numeric: tabular-nums; }
+.phone-activation-form .field input[readonly] {
+  color: var(--phone-muted);
+  background: var(--phone-surface);
+}
+
+.phone-activation-purpose {
+  max-inline-size: 360px;
+  margin-block-start: 14px;
+}
+
+.phone-activation-status {
+  margin-block-start: 10px;
+  color: var(--phone-muted);
+  font-size: 14px;
+}
+
+.phone-activation-status:empty { display: none; }
+.phone-activation-first {
+  margin-block-start: 14px;
+  padding: 12px 14px 14px;
+  border: 1px solid var(--phone-border);
+  border-radius: 13px;
+  background: var(--phone-surface);
+}
+
+.phone-activation-first legend { padding-inline: 5px; font-weight: 700; }
+.phone-activation-first :is(p, small) { color: var(--phone-muted); font-size: 14px; font-weight: 400; }
+.phone-activation-first p { margin-block-start: 10px; }
+.phone-activation-form form .notice { margin-block-start: 12px; }
+.phone-activation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-block-start: 14px;
+}
+
+.phone-activation-actions:empty { display: none; }
+.phone-activation-actions button { min-block-size: 46px; }
+.phone-activation-result {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 9px 16px;
+  margin-block-start: 16px;
+  padding: 13px 16px;
+  border-radius: 12px;
+  color: var(--phone-green);
+  background: var(--phone-green-tint);
+}
+
+.phone-activation-result > div { flex: 1 1 220px; }
+.phone-activation-result p { font-size: 14px; }
+.phone-activation-result strong {
+  font-size: 28px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .12em;
+}
+
+.phone-activation-dossier {
+  margin-block-start: 16px;
+  padding: 0 14px 10px;
+  border: 1px solid var(--phone-border);
+  border-radius: 12px;
+  background: var(--phone-surface);
+}
+
+.phone-activation-dossier summary { min-block-size: 44px; padding-block-start: 10px; cursor: pointer; font-weight: 600; }
+.phone-activation-dossier:not([open]) { padding-block-end: 0; }
+
+@container phone-activation (max-width: 520px) {
+  .phone-activation-fields { grid-template-columns: minmax(0, 1fr); }
+  .phone-activation-purpose { max-inline-size: none; }
+  .phone-activation-actions button { inline-size: 100%; }
+}

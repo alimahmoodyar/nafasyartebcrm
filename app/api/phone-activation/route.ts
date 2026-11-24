@@ -118,12 +118,13 @@ function customerInput(raw:unknown,existing:Partial<PhoneActivationCustomer>):Ph
  const name=text(value.name??existing.name,100);
  const mobile=normalizeSerial(text(value.mobile??existing.mobile,20)).replace(/^\+98/,'0');
  const nationalId=normalizeSerial(text(value.nationalId??existing.nationalId,15));
- const postalCode=normalizeSerial(text(value.postalCode??existing.postalCode,15));
+ const suppliedPostalCode=value.postalCode??existing.postalCode??'';
+ const postalCode=typeof suppliedPostalCode==='string'?normalizeSerial(suppliedPostalCode):failure('کد پستی واردشده باید ۱۰ رقم باشد.');
  const referrer=text(value.referrer??existing.referrer,120);
  if(!name||!/^09\d{9}$/.test(mobile))failure('نام کامل و شماره همراه معتبر مشتری لازم است.');
  const sum=[...nationalId.slice(0,9)].reduce((n,d,i)=>n+Number(d)*(10-i),0)%11;
  if(!/^\d{10}$/.test(nationalId)||/^(\d)\1{9}$/.test(nationalId)||Number(nationalId[9])!==(sum<2?sum:11-sum))failure('کد ملی مشتری معتبر نیست.');
- if(!/^\d{10}$/.test(postalCode))failure('کد پستی ۱۰رقمی مشتری لازم است.');
+ if(postalCode&&!/^\d{10}$/.test(postalCode))failure('کد پستی واردشده باید ۱۰ رقم باشد.');
  return {name,mobile,nationalId,postalCode,referrer};
 }
 
