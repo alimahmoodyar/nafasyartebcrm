@@ -1,5 +1,6 @@
 import {env} from 'cloudflare:workers';
 import {generateActivationCode,normalizeActivationInput} from './activation-code';
+import {panelConfig,validLine} from './sms-panel';
 import {assetSmsReady,sendNafasyarSms} from './asset-sms';
 import {AccessError} from './authorization';
 import {normalizeSerial} from './distribution';
@@ -18,20 +19,22 @@ const contactSupport=()=>fail('این دستگاه برای فعال‌سازی 
 const validTicket=(token:unknown)=>typeof token==='string'&&/^[a-f0-9]{64}$/.test(token);
 const localizedDate=new Intl.DateTimeFormat('fa-IR-u-ca-persian',{year:'numeric',month:'2-digit',day:'2-digit',timeZone:'Asia/Tehran'});
 
-export function publicWarrantyReady(){
+export async function publicWarrantyReady(){
  const {PUBLIC_WARRANTY_ACTIVATION,PUBLIC_WARRANTY_TEST_MOBILE}=settings();
- return PUBLIC_WARRANTY_ACTIVATION==='1'&&assetSmsReady()
+ return PUBLIC_WARRANTY_ACTIVATION==='1'&&await assetSmsReady()
   &&(!PUBLIC_WARRANTY_TEST_MOBILE||/^09\d{9}$/.test(PUBLIC_WARRANTY_TEST_MOBILE));
 }
-export function publicWarrantySmsTestReady(){
- return assetSmsReady()&&/^09\d{9}$/.test(settings().PUBLIC_WARRANTY_TEST_MOBILE||'');
+export async function publicWarrantySmsTestReady(){
+ const config=await panelConfig();
+ return !!config.apiKey&&validLine(config.line)&&/^09\d{9}$/.test(config.mobile);
 }
 export async function sendPublicWarrantyTestSms(){
- const mobile=settings().PUBLIC_WARRANTY_TEST_MOBILE;
- if(!assetSmsReady())return fail('کلید یا خط ارسال پیامک در تنظیمات سرور آماده نیست.',503);
+ const config=await panelConfig();
+ const mobile=config.mobile;
+ if(!config.apiKey||!validLine(config.line))return fail('کلید یا خط ارسال پیامک در تنظیمات سرور آماده نیست.',503);
  if(!mobile||!/^09\d{9}$/.test(mobile))return fail('شمارهٔ آزمون پیامک در میزبان تنظیم نشده است.',503);
  await rate('panel-test',mobile,1,300000);
- await sendNafasyarSms(mobile,'نفس‌یار طب\nاین پیامک برای تست ارسال شده است.');
+ await sendNafasyarSms(mobile,'نفس‌یار طب\nاین پیامک برای تست ارسال شده است.',config);
  return {accepted:true,mobileLast4:mobile.slice(-4)};
 }
 async function rate(scope:string,value:string,limit:number,windowMs:number){
@@ -81,7 +84,7 @@ async function preparePilotDevice(serial:string){
 }
 
 export async function requestPublicWarranty(raw:unknown,client:string){
- if(!publicWarrantyReady())fail('ارسال پیامک فعال‌سازی فعلاً در دسترس نیست.',503);
+ if(!await publicWarrantyReady())fail('ارسال پیامک فعال‌سازی فعلاً در دسترس نیست.',503);
  const details=input(raw);
  await rate('client',client,10,600000);
  await preparePilotDevice(details.serial);
@@ -103,7 +106,7 @@ export async function requestPublicWarranty(raw:unknown,client:string){
 }
 
 export async function confirmPublicWarranty(raw:unknown,token:unknown,entered:unknown,client:string){
- if(!publicWarrantyReady())fail('فعال‌سازی اینترنتی فعلاً در دسترس نیست.',503);
+ if(!await publicWarrantyReady())fail('فعال‌سازی اینترنتی فعلاً در دسترس نیست.',503);
  if(typeof token!=='string'||!validTicket(token))return fail('درخواست منقضی شده است. کد تازه بگیرید.',410);
  const details=input(raw),{serial,customer}=details,db=storage(),id=ticketType+':'+await hash(token);
  await rate('confirm-client',client,30,600000);

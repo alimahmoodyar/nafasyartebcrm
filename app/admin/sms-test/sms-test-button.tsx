@@ -1,4 +1,5 @@
 'use client';
+import {PanelSettings} from './panel-settings';
 import {useRef,useState} from 'react';
 
 export function SmsTestButton(){
@@ -22,5 +23,5 @@ export function SmsTestButton(){
    setBusy(false);
   }
  }
- return <><button className="btn" type="button" disabled={busy} onClick={send}>{busy?'در حال ارسال…':'تست پیامک'}</button>{message && <p className="notice" role="status">{message}</p>}</>;
+ return <><button className="btn" type="button" disabled={busy} onClick={send}>{busy?'در حال ارسال…':'تست پیامک'}</button> <PanelSettings/>{message && <p className="notice" role="status">{message}</p>}</>;
 }

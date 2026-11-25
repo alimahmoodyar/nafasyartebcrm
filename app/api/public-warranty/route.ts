@@ -1,4 +1,5 @@
 import {accessResponse,checkOrigin,requireAdmin,AccessError} from '@/lib/authorization';
+import {panelConfig,publicFields,savePanel} from '@/lib/sms-panel';
 import {boundedBody} from '@/lib/firmware-storage';
 import {confirmPublicWarranty,publicWarrantyReady,requestPublicWarranty,publicWarrantySmsTestReady,sendPublicWarrantyTestSms} from '@/lib/public-warranty';
 
@@ -9,8 +10,8 @@ async function smsTestAdmin(){
 }
 export async function GET(){
  let smsTest=false;
- if(publicWarrantySmsTestReady())try{await smsTestAdmin();smsTest=true;}catch{}
- return reply({ready:publicWarrantyReady(),smsTest});
+ if(await publicWarrantySmsTestReady())try{await smsTestAdmin();smsTest=true;}catch{}
+ return reply({ready:await publicWarrantyReady(),smsTest});
 }
 export async function POST(request:Request){
  let stage='request';
@@ -20,6 +21,10 @@ export async function POST(request:Request){
   const client=(request.headers.get('cf-connecting-ip')||request.headers.get('x-real-ip')||'shared').slice(0,64);
   if(body?.mode==='request'){stage='send';return reply(await requestPublicWarranty(body.details,client));}
   if(body?.mode==='confirm'){stage='confirm';return reply(await confirmPublicWarranty(body.details,body.token,body.code,client));}
+  if(body?.mode==='panel-settings'||body?.mode==='save-panel'){
+   await smsTestAdmin();
+   return reply(body.mode==='save-panel'?await savePanel(body):publicFields(await panelConfig()));
+  }
   if(body?.mode==='test-sms'){stage='test-sms';await smsTestAdmin();return reply(await sendPublicWarrantyTestSms());}
   return reply({error:'نوع عملیات معتبر نیست.'},400);
  }catch(error){
