@@ -60,10 +60,15 @@
 @media(max-width:600px){.employee-home{padding:10px}.employee-home .employee-home-cards,.employee-workspace-grid{grid-template-columns:1fr}.employee-home .employee-home-header h2{font-size:22px}.employee-home .employee-home-card{padding:12px 14px;min-height:68px}}
 .central-warehouse-brand{display:block;flex:none;object-fit:contain;margin-inline-end:4px}
 .central-warehouse-menu-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-block-end:12px}
-.central-warehouse-menu-heading h3{margin:0}
+.central-warehouse-menu-heading h2{margin:0}
 .central-warehouse-menu-heading button{display:inline-flex;align-items:center;gap:6px}
 .central-warehouse-menu .central-warehouse-tile{min-height:68px;display:flex;align-items:center;gap:10px}
-.central-warehouse-tile>strong{flex:1}
+.central-warehouse-tile>strong,.central-warehouse-tile-copy{flex:1;min-width:0}
+.central-warehouse-tile-copy strong,.central-warehouse-tile-copy small{display:block;overflow-wrap:anywhere}
+.central-warehouse-tile-copy small{margin-block-start:4px}
+.central-warehouse-menu .central-warehouse-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media(max-width:760px){.central-warehouse-menu .central-warehouse-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:490px){.central-warehouse-menu .central-warehouse-grid{grid-template-columns:1fr}}
 .central-warehouse-tile>svg{flex:none;color:#617086}
 .central-warehouse-menu .employee-service-icon{width:34px;height:34px;flex:none}
 @media(max-width:560px){.central-warehouse-brand{width:28px;height:28px}.central-warehouse-menu-heading{flex-wrap:wrap}}

@@ -1,0 +1,64 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),ts=require('typescript');
+const {DatabaseSync}=require('node:sqlite');const root=path.resolve(__dirname,'..');const sql=new DatabaseSync(':memory:');sql.exec('PRAGMA foreign_keys=ON');for(const f of fs.readdirSync(path.join(root,'drizzle')).filter(f=>f.endsWith('.sql')).sort())sql.exec(fs.readFileSync(path.join(root,'drizzle',f),'utf8'));
+const db={prepare(q){let args=[];return{bind(...a){args=a;return this},async first(){return sql.prepare(q).get(...args)||null},async all(){return {results:sql.prepare(q).all(...args)}},async run(){return {meta:{changes:sql.prepare(q).run(...args).changes}}}}},async batch(stmts){sql.exec('BEGIN');try{const r=[];for(const s of stmts)r.push(await s.run());sql.exec('COMMIT');return r;}catch(e){sql.exec('ROLLBACK');throw e;}}};
+const objects=new Map();const bucket={async put(k,b){objects.set(k,b.slice(0));return {key:k}},async get(k){const b=objects.get(k);return b?{arrayBuffer:async()=>b.slice(0)}:null},async delete(k){objects.delete(k)}};
+let identity=null;const env={TRACE_OWNER_EMAIL:'owner@example.com',LLM_CONFIG_ENCRYPTION_KEY:require('node:crypto').randomBytes(32).toString('base64'),DB:db,BUCKET:bucket};
+const cache={};function load(file){file=path.resolve(root,file);if(cache[file])return cache[file];const exports={};cache[file]=exports;const source=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+vm.runInNewContext(source,{exports,require:n=>{if(n==='cloudflare:workers')return {env};if(n==='@/app/chatgpt-auth')return {getChatGPTUser:async()=>identity};if(n.startsWith('@/')||n.startsWith('.')){const p=n.startsWith('@/')?path.join(root,n.slice(2)):path.resolve(path.dirname(file),n);return load(p+(path.extname(p)?'':'.ts'));}return require(n)},Response,Request,URL,URLSearchParams,Error,crypto:globalThis.crypto,Date,Intl,Set,Map,FormData,Blob,File,TextEncoder,TextDecoder,Uint8Array,ArrayBuffer,AbortController,ReadableStream,btoa,atob,setTimeout:(f,n)=>setTimeout(f,Math.min(n,10)),clearTimeout,console},{filename:file});return exports;}
+const context=load('lib/mcp/context.ts').mcpActor;
+const suppliers=load('app/api/suppliers/route.ts');
+const base='https://test.local';
+const material={id:'material:foreign-test',data:{code:'PRT-042',name:'Filter',unit:'عدد',specs:'V1'}};
+const now=new Date().toISOString();
+sql.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'material',?,1,?,?)").run(material.id,JSON.stringify(material.data),now,now);
+const actor=role=>({userId:'test:'+role,name:role,isAdmin:false,permissions:{read:[],write:[],eventStages:[],supplyRoles:[role]}});
+const request=(route,method='GET',payload)=>new Request(base+route,{method,headers:{origin:base,'Content-Type':'application/json'},body:payload?JSON.stringify(payload):undefined});
+const entities=type=>sql.prepare('SELECT id,data FROM flow_entities WHERE type=? ORDER BY id').all(type).map(row=>({...row,data:JSON.parse(row.data)}));
+async function supplier(mode,data,status,user){
+ const result=await context.run(user,()=>suppliers.POST(request('/api/suppliers','POST',{id:crypto.randomUUID(),confirmed:true,mode,...data})));
+ const body=await result.json();
+ assert.equal(result.status,status,JSON.stringify(body));
+ return body;
+}
+(async()=>{
+ const buyer=actor('foreign'),finance=actor('finance'),technical=actor('engineering');
+ const foreignSupplier=await supplier('supplier',{route:'foreign',kind:'manufacturer',active:true,name:'Foreign Vendor',country:'DE',contact:'Private contact',phone:'5550100',email:'private@example.test'},200,buyer);
+ const foreignLink=await supplier('link',{supplierId:foreignSupplier.id,materialId:material.id},200,buyer);
+ const readCatalog=user=>context.run(user,async()=>await (await suppliers.GET(request('/api/suppliers?material='+material.id))).json());
+ const privateCard=(await readCatalog(technical)).suppliers.find(row=>row.id===foreignSupplier.id);
+ assert.equal(privateCard.data.name,'Foreign Vendor');
+ assert.equal(privateCard.data.email,undefined);
+ assert.equal(privateCard.data.phone,undefined);
+ assert.equal(privateCard.canEditIdentity,false);
+ assert.equal((await readCatalog(buyer)).suppliers.find(row=>row.id===foreignSupplier.id).data.email,'private@example.test');
+ const historyApi=load('app/api/suppliers/history/route.ts'),path='/api/suppliers/history';
+ const historyData={id:crypto.randomUUID(),linkId:foreignLink.id,reference:'Invoice ۴۲',quantity:'۲',unit:'عدد',price:'11.2',currency:'USD'};
+ const postHistory=(user,metadata)=>{
+  const body=new FormData();
+  body.append('metadata',JSON.stringify(metadata));
+  body.append('file',new File(['historical invoice'],'invoice.pdf'));
+  return context.run(user,()=>historyApi.POST(new Request(base+path,{method:'POST',headers:{origin:base},body})));
+ };
+ const operationalState=()=>JSON.stringify({orders:entities('purchase_order'),receipts:entities('receipt'),stock:sql.prepare('SELECT * FROM inventory_balances ORDER BY id').all()});
+ const beforeHistory=operationalState();
+ assert.equal((await postHistory(finance,historyData)).status,403);
+ const registered=await postHistory(buyer,historyData);
+ assert.equal(registered.status,201,await registered.text());
+ assert.equal((await postHistory(buyer,historyData)).status,200);
+ assert.equal((await postHistory(buyer,{...historyData,id:crypto.randomUUID(),reference:'invoice 42'})).status,409);
+ assert.equal(operationalState(),beforeHistory);
+ assert.equal(entities('supplier_material').find(row=>row.id===foreignLink.id).data.status,'pending');
+ const historyResponse=user=>context.run(user,()=>historyApi.GET(request(path+'?link='+foreignLink.id)));
+ assert.equal((await historyResponse(technical)).status,403);
+ assert.equal((await historyResponse(actor('domestic'))).status,403);
+ const history=await (await historyResponse(finance)).json();
+ assert.equal(history.entries.length,1);
+ assert.equal(history.entries[0].price,'11.2');
+ assert.equal(history.entries[0].day,'');
+ assert.equal(history.entries[0].files.length,1);
+ const download=user=>context.run(user,()=>historyApi.GET(request(path+'?file='+history.entries[0].files[0].id)));
+ assert.equal((await download(technical)).status,403);
+ assert.equal(await (await download(finance)).text(),'historical invoice');
+ assert.equal(sql.prepare('PRAGMA foreign_key_check').all().length,0);
+ console.log('PASS foreign purchase history: restricted identity and prices, role-checked attachment download, duplicate and retry handling, no inventory or purchase effects.');
+})().catch(error=>{console.error(error);process.exitCode=1;});

@@ -54,9 +54,11 @@ export async function POST(request:Request){try{checkOrigin(request);const u=awa
  else if(b.mode==='approve_bom'){need('manager');const x=unit();
   const base=s.boms.find((v:any)=>v.id===x.bomId),product=s.records.find((r:any)=>r.kind==='product'&&r.id===(x.productId||base?.product_id));
   if(product){
-   const productData=JSON.parse(product.payload),issue=productProductionIssue(productData,'project');
+   const payload=product.payload;
+   if(typeof payload!=='string')return fail('اطلاعات محصول پروژه قابل خواندن نیست.',409);
+   const productData=JSON.parse(payload),issue=productProductionIssue(productData,'project');
    if(issue)fail(issue);
-   if(productData.createdAsDraft==='true')guard('EXISTS(SELECT 1 FROM records WHERE id=? AND payload=?)',product.id,product.payload);
+   if(productData.createdAsDraft==='true')guard('EXISTS(SELECT 1 FROM records WHERE id=? AND payload=?)',product.id,payload);
   }
   if(!x.lines.length)fail('فهرست قطعات خالی است.');x.approved={version:x.versions.length,...stamp};if(p.executionVersion===2){const sourceWarehouse=s.entities.find((e:any)=>e.type==='material_warehouse'&&e.id===b.sourceWarehouseId&&e.data.active&&e.data.warehouseType==='storage');if(!sourceWarehouse)fail('انبار مرکزی تأمین‌کننده را انتخاب کنید.');for(const l of x.lines){const ids=s.records.filter((r:any)=>r.kind==='batch'&&JSON.parse(r.payload).partCode===l.partCode&&JSON.parse(r.payload).unit===l.unit&&JSON.parse(r.payload).status==='تأیید').map((r:any)=>r.id),available=s.entries.filter((e:any)=>e.warehouse==='line'&&ids.includes(e.item_id)).reduce((n:number,e:any)=>n+e.delta,0),pending=s.entities.filter((e:any)=>e.type==='request'&&e.data.materialId===l.materialId&&['line_review','pending','awaiting_line_receipt'].includes(e.data.state)).reduce((n:number,e:any)=>n+e.data.quantity,0),quantity=Math.max(0,l.quantity-available-pending);if(quantity){const rid='project-demand:'+id+':'+x.id+':'+x.versions.length+':'+l.materialId;stmts.push(db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'request',?,1,?,?)").bind(rid,JSON.stringify({materialId:l.materialId,quantity,state:'line_review',projectId:id,projectUnitId:x.id,warehouseId:sourceWarehouse.id,requestedBy:u.name,notes:'کسری BOM پروژه؛ بررسی انبار خط پیش از ارسال به مرکزی'}),now,now));}}}}
  else if(b.mode==='budget'){need('finance');p.budgets.push({amount:amount(b.amount),...stamp});p.contractAmount=amount(b.contractAmount);p.remaining=amount(b.remaining);}

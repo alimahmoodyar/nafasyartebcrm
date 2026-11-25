@@ -20,7 +20,8 @@ export async function GET(request:Request){try{
  const f=await assetRow(q.get('id')||'');if(!f||f.type!=='asset_file')assetFail('مدرک یافت نشد.',404);
  if(f.data.purpose==='transfer_photo')await accessTransferPhoto(u,f);else {
  const {r:parent,a}=await accessWorkflowAsset(u,f.data.assetId);
- if(f.data.purpose==='purchase'){if(!a.custodian)assetFail('مدارک خرید فقط در دسترسی اموال‌دار است.',403);}else if(parent.data.custodyId!==f.data.custodyId)assetFail('مدرک مربوط به تحویل پیشین است.',404);}
+ if(f.data.purpose==='employee_request'){if(!a.custodian&&(a.external||!ownsAsset(parent.data,a)||f.data.actor!==u.userId||f.data.custodyId!==(parent.data.custodyId||'')))assetFail('عکس درخواست در دسترسی شما نیست.',404);}
+ else if(f.data.purpose==='purchase'){if(!a.custodian)assetFail('مدارک خرید فقط در دسترسی اموال‌دار است.',403);}else if(parent.data.custodyId!==f.data.custodyId)assetFail('مدرک مربوط به تحویل پیشین است.',404);}
  const object=await firmwareBucket().get(f.data.objectKey);if(!object)assetFail('فایل در دسترس نیست.',404);const bytes=await object!.arrayBuffer();
  if(bytes.byteLength!==f.data.byteSize||await sha256(bytes)!==f.data.sha256)assetFail('یکپارچگی فایل تأیید نشد.',503);
  const mime=q.get('view')==='preview'?imageType(new Uint8Array(bytes)):'';
@@ -29,14 +30,16 @@ export async function GET(request:Request){try{
 export async function POST(request:Request){let key='',fileId='';try{
  checkOrigin(request);const u=await requireAccess();if(request.headers.get('x-asset-account')&&request.headers.get('x-asset-account')!==u.userId)assetFail('حساب ورود تغییر کرده است؛ صفحه را تازه کنید.',409);
  const q=new URL(request.url).searchParams;fileId=taskRequired(q.get('id'));const assetId=taskRequired(q.get('assetId')),filename=taskRequired(q.get('filename'),180),purpose=q.get('purpose')||'custody';
- if(!['custody','purchase','transfer_photo'].includes(purpose)||q.get('confirmed')!=='true'||! /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(fileId))assetFail('تأیید و شناسه فایل لازم است.');
+ if(!['custody','purchase','transfer_photo','employee_request'].includes(purpose)||q.get('confirmed')!=='true'||! /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(fileId))assetFail('تأیید و شناسه فایل لازم است.');
  if(purpose==='transfer_photo')return await uploadTransferPhoto(request,u,q);
  const members=await assetMembers(),{r,a}=await accessWorkflowAsset(u,assetId),rows=await assetRows();
+ const requestOperationId=q.get('requestOperationId')||'';
+ if(purpose==='employee_request'&&(u.profileReview||a.external||r.data.holderKind!=='employee'||!ownsAsset(r.data,a)||r.data.pending||r.data.lifecycle==='disposed'||! /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestOperationId)))assetFail('پیوست فقط برای درخواست دارنده فعلی مجاز است.',403);
  if(purpose==='purchase'?!a.custodian:!(a.custodian||ownsAsset(r.data,a)||technicalAsset(r.data,a)))assetFail('اجازه پیوست این مدرک را ندارید.',403);
- const bytes=await boundedBody(request,MAX_BATCH_FILE_BYTES);try{validateBatchFile(filename,bytes.length)}catch(e){assetFail((e as Error).message)}const hash=await sha256(bytes.buffer as ArrayBuffer),old=rows.find(x=>x.id===fileId);
- if(old){if(old.type!=='asset_file'||old.data.assetId!==r.id||(old.data.purpose||'custody')!==purpose||purpose!=='purchase'&&old.data.custodyId!==r.data.custodyId||old.data.actor!==u.userId||old.data.sha256!==hash||old.data.filename!==filename)assetFail('شناسه فایل تکراری است.',409);return Response.json({id:fileId,repeated:true},{headers});}
+ const bytes=await boundedBody(request,MAX_BATCH_FILE_BYTES);try{validateBatchFile(filename,bytes.length)}catch(e){assetFail((e as Error).message)}if(purpose==='employee_request'&&!imageType(bytes))assetFail('عکس باید JPEG، PNG یا WebP باشد.');const hash=await sha256(bytes.buffer as ArrayBuffer),old=rows.find(x=>x.id===fileId);
+ if(old){if(old.type!=='asset_file'||old.data.assetId!==r.id||(old.data.purpose||'custody')!==purpose||purpose!=='purchase'&&(old.data.custodyId||'')!==(r.data.custodyId||'')||purpose==='employee_request'&&old.data.requestOperationId!==requestOperationId||old.data.actor!==u.userId||old.data.sha256!==hash||old.data.filename!==filename)assetFail('شناسه فایل تکراری است.',409);return Response.json({id:fileId,repeated:true},{headers});}
  if(String(r.revision)!==q.get('revision'))assetFail('تحویل یا پرونده تغییر کرده؛ تازه‌سازی کنید.',409);
  key='assets/'+assetId+'/'+fileId+'/'+crypto.randomUUID();await firmwareBucket().put(key,bytes,{httpMetadata:{contentType:'application/octet-stream'}});
- await commitAssets(u,crypto.randomUUID(),JSON.stringify({fileId,assetId,filename,hash,purpose}),rows,members,[{id:fileId,type:'asset_file',revision:0,data:{assetId,custodyId:r.data.custodyId,purpose,filename,mime:imageType(bytes),actor:u.userId,objectKey:key,sha256:hash,byteSize:bytes.length}}],'upload');
+ await commitAssets(u,crypto.randomUUID(),JSON.stringify({fileId,assetId,filename,hash,purpose}),rows,members,[{id:fileId,type:'asset_file',revision:0,data:{assetId,custodyId:purpose==='employee_request'?(r.data.custodyId||''):r.data.custodyId,purpose,...(purpose==='employee_request'?{requestOperationId}:{}),filename,mime:imageType(bytes),actor:u.userId,objectKey:key,sha256:hash,byteSize:bytes.length}}],'upload');
  return Response.json({id:fileId,filename},{headers});
 }catch(e){if(key)try{const linked:any=await storage().prepare("SELECT data FROM flow_entities WHERE id=? AND type='asset_file'").bind(fileId).first();if(linked&&JSON.parse(linked.data).objectKey===key)return Response.json({id:fileId},{headers});await firmwareBucket().delete(key)}catch{}return accessResponse(e)||Response.json({error:'مدرک ذخیره نشد؛ فهرست مدارک را تازه کنید.'},{status:409,headers})}}

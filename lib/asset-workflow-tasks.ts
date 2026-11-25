@@ -3,10 +3,11 @@ import {assetIdentity,technicalAsset} from './asset-workflow';
 import {assetMembers,assetInternal} from './assets';
 import {storedAccessPermissions} from './permissions';
 import {dayAt} from './duties';
+import {currentEmployeeAssetRequests,employeeAssetKinds,employeeAssetTerminal} from './asset-employee-request';
 export function assetServiceDue(d:any){const p=d.servicePlan;return !!p&&(!!p.nextDay&&p.nextDay<=dayAt()||p.hours>0&&(d.meters?.hours||0)-p.baselineHours>=p.hours||p.cycles>0&&(d.meters?.cycles||0)-p.baselineCycles>=p.cycles);}
 /** Same custodian obligations for the assigned cartable and administrator role review. */
 export function assetCustodianSteps(d:any,revision=0){
- const steps:{stage:string;title:string}[]=[],add=(stage:string,title:string)=>steps.push({stage,title});
+ const steps:{stage:string;title:string;requesterId?:string}[]=[],add=(stage:string,title:string)=>steps.push({stage,title});
  if(d.lifecycle==='disposed')return steps;
  if(d.pending&&(d.pending.state==='awaiting_approval'||d.pending.kind!=='employee'))add('transfer:'+d.pending.id+':'+d.pending.state,d.pending.state==='awaiting_approval'?'مجوز انتقال اموال':'پیگیری تحویل اموال');
  if(d.signatureRequired&&!d.signedReceiptId)add('signature:'+d.custodyId,'رسید امضاشده تحویل اموال');
@@ -15,6 +16,9 @@ export function assetCustodianSteps(d:any,revision=0){
  if(d.issue?.state==='open'&&!d.technicalId)add('fault:'+(d.issue.id||d.issue.at||revision),'بررسی خرابی / خطر اموال');
  if(assetServiceDue(d))add('service:'+d.servicePlan.baseAt,'سرویس سررسیدشده اموال');
  if(d.service?.state==='awaiting_review'&&!d.technicalId)add('review:'+d.service.id,'تأیید فنی پایان سرویس');
+ for(const request of currentEmployeeAssetRequests(d))if(['submitted','review'].includes(request.state)){
+  steps.push({stage:'employee-request:'+request.version,title:request.state==='review'?'تأیید نهایی اصلاح شناسنامه':'بررسی درخواست '+employeeAssetKinds[request.kind],requesterId:request.requesterId});
+ }
  return steps;
 }
 // Stable tasks are derived from each current record. Revocation retires old ownership on the next tick.
@@ -22,7 +26,11 @@ export async function syncAssetWorkflowTasks(){const db=storage(),policy:any=awa
  while(true){const rows=(await db.prepare("SELECT id,data,revision FROM flow_entities WHERE type='asset_item' AND id>? ORDER BY id LIMIT 100").bind(after).all()).results as any[];if(!rows.length)break;
   for(const r of rows){const d=JSON.parse(r.data),wanted:{member:string;stage:string;title:string;cartableRole:string}[]=[],add=(ids:string[],stage:string,title:string,cartableRole='personal')=>ids.forEach(member=>wanted.push({member,stage,title,cartableRole}));
    if(d.lifecycle!=='disposed'){
-    for(const step of assetCustodianSteps(d,r.revision))add(keepers,step.stage,step.title,'custodian');
+    for(const step of assetCustodianSteps(d,r.revision))add(keepers.filter(id=>id!==step.requesterId),step.stage,step.title,'custodian');
+    for(const request of currentEmployeeAssetRequests(d)){
+     const title=request.state==='returned'?'تکمیل درخواست اموال':request.state==='editing'?'اصلاح اطلاعات مال':employeeAssetTerminal(request)&&!request.seen?'نتیجهٔ درخواست '+employeeAssetKinds[request.kind]:'';
+     if(title)add([request.requesterId],'employee-request:'+request.version,title);
+    }
     if(d.pending?.state==='awaiting_receipt'&&d.pending.kind==='employee')add([d.pending.holderId],'transfer:'+d.pending.id+':'+d.pending.state,'پیگیری تحویل اموال');
     if(d.issue?.state==='open'&&d.technicalId)add([d.technicalId],'fault:'+(d.issue.id||d.issue.at||r.revision),'بررسی خرابی / خطر اموال');
     if(assetServiceDue(d)&&d.servicePlan.executorId&&!keepers.includes(d.servicePlan.executorId))add([d.servicePlan.executorId],'service:'+d.servicePlan.baseAt,'سرویس سررسیدشده اموال');

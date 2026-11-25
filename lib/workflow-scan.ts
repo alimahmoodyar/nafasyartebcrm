@@ -13,8 +13,9 @@ import {readOfficeService,officeServiceAccess} from './service-office';
 import {transportDriver} from './transport';
 import {GET as packages} from '@/app/api/finished-packages/route';
 import {GET as driverWorkspace} from '@/app/api/transport/driver-workspace/route';
-import {agencyScanWorkspace,customerScanWorkspace,agencyCaseForms,agencyCaseFormAvailable,customerCaseForm,parseWorkflowLabel,type ScanAction,type ScanResult} from './workflow-scan-contract';
+import {agencyScanWorkspace,customerScanWorkspace,lineManagerScanWorkspace,centralStoreScanWorkspace,agencyCaseForms,agencyCaseFormAvailable,customerCaseForm,parseWorkflowLabel,type ScanAction,type ScanResult} from './workflow-scan-contract';
 import {memberId} from './duties';
+import {materialProfileWork} from './role-profiles';
 import {domainWriteAccess} from './service-access';
 import {serviceActions} from './after-sales-labels';
 
@@ -28,15 +29,16 @@ async function transferActions(u:Session,itemId:string,kind:string):Promise<Scan
  if(rows.length>20)throw new AccessError('انتقال‌های متعدد وجود دارد؛ از فهرست انتقال‌ها انتخاب کنید.',409);
  return rows.map(r=>({id:'transfer:'+r.id,title:ids.includes(JSON.parse(r.data).toWarehouseId)?'دریافت انتقال از انبار دیگر':'پیگیری انتقال به انبار دیگر',kind:'transfer',target:r.id}));
 }
-async function hasServiceWorkspace(u:Session,workspace:string){
- if(u.profileReview)return u.profileReview.id===workspace;
+async function assignedWorkspace(u:Session,workspace:string){
+ if(u.profileReview)return u.profileReview.id===workspace?{warehouseIds:u.profileReview.warehouseIds}:undefined;
  const member=await memberId(u);
  const assignment=member?await storage().prepare("SELECT data FROM flow_entities WHERE id=? AND type='member_role_assignment'").bind('member-role-assignment:'+member).first<{data:string}>():null;
- return !!assignment&&JSON.parse(assignment.data).bindings.some((binding:{profileId:string})=>binding.profileId===workspace);
+ const bindings=assignment?JSON.parse(assignment.data).bindings as {profileId:string;warehouseIds?:string[]}[]:[];
+ return bindings.find(binding=>binding.profileId===workspace);
 }
 async function resolveAgencyScan(u:Session,label:ReturnType<typeof parseWorkflowLabel>):Promise<ScanResult>{
  const db=storage();
- if(!await hasServiceWorkspace(u,agencyScanWorkspace)||u.isAdmin||u.permissions.serviceAgentId||u.permissions.salesAgentId||u.permissions.hospitalCenterId||
+ if(!await assignedWorkspace(u,agencyScanWorkspace)||u.isAdmin||u.permissions.serviceAgentId||u.permissions.salesAgentId||u.permissions.hospitalCenterId||
     !domainWriteAccess(u,'home')||!u.permissions.serviceRoles?.includes('coordinator'))
   throw new AccessError('دسترسی نقش مسئول نمایندگی‌ها در این نشست فعال نیست.',403);
 
@@ -69,7 +71,7 @@ async function resolveAgencyScan(u:Session,label:ReturnType<typeof parseWorkflow
 async function resolveCustomerScan(u:Session,label:ReturnType<typeof parseWorkflowLabel>):Promise<ScanResult>{
  const support=!!u.permissions.serviceRoles?.includes('support');
  const intake=!!u.permissions.serviceRoles?.includes('intake')&&canReceiveDriverReceipt(u,'home');
- if(!officeServiceAccess(u)||(!support&&!intake)||!await hasServiceWorkspace(u,customerScanWorkspace))
+ if(!officeServiceAccess(u)||(!support&&!intake)||!await assignedWorkspace(u,customerScanWorkspace))
   throw new AccessError('دسترسی نقش پاسخ‌گویی مشتری در این نشست فعال نیست.',403);
  const db=storage();
  const officeCases="type='as_case' AND json_extract(data,'$.domain')='home' AND COALESCE(json_extract(data,'$.agentId'),'')=''";
@@ -120,11 +122,63 @@ async function resolveCustomerScan(u:Session,label:ReturnType<typeof parseWorkfl
  if(caseHistory.length)return result(label.kind,[currentCase(caseHistory[0])]);
  throw inaccessible();
 }
+async function resolveLineManagerScan(u:Session,label:ReturnType<typeof parseWorkflowLabel>):Promise<ScanResult>{
+ if(external(u)||!flowRole(u,'production')||!await assignedWorkspace(u,lineManagerScanWorkspace))
+  throw new AccessError('دسترسی نقش مسئول خط تولید در این نشست فعال نیست.',403);
+ const missing=()=>new AccessError('برای این کد، کار مرتبطی در تولید پیدا نشد.',404);
+ if(label.kind!=='device'&&(label.kind!=='unknown'||label.code.length>160||/[:/\n]/.test(label.code)))throw missing();
+ const db=storage();
+ const devices=await db.prepare("SELECT id FROM records WHERE kind='device' AND json_extract(payload,'$.code')=? LIMIT 2").bind(label.code).all<{id:string}>();
+ if(devices.results.length>1)throw new AccessError('سریال یکتا نیست؛ بررسی شناسنامه لازم است.',409);
+ const device=devices.results[0];
+ if(!device)throw missing();
+ const build=await db.prepare("SELECT id,data FROM flow_entities WHERE type='build' AND id=?").bind(device.id).first<{id:string;data:string}>();
+ if(!build)throw missing();
+ const work=materialProfileWork(lineManagerScanWorkspace,[{id:build.id,type:'build',data:JSON.parse(build.data)}]);
+ const actions=work.length?work.map(row=>nav(row.id,row.title,row.section,row.target)):
+  [nav('build-history','مشاهدهٔ وضعیت تولید دستگاه','warehouse',warehouseTarget('flow',device.id,'builds'))];
+ return {kind:label.kind,message:'دستگاه در تولید شناسایی شد.',actions};
+}
+async function resolveCentralStoreScan(u:Session,label:ReturnType<typeof parseWorkflowLabel>):Promise<ScanResult>{
+ const assignment=await assignedWorkspace(u,centralStoreScanWorkspace);
+ if(external(u)||!flowRole(u,'inventory')||!assignment)throw new AccessError('نقش مسئول انبار مرکزی در این نشست فعال نیست.',403);
+ const missing=()=>new AccessError('برای این کد در انبارهای این نقش کاری پیدا نشد.',404);
+ const warehouses=(await warehouseDirectory()).filter(w=>assignment.warehouseIds?.includes(w.id)&&w.data.active&&!w.data.deletedAt&&warehouseMember(u,w,'inventory'));
+ if(!warehouses.length)throw missing();
+ const scope=JSON.stringify(warehouses.map(w=>w.id)),db=storage();
+ type ScanRow={id:string;type:string;data:string};
+ let candidates:ScanRow[];
+ if(label.kind==='batch'){
+  const records=await db.prepare("SELECT id FROM records WHERE kind='batch' AND json_extract(payload,'$.code')=? LIMIT 2").bind(label.code).all<{id:string}>();
+  if(records.results.length!==1)throw missing();
+  const batch=records.results[0].id;
+  candidates=(await db.prepare(`SELECT id,type,data FROM flow_entities WHERE
+   ((type='receipt' AND (id=? OR json_extract(data,'$.batchId')=?) AND json_extract(data,'$.state') IN ('awaiting_warehouse','awaiting_relabel'))
+   OR (type='line_return' AND json_extract(data,'$.batchId')=? AND json_extract(data,'$.state') IN ('pending','resubmitted')))
+   AND json_extract(data,'$.warehouseId') IN (SELECT value FROM json_each(?)) ORDER BY id LIMIT 21`)
+   .bind(batch,batch,batch,scope).all<ScanRow>()).results;
+ }else if(label.kind==='device'||label.kind==='unknown'&&label.code.length<=160&&!/[:/\n]/.test(label.code)){
+  if(!warehouseAccess(u,'finished'))throw missing();
+  const records=await db.prepare("SELECT id FROM records WHERE kind='device' AND json_extract(payload,'$.code')=? LIMIT 2").bind(label.code).all<{id:string}>();
+  if(records.results.length!==1)throw missing();
+  candidates=(await db.prepare(`SELECT id,type,data FROM flow_entities WHERE type='handoff'
+   AND json_extract(data,'$.state')='pending' AND EXISTS(SELECT 1 FROM json_each(data,'$.pending') WHERE value=?)
+   AND json_extract(data,'$.warehouseId') IN (SELECT value FROM json_each(?)) ORDER BY id LIMIT 21`)
+   .bind(records.results[0].id,scope).all<ScanRow>()).results;
+ }else throw missing();
+ if(candidates.length>20)throw new AccessError('چندین کار در جریان است. کار موردنظر را از کارتابل انبار انتخاب کنید.',409);
+ const work=materialProfileWork(centralStoreScanWorkspace,candidates.map(row=>({...row,data:JSON.parse(row.data)})));
+ if(!work.length)throw missing();
+ return {kind:label.kind,message:work.length===1?'کار مرتبط با لیبل شناسایی شد.':'کار موردنظر را انتخاب کنید.',
+  actions:work.map(row=>nav(row.id,row.title,row.section,row.target))};
+}
 /** Read-only resolution. All subsequent writes still execute the owning domain's guards. */
 export async function resolveWorkflowScan(u:Session,raw:string,origin:string,workspace=''):Promise<ScanResult>{
  let label:ReturnType<typeof parseWorkflowLabel>;try{label=parseWorkflowLabel(raw,origin)}catch(e){throw new AccessError((e as Error).message,400)}
  if(workspace===agencyScanWorkspace)return resolveAgencyScan(u,label);
  if(workspace===customerScanWorkspace)return resolveCustomerScan(u,label);
+ if(workspace===lineManagerScanWorkspace)return resolveLineManagerScan(u,label);
+ if(workspace===centralStoreScanWorkspace)return resolveCentralStoreScan(u,label);
  const db=storage(),actions:ScanAction[]=[];
  if(label.kind==='asset'){
   const {accessWorkflowAsset}=await import('./asset-workflow');const {r}=await accessWorkflowAsset(u,label.code);

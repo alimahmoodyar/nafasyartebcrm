@@ -109,7 +109,7 @@ export const jobRoles:JobRole[]=[
  job('engineering','تحقیق و توسعه','انبار و تولید','مشخصات و BOM، مسیر تأمین، بررسی فنی پیشنهاد و تغییر طراحی',presets['تحقیق‌وتوسعه و مهندسی طراحی']),
  job('qc','کنترل کیفیت','کیفیت','کنترل ورودی و نهایی، صلاحیت منبع و ثبت عدم انطباق',{...presets['کنترل کیفیت'],qmsRoles:['qc']}),
  job('domestic','کارشناس خرید داخلی','خرید','استعلام داخلی، پرونده تأمین‌کننده و پیگیری سفارش و مدارک',{supplyRoles:['domestic'],flowRoles:['procurement'],read:['batch']}),
- job('foreign','کارشناس خرید خارجی','خرید','منبع‌یابی، نمونه، اسناد واردات، پیگیری ارز، بار و ترخیص',{supplyRoles:['foreign'],flowRoles:['procurement'],read:['batch']}),
+ job('foreign','کارشناس بازرگانی خارجی','خرید','منبع‌یابی، نمونه، اسناد واردات، پیگیری ارز، بار و ترخیص',{supplyRoles:['foreign'],flowRoles:['procurement'],read:['batch']}),
  job('commerce','مدیر بازرگانی','خرید','مدیریت مسئول‌ها و پیگیری خرید داخلی و خارجی',presets['مدیر بازرگانی']),
  job('purchase_finance','کارشناس خرید مالی','مالی','بودجه و صدور خرید، بررسی بدهی، مجوز پرداخت و تأیید بهای خرید',{finance:'write',supplyRoles:['finance']}),
  job('finance','کارشناس مالی','مالی','مشاهده و ثبت بررسی‌های مالی و هزینه‌ها',{...presets['مالی'],financialRead:[...manualFinancialDomains],financialWrite:[...manualFinancialDomains]}),

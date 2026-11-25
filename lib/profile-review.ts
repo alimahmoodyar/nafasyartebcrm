@@ -14,7 +14,7 @@ export const profileJobRoles:Record<string,string[]>={
  'central-store':['inventory','service_inventory'],'line-store':['production_store_assistant'],'line-manager':['production'],
  'warehouse-worker':[],'production-worker':[],'packaging-worker':[],'repair-worker':[],
  quality:['qc'],technical:['engineering','product_manager'],'finance-director':['finance_director','purchase_finance'],
- ceo:['ceo'],domestic:['domestic'],foreign:['foreign'],sales:['sales'],
+ ceo:['ceo'],domestic:['domestic'],foreign:['foreign'],'foreign-commerce-lead':[],sales:['sales'],
  'home-sales':['home_sales'],'hospital-sales':['hospital_sales'],'sales-representative':['sales_agent'],'sales-manager':['sales_manager'],'sales-finance':['sales_finance'],treasurer:['treasurer'],
  'home-service-intake':['service_intake'],'hospital-service-intake':['service_intake'],'home-service-customer-support':['service_support','service_intake'],'home-service-technician':['service_technician'],'home-service-manager':['service_manager'],'home-service-representative':['service_agent'],'home-service':['service_support','service_intake','service_technician','service_coordinator'],'hospital-service':['service_support','service_intake','service_technician'],logistics:['transport_manager'],driver:['driver']
 };

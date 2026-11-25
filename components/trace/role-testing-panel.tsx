@@ -8,6 +8,8 @@ import {DriverDashboard} from './driver-dashboard';
 import {useEffect,useRef,useState} from 'react';
 import {ArrowLeftRight,Boxes,ClipboardList,Search,UserRound} from 'lucide-react';
 import {batchScanCode} from '@/lib/batch-qr';
+import type {CartableRow} from '@/lib/cartable-view';
+import {LineManagerHome,OperationalRoleHome} from './line-manager-home';
 import './technical-role.css';
 import type {RoleProfile,ProfileWork} from '@/lib/role-profiles';
 
@@ -46,7 +48,7 @@ function BatchLookup(){
   </form>}
  </div>;
 }
-export function RoleTestingPanel({assigned,targetId='',onNavigate,onProfile,onAccessChanged,representativeDashboard,serviceRepresentativeDashboard,officeServiceDashboard,centralWarehouseTools}:{assigned?:{profile:RoleProfile;count:number;taskTitles?:string[];exit:()=>void};targetId?:string;onNavigate:(section:string,target?:string)=>void;onProfile:(profile:{id:string;title:string}|null)=>void;onAccessChanged?:()=>Promise<void>;representativeDashboard?:React.ReactNode;serviceRepresentativeDashboard?:React.ReactNode;centralWarehouseTools?:React.ReactNode;officeServiceDashboard?:React.ReactNode}){
+export function RoleTestingPanel({assigned,targetId='',onNavigate,onProfile,onAccessChanged,representativeDashboard,serviceRepresentativeDashboard,officeServiceDashboard,centralWarehouseTools}:{assigned?:{profile:RoleProfile;count:number;taskTitles?:string[];tasks?:CartableRow[];loading?:boolean;error?:string;limited?:boolean;exit:()=>void};targetId?:string;onNavigate:(section:string,target?:string)=>void;onProfile:(profile:{id:string;title:string}|null)=>void;onAccessChanged?:()=>Promise<void>;representativeDashboard?:React.ReactNode;serviceRepresentativeDashboard?:React.ReactNode;centralWarehouseTools?:React.ReactNode;officeServiceDashboard?:React.ReactNode}){
  const [profiles,setProfiles]=useState<RoleProfile[]>([]),[previewSnapshot,setSnapshot]=useState<Snapshot|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(false);
  const snapshot:Snapshot|null=assigned?{profile:assigned.profile,work:[],unverified:[],personalPreview:false}:previewSnapshot;
  const [query,setQuery]=useState('');
@@ -87,6 +89,17 @@ export function RoleTestingPanel({assigned,targetId='',onNavigate,onProfile,onAc
  if(id==='custodian'&&!snapshot&&!error&&!choosing)return <section className="panel inside" role="status">در حال دریافت پنل اموال‌دار…</section>;
  if(snapshot?.profile.id==='driver'&&!choosing)return <DriverDashboard accountKey={snapshot.profile.id} onNavigate={onNavigate}/>;
  if(id==='driver'&&!snapshot&&!error&&!choosing)return <section className="panel inside" role="status">در حال دریافت پنل راننده…</section>;
+ if(['line-manager','central-store'].includes(id)&&snapshot?.profile.id===id&&!choosing){
+  const work=assigned?(assigned.tasks||[]).map(row=>({
+   id:row.id,title:row.title,context:row.context,reference:row.subtitle,
+   section:row.kind==='position'?row.source.section:'tasks',target:row.kind==='position'?row.source.target:undefined,
+  })):snapshot.work.map(row=>({...row,reference:row.sourceId}));
+  const home={profile:snapshot.profile,work,loading:assigned?!!assigned.loading:loading,error:assigned?assigned.error:error,
+   limited:assigned?.limited||snapshot.workHasMore,onExit:assigned?.exit,onNavigate};
+  return id==='line-manager'?<LineManagerHome {...home}/>:<OperationalRoleHome {...home} groupLabel="انبار مرکزی">
+   {centralWarehouseTools||<p>ابزارهای انبار برای دسترسی فعلی در دسترس نیستند.</p>}
+  </OperationalRoleHome>;
+ }
  const technical=snapshot?.profile.id==='technical';
  const cartableButton=snapshot&&!snapshot.profile.pendingWorkflow&&<button className={'panel inside'+(technical?' technical-cartable':'')} disabled={loading} style={{cursor:"pointer",textAlign:"right",width:"100%"}} onClick={()=>onNavigate("tasks")}><ClipboardList size={28}/><h3>کارتابل ({(assigned?.count??snapshot.work.length).toLocaleString("fa-IR")})</h3><p>{snapshot.sample?'کارهای فرایندی این جایگاه':'پیام‌های مستقیم و کارهای فرایندی این جایگاه'}</p></button>;
  return <section className={'panel'+(technical?' technical-role-home':'')} dir="rtl"><div className="panelhead"><div><h2>{snapshot?'پروفایل نقش '+snapshot.profile.title:'پروفایل نقش‌ها'}</h2>{!assigned&&<p className="subtle">جایگاه مستقل از شخص؛ بررسی مرحله‌به‌مرحله فرایندهای فروش، انبار و تولید</p>}</div>{id&&<button className="btn" onClick={()=>void select(null)}>همه نقش‌ها</button>}</div>

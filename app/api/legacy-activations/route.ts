@@ -1,5 +1,6 @@
 import {AccessError,accessResponse,checkOrigin,requireAdmin} from '@/lib/authorization';
 import {boundedBody} from '@/lib/firmware-storage';
+import {latinDigits} from '@/lib/persian-date';
 import {storage} from '@/lib/storage';
 import {trainingContext} from '@/lib/training-context';
 import {cleanLegacyActivation,legacyActivationChunkSize,legacyDetailsComparison,legacyActivationType,legacyAgencyType,type LegacyActivation,type LegacyPreview} from '@/lib/legacy-activation-import';
@@ -32,13 +33,14 @@ export async function GET(request:Request){
   scope(request,user.userId);
   const db=storage(),q=new URL(request.url).searchParams;
   if(q.get('view')==='history'){
-   const page=Number(q.get('page')||1),query=(q.get('q')||'').trim().slice(0,160).toUpperCase();
+   const page=Number(q.get('page')||1),query=latinDigits((q.get('q')||'').trim().slice(0,160)).toUpperCase();
    if(!Number.isSafeInteger(page)||page<1||page>100000)fail('شمارهٔ صفحه معتبر نیست.');
    const data=await db.prepare(`SELECT e.data,s.data AS salesData FROM flow_entities e
     LEFT JOIN flow_entities m ON m.type=? AND m.id='legacy-activation-agency:'||json_extract(e.data,'$.event.agencyId')
     LEFT JOIN flow_entities s ON s.type='sales_agent' AND s.id=json_extract(m.data,'$.salesId')
-    WHERE e.type=? AND (?='' OR e.id=? OR json_extract(e.data,'$.event.serial')=? OR json_extract(e.data,'$.event.setSerial')=?)
-    ORDER BY e.id LIMIT 41 OFFSET ?`).bind(legacyAgencyType,legacyActivationType,query,eventId(query),query,query,(page-1)*40)
+    WHERE e.type=? AND (?='' OR e.id=? OR json_extract(e.data,'$.event.serial')=?
+     OR json_extract(e.data,'$.event.setSerial')=? OR json_extract(e.data,'$.event.deviceSetSerial')=?)
+    ORDER BY e.id LIMIT 41 OFFSET ?`).bind(legacyAgencyType,legacyActivationType,query,eventId(query),query,query,query,(page-1)*40)
     .all<{data:string;salesData:string|null}>();
    return json({rows:data.results.slice(0,40).map(row=>({...JSON.parse(row.data),salesName:row.salesData?JSON.parse(row.salesData).name:''})),more:data.results.length>40});
   }

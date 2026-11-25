@@ -3,16 +3,16 @@ import {storage} from '@/lib/storage';
 import {boundedBody} from '@/lib/firmware-storage';
 import {taskRequired as req,taskText as txt,dayAt,validDay} from '@/lib/duties';
 import {scaled} from '@/lib/production';
-import {supplierRead,supplierManage,supplierQuality,supplierCommercial,supplierRoute,supplierRows,supplierEntity,supplierMetrics,qualification,supplierEvidenceBlock,technicalAuthorities,technicalBlock} from '@/lib/suppliers';
+import {supplierRead,supplierManage,supplierQuality,supplierCommercial,supplierRoute,supplierRows,supplierEntity,supplierIdentityView,supplierIdentityWrite,supplierHistoryWrite,supplierMetrics,qualification,supplierEvidenceBlock,technicalAuthorities,technicalBlock} from '@/lib/suppliers';
 import {supplierFields,supplierStates,supplierRisks,supplierHelp} from '@/lib/supplier-contract';
 const json=(v:any,status=200)=>Response.json(v,{status,headers:{'Cache-Control':'private, no-store'}});
 const fail=(s:string,status=400):never=>{throw new AccessError(s,status)};
 export async function GET(request:Request){try{
  const u=await requireAccess();if(!supplierRead(u))fail('دسترسی تأمین‌کنندگان ندارید.',403);
  const materialId=new URL(request.url).searchParams.get('material')||'',suppliers=(await supplierRows('supplier')).filter(s=>supplierRoute(u,s.data.route)),materials=await supplierRows('material'),reviews=await supplierRows('supplier_review'),documents=await supplierRows('supplier_document'),links=(await supplierRows('supplier_material')).filter(l=>(!materialId||l.data.materialId===materialId)&&suppliers.some(s=>s.id===l.data.supplierId));
- const items=await Promise.all(links.map(async l=>{const s=suppliers.find(s=>s.id===l.data.supplierId)!,m=materials.find(m=>m.id===l.data.materialId),commercial=supplierCommercial(u,s.data.route),rs=reviews.filter(r=>r.data.linkId===l.id);return {...l,documents:documents.filter(d=>d.data.supplierId===s.id&&(!d.data.linkId||d.data.linkId===l.id)&&d.data.state==='approved'&&(!d.data.expiresOn||d.data.expiresOn>=dayAt())&&(d.data.visibility!=='commercial'||commercial)).map(d=>({id:d.id,title:d.data.title,version:d.data.version})),metrics:await supplierMetrics(l),block:m?(qualification(l,s,m)||await supplierEvidenceBlock(l)):'کالا موجود نیست',reviews:rs.map(r=>commercial?r:{...r,data:{...r.data,scores:undefined,score:undefined}}),commercial};}));
+ const items=await Promise.all(links.map(async l=>{const s=suppliers.find(s=>s.id===l.data.supplierId)!,m=materials.find(m=>m.id===l.data.materialId),commercial=supplierCommercial(u,s.data.route),rs=reviews.filter(r=>r.data.linkId===l.id);return {...l,data:l.data&&s.data.route==='foreign'&&!commercial?{...l.data,notes:undefined,commercialDetails:undefined}:l.data,documents:documents.filter(d=>d.data.supplierId===s.id&&(!d.data.linkId||d.data.linkId===l.id)&&d.data.state==='approved'&&(!d.data.expiresOn||d.data.expiresOn>=dayAt())&&(d.data.visibility!=='commercial'||commercial)).map(d=>({id:d.id,title:d.data.title,version:d.data.version})),metrics:await supplierMetrics(l),block:m?(qualification(l,s,m)||await supplierEvidenceBlock(l)):'کالا موجود نیست',reviews:rs.map(r=>commercial?r:{...r,data:{...r.data,scores:undefined,score:undefined,supplierSnapshot:s.data.route==='foreign'?undefined:r.data.supplierSnapshot}}),commercial};}));
  const orders=(await supplierRows('purchase_order')).filter(o=>links.some(l=>l.id===o.data.supplierLinkId)).map(o=>supplierCommercial(u,o.data.route)?o:{id:o.id,created:o.created,data:{supplierLinkId:o.data.supplierLinkId,state:o.data.state,quantity:o.data.quantity,unit:o.data.unit,eta:o.data.promisedEta||o.data.eta}});
- return json({suppliers,links:items,orders,materials:materials.map(m=>({id:m.id,...m.data,revision:m.revision})),canManage:supplierManage(u),canQuality:supplierQuality(u),technicalAuthorities:technicalAuthorities(u),help:supplierHelp});
+ return json({suppliers:suppliers.map(s=>({...supplierIdentityView(u,s),canEditIdentity:supplierIdentityWrite(u,s.data.route)})),links:items,orders,canWriteHistory:supplierHistoryWrite(u),materials:materials.map(m=>({id:m.id,...m.data,revision:m.revision})),canManage:supplierManage(u),canQuality:supplierQuality(u),technicalAuthorities:technicalAuthorities(u),help:supplierHelp});
  }catch(e){return accessResponse(e)||json({error:'دریافت تأمین‌کنندگان انجام نشد.'},503)}}
 export async function POST(request:Request){try{
  checkOrigin(request);const u=await requireAccess();if(!supplierRead(u))fail('دسترسی ندارید.',403);const b=JSON.parse(new TextDecoder().decode(await boundedBody(request,40000))),db=storage(),id=req(b.id,80),mode=req(b.mode,30),now=new Date().toISOString();
@@ -26,7 +26,7 @@ export async function POST(request:Request){try{
  let target=id;
  if(mode==='archive'||mode==='restore'){
   const old=await get(req(b.supplierId),'supplier');target=old.id;
-  if(!supplierRoute(u,old.data.route))fail('مجوز مسیر تأمین را ندارید.',403);
+  if(!supplierIdentityWrite(u,old.data.route))fail('مجوز ویرایش پرونده تأمین‌کننده را ندارید.',403);
   if(b.revision!==old.revision)fail('پرونده تغییر کرده است.',409);
   if((mode==='archive')===!!old.data.deletedAt)fail('وضعیت حذف پرونده تغییر کرده است.',409);
   const reason=req(b.reason,3000),event={action:mode,reason,actor:u.userId,at:now};
@@ -47,10 +47,17 @@ export async function POST(request:Request){try{
   if(linkMaterial&&b.supplierId)fail('اتصال هم‌زمان به کالا فقط برای تأمین‌کننده جدید است.');
 
   const old=b.supplierId?await get(req(b.supplierId),'supplier'):null;if(old?.data.deletedAt)fail('برای ویرایش ابتدا پرونده حذف‌شده را بازیابی کنید.',409);if(old&&b.revision!==old.revision)fail('پرونده تغییر کرده است.',409);
-  const route=req(b.route);if(!['domestic','foreign'].includes(route)||!supplierRoute(u,route)||old&&!supplierRoute(u,old.data.route))fail('مجوز مسیر تأمین را ندارید.',403);if(old&&old.data.route!==route)fail('مسیر پرونده ثابت است؛ برای مسیر دیگر پرونده جدا بسازید.');
+  const route=req(b.route);if(!['domestic','foreign'].includes(route)||!supplierIdentityWrite(u,route)||old&&!supplierIdentityWrite(u,old.data.route))fail('مجوز مسیر تأمین را ندارید.',403);if(old&&old.data.route!==route)fail('مسیر پرونده ثابت است؛ برای مسیر دیگر پرونده جدا بسازید.');
   if(!['manufacturer','trader'].includes(b.kind)||typeof b.active!=='boolean')fail('نوع و وضعیت تأمین‌کننده معتبر نیست.');
   const phones=Array.isArray(b.phones)?b.phones.map((v:any)=>txt(v||'',100)).filter(Boolean):[txt(b.phone||'',100)].filter(Boolean);if(phones.length>10)fail('حداکثر ۱۰ شماره تلفن می‌توانید ثبت کنید.');const d:any={...old?.data,route,kind:b.kind,active:b.active};for(const k of Object.keys(supplierFields))d[k]=txt(b[k]||'',k==='notes'?3000:500);d.phone=phones[0]||'';d.phones=phones;for(const k of ['name','country','contact','phone'])if(!d[k])fail('نام، کشور، مسئول تماس و تلفن اصلی لازم است.');if(d.email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email))fail('ایمیل معتبر نیست.');target=old?.id||id;put(target,'supplier',d,old);
   if(linkMaterial)put('supplier-material:'+id,'supplier_material',{supplierId:target,materialId:linkMaterial.id,partCode:linkMaterial.data.code,supplierCode:txt(b.supplierCode||'',100),status:'pending',specs:linkMaterial.data.specs||'',unit:linkMaterial.data.unit,qualityRisk:'high',supplyRisk:'high',reviewDue:'',supplierRevision:1,notes:txt(b.linkNotes||'',3000)});
+ }else if(mode==='commercial_details'){
+  const link=await get(req(b.linkId),'supplier_material'),supplier=await get(link.data.supplierId,'supplier');
+  if(supplier.data.route!=='foreign'||!supplierHistoryWrite(u))fail('مجوز ویرایش مشخصات خرید خارجی را ندارید.',403);
+  if(supplier.data.deletedAt||b.revision!==link.revision)fail('ارتباط کالا تغییر کرده یا تأمین‌کننده حذف شده است.',409);
+  const commercialDetails={brand:txt(b.brand||'',150),packaging:txt(b.packaging||'',300),minimumOrder:txt(b.minimumOrder||'',100),leadTime:txt(b.leadTime||'',100)};
+  target=link.id;
+  put(link.id,'supplier_material',{...link.data,supplierCode:txt(b.supplierCode||'',100),commercialDetails},link);
  }else if(mode==='link'){
   const s=await get(req(b.supplierId),'supplier'),m=await get(req(b.materialId),'material');if(!supplierRoute(u,s.data.route))fail('مجوز مسیر ندارید.',403);
   if(s.data.deletedAt)fail('تأمین‌کننده حذف شده است.',409);

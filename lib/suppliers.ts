@@ -3,11 +3,19 @@ import {AccessError} from './authorization';
 import {dayAt} from './duties';
 import type {Session} from './permissions';
 export const supplierTypes=['supplier','supplier_material','supplier_review'];
-export const supplierRead=(u:Session)=>technicalAuthorities(u).length>0||u.isAdmin||!!u.permissions.supplyRoles?.some(r=>['ceo','engineering','finance','domestic','foreign','inventory'].includes(r))||!!u.permissions.flowRoles?.some(r=>['qc','inventory','procurement'].includes(r));
+export const supplierRead=(u:Session)=>technicalAuthorities(u).length>0||u.isAdmin||!!u.permissions.supplyRoles?.some(r=>['ceo','engineering','finance','domestic','foreign','inventory','commerce_manager'].includes(r))||!!u.permissions.flowRoles?.some(r=>['qc','inventory','procurement'].includes(r));
 export const supplierManage=(u:Session)=>u.isAdmin||!!u.permissions.supplyRoles?.some(r=>['domestic','foreign','engineering'].includes(r))||!!u.permissions.flowRoles?.includes('procurement');
 export const supplierQuality=(u:Session)=>technicalAuthorities(u).includes('quality');
-export const supplierCommercial=(u:Session,route:string)=>u.isAdmin||!!u.permissions.supplyRoles?.some(r=>['ceo','finance','commerce_manager',route].includes(r));
-export const supplierRoute=(u:Session,route:string)=>technicalAuthorities(u).length>0||u.isAdmin||!!u.permissions.supplyRoles?.some(r=>['ceo','engineering','finance','inventory',route].includes(r))||!!u.permissions.flowRoles?.some(r=>['qc','inventory','procurement'].includes(r));
+const internalSupplierUser=(u:Session)=>!u.permissions.salesAgentId&&!u.permissions.serviceAgentId&&!u.permissions.hospitalCenterId&&!u.permissions.salesRoles?.includes('agent')&&!u.permissions.serviceRoles?.includes('agent');
+export const supplierCommercial=(u:Session,route:string)=>u.isAdmin||(route!=='foreign'||internalSupplierUser(u))&&!!u.permissions.supplyRoles?.some(r=>['ceo','finance','commerce_manager',route].includes(r));
+export const supplierRoute=(u:Session,route:string)=>(route!=='foreign'||u.isAdmin||internalSupplierUser(u))&&(technicalAuthorities(u).length>0||u.isAdmin||!!u.permissions.supplyRoles?.some(r=>['ceo','engineering','finance','inventory','commerce_manager',route].includes(r))||!!u.permissions.flowRoles?.some(r=>['qc','inventory','procurement'].includes(r)));
+export const supplierIdentityWrite=(u:Session,route:string)=>supplierManage(u)&&supplierRoute(u,route)&&(route!=='foreign'||supplierCommercial(u,route));
+export const supplierHistoryWrite=(u:Session)=>supplierCommercial(u,'foreign')&&(u.isAdmin||u.permissions.supplyRoles?.includes('foreign')===true);
+export function supplierIdentityView(u:Session,supplier:any){
+ if(supplier.data.route!=='foreign'||supplierCommercial(u,'foreign'))return supplier;
+ const {name,country,kind,route,active,deletedAt}=supplier.data;
+ return {id:supplier.id,revision:supplier.revision,data:{name,country,kind,route,active,deletedAt}};
+}
 export async function supplierRows(type:string){return (await storage().prepare('SELECT * FROM flow_entities WHERE type=? ORDER BY created,id').bind(type).all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}));}
 export async function supplierEntity(id:string,type:string){const r:any=await storage().prepare('SELECT * FROM flow_entities WHERE id=? AND type=?').bind(id,type).first();if(!r)throw new AccessError('رکورد مرتبط یافت نشد.',404);return {...r,data:JSON.parse(r.data)};}
 export function technicalAuthorities(u:Session){const p=u.permissions,internal=!p.salesAgentId&&!p.serviceAgentId&&!p.hospitalCenterId&&!p.salesRoles?.includes('agent')&&!p.serviceRoles?.includes('agent');return internal?['engineering','quality'].filter(r=>u.isAdmin||(r==='engineering'?p.supplyRoles?.includes('engineering'):p.flowRoles?.includes('qc')||p.qmsRoles?.some(x=>['qa','qc'].includes(x)))):[];}

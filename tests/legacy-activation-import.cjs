@@ -63,7 +63,7 @@ async function get(query=''){
  assert.equal(response.status,200);
  return response.json();
 }
-const row={activeId:'123',activeDate:'2026-11-17T09:10:11.000Z',status:'0',channel:'1',serial:'0012345678',agencyId:'27',agencyName:'Old Agency'};
+const row={activeId:'123',activeDate:'2026-11-17T09:10:11.000Z',status:'0',channel:'1',serial:'0012345678',deviceSetSerial:'00123456',agencyId:'27',agencyName:'Old Agency'};
 const preview=rows=>post({mode:'preview',rows});
 const importer=rows=>({mode:'import',rows,file:'sample.xlsx',confirmed:true});
 const persisted=()=>sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type='legacy_activation_event'").get().n;
@@ -103,6 +103,9 @@ const addAgent=(id,kind,active)=>sql.prepare("INSERT INTO flow_entities(id,type,
  assert.equal(persisted(),2);
  const history=await get('?view=history&q=0012345678');
  assert.equal(history.rows.length,2);assert.equal(history.rows[0].event.serial,'0012345678');
+ const byChassis=await get('?'+new URLSearchParams({view:'history',q:'۰۰۱۲۳۴۵۶'}));
+ assert.equal(byChassis.rows.length,2);
+ assert.equal(byChassis.rows[0].event.deviceSetSerial,'00123456');
  assert.equal(history.rows[0].event.agencyId,'27');assert.equal(history.rows[0].salesName,'');
  addAgent('sale','representative',true);addAgent('inactive','representative',false);addAgent('lead','referrer',true);
  assert.equal((await get()).sales.length,1);

@@ -22,13 +22,18 @@ export async function custodianProfileWork(user:Session){
   OR (json_extract(data,'$.servicePlan.hours')>0 AND coalesce(json_extract(data,'$.meters.hours'),0)-json_extract(data,'$.servicePlan.baselineHours')>=json_extract(data,'$.servicePlan.hours'))
   OR (json_extract(data,'$.servicePlan.cycles')>0 AND coalesce(json_extract(data,'$.meters.cycles'),0)-json_extract(data,'$.servicePlan.baselineCycles')>=json_extract(data,'$.servicePlan.cycles'))
   OR (json_type(data,'$.assetKind') IS NULL AND json_extract(data,'$.holderKind')='contractor')
+  OR EXISTS(SELECT 1 FROM json_each(data,'$.employeeRequests') req
+   WHERE json_extract(req.value,'$.state') IN ('submitted','review')
+   AND json_extract(data,'$.holderKind')='employee'
+   AND json_extract(req.value,'$.requesterId')=json_extract(data,'$.holderId')
+   AND json_extract(req.value,'$.custodyId')=coalesce(json_extract(data,'$.custodyId'),''))
  ) ORDER BY id LIMIT 101`).bind(today,today,today).all()).results as any[];
  const work:ProfileWork[]=[];
  const declarations=(await db.prepare("SELECT id,data FROM flow_entities WHERE type='asset_declaration' AND json_extract(data,'$.state')='submitted' ORDER BY updated,id LIMIT 101").all()).results as any[];
  for(const r of declarations){const d=JSON.parse(r.data),own=d.memberId===actor.id||d.createdBy===user.userId;work.push({id:'asset-declaration:'+r.id,title:own?(d.reviewedAt?'اعلام اصلاح‌شدهٔ من':'اعلام موجودی من')+' · در انتظار تأیید':'بررسی اعلام موجودی · '+d.memberName,section:'assets',target:'asset-declaration:'+r.id,sourceId:r.id,state:own?'awaiting_other_reviewer':'open'});}
 
  for(const r of rows){const d=JSON.parse(r.data);
-  for(const step of assetCustodianSteps(d,r.revision))work.push({id:'asset-work:'+r.id+':'+step.stage,title:step.title+' · '+d.name,section:'assets',target:r.id,sourceId:r.id,state:'open'});
+  for(const step of assetCustodianSteps(d,r.revision))if(!step.requesterId||step.requesterId!==actor.id)work.push({id:'asset-work:'+r.id+':'+step.stage,title:step.title+' · '+d.name,section:'assets',target:r.id,sourceId:r.id,state:'open'});
   if(!d.assetKind&&d.holderKind==='contractor')work.push({id:'assets:'+r.id+':annual',title:'تأیید کتبی سالانه · '+d.name,section:'assets',target:'asset-legacy:'+r.id,sourceId:r.id,state:'open'});
  }
  const clearances=(await db.prepare("SELECT id,data FROM flow_entities WHERE type='asset_clearance' AND json_extract(data,'$.state')='open' ORDER BY id LIMIT 101").all()).results as any[];
