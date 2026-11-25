@@ -230,6 +230,7 @@ async function get(u){const r=await context.run(u,()=>api.GET(request('/api/acti
  assert.equal(sentSms.length,2,'retry sends no extra welcome');
  assert.equal((await publicRequest(startPublic)).status,409);
 
+ env.PUBLIC_WARRANTY_ACTIVATION='0';
  const guestTest=await context.run(manager,()=>publicRequest({mode:'test-sms'}));
  assert.equal(guestTest.status,403);
  const adminTest=()=>context.run({userId:'test-panel-admin',email:'admin@test.local',name:'Admin',isAdmin:true,permissions:perms},()=>publicRequest({mode:'test-sms'}));

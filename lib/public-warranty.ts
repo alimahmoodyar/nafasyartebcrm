@@ -24,11 +24,12 @@ export function publicWarrantyReady(){
   &&(!PUBLIC_WARRANTY_TEST_MOBILE||/^09\d{9}$/.test(PUBLIC_WARRANTY_TEST_MOBILE));
 }
 export function publicWarrantySmsTestReady(){
- return publicWarrantyReady()&&/^09\d{9}$/.test(settings().PUBLIC_WARRANTY_TEST_MOBILE||'');
+ return assetSmsReady()&&/^09\d{9}$/.test(settings().PUBLIC_WARRANTY_TEST_MOBILE||'');
 }
 export async function sendPublicWarrantyTestSms(){
  const mobile=settings().PUBLIC_WARRANTY_TEST_MOBILE;
- if(!mobile||!publicWarrantySmsTestReady())return fail('شمارهٔ آزمون پیامک در میزبان تنظیم نشده است.',503);
+ if(!assetSmsReady())return fail('کلید یا خط ارسال پیامک در تنظیمات سرور آماده نیست.',503);
+ if(!mobile||!/^09\d{9}$/.test(mobile))return fail('شمارهٔ آزمون پیامک در میزبان تنظیم نشده است.',503);
  await rate('panel-test',mobile,1,300000);
  await sendNafasyarSms(mobile,'نفس‌یار طب\nاین پیامک برای تست ارسال شده است.');
  return {accepted:true,mobileLast4:mobile.slice(-4)};
