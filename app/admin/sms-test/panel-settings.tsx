@@ -2,10 +2,12 @@
 import {useState,type FormEvent} from 'react';
 
 type Fields={hasKey:boolean;line:string;mobile:string};
-async function requestFields(mode:string,values?:{apiKey:string;line:string;mobile:string}){
- const response=await fetch('/api/public-warranty',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode,...values})});
- const data=await response.json() as Fields & {error?:string};
- if(!response.ok)throw new Error(data.error||'دسترسی به تنظیمات پنل ممکن نشد.');
+async function requestFields(values?:{apiKey:string;line:string;mobile:string}){
+ const response=await fetch('/api/admin/sms-panel',values?{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(values)}:{cache:'no-store'});
+ const data=await response.json().catch(()=>null) as (Fields & {error?:string})|null;
+ if(!response.ok||!data||typeof data.hasKey!=='boolean'||typeof data.line!=='string'||typeof data.mobile!=='string'){
+  throw new Error(data?.error||('سرور به درخواست تنظیمات پاسخ معتبر نداد (وضعیت '+response.status+').'));
+ }
  return data;
 }
 export function PanelSettings(){
@@ -16,7 +18,8 @@ export function PanelSettings(){
  async function open(){
   setMessage('');
   setBusy(true);
-  try{setFields(await requestFields('panel-settings'));}
+  setFields({hasKey:false,line:'',mobile:''});
+  try{setFields(await requestFields());}
   catch(e){setMessage(e instanceof Error?e.message:'خواندن تنظیمات ممکن نشد.');}
   finally{setBusy(false);}
  }
@@ -25,7 +28,7 @@ export function PanelSettings(){
   if(!fields||busy)return;
   setBusy(true);
   try{
-   await requestFields('save-panel',{apiKey,line:fields.line,mobile:fields.mobile});
+   await requestFields({apiKey,line:fields.line,mobile:fields.mobile});
    setKey('');setFields(null);setMessage('تنظیمات ذخیره شد. برای بررسی ارسال، «تست پیامک» را بزنید.');
   }catch(e){setMessage(e instanceof Error?e.message:'ذخیره نشد.');}
   finally{setBusy(false);}

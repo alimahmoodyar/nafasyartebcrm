@@ -237,7 +237,11 @@ async function get(u){const r=await context.run(u,()=>api.GET(request('/api/acti
  const asAdmin=fn=>context.run({userId:'test-panel-admin',email:'admin@test.local',name:'Admin',isAdmin:true,permissions:perms},fn);
  const panel={mode:'save-panel',apiKey:'private-panel-test-key',line:'۳۰۰۰۰۰۰۰۰۰',mobile:'۰۹۱۲۲۲۲۲۲۲۲'};
  assert.equal((await context.run(manager,()=>publicRequest(panel))).status,403);
- const saved=await asAdmin(()=>publicRequest(panel));
+ const settingsApi=load('app/api/admin/sms-panel/route.ts');
+ assert.equal((await context.run(manager,()=>settingsApi.GET())).status,403);
+ const panelRead=await asAdmin(()=>settingsApi.GET());
+ assert.deepEqual(await panelRead.json(),{hasKey:true,line:'3000000000',mobile:details.mobile});
+ const saved=await asAdmin(()=>settingsApi.PUT(request('/api/admin/sms-panel','PUT',panel)));
  assert.equal(saved.status,200,await saved.clone().text());
  assert.deepEqual(await saved.json(),{hasKey:true,line:'3000000000',mobile:'09122222222'});
  assert.ok(!new TextDecoder().decode(objects.get('private-settings/sms-panel.v1')).includes(panel.apiKey));
