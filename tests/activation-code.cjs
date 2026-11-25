@@ -249,7 +249,8 @@ async function get(u){const r=await context.run(u,()=>api.GET(request('/api/acti
  assert.equal((await asAdmin(()=>publicRequest({...panel,apiKey:''}))).status,200);
  const sms=await adminTest();assert.equal(sms.status,200,await sms.clone().text());assert.deepEqual(await sms.json(),{accepted:true,messageId:12,mobileLast4:'2222'});
  assert.deepEqual(sentSms[2].Mobiles,['09122222222']);assert.equal(sentSms.length,3);assert.ok(sentSms[2].MessageText.endsWith('\nلغو11'));
- assert.equal((await adminTest()).status,429);assert.equal(sentSms.length,3);
+ assert.equal((await adminTest()).status,200);assert.equal(sentSms.length,4);
+ assert.deepEqual(sentSms[3],sentSms[2]);
  console.log('PASS public warranty: gate, origin, known device, pilot number, one-code registration, dossier, two SMS and replay.');
 
  console.log('PASS activation: 10,000 VB-compatible vectors; normalization, leading zeros, roles, account/origin, fresh permissions, rollback, reset freeze/backup contract, retry audit, isolated history and MCP scopes.');

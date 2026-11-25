@@ -12,7 +12,7 @@ export async function sendNafasyarSms(mobile:string,message:string,config?:Panel
  const controller=new AbortController();
  const timer=setTimeout(()=>controller.abort(),20000);
  let r:Response;
- try{r=await fetch('https://api.sms.ir/v1/send/bulk',{method:'POST',redirect:'error',headers:{'X-API-KEY':apiKey,'Content-Type':'application/json; charset=utf-8',Accept:'application/json'},body:JSON.stringify({lineNumber:Number(line),MessageText:messageText,Mobiles:[mobile],SendDateTime:null}),signal:controller.signal});}
+ try{r=await fetch('https://api.sms.ir/v1/send/bulk',{method:'POST',redirect:'manual',headers:{'X-API-KEY':apiKey,'Content-Type':'application/json; charset=utf-8',Accept:'application/json'},body:JSON.stringify({lineNumber:Number(line),MessageText:messageText,Mobiles:[mobile],SendDateTime:null}),signal:controller.signal});}
  catch(error){
   const cause=error instanceof Error?error.message:'';
   const detail=controller.signal.aborted?'مهلت ۲۰ ثانیه‌ای اتصال پایان یافت.':
