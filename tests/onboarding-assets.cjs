@@ -78,6 +78,7 @@ const op=(mode,extra={})=>({id:crypto.randomUUID(),mode,confirmed:true,revision:
  assert.ok(sql.prepare("SELECT 1 FROM duty_runs WHERE template_id='asset-declarations' AND assignee=? AND json_extract(data,'$.sourceId')=? AND state='open'").get(newKeeperId,record.id),'Role save backfills pending announcements.');
  assert.ok((await inbox({...newCustodian,permissions:preview.after})).some(t=>t.data.sourceId===record.id));
  result=await call(custodian,op('return',{recordId:record.id,revision:record.revision,notes:'Check second photo'}));assert.equal(result.status,200);record=(await result.json()).record;assert.equal(record.data.state,'returned');await load('lib/asset-declaration-tasks.ts').syncDeclarationTasks();assert.ok(sql.prepare("SELECT id FROM duty_runs WHERE template_id='asset-declarations' AND assignee=? AND state='open'").get(mid),'return routed to self');
+ assert.ok(!(await (await read(custodian,'?review=true&queue=true')).json()).records.some(r=>r.id===record.id));
  const returnedTask=(await inbox(staff)).find(t=>t.data.sourceId===record.id&&t.state==='open');
  assert.ok(returnedTask,'The original employee sees the correction without custodian rights.');
  assert.equal(returnedTask.data.sourceSection,'personnel');
@@ -86,6 +87,8 @@ const op=(mode,extra={})=>({id:crypto.randomUUID(),mode,confirmed:true,revision:
  assert.ok((await inbox(staff)).some(t=>t.id===returnedTask.id&&t.state==='open'),'The employee cartable recovers a missing open correction.');
  assert.ok(!(await inbox(other)).some(t=>t.data.sourceId===record.id));
  result=await call(staff,op('submit',{recordId:record.id,revision:record.revision,items:record.data.items,holderConfirmed:true}));assert.equal(result.status,200);record=(await result.json()).record;
+ assert.ok((await (await read(custodian,'?review=true&queue=true')).json()).records.some(r=>r.id===record.id));
+ assert.equal((await read(other,'?review=true&queue=true')).status,403);
  const multiKeeper={...newCustodian,permissions:preview.after};
  const isOpenReview=t=>t.data.sourceId===record.id&&t.state==='open';
  assert.equal((await inbox(multiKeeper,'custodian')).filter(isOpenReview).length,1);
@@ -112,6 +115,10 @@ const op=(mode,extra={})=>({id:crypto.randomUUID(),mode,confirmed:true,revision:
  const approveDecl=op('approve',{recordId:record.id,revision:record.revision,reviewItems,matched:true});assert.equal((await call(custodian,approveDecl)).status,503);assert.equal(sql.prepare("SELECT count(*) n FROM flow_entities WHERE type='asset_item'").get().n,1,'rollback every generated asset');sql.exec('DROP TRIGGER onboarding_fail');
  result=await call(custodian,approveDecl);assert.equal(result.status,200,await result.clone().text());record=(await result.json()).record;assert.equal(record.data.approvedItems.length,2);assert.equal(record.data.state,'approved');const official=record.data.approvedItems.map(v=>row(v.assetId));for(const a of official){assert.equal(a.data.holderId,mid);assert.equal(a.data.holderKind,'employee');assert.equal(a.data.registrationBasis,'opening_inventory');assert.equal(a.data.handedDay,'');assert.equal(a.data.history[0].mode,'opening_inventory');}assert.notEqual(official[0].data.code,official[1].data.code);assert.equal(record.data.approvedItems[0].copies,2);assert.equal(row(fileId).data.purpose,'asset_photo');
  assert.deepEqual(record.data.items.map(v=>v.existingCode),['002877','AM-009998'],'Employee label text survives approval for audit.');
+ const completedId=record.id;
+ assert.ok(!(await (await read(custodian,'?review=true&queue=true')).json()).records.some(r=>r.id===completedId));
+ assert.equal((await (await read(custodian,'?review=true&queue=true&id='+completedId)).json()).records[0].data.groupId,record.data.groupId);
+ assert.equal((await (await read(staff)).json()).records.find(r=>r.id===completedId).data.state,'approved');
  assert.ok(official.every((asset,i)=>asset.data.code!==record.data.items[i].existingCode));
  const count=sql.prepare("SELECT count(*) n FROM flow_entities WHERE type='asset_item'").get().n;assert.equal((await call(custodian,approveDecl)).status,200);assert.equal(sql.prepare("SELECT count(*) n FROM flow_entities WHERE type='asset_item'").get().n,count);
  const print=await context.run(custodian,()=>load('app/api/assets/registration/route.ts').GET(req('/api/assets/registration?id='+encodeURIComponent(record.data.groupId))));assert.equal(print.status,200);assert.equal((await print.json()).items[1].number,2);

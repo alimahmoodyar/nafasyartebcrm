@@ -19,3 +19,9 @@
   margin: 0;
   accent-color: #167449;
 }
+
+@media (max-width: 760px) {
+  .asset-declarations-layout[data-review-open] > .asset-declaration-detail {
+    grid-row: 1;
+  }
+}

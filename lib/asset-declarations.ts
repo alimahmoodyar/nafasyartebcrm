@@ -57,7 +57,8 @@ function checkPhotos(items:any[],r:any,rows:any[]){const used=new Set<string>();
 export async function readAssetDeclarations(u:Session,q:URLSearchParams){
  const {a,rows,members}=await context(u),review=q.get('review')==='true';if(review&&!a.custodian)assetFail('بررسی اعلام‌ها فقط برای اموالدار است.',403);
  if(q.has('assetSearch')){if(!a.custodian)assetFail('جست‌وجوی دفتر اموال فقط برای اموالدار است.',403);const term=text(q.get('assetSearch'),100).toLocaleLowerCase();return {accountId:u.userId,assets:term?rows.filter(r=>r.type==='asset_item'&&r.data.lifecycle!=='disposed'&&(r.data.code+' '+r.data.name+' '+(r.data.serial||'')).toLocaleLowerCase().includes(term)).slice(0,30).map(r=>({id:r.id,revision:r.revision,name:r.data.name,code:r.data.code,holderName:r.data.holderName,holderKind:r.data.holderKind,holderId:r.data.holderId})):[]};}
- const records=q.get('id')?[access(rows,q.get('id')!,a)]:rows.filter(r=>r.type==='asset_declaration'&&(review?['submitted','returned','approved'].includes(r.data.state):owner(r,a))).sort((x,y)=>y.updated.localeCompare(x.updated)).slice(0,100);
+ const reviewStates=q.get('queue')==='true'?['submitted']:['submitted','returned','approved'];
+ const records=q.get('id')?[access(rows,q.get('id')!,a)]:rows.filter(r=>r.type==='asset_declaration'&&(review?reviewStates.includes(r.data.state):owner(r,a))).sort((x,y)=>y.updated.localeCompare(x.updated)).slice(0,100);
  const index=review?codeIndex(rows):undefined;
  return {accountId:u.userId,me:a.id,custodian:a.custodian,review,records:records.map(r=>publicRecord(r,rows,index)),conditions:assetConditions,personName:members.find(m=>m.id===a.id)?.name||u.name};
 }
