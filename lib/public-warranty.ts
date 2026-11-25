@@ -23,6 +23,16 @@ export function publicWarrantyReady(){
  return PUBLIC_WARRANTY_ACTIVATION==='1'&&assetSmsReady()
   &&(!PUBLIC_WARRANTY_TEST_MOBILE||/^09\d{9}$/.test(PUBLIC_WARRANTY_TEST_MOBILE));
 }
+export function publicWarrantySmsTestReady(){
+ return publicWarrantyReady()&&/^09\d{9}$/.test(settings().PUBLIC_WARRANTY_TEST_MOBILE||'');
+}
+export async function sendPublicWarrantyTestSms(){
+ const mobile=settings().PUBLIC_WARRANTY_TEST_MOBILE;
+ if(!mobile||!publicWarrantySmsTestReady())return fail('شمارهٔ آزمون پیامک در میزبان تنظیم نشده است.',503);
+ await rate('panel-test',mobile,1,300000);
+ await sendNafasyarSms(mobile,'نفس‌یار طب\nاین پیامک برای تست ارسال شده است.');
+ return {accepted:true,mobileLast4:mobile.slice(-4)};
+}
 async function rate(scope:string,value:string,limit:number,windowMs:number){
  const db=storage(),now=new Date().toISOString(),key=channel+':'+scope+':'+await hash(value);
  const row=await db.prepare('INSERT INTO login_attempts(key,count,reset) VALUES(?,1,?) ON CONFLICT(key) DO UPDATE SET count=CASE WHEN reset<=? THEN 1 ELSE count+1 END,reset=CASE WHEN reset<=? THEN excluded.reset ELSE reset END RETURNING count')

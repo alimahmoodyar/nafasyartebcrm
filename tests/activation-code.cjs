@@ -229,6 +229,13 @@ async function get(u){const r=await context.run(u,()=>api.GET(request('/api/acti
  assert.equal((await (await publicRequest(answer)).json()).welcomeStatus,'sent');
  assert.equal(sentSms.length,2,'retry sends no extra welcome');
  assert.equal((await publicRequest(startPublic)).status,409);
+
+ const guestTest=await context.run(manager,()=>publicRequest({mode:'test-sms'}));
+ assert.equal(guestTest.status,403);
+ const adminTest=()=>context.run({userId:'test-panel-admin',email:'admin@test.local',name:'Admin',isAdmin:true,permissions:perms},()=>publicRequest({mode:'test-sms'}));
+ const sms=await adminTest();assert.equal(sms.status,200,await sms.clone().text());assert.equal((await sms.json()).accepted,true);
+ assert.equal(sentSms.length,3);assert.ok(sentSms[2].MessageText.endsWith('\nلغو11'));
+ assert.equal((await adminTest()).status,429);assert.equal(sentSms.length,3);
  console.log('PASS public warranty: gate, origin, known device, pilot number, one-code registration, dossier, two SMS and replay.');
 
  console.log('PASS activation: 10,000 VB-compatible vectors; normalization, leading zeros, roles, account/origin, fresh permissions, rollback, reset freeze/backup contract, retry audit, isolated history and MCP scopes.');

@@ -19,15 +19,30 @@ export function PublicWarrantyForm(){
  const [ticket,setTicket]=useState<{token:string;mobileLast4:string}|null>(null);
  const [code,setCode]=useState(''),[result,setResult]=useState<Result|null>(null);
  const [available,setAvailable]=useState<boolean|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ const [smsTest,setSmsTest]=useState(false),[testResult,setTestResult]=useState('');
  const pending=useRef(false),codeInput=useRef<HTMLInputElement>(null);
  useEffect(()=>{
   const request=new AbortController();
   void fetch('/api/public-warranty',{cache:'no-store',signal:request.signal})
-   .then(async r=>setAvailable(r.ok&&(await r.json() as {ready:boolean}).ready===true))
+   .then(async r=>{
+    const state=r.ok?await r.json() as {ready:boolean;smsTest:boolean}:null;
+    setAvailable(state?.ready===true);setSmsTest(state?.smsTest===true);
+   })
    .catch(()=>{if(!request.signal.aborted)setAvailable(false);});
   return ()=>request.abort();
  },[]);
  useEffect(()=>{if(ticket)codeInput.current?.focus();},[ticket]);
+ async function testSms(){
+  if(pending.current||!smsTest)return;
+  pending.current=true;setBusy(true);setError('');setTestResult('');
+  try{
+   const r=await fetch('/api/public-warranty',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'test-sms'})});
+   const data=await r.json() as {error?:string;accepted?:boolean;mobileLast4?:string};
+   if(!r.ok||!data.accepted)throw Error(data.error||'ارسال پیامک آزمایشی تأیید نشد.');
+   setTestResult('پنل، ارسال پیامک آزمایشی به شمارهٔ منتهی به '+data.mobileLast4+' را پذیرفت.');
+  }catch(e){setError((e as Error).message||'نتیجهٔ ارسال پیامک مشخص نشد.');}
+  finally{pending.current=false;setBusy(false);}
+ }
  async function submit(event:FormEvent<HTMLFormElement>){
   event.preventDefault();
   if(pending.current||!available)return;
@@ -69,8 +84,10 @@ export function PublicWarrantyForm(){
    </div>}
   </fieldset>
   {error&&<p role="alert" className="public-warranty-error">{error}</p>}
+  {testResult&&<p role="status">{testResult}</p>}
   <div className="public-warranty-actions">
    <button type="submit" disabled={busy||available!==true}>{busy?'در حال انجام…':ticket?'تأیید کد و ثبت گارانتی':'ارسال کد پنج‌رقمی'}</button>
+   {smsTest&&!ticket&&<button type="button" disabled={busy} onClick={()=>void testSms()}>ارسال پیامک تست پنل</button>}
    {ticket&&<button type="button" disabled={busy} onClick={()=>{setCode('');setError('');setTicket(null);}}>ویرایش اطلاعات یا دریافت دوبارهٔ کد</button>}
   </div>
  </form>;
