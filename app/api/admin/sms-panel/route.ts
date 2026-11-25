@@ -1,3 +1,4 @@
+import {sendPublicWarrantyTestSms} from '@/lib/panel-test-sms';
 import {accessResponse,AccessError,checkOrigin,requireAdmin} from '@/lib/authorization';
 import {panelConfig,publicFields,savePanel} from '@/lib/sms-panel';
 import {boundedBody} from '@/lib/firmware-storage';
@@ -9,6 +10,7 @@ async function handle(request?:Request){
   if(request)checkOrigin(request);
   const user=await requireAdmin();
   if(user.rolePreview||user.profileReview)throw new AccessError('با حساب مدیر وارد شوید.',403);
+  if(request?.method==='POST')return reply(await sendPublicWarrantyTestSms());
   if(!request)return reply(publicFields(await panelConfig()));
   const body=JSON.parse(new TextDecoder().decode(await boundedBody(request,4000)));
   if(!body||typeof body!=='object'||Array.isArray(body))return reply({error:'اطلاعات تنظیمات معتبر نیست.'},400);
@@ -19,3 +21,5 @@ async function handle(request?:Request){
 }
 export function GET(){return handle();}
 export function PUT(request:Request){return handle(request);}
+
+export function POST(request:Request){return handle(request);}

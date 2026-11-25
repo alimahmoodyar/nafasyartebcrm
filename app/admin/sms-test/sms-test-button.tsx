@@ -12,10 +12,10 @@ export function SmsTestButton(){
   setBusy(true);
   setMessage('');
   try{
-   const response=await fetch('/api/public-warranty',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'test-sms'})});
-   const result=await response.json() as {accepted?:boolean;error?:string;mobileLast4?:string};
+   const response=await fetch('/api/admin/sms-panel',{method:'POST'});
+   const result=await response.json() as {accepted?:boolean;error?:string;messageId?:number;mobileLast4?:string};
    if(!response.ok || !result.accepted)throw new Error(result.error || 'ارسال پیامک تأیید نشد.');
-   setMessage('پنل ارسال پیامک به شمارهٔ منتهی به '+result.mobileLast4+' را پذیرفت.');
+   setMessage('پنل ارسال پیامک به شمارهٔ منتهی به '+result.mobileLast4+' را پذیرفت. شناسهٔ پیامک '+result.messageId);
   }catch(error){
    setMessage(error instanceof SyntaxError?'پاسخ سرور قابل خواندن نبود.':error instanceof Error?error.message:'ارتباط با سرور برقرار نشد.');
   }finally{

@@ -1,3 +1,4 @@
+import {rate} from './sms-rate';
 import {env} from 'cloudflare:workers';
 import {generateActivationCode,normalizeActivationInput} from './activation-code';
 import {panelConfig,validLine} from './sms-panel';
@@ -28,21 +29,7 @@ export async function publicWarrantySmsTestReady(){
  const config=await panelConfig();
  return !!config.apiKey&&validLine(config.line)&&/^09\d{9}$/.test(config.mobile);
 }
-export async function sendPublicWarrantyTestSms(){
- const config=await panelConfig();
- const mobile=config.mobile;
- if(!config.apiKey||!validLine(config.line))return fail('کلید یا خط ارسال پیامک در تنظیمات سرور آماده نیست.',503);
- if(!mobile||!/^09\d{9}$/.test(mobile))return fail('شمارهٔ آزمون پیامک در میزبان تنظیم نشده است.',503);
- await rate('panel-test',mobile,1,300000);
- await sendNafasyarSms(mobile,'نفس‌یار طب\nاین پیامک برای تست ارسال شده است.',config);
- return {accepted:true,mobileLast4:mobile.slice(-4)};
-}
-async function rate(scope:string,value:string,limit:number,windowMs:number){
- const db=storage(),now=new Date().toISOString(),key=channel+':'+scope+':'+await hash(value);
- const row=await db.prepare('INSERT INTO login_attempts(key,count,reset) VALUES(?,1,?) ON CONFLICT(key) DO UPDATE SET count=CASE WHEN reset<=? THEN 1 ELSE count+1 END,reset=CASE WHEN reset<=? THEN excluded.reset ELSE reset END RETURNING count')
-  .bind(key,new Date(Date.now()+windowMs).toISOString(),now,now).first<{count:number}>();
- if(!row||row.count>limit)fail('تعداد درخواست زیاد است. کمی صبر کنید و دوباره تلاش کنید.',429);
-}
+export {sendPublicWarrantyTestSms} from './panel-test-sms';
 function input(raw:unknown){
  if(!raw||Array.isArray(raw)||typeof raw!=='object')return fail('اطلاعات فرم معتبر نیست.');
  const b=raw as Record<string,unknown>;

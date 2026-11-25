@@ -233,7 +233,7 @@ async function get(u){const r=await context.run(u,()=>api.GET(request('/api/acti
  env.PUBLIC_WARRANTY_ACTIVATION='0';
  const guestTest=await context.run(manager,()=>publicRequest({mode:'test-sms'}));
  assert.equal(guestTest.status,403);
- const adminTest=()=>context.run({userId:'test-panel-admin',email:'admin@test.local',name:'Admin',isAdmin:true,permissions:perms},()=>publicRequest({mode:'test-sms'}));
+ const adminTest=()=>context.run({userId:'test-panel-admin',email:'admin@test.local',name:'Admin',isAdmin:true,permissions:perms},()=>settingsApi.POST(request('/api/admin/sms-panel','POST')));
  const asAdmin=fn=>context.run({userId:'test-panel-admin',email:'admin@test.local',name:'Admin',isAdmin:true,permissions:perms},fn);
  const panel={mode:'save-panel',apiKey:'private-panel-test-key',line:'۳۰۰۰۰۰۰۰۰۰',mobile:'۰۹۱۲۲۲۲۲۲۲۲'};
  assert.equal((await context.run(manager,()=>publicRequest(panel))).status,403);
@@ -247,7 +247,7 @@ async function get(u){const r=await context.run(u,()=>api.GET(request('/api/acti
  assert.ok(!new TextDecoder().decode(objects.get('private-settings/sms-panel.v1')).includes(panel.apiKey));
  delete env.SMSIR_API_KEY;delete env.SMSIR_LINE_NUMBER;
  assert.equal((await asAdmin(()=>publicRequest({...panel,apiKey:''}))).status,200);
- const sms=await adminTest();assert.equal(sms.status,200,await sms.clone().text());assert.equal((await sms.json()).accepted,true);
+ const sms=await adminTest();assert.equal(sms.status,200,await sms.clone().text());assert.deepEqual(await sms.json(),{accepted:true,messageId:12,mobileLast4:'2222'});
  assert.deepEqual(sentSms[2].Mobiles,['09122222222']);assert.equal(sentSms.length,3);assert.ok(sentSms[2].MessageText.endsWith('\nلغو11'));
  assert.equal((await adminTest()).status,429);assert.equal(sentSms.length,3);
  console.log('PASS public warranty: gate, origin, known device, pilot number, one-code registration, dossier, two SMS and replay.');
