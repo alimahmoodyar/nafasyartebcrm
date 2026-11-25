@@ -8,8 +8,10 @@ export const supplierManage=(u:Session)=>u.isAdmin||!!u.permissions.supplyRoles?
 export const supplierQuality=(u:Session)=>technicalAuthorities(u).includes('quality');
 const internalSupplierUser=(u:Session)=>!u.permissions.salesAgentId&&!u.permissions.serviceAgentId&&!u.permissions.hospitalCenterId&&!u.permissions.salesRoles?.includes('agent')&&!u.permissions.serviceRoles?.includes('agent');
 export const supplierCommercial=(u:Session,route:string)=>u.isAdmin||(route!=='foreign'||internalSupplierUser(u))&&!!u.permissions.supplyRoles?.some(r=>['ceo','finance','commerce_manager',route].includes(r));
-export const supplierRoute=(u:Session,route:string)=>(route!=='foreign'||u.isAdmin||internalSupplierUser(u))&&(technicalAuthorities(u).length>0||u.isAdmin||!!u.permissions.supplyRoles?.some(r=>['ceo','engineering','finance','inventory','commerce_manager',route].includes(r))||!!u.permissions.flowRoles?.some(r=>['qc','inventory','procurement'].includes(r)));
+const foreignSupplierAccess=(u:Session)=>!u.permissions.supplyRoles?.includes('domestic')||!!u.permissions.supplyRoles.some(r=>['ceo','engineering','finance','foreign','inventory','commerce_manager'].includes(r))||!!u.permissions.flowRoles?.some(r=>['qc','inventory'].includes(r))||technicalAuthorities(u).length>0;
+export const supplierRoute=(u:Session,route:string)=>(route!=='foreign'||u.isAdmin||internalSupplierUser(u)&&foreignSupplierAccess(u))&&(technicalAuthorities(u).length>0||u.isAdmin||!!u.permissions.supplyRoles?.some(r=>['ceo','engineering','finance','inventory','commerce_manager',route].includes(r))||!!u.permissions.flowRoles?.some(r=>['qc','inventory','procurement'].includes(r)));
 export const supplierIdentityWrite=(u:Session,route:string)=>supplierManage(u)&&supplierRoute(u,route)&&(route!=='foreign'||supplierCommercial(u,route));
+export const supplierLinkWrite=(u:Session,route:string)=>supplierManage(u)&&supplierRoute(u,route);
 export const supplierHistoryWrite=(u:Session)=>supplierCommercial(u,'foreign')&&(u.isAdmin||u.permissions.supplyRoles?.includes('foreign')===true);
 export function supplierIdentityView(u:Session,supplier:any){
  if(supplier.data.route!=='foreign'||supplierCommercial(u,'foreign'))return supplier;

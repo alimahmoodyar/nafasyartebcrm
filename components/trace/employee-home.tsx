@@ -48,7 +48,7 @@ export function EmployeeHome({user,apps,onNavigate,workspace,onWorkspaceChange,w
   </>;
  const profile=active&&roleProfiles.find(p=>p.id===active.id);
  if(active&&profile)return <section dir="rtl">
-  {!['line-manager','central-store'].includes(active.id)&&<button type="button" className="btn" onClick={()=>selectWorkspace('')}>بازگشت به خانهٔ من</button>}
+  {!['line-manager','central-store','domestic'].includes(active.id)&&<button type="button" className="btn" onClick={()=>selectWorkspace('')}>بازگشت به خانهٔ من</button>}
   <RoleTestingPanel assigned={{profile:{...profile,links:active.links},count:current?.tasks.length||0,taskTitles:current?.tasks.map(row=>row.title),tasks:current?.tasks,loading:!current&&!error,error,limited:current?.limited,exit:()=>selectWorkspace('')}} targetId={active.id} onNavigate={onNavigate} onProfile={()=>{}} representativeDashboard={<SalesPanel demo={false} targetId="rep-dashboard" onNavigate={onNavigate}/>} serviceRepresentativeDashboard={<ServiceRepresentativeDashboard user={user} onNavigate={onNavigate}/>} centralWarehouseTools={warehouseTools} officeServiceDashboard={<ServiceOfficeWorkspace customerWorkspace={active.id==='home-service-customer-support'} taskTitles={current?.tasks.slice(0,2).map(row=>row.title)} user={user} onNavigate={onNavigate}/>}/>
   {['personnel-hr','home-service-technician','driver','sales-representative','home-service-representative'].includes(active.id)&&<button className="btn primary" onClick={()=>onNavigate('tasks')}>کارتابل {active.title}</button>}
   <RoleTaskTools accountId={user.userId} workspace={active.id} onNavigate={onNavigate}/>

@@ -9,6 +9,7 @@ import {useEffect,useRef,useState} from 'react';
 import {ArrowLeftRight,Boxes,ClipboardList,Search,UserRound} from 'lucide-react';
 import {batchScanCode} from '@/lib/batch-qr';
 import type {CartableRow} from '@/lib/cartable-view';
+import {DomesticSupplyHome} from './domestic-supply-home';
 import {LineManagerHome,OperationalRoleHome} from './line-manager-home';
 import './technical-role.css';
 import type {RoleProfile,ProfileWork} from '@/lib/role-profiles';
@@ -89,6 +90,11 @@ export function RoleTestingPanel({assigned,targetId='',onNavigate,onProfile,onAc
  if(id==='custodian'&&!snapshot&&!error&&!choosing)return <section className="panel inside" role="status">در حال دریافت پنل اموال‌دار…</section>;
  if(snapshot?.profile.id==='driver'&&!choosing)return <DriverDashboard accountKey={snapshot.profile.id} onNavigate={onNavigate}/>;
  if(id==='driver'&&!snapshot&&!error&&!choosing)return <section className="panel inside" role="status">در حال دریافت پنل راننده…</section>;
+ if(id==='domestic'&&snapshot?.profile.id===id&&!choosing)return <DomesticSupplyHome
+  canOpenCatalog={snapshot.profile.links.some(link=>link.target==='domestic-suppliers:')}
+  onNavigate={onNavigate} onExit={assigned?.exit}
+  firstTask={assigned?.tasks?.[0]?.title??snapshot.work[0]?.title}
+  loading={assigned?!!assigned.loading:loading} error={assigned?assigned.error:error}/>;
  if(['line-manager','central-store'].includes(id)&&snapshot?.profile.id===id&&!choosing){
   const work=assigned?(assigned.tasks||[]).map(row=>({
    id:row.id,title:row.title,context:row.context,reference:row.subtitle,

@@ -31,6 +31,37 @@ async function supplier(mode,data,status,user){
  assert.equal(privateCard.data.phone,undefined);
  assert.equal(privateCard.canEditIdentity,false);
  assert.equal((await readCatalog(buyer)).suppliers.find(row=>row.id===foreignSupplier.id).data.email,'private@example.test');
+ const domestic=actor('domestic');
+ domestic.permissions.flowRoles=['procurement']; // Same combined grants as the assigned role.
+ const domesticIdentity={route:'domestic',kind:'manufacturer',active:true,name:'Domestic Vendor',country:'ایران',contact:'Sales',phones:['02155550111','09125550112','02655550113'],economicCode:'۰۰۱٢۳',nationalId:'00123456789'};
+ await supplier('supplier',{...domesticIdentity,nationalId:'invalid'},400,domestic);
+ const domesticSupplier=await supplier('supplier',domesticIdentity,200,domestic);
+ const lookup=()=>context.run(domestic,async()=>await (await suppliers.GET(request('/api/suppliers?route=domestic'))).json());
+ let local=await lookup();
+ assert.equal(local.suppliers.length,1);
+ assert.equal(local.suppliers[0].id,domesticSupplier.id);
+ assert.equal(local.links.length,0,'supplier registration does not require a material link');
+ assert.equal(local.suppliers[0].data.economicCode,'00123');
+ assert.equal(local.suppliers[0].data.nationalId,'00123456789');
+ assert.deepEqual(local.suppliers[0].data.phones,domesticIdentity.phones);
+ assert.equal((await readCatalog(domestic)).suppliers.some(row=>row.id===foreignSupplier.id),false);
+ assert.equal((await context.run(domestic,()=>suppliers.GET(request('/api/suppliers?route=foreign')))).status,403);
+ await supplier('link',{supplierId:foreignSupplier.id,materialId:material.id},403,domestic);
+ await supplier('supplier',{...domesticIdentity,route:'foreign'},403,domestic);
+ const {economicCode,nationalId,phones,...legacy} = domesticIdentity;
+ await supplier('supplier',{...legacy,city:'تهران',phone:phones[0],supplierId:domesticSupplier.id,revision:local.suppliers[0].revision},200,domestic);
+ local=await lookup();
+ assert.equal(local.suppliers[0].data.economicCode,'00123');
+ assert.equal(local.suppliers[0].data.nationalId,'00123456789');
+ assert.deepEqual(local.suppliers[0].data.phones,phones);
+ const localItems=[material,{id:'material:domestic-test',data:{code:'PRT-043',name:'Cable',unit:'عدد'}}];
+ sql.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'material',?,1,?,?)").run(localItems[1].id,JSON.stringify(localItems[1].data),now,now);
+ for(const item of localItems)await supplier('link',{supplierId:domesticSupplier.id,materialId:item.id,supplierCode:'D-'+item.data.code},200,domestic);
+ await supplier('link',{supplierId:domesticSupplier.id,materialId:material.id},409,domestic);
+ local=await lookup();
+ assert.equal(local.links.length,2);
+ assert.ok(local.links.every(link=>link.data.status==='pending'));
+ assert.equal(entities('purchase_order').length,0);
  const historyApi=load('app/api/suppliers/history/route.ts'),path='/api/suppliers/history';
  const historyData={id:crypto.randomUUID(),linkId:foreignLink.id,reference:'Invoice ۴۲',quantity:'۲',unit:'عدد',price:'11.2',currency:'USD'};
  const postHistory=(user,metadata)=>{
@@ -60,5 +91,5 @@ async function supplier(mode,data,status,user){
  assert.equal((await download(technical)).status,403);
  assert.equal(await (await download(finance)).text(),'historical invoice');
  assert.equal(sql.prepare('PRAGMA foreign_key_check').all().length,0);
- console.log('PASS foreign purchase history: restricted identity and prices, role-checked attachment download, duplicate and retry handling, no inventory or purchase effects.');
+ console.log('PASS domestic suppliers: save before linking, registration identifiers, several phones, legacy edit, two distinct materials, duplicate and foreign-scope restrictions. PASS foreign purchase history: privacy, attachments, retry and no operational writes.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

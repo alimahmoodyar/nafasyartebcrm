@@ -1,0 +1,83 @@
+.domestic-supply-home {
+  display: grid;
+  gap: 16px;
+  padding-block: 18px;
+}
+.domestic-supply-heading {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+}
+.domestic-supply-home :is(h1,h2,p) {
+  margin-block: 0;
+}
+.domestic-supply-layout {
+  align-items: start;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(182px,218px) minmax(0,1fr);
+}
+.domestic-supply-layout > nav {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  display: grid;
+  gap: 5px;
+  padding: 8px;
+}
+.domestic-supply-layout > nav .btn {
+  justify-content: start;
+  min-height: 44px;
+  text-align: start;
+}
+.domestic-supply-layout > nav .btn[aria-current="page"],
+.domestic-supply-intro {
+  background: color-mix(in srgb,var(--primary) 9%,var(--card));
+}
+.domestic-supply-content {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.domestic-supply-intro {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+  padding: clamp(14px,3vw,26px);
+}
+.domestic-supply-icon {
+  align-items: center;
+  background: var(--card);
+  border-radius: 10px;
+  display: inline-flex;
+  padding: 9px;
+}
+.domestic-supply-work {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+}
+.domestic-supply-work .domestic-supply-heading {
+  width: 100%;
+}
+.supplier-link-actions {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+.supplier-link-actions > fieldset {
+  width: 100%;
+}
+@media (max-width: 670px) {
+  .domestic-supply-layout {
+    grid-template-columns: minmax(0,1fr);
+  }
+  .domestic-supply-layout > nav {
+    display: flex;
+    flex-wrap: wrap;
+  }
+}
