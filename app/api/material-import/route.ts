@@ -2,13 +2,30 @@ import {storage} from '@/lib/storage';
 import {requireAccess,checkOrigin,AccessError,accessResponse} from '@/lib/authorization';
 import {boundedBody} from '@/lib/firmware-storage';
 import {normalizeMaterialImportRows,parseMaterialImportGrid} from '@/lib/material-import';
+import {accountingMaterialImport} from '@/lib/material-accounting-import';
 const json=(v:unknown,status=200)=>Response.json(v,{status,headers:{'Cache-Control':'private, no-store',Vary:'Cookie, Authorization'}});
 const fail=(message:string,status=400):never=>{throw new AccessError(message,status)};
+export async function GET(){
+ try{
+  const user=await requireAccess();
+  if(!user.isAdmin||user.profileReview)fail('خروجی کدهای حسابداری فقط برای مدیر سامانه است.',403);
+  const rows=(await storage().prepare("SELECT data FROM flow_entities WHERE type='material' ORDER BY id LIMIT 20001").all<{data:string}>()).results;
+  if(rows.length>20000)fail('تعداد کالاها بیش از سقف این خروجی است.',409);
+  const XLSX=await import('xlsx'),book=XLSX.utils.book_new();
+  const values=[['کد هم‌نفس','کد حسابداری','نام کالا','واحد'],...rows.map(row=>{
+   const {code,accountingCode,name,unit}=JSON.parse(row.data);
+   return [code,accountingCode,name,unit].map(value=>String(value||''));
+  })];
+  XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet(values),'کالاها');
+  return new Response(XLSX.write(book,{type:'array',bookType:'xlsx'}),{headers:{'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','Content-Disposition':'attachment; filename="material-accounting-codes.xlsx"','Cache-Control':'private, no-store'}});
+ }catch(e){return accessResponse(e)||json({error:'خروجی کدهای کالا آماده نشد.'},503);}
+}
 export async function POST(request:Request){try{
  checkOrigin(request);const u=await requireAccess();
  if(!u.isAdmin&&!u.permissions.flowRoles?.includes('inventory'))fail('ورود گروهی کالا به مجوز تعریف کالا در انبار نیاز دارد.',403);
  const b=JSON.parse(new TextDecoder().decode(await boundedBody(request,180000)));
  if(!b||typeof b!=='object'||Array.isArray(b))fail('ساختار درخواست معتبر نیست.');
+ if(b.catalog==='accounting')return json(await accountingMaterialImport(u,b));
  if(b.mode==='parse'){try{return json({rows:parseMaterialImportGrid(b.grid,b.header,b.mapping)});}catch(e){fail(e instanceof Error?e.message:'ساختار فایل معتبر نیست.');}}
  if(!['preview','commit'].includes(b.mode))fail('عملیات ورود کالا معتبر نیست.');
  if(typeof b.source!=='string'||!b.source.trim()||b.source.length>500)fail('نام فایل را مشخص کنید.');

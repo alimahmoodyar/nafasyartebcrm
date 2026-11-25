@@ -39,6 +39,44 @@ const commit=(data,p,extra={},status=200,user=inventory)=>invoke({mode:'commit',
  const tools=load('lib/mcp/tools.ts').tools,parseTool=tools.find(t=>t.name==='parse_material_catalog_spreadsheet'),previewTool=tools.find(t=>t.name==='preview_material_import'),commitTool=tools.find(t=>t.name==='commit_material_import');assert.equal(parseTool.write,false);assert.equal(previewTool.write,false);assert.equal(commitTool.write,true);
  const mcpInput=input([sample('55555555')]),mp=await context.run(inventory,()=>previewTool.run(mcpInput,base));assert.equal(mp.newMaterialCount,1);assert.equal(master('55555555'),null);await assert.rejects(()=>context.run(actor('qc',['qc']),()=>previewTool.run(mcpInput,base)));await assert.rejects(()=>context.run(inventory,()=>commitTool.run({...mcpInput,id:crypto.randomUUID(),confirmed:false,catalogSnapshot:mp.catalogSnapshot},base)));
  await context.run(inventory,()=>commitTool.run({...mcpInput,id:crypto.randomUUID(),confirmed:true,catalogSnapshot:mp.catalogSnapshot},base));assert.ok(master('55555555'));const parsed=await context.run(inventory,()=>parseTool.run({grid,header:0,mapping},base));assert.equal(parsed.rows[0].code,'001234');
+ const admin={...actor('admin'),isAdmin:true};
+ const accounting=(rows,mode='preview',other={})=>({mode,catalog:'accounting',source:'accounting.xlsx',rows,...other});
+ const inspect=rows=>invoke(accounting(rows),200,admin);
+ const apply=(rows,view,expected=200,other={})=>invoke(accounting(rows,'commit',{id:crypto.randomUUID(),confirmed:true,catalogSnapshot:view.catalogSnapshot,...other}),expected,admin);
+ const accountingRow=(code,name,unit='عدد',existingCode='')=>({code,name,unit,existingCode});
+ const migration=[accountingRow('10100000','Material 0'),accountingRow('A-001','New accounting item'),accountingRow('A-001','New accounting item')];
+ const previewMigration=await inspect(migration);assert.equal(previewMigration.linkedCount,1);assert.equal(previewMigration.newMaterialCount,1);assert.equal(previewMigration.duplicateCount,1);assert.equal(previewMigration.errors.length,0);
+ assert.equal(master('10100000').data.accountingCode,undefined);
+ await invoke(accounting(migration),403,inventory);
+ const newInternalCode=previewMigration.changes[1].internalCode,materialId=master('10100000').id;
+ const migrationId=crypto.randomUUID();
+ assert.equal((await apply(migration,previewMigration,200,{id:migrationId})).linkedCount,1);
+ assert.equal(master('10100000').id,materialId);assert.equal(master('10100000').data.accountingCode,'10100000');assert.equal(master(newInternalCode).data.accountingCode,'A-001');
+ assert.match(newInternalCode,/^\d{12}$/);assert.equal((await apply(migration,previewMigration,200,{id:migrationId})).repeated,true);
+ assert.equal((await inspect(migration)).existingCount,2);
+ const ambiguous=[accountingRow('000777','Material 1','ست')];assert.equal((await inspect(ambiguous)).changes[0].status,'review');
+ const resolved=[{...ambiguous[0],existingCode:'10100001'}],resolvedPreview=await inspect(resolved);assert.equal(resolvedPreview.linkedCount,1);
+ await apply(resolved,resolvedPreview);assert.equal(master('10100001').data.accountingCode,'000777');
+ for(const conflicting of [
+  [accountingRow('A-001','New accounting item','کیلوگرم')],
+  [accountingRow('A-001','Linked elsewhere','عدد','10100000')],
+  [accountingRow('Conflicting','Part'),accountingRow('Conflicting','Different part')]
+ ]){const reviewed=await inspect(conflicting);assert.ok(reviewed.errors.length);await apply(conflicting,reviewed,400);}
+ const raceRow=[accountingRow('RACE-ACCT','New racing item')],raceView=await inspect(raceRow);
+ beforeBatch=()=>sql.prepare("UPDATE flow_entities SET data=json_set(data,'$.accountingCode','race-acct') WHERE id='material:10100002'").run();
+ await apply(raceRow,raceView,409);assert.equal(master(raceView.changes[0].internalCode),null);
+ const workbookGrid=[['کد هم‌نفس','کد حسابداری','نام کالا','واحد'],['10100001','۰۰۰۷۷۷','Material 1','ست']];
+ const accountingMapping=parser.guessMaterialImportMapping(workbookGrid[0],true),accountingFileRows=parser.parseMaterialImportGrid(workbookGrid,0,accountingMapping,true);
+ assert.equal(accountingFileRows[0].code,'000777');assert.equal(accountingFileRows[0].existingCode,'10100001');
+ assert.equal((await inspect([accountingRow('','Material 3','سانتی‌متر','10100003')])).skippedCount,1);
+ const workbook=await context.run(admin,()=>route.GET());assert.equal(workbook.status,200);
+ const xlsx=require('xlsx'),wb=xlsx.read(await workbook.arrayBuffer(),{type:'array'}),sheet=xlsx.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1});
+ assert.ok(sheet.some(row=>row[0]==='10100001'&&row[1]==='000777'));
+ const formattedBook=xlsx.utils.book_new(),formattedSheet=xlsx.utils.aoa_to_sheet([['کد حسابداری','نام کالا','واحد'],[77,'Formatted code','عدد']]);
+ formattedSheet.A2.z='000000';
+ xlsx.utils.book_append_sheet(formattedBook,formattedSheet,'اقلام');
+ const formatted=await load('lib/bom-import-file.ts').readBomSheets(new File([xlsx.write(formattedBook,{type:'array',bookType:'xlsx'})],'accounting.xlsx'),true);
+ assert.equal(formatted[0].grid[1][0],'000077');
  assert.equal(counts().stock,0);assert.equal(counts().records,0);assert.equal(counts().bom,0);
  const reset=load('lib/reset-contract.ts');assert.ok(reset.resetWhere('flow_entities','operations').includes("'material'"));assert.equal(sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type='material' AND ("+reset.resetWhere('flow_entities','full')+')').get().n,counts().masters);
  console.log('PASS material catalog import: independent 81-row catalog, no invented stock/BOM, incomplete/QC handling, permissions, preserve masters, duplicates, stale/racing snapshots, atomic rollback, idempotency, reset freeze and MCP parity.');

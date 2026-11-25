@@ -2,7 +2,7 @@ import {guessImportMapping,parseBomGrid,parseMappedBomGrid} from './bom-import';
 export type BomSheet={name:string;grid:unknown[][]};
 export function defaultBomSheet(sheets:BomSheet[]){return Math.max(0,sheets.findIndex(s=>s.name.trim().replace(/[١۱]/g,'1')==='1'));}
 function boundedGrid(grid:unknown[][]){if(grid.length>5000||grid.some(r=>r.length>200))throw Error('ابعاد فایل بیش از حد مجاز است.');return grid.map(row=>Array.from(row,v=>v??''));}
-export async function readBomSheets(file:File):Promise<BomSheet[]>{
+export async function readBomSheets(file:File,formattedText=false):Promise<BomSheet[]>{
  if(file.size>5*1024*1024)throw Error('حداکثر حجم فایل ۵ مگابایت است.');
  const prefix=await file.slice(0,200).text();let result:BomSheet[];
  if(prefix.trimStart().startsWith('<')){
@@ -30,9 +30,19 @@ export async function readBomSheets(file:File):Promise<BomSheet[]>{
   });
  }else{
   if(!/\.xlsx$/i.test(file.name))throw Error('این XLS باینری است؛ در اکسل با فرمت XLSX ذخیره کنید. خروجی XML حسابداری با پسوند XLS پشتیبانی می‌شود.');
-  const {default:readWorkbook}=await import('read-excel-file/browser');const sheets=await readWorkbook(file);
-  if(!sheets.length||sheets.length>50)throw Error('فایل باید بین ۱ تا ۵۰ برگه داشته باشد.');
-  result=sheets.map(s=>({name:s.sheet,grid:boundedGrid(s.data)}));
+  if(formattedText){
+   const XLSX=await import('xlsx'),workbook=XLSX.read(await file.arrayBuffer(),{type:'array',sheetRows:5001});
+   if(!workbook.SheetNames.length||workbook.SheetNames.length>50)throw Error('فایل باید بین ۱ تا ۵۰ برگه داشته باشد.');
+   result=workbook.SheetNames.map(name=>{
+    const sheet=workbook.Sheets[name],range=XLSX.utils.decode_range(sheet['!fullref']||sheet['!ref']||'A1');
+    if(range.e.r>=5000||range.e.c>=200)throw Error('ابعاد فایل بیش از حد مجاز است.');
+    return {name,grid:boundedGrid(XLSX.utils.sheet_to_json<unknown[]>(sheet,{header:1,raw:false,defval:''}))};
+   });
+  }else{
+   const {default:readWorkbook}=await import('read-excel-file/browser');const sheets=await readWorkbook(file);
+   if(!sheets.length||sheets.length>50)throw Error('فایل باید بین ۱ تا ۵۰ برگه داشته باشد.');
+   result=sheets.map(s=>({name:s.sheet,grid:boundedGrid(s.data)}));
+  }
  }
  return result;
 }

@@ -2,11 +2,11 @@
 import {useEffect,useId,useRef,useState} from 'react';
 import {ChevronDown,Check} from 'lucide-react';
 
-type Choice={id:string;code:string;name:string};
+type Choice={id:string;code:string;name:string;accountingCode?:string};
 const normalize=(s:string)=>s.toLowerCase().replace(/[يى]/g,'ی').replace(/ك/g,'ک').replace(/[۰-۹]/g,c=>String(c.charCodeAt(0)-1776)).replace(/[٠-٩]/g,c=>String(c.charCodeAt(0)-1632)).replace(/\u200c/g,' ').trim();
 export function searchMaterials(choices:Choice[],query:string){
  const words=normalize(query).split(/\s+/).filter(Boolean);
- return choices.filter(c=>words.every(word=>normalize(c.code+' '+c.name).includes(word)));
+ return choices.filter(c=>words.every(word=>normalize([c.code,c.accountingCode,c.name].join(' ')).includes(word)));
 }
 
 export function MaterialSelect({value,onChange,choices,title='کالا',placeholder='جست‌وجو با نام یا کد کالا',required=true,disabled=false,className='',emptyMessage='کالایی با این نام یا کد پیدا نشد.',listLabel='کالاها'}:{value:string;onChange:(id:string)=>void;choices:Choice[];title?:string;placeholder?:string;required?:boolean;disabled?:boolean;className?:string;emptyMessage?:string;listLabel?:string}){
