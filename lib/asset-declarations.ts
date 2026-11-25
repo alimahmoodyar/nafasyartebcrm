@@ -11,10 +11,12 @@ import type {Session} from './permissions';
 
 const uuid=(s:unknown)=>typeof s==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s);
 const editable=(r:any)=>r&&['draft','returned'].includes(r.data.state);
+const withdrawable=(r:any)=>editable(r)||r?.data.state==='submitted';
+const photoIds=(r:any)=>new Set<string>((r.data.items||[]).flatMap((item:any)=>item.photoFileIds||[]));
 const text=(v:unknown,n=300)=>taskText(v??'',n);
 const owner=(r:any,a:any)=>r.data.memberId===a.id;
 async function context(u:Session){const members=await assetMembers(),a=await assetActor(u,members),rows=await assetRows();return {members,a,rows};}
-function access(rows:any[],id:string,a:any){const r=rows.find(r=>r.id===id&&r.type==='asset_declaration');if(!r||!a.custodian&&!owner(r,a))assetFail('اعلام اموال در دسترسی شما نیست.',404);return r;}
+function access(rows:any[],id:string,a:any){const r=rows.find(r=>r.id===id&&r.type==='asset_declaration'&&r.data.state!=='withdrawn');if(!r||!a.custodian&&!owner(r,a))assetFail('اعلام اموال در دسترسی شما نیست.',404);return r;}
 function codeIndex(rows:any[]){
  const byId=new Map<string,any>(),byCode=new Map<string,any[]>();
  for(const row of rows){
@@ -40,7 +42,8 @@ function publicRecord(r:any,rows:any[],index?:ReturnType<typeof codeIndex>){
   const result=matchCode(String(item.existingCode||''),index);
   return result.state==='existing'?{state:result.state,asset:assetOption(result.asset)}:{state:result.state};
  }):undefined;
- return {...r,...(codeMatches?{codeMatches}:{}),files:rows.filter(f=>f.type==='asset_file'&&f.data.declarationId===r.id).map(f=>({id:f.id,number:f.data.registrationNumber,filename:f.data.filename,url:'/api/assets/declarations/files?id='+encodeURIComponent(f.id)}))};
+ const attached=photoIds(r);
+ return {...r,...(codeMatches?{codeMatches}:{}),files:rows.filter(f=>f.type==='asset_file'&&f.data.declarationId===r.id&&attached.has(f.id)).map(f=>({id:f.id,number:f.data.registrationNumber,filename:f.data.filename,url:'/api/assets/declarations/files?id='+encodeURIComponent(f.id)}))};
 }
 function entries(input:any,strict:boolean,noAssets:boolean){
  if(noAssets){if(input?.length)assetFail('در اعلام نداشتن مال نباید ردیف مال وجود داشته باشد.');return [];}
@@ -53,23 +56,40 @@ function entries(input:any,strict:boolean,noAssets:boolean){
   return row;
  });
 }
-function checkPhotos(items:any[],r:any,rows:any[]){const used=new Set<string>();for(const item of items){if(!item.photoFileIds.length)assetFail('برای تک‌تک اموال عکس جداگانه لازم است.');for(const id of item.photoFileIds){const f=rows.find(x=>x.id===id&&x.type==='asset_file');if(used.has(id)||!f||f.data.declarationId!==r.id||f.data.registrationNumber!==item.number||f.data.actor!==r.data.createdBy)assetFail('عکس باید متعلق به همین شخص، اعلام و شماره مال باشد.');used.add(id);}}if(used.size>40)assetFail('حداکثر چهل عکس در هر اعلام مجاز است.');}
+function checkPhotos(items:any[],r:any,rows:any[],required=true){
+ const used=new Set<string>(),attached=photoIds(r);
+ for(const item of items){
+  if(required&&!item.photoFileIds.length)assetFail('برای تک‌تک اموال عکس جداگانه لازم است.');
+  for(const id of item.photoFileIds){
+   const f=rows.find(x=>x.id===id&&x.type==='asset_file');
+   if(used.has(id)||!attached.has(id)||!f||f.data.declarationId!==r.id||f.data.registrationNumber!==item.number||f.data.actor!==r.data.createdBy)
+    assetFail('عکس باید متعلق به همین شخص، اعلام و شماره مال باشد.');
+   used.add(id);
+  }
+ }
+ if(used.size>40)assetFail('حداکثر چهل عکس در هر اعلام مجاز است.');
+}
 export async function readAssetDeclarations(u:Session,q:URLSearchParams){
  const {a,rows,members}=await context(u),review=q.get('review')==='true';if(review&&!a.custodian)assetFail('بررسی اعلام‌ها فقط برای اموالدار است.',403);
  if(q.has('assetSearch')){if(!a.custodian)assetFail('جست‌وجوی دفتر اموال فقط برای اموالدار است.',403);const term=text(q.get('assetSearch'),100).toLocaleLowerCase();return {accountId:u.userId,assets:term?rows.filter(r=>r.type==='asset_item'&&r.data.lifecycle!=='disposed'&&(r.data.code+' '+r.data.name+' '+(r.data.serial||'')).toLocaleLowerCase().includes(term)).slice(0,30).map(r=>({id:r.id,revision:r.revision,name:r.data.name,code:r.data.code,holderName:r.data.holderName,holderKind:r.data.holderKind,holderId:r.data.holderId})):[]};}
  const reviewStates=q.get('queue')==='true'?['submitted']:['submitted','returned','approved'];
- const records=q.get('id')?[access(rows,q.get('id')!,a)]:rows.filter(r=>r.type==='asset_declaration'&&(review?reviewStates.includes(r.data.state):owner(r,a))).sort((x,y)=>y.updated.localeCompare(x.updated)).slice(0,100);
+ const records=q.get('id')?[access(rows,q.get('id')!,a)]:rows.filter(r=>r.type==='asset_declaration'&&r.data.state!=='withdrawn'&&(review?reviewStates.includes(r.data.state):owner(r,a))).sort((x,y)=>y.updated.localeCompare(x.updated)).slice(0,100);
  const index=review?codeIndex(rows):undefined;
  return {accountId:u.userId,me:a.id,custodian:a.custodian,review,records:records.map(r=>publicRecord(r,rows,index)),conditions:assetConditions,personName:members.find(m=>m.id===a.id)?.name||u.name};
 }
 export async function applyAssetDeclaration(u:Session,b:any){
- if(!b||!uuid(b.id)||b.confirmed!==true||!['save','submit','approve','return'].includes(b.mode)||!Number.isSafeInteger(b.revision)||b.revision<0)assetFail('شناسه، نسخه و تأیید عملیات لازم است.');
+ if(!b||!uuid(b.id)||b.confirmed!==true||!['save','submit','approve','return','withdraw'].includes(b.mode)||!Number.isSafeInteger(b.revision)||b.revision<0)assetFail('شناسه، نسخه و تأیید عملیات لازم است.');
  const allowed=['id','recordId','revision','confirmed','mode','items','noAssets','holderConfirmed','notes','matched','reviewItems'];if(Object.keys(b).some(k=>!allowed.includes(k)))assetFail('اطلاعات خارج از فرم اعلام اموال مجاز نیست.');
  const db=storage(),{a,rows,members}=await context(u),recordId=b.recordId||b.id;if(!uuid(recordId))assetFail('شناسه اعلام معتبر نیست.');
  const signature=JSON.stringify(b),prior:any=await db.prepare('SELECT actor,payload FROM inventory_operations WHERE id=?').bind(b.id).first();
- if(prior){if(prior.actor!==u.userId||prior.payload!==signature)assetFail('شناسه عملیات با اطلاعات دیگری استفاده شده است.',409);const r=access(rows,recordId,a);return {saved:true,id:r.id,record:publicRecord(r,rows),repeated:true};}
+ if(prior){if(prior.actor!==u.userId||prior.payload!==signature)assetFail('شناسه عملیات با اطلاعات دیگری استفاده شده است.',409);if(b.mode==='withdraw')return {saved:true,id:recordId,record:null,repeated:true};const r=access(rows,recordId,a);return {saved:true,id:r.id,record:publicRecord(r,rows),repeated:true};}
  let old=rows.find(r=>r.id===recordId&&r.type==='asset_declaration');if(old)old=access(rows,recordId,a);if((old?.revision||0)!==b.revision)assetFail('اعلام تغییر کرده است؛ اطلاعات را تازه کنید.',409);
  const now=new Date().toISOString(),notes=text(b.notes,4000),history=(data:any)=>({...data,history:[...(old?.data.history||[]),{at:now,actor:u.userId,name:u.name,mode:b.mode,notes,state:data.state}]});
+ if(b.mode==='withdraw'){
+  if(!old||!owner(old,a)||!withdrawable(old))assetFail('فقط اعلام خودتان تا پیش از تأیید اموال‌دار قابل حذف است.',403);
+  await commitAssets(u,b.id,signature,rows,members,[{...old,data:{state:'withdrawn',withdrawnAt:now,withdrawnBy:u.userId}}],'declaration_withdraw');
+  return {saved:true,id:recordId,record:null};
+ }
  if((old?.data.history||[]).length>=200)assetFail('سقف سابقه اعلام پر شده است.');
  const changes:any[]=[];
  if(b.mode==='save'||b.mode==='submit'){
@@ -78,8 +98,8 @@ export async function applyAssetDeclaration(u:Session,b:any){
   if(old&&(!owner(old,a)||(!editable(old)&&!reopen)))assetFail('فقط اعلام خودتان تا پیش از تأیید اموال‌دار قابل ویرایش است.',403);
   const hr:any=await db.prepare("SELECT data,revision,id FROM flow_entities WHERE type='hr_employee' AND json_extract(data,'$.memberId')=?").bind(a.id).first();if(!hr||JSON.parse(hr.data).state!=='active')assetFail('ابتدا اطلاعات پرونده پرسنلی باید تأیید شود.',409);
   const noAssets=b.noAssets===true,items=entries(b.items,b.mode==='submit',noAssets);
-  if(b.mode==='submit'){if(b.holderConfirmed!==true)assetFail('تأیید موجودی نزد خودتان لازم است.');checkPhotos(items,old||{id:recordId,data:{createdBy:u.userId}},rows);}
-  if(old){const removed=(old.data.items||[]).some((v:any,i:number)=>(v.photoFileIds||[]).some((id:string)=>!items[i]?.photoFileIds.includes(id)));if(removed)assetFail('ردیف یا عکس بارگذاری‌شده را از اعلام حذف نکنید؛ شماره عکس‌ها باید حفظ شود.');}
+  if(b.mode==='submit'&&b.holderConfirmed!==true)assetFail('تأیید موجودی نزد خودتان لازم است.');
+  checkPhotos(items,old||{id:recordId,data:{createdBy:u.userId}},rows,b.mode==='submit');
   const data=history({...old?.data,memberId:a.id,memberName:members.find(m=>m.id===a.id)!.name,createdBy:old?.data.createdBy||u.userId,createdAt:old?.data.createdAt||now,noAssets,items,state:b.mode==='submit'?'submitted':'draft',...(b.mode==='submit'?{submittedAt:now,holderConfirmedAt:now}:{})});
   changes.push({id:recordId,type:'asset_declaration',revision:old?.revision||0,data});
   const guard=db.prepare("UPDATE inventory_operations SET guard=CASE WHEN EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND revision=? AND json_extract(data,'$.state')='active') THEN guard ELSE 0 END WHERE id=?").bind(hr.id,hr.revision,b.id);
@@ -130,15 +150,19 @@ export async function applyAssetDeclaration(u:Session,b:any){
 }
 export async function uploadDeclarationPhoto(u:Session,request:Request){
  const q=new URL(request.url).searchParams,id=q.get('id'),recordId=q.get('recordId')||'',number=Number(q.get('number')),revision=Number(q.get('revision'));if(!uuid(id)||q.get('confirmed')!=='true'||!Number.isInteger(number)||number<1||number>20)assetFail('شناسه و ردیف عکس معتبر لازم است.');
+ const replaceId=q.get('replaceId');if(replaceId!==null&&!uuid(replaceId))assetFail('شناسهٔ عکس جایگزین‌شونده معتبر نیست.');
  const {a,rows,members}=await context(u),r=access(rows,recordId,a);if(!owner(r,a)||!editable(r))assetFail('فقط عکس اعلام پیش‌نویس یا برگشتی خودتان قابل بارگذاری است.',403);
  const bytes=await boundedBody(request,10*1024*1024),mime=assetImageMime(new Uint8Array(bytes));if(!mime)assetFail('فقط تصویر JPEG، PNG یا WEBP معتبر مجاز است.');
- const hash=await sha256(bytes),signature=JSON.stringify({recordId,number,hash}),prior:any=await storage().prepare('SELECT actor,payload FROM inventory_operations WHERE id=?').bind(id).first();
+ const hash=await sha256(bytes),signature=JSON.stringify({recordId,number,hash,...(replaceId?{replaceId}:{})}),prior:any=await storage().prepare('SELECT actor,payload FROM inventory_operations WHERE id=?').bind(id).first();
  if(prior){if(prior.actor!==u.userId||prior.payload!==signature)assetFail('شناسه عکس قبلاً استفاده شده است.',409);return {saved:true,id,record:publicRecord(r,rows),repeated:true};}
  if(r.revision!==revision)assetFail('اعلام تغییر کرده است؛ تازه‌سازی کنید.',409);
- const items=entries(r.data.items,false,!!r.data.noAssets),item=items[number-1];if(!item||item.photoFileIds.length>=5||items.reduce((n:number,x:any)=>n+x.photoFileIds.length,0)>=40)assetFail('ردیف عکس یا تعداد عکس‌ها معتبر نیست.');
- const key='asset-declarations/'+r.id+'/'+id+'/'+hash,made=new Date().toISOString(),file={id,type:'asset_file',revision:0,data:{purpose:'declaration_photo',declarationId:r.id,registrationNumber:number,actor:u.userId,objectKey:key,filename:taskRequired(q.get('filename'),180),mime,byteSize:bytes.byteLength,sha256:hash,staged:true}};item.photoFileIds=[...item.photoFileIds,id!];
+ const items=entries(r.data.items,false,!!r.data.noAssets),item=items[number-1];if(!item)assetFail('ردیف عکس معتبر نیست.');
+ if(replaceId&&!item.photoFileIds.includes(replaceId))assetFail('عکس انتخاب‌شده دیگر به این ردیف پیوست نیست.',409);
+ if(!replaceId&&(item.photoFileIds.length>=5||items.reduce((n:number,x:any)=>n+x.photoFileIds.length,0)>=40))assetFail('تعداد عکس‌ها بیشتر از سقف مجاز است.');
+ const key='asset-declarations/'+r.id+'/'+id+'/'+hash,made=new Date().toISOString(),file={id,type:'asset_file',revision:0,data:{purpose:'declaration_photo',declarationId:r.id,registrationNumber:number,actor:u.userId,objectKey:key,filename:taskRequired(q.get('filename'),180),mime,byteSize:bytes.byteLength,sha256:hash,staged:true}};
+ item.photoFileIds=replaceId?item.photoFileIds.map((photoId:string)=>photoId===replaceId?id!:photoId):[...item.photoFileIds,id!];
  await firmwareBucket().put(key,bytes,{httpMetadata:{contentType:mime}});
  try{await commitAssets(u,id!,signature,rows,members,[file,{...r,data:{...r.data,items}}],'declaration_photo');}catch(error){const persisted:any=await storage().prepare('SELECT data FROM flow_entities WHERE id=?').bind(id).first();if(!persisted||JSON.parse(persisted.data).objectKey!==key)try{await firmwareBucket().delete(key)}catch{}throw error;}
  return {saved:true,id,record:publicRecord({...r,revision:r.revision+1,updated:made,data:{...r.data,items}},[...rows,file])};
 }
-export async function declarationPhoto(u:Session,id:string){const {a,rows}=await context(u),f=rows.find(r=>r.id===id&&r.type==='asset_file'&&r.data.declarationId);if(!f)assetFail('عکس یافت نشد.',404);access(rows,f.data.declarationId,a);const obj=await firmwareBucket().get(f.data.objectKey);if(!obj)assetFail('فایل در دسترس نیست.',404);const bytes=await obj!.arrayBuffer();if(bytes.byteLength!==f.data.byteSize||await sha256(bytes)!==f.data.sha256)assetFail('یکپارچگی عکس تأیید نشد.',503);return new Response(bytes,{headers:{'Content-Type':f.data.mime,'Cache-Control':'private, no-store','Vary':'Cookie, Authorization','X-Content-Type-Options':'nosniff','Content-Security-Policy':"sandbox; default-src 'none'"}});}
+export async function declarationPhoto(u:Session,id:string){const {a,rows}=await context(u),f=rows.find(r=>r.id===id&&r.type==='asset_file'&&r.data.declarationId);if(!f)assetFail('عکس یافت نشد.',404);const record=access(rows,f.data.declarationId,a);if(!photoIds(record).has(id))assetFail('عکس یافت نشد.',404);const obj=await firmwareBucket().get(f.data.objectKey);if(!obj)assetFail('فایل در دسترس نیست.',404);const bytes=await obj!.arrayBuffer();if(bytes.byteLength!==f.data.byteSize||await sha256(bytes)!==f.data.sha256)assetFail('یکپارچگی عکس تأیید نشد.',503);return new Response(bytes,{headers:{'Content-Type':f.data.mime,'Cache-Control':'private, no-store','Vary':'Cookie, Authorization','X-Content-Type-Options':'nosniff','Content-Security-Policy':"sandbox; default-src 'none'"}});}

@@ -86,6 +86,26 @@ const op=(mode,extra={})=>({id:crypto.randomUUID(),mode,confirmed:true,revision:
  sql.prepare("UPDATE duty_runs SET state='cancelled' WHERE id=?").run(returnedTask.id);
  assert.ok((await inbox(staff)).some(t=>t.id===returnedTask.id&&t.state==='open'),'The employee cartable recovers a missing open correction.');
  assert.ok(!(await inbox(other)).some(t=>t.data.sourceId===record.id));
+
+ const replaceId=record.data.items[0].photoFileIds[0],newPhoto=crypto.randomUUID();
+ const replaceQuery=new URLSearchParams({id:newPhoto,recordId:record.id,revision:String(record.revision),number:'1',filename:'edited.png',confirmed:'true',replaceId});
+ const replacePhoto=user=>context.run(user,()=>photos.POST(new Request(base+'/api/assets/declarations/files?'+replaceQuery,{method:'POST',headers:{origin:base},body:png})));
+ assert.equal((await replacePhoto(other)).status,404);
+ assert.equal((await replacePhoto(custodian)).status,403);
+ result=await replacePhoto(staff);assert.equal(result.status,200,await result.clone().text());
+ record=(await result.json()).record;
+ assert.ok(record.files.some(f=>f.id===newPhoto));
+ assert.equal((await replacePhoto(staff)).status,200,'same image replacement is retryable');
+ const downloadPhoto=id=>context.run(staff,()=>photos.GET(req('/api/assets/declarations/files?id='+id)));
+ assert.equal((await downloadPhoto(replaceId)).status,404);
+ const removeFromLast=record.data.items.map((item,i)=>i===record.data.items.length-1?{...item,photoFileIds:[]}:item);
+ assert.equal((await call(staff,op('submit',{recordId:record.id,revision:record.revision,items:removeFromLast,holderConfirmed:true}))).status,400);
+ const removeId=record.data.items.at(-1).photoFileIds[0];
+ result=await call(staff,op('save',{recordId:record.id,revision:record.revision,items:removeFromLast}));assert.equal(result.status,200);
+ record=(await result.json()).record;
+ assert.equal((await downloadPhoto(removeId)).status,404);
+ result=await upload(staff,record,record.data.items.length);assert.equal(result.status,200);
+ record=(await result.json()).record;
  result=await call(staff,op('submit',{recordId:record.id,revision:record.revision,items:record.data.items,holderConfirmed:true}));assert.equal(result.status,200);record=(await result.json()).record;
  assert.ok((await (await read(custodian,'?review=true&queue=true')).json()).records.some(r=>r.id===record.id));
  assert.equal((await read(other,'?review=true&queue=true')).status,403);
@@ -113,7 +133,7 @@ const op=(mode,extra={})=>({id:crypto.randomUUID(),mode,confirmed:true,revision:
  assert.equal((await call(custodian,op('approve',{recordId:record.id,revision:record.revision,matched:true,reviewItems:[{...reviewItems[0],existingAssetId:conflicting,assetRevision:1},reviewItems[1]]}))).status,409,'no stealing another holder');
  sql.exec("CREATE TRIGGER onboarding_fail BEFORE UPDATE ON flow_entities WHEN NEW.type='asset_declaration' AND json_extract(NEW.data,'$.state')='approved' BEGIN SELECT RAISE(ABORT,'SQLITE forced failure'); END");
  const approveDecl=op('approve',{recordId:record.id,revision:record.revision,reviewItems,matched:true});assert.equal((await call(custodian,approveDecl)).status,503);assert.equal(sql.prepare("SELECT count(*) n FROM flow_entities WHERE type='asset_item'").get().n,1,'rollback every generated asset');sql.exec('DROP TRIGGER onboarding_fail');
- result=await call(custodian,approveDecl);assert.equal(result.status,200,await result.clone().text());record=(await result.json()).record;assert.equal(record.data.approvedItems.length,2);assert.equal(record.data.state,'approved');const official=record.data.approvedItems.map(v=>row(v.assetId));for(const a of official){assert.equal(a.data.holderId,mid);assert.equal(a.data.holderKind,'employee');assert.equal(a.data.registrationBasis,'opening_inventory');assert.equal(a.data.handedDay,'');assert.equal(a.data.history[0].mode,'opening_inventory');}assert.notEqual(official[0].data.code,official[1].data.code);assert.equal(record.data.approvedItems[0].copies,2);assert.equal(row(fileId).data.purpose,'asset_photo');
+ result=await call(custodian,approveDecl);assert.equal(result.status,200,await result.clone().text());record=(await result.json()).record;assert.equal(record.data.approvedItems.length,2);assert.equal(record.data.state,'approved');const official=record.data.approvedItems.map(v=>row(v.assetId));for(const a of official){assert.equal(a.data.holderId,mid);assert.equal(a.data.holderKind,'employee');assert.equal(a.data.registrationBasis,'opening_inventory');assert.equal(a.data.handedDay,'');assert.equal(a.data.history[0].mode,'opening_inventory');}assert.notEqual(official[0].data.code,official[1].data.code);assert.equal(record.data.approvedItems[0].copies,2);assert.equal(row(newPhoto).data.purpose,'asset_photo');assert.equal(row(fileId).data.purpose,'declaration_photo');
  assert.deepEqual(record.data.items.map(v=>v.existingCode),['002877','AM-009998'],'Employee label text survives approval for audit.');
  const completedId=record.id;
  assert.ok(!(await (await read(custodian,'?review=true&queue=true')).json()).records.some(r=>r.id===completedId));
@@ -148,6 +168,33 @@ const op=(mode,extra={})=>({id:crypto.randomUUID(),mode,confirmed:true,revision:
  assert.equal((await call(custodian,op('approve',{recordId:matchCase.id,revision:matchCase.revision,matched:true}))).status,409,'An archived code cannot be registered as a new asset.');
  sql.prepare("UPDATE flow_entities SET type='asset_item' WHERE id=?").run(stockId);
  const countBeforeMatch=sql.prepare("SELECT count(*) n FROM flow_entities WHERE type='asset_item'").get().n;result=await call(custodian,op('approve',{recordId:matchCase.id,revision:matchCase.revision,reviewItems:[{...matchCase.data.items[0],existingAssetId:stockId,assetRevision:1,copies:3}],matched:true}));assert.equal(result.status,200,await result.clone().text());assert.equal(sql.prepare("SELECT count(*) n FROM flow_entities WHERE type='asset_item'").get().n,countBeforeMatch);assert.equal(row(stockId).data.holderId,(await load('lib/assets.ts').assetActor(other)).id);assert.equal(row(stockId).data.handedDay,'');
+
+ assert.equal((await call(staff,op('withdraw',{recordId:record.id,revision:record.revision}))).status,403,'approved asset declaration is locked');
+ for(const state of ['draft','submitted','returned']){
+  result=await call(staff,op('save',{items:[{name:'Withdraw test',category:'Office',location:'Desk',condition:'good'}]}));assert.equal(result.status,200);
+  let candidate=(await result.json()).record;result=await upload(staff,candidate,1);assert.equal(result.status,200);candidate=(await result.json()).record;
+  const attachment=candidate.files[0].id;
+  if(state!=='draft'){
+   result=await call(staff,op('submit',{recordId:candidate.id,revision:candidate.revision,items:candidate.data.items,holderConfirmed:true}));assert.equal(result.status,200);candidate=(await result.json()).record;
+  }
+  if(state==='returned'){
+   result=await call(custodian,op('return',{recordId:candidate.id,revision:candidate.revision,notes:'Review for correction'}));assert.equal(result.status,200);candidate=(await result.json()).record;
+  }
+  const drop=op('withdraw',{recordId:candidate.id,revision:candidate.revision});
+  assert.equal((await call(custodian,drop)).status,403);
+  assert.equal((await call(other,drop)).status,404);
+  assert.equal((await call(staff,{...drop,revision:candidate.revision-1})).status,409);
+  result=await call(staff,drop);assert.equal(result.status,200,await result.clone().text());
+  assert.equal((await result.json()).record,null);
+  assert.equal((await (await call(staff,drop)).json()).repeated,true);
+  assert.equal((await read(staff,'?id='+candidate.id)).status,404);
+  assert.equal((await read(custodian,'?review=true&id='+candidate.id)).status,404);
+  assert.ok(!(await (await read(staff)).json()).records.some(r=>r.id===candidate.id));
+  assert.equal((await downloadPhoto(attachment)).status,404);
+  assert.ok(!(await inbox(custodian)).some(t=>t.data.sourceId===candidate.id&&t.state==='open'));
+  assert.ok(!(await inbox(staff)).some(t=>t.data.sourceId===candidate.id&&t.state==='open'));
+  assert.equal((await call(custodian,op('approve',{recordId:candidate.id,revision:candidate.revision,matched:true}))).status,404);
+ }
  const reset=load('lib/reset-contract.ts');for(const scope of ['operations','full'])assert.equal(sql.prepare("SELECT count(*) n FROM flow_entities WHERE type='asset_declaration' AND ("+reset.resetWhere('flow_entities',scope)+')').get().n,sql.prepare("SELECT count(*) n FROM flow_entities WHERE type='asset_declaration'").get().n,'reset scope covers all opening declarations');
  const report=await context.run(hr,()=>onboarding.GET());assert.equal(report.status,200);assert.ok(!(await report.text()).includes('password_hash'));
  const principal={user:staff,scope:'read_write',tokenId:null};const ownMcp=await catalog.executeTool('get_asset_declarations',{},base,principal);assert.ok(ownMcp.records.some(r=>r.id===record.id));await assert.rejects(()=>catalog.executeTool('asset_declaration_apply',approveDecl,base,principal));

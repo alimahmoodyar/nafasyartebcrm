@@ -25,3 +25,5 @@
     grid-row: 1;
   }
 }
+
+.asset-declaration-delete{color:#a32633}.asset-declaration-photo-card{display:grid;gap:6px}.asset-declaration-photo-card .tools{gap:6px;flex-wrap:wrap}
