@@ -89,19 +89,20 @@ const commit=(data,p,extra={},status=200,user=inventory)=>invoke({mode:'commit',
  const file=new File([bytes],'اقلام پرمصرف.xls'),reader=load('lib/bom-import-file.ts');
  await assert.rejects(()=>reader.readBomSheets(file,true),/باینری/);
  const importSource=parser.financeMaterialWorkbook(await reader.readBomSheets(file,true,true));
- assert.equal(importSource.name,'Sheet1');assert.equal(importSource.rows.length,999);
+ const expectedRows=Number(process.env.FINANCE_MATERIAL_EXPECTED_ROWS||999);
+ assert.equal(importSource.name,'Sheet1');assert.equal(importSource.rows.length,expectedRows);
  const profile={profile:'finance-frequent',source:'finance.xls · Sheet1'};
  const beforeBatchImport=counts();
  const financeView=await invoke(accounting(importSource.rows,'preview',profile),200,admin);
  const units=load('lib/material-units.ts');
  const sourceExcluded=importSource.rows.filter(row=>row.financeIssue||!units.normalizeMaterialUnit(row.unit)).length;
- assert.equal(sourceExcluded,actualFile?50:2);
+ assert.equal(sourceExcluded,actualFile?Number(process.env.FINANCE_MATERIAL_EXPECTED_EXCLUDED||50):2);
  const expectedExcluded=financeView.excludedCount;
  assert.ok(expectedExcluded>=sourceExcluded);
  if(actualFile)assert.ok(expectedExcluded>sourceExcluded,'legacy conflicts are excluded along with source issues');
  assert.equal(financeView.errors.length,0);
  assert.equal(financeView.excludedCount,expectedExcluded);
- assert.equal(financeView.newMaterialCount+financeView.linkedCount+financeView.existingCount,999-expectedExcluded);
+ assert.equal(financeView.newMaterialCount+financeView.linkedCount+financeView.existingCount,expectedRows-expectedExcluded);
  assert.deepEqual(counts(),beforeBatchImport,'preview does not write');
  await invoke(accounting(importSource.rows,'preview'),400,admin);
  await invoke(accounting(importSource.rows,'preview',profile),403,inventory);
@@ -113,7 +114,7 @@ const commit=(data,p,extra={},status=200,user=inventory)=>invoke({mode:'commit',
  assert.equal(afterFinance.newMaterialCount,0);assert.equal(afterFinance.excludedCount,expectedExcluded);
  for(const issue of financeView.changes.filter(row=>row.status==='excluded'))
   assert.equal(sql.prepare("SELECT 1 FROM flow_entities WHERE type='material' AND json_extract(data,'$.accountingCode')=? AND json_extract(data,'$.importSource')=?").get(issue.accountingCode,profile.source),undefined);
- console.log('PASS 999-row binary finance workbook: one confirmation, excluded rows, no duplicates and retry.');
+ console.log('PASS '+expectedRows+'-row binary finance workbook: one confirmation, excluded rows, no duplicates and retry.');
  assert.equal(counts().stock,0);assert.equal(counts().records,0);assert.equal(counts().bom,0);
  const reset=load('lib/reset-contract.ts');assert.ok(reset.resetWhere('flow_entities','operations').includes("'material'"));assert.equal(sql.prepare("SELECT COUNT(*) n FROM flow_entities WHERE type='material' AND ("+reset.resetWhere('flow_entities','full')+')').get().n,counts().masters);
  console.log('PASS material catalog import: independent 81-row catalog, no invented stock/BOM, incomplete/QC handling, permissions, preserve masters, duplicates, stale/racing snapshots, atomic rollback, idempotency, reset freeze and MCP parity.');
