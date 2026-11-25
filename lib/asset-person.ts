@@ -4,6 +4,8 @@ import {assetInternal} from './assets';
 import {custodianProfileWork} from './asset-profile-work';
 import type {Session} from './permissions';
 const normalize=(s:string)=>s.normalize('NFKC').replace(/[يى]/g,'ی').replace(/ك/g,'ک').replace(/[\u064B-\u065F\u0670\u0640\u200c\u200d\s]/g,'').toLocaleLowerCase();
+const holderIdSql="json_extract(data,'$.holderId')";
+const currentEmployeeAssets="type='asset_item' AND json_extract(data,'$.holderKind')='employee' AND coalesce(json_extract(data,'$.lifecycle'),'active')<>'disposed'";
 // Reads the accepted handover events and legacy snapshots; requests/cancellations
 // never become receipts. Names come from the current asset passport, not a new ledger.
 const historySql=`WITH moves AS (
@@ -25,16 +27,18 @@ export async function assetPersonView(u:Session,q:URLSearchParams){
  const a=await assetIdentity(u);if(!a.custodian)afail('دسترسی اموال‌دار لازم است.',403);
  const view=q.get('view')||'people',raw=q.get('offset')||'0',offset=Number(raw);if(!/^\d+$/.test(raw)||!Number.isSafeInteger(offset)||offset>1000000)afail('شماره صفحه معتبر نیست.');
  if(view==='work')return {accountId:u.userId,...await custodianProfileWork(u)};
- const units=(await storage().prepare('SELECT id,unit FROM app_members').all()).results as any[],unitMap=new Map(units.map(m=>[m.id,m.unit]));
+ const db=storage(),units=(await db.prepare('SELECT id,unit FROM app_members').all()).results as any[],unitMap=new Map(units.map(m=>[m.id,m.unit]));
  const people=a.members.filter(m=>assetInternal({...m,status:'active'})).map(m=>({...m,unit:unitMap.get(m.id)||''})),publicPerson=(p:any)=>({id:p.id,name:p.name,unit:p.unit||'',active:p.status==='active'});
  if(view==='people'){
   const words=normalize(String(q.get('q')||'').slice(0,120));if(!words)return {accountId:u.userId,people:[],hasMore:false};
-  const matches=people.filter(p=>normalize(p.name+' '+p.id+' '+(p.unit||'')).includes(words)).sort((x,y)=>x.name.localeCompare(y.name,'fa')||x.id.localeCompare(y.id));
-  return {accountId:u.userId,people:matches.slice(offset,offset+20).map(publicPerson),hasMore:matches.length>offset+20};
+  const holdersOnly=q.get('holdersOnly')==='true';
+  const holders=holdersOnly?new Map((await db.prepare(`SELECT ${holderIdSql} AS id, COUNT(*) AS total FROM flow_entities WHERE ${currentEmployeeAssets} GROUP BY ${holderIdSql}`).all<{id:string;total:number}>()).results.map(holder=>[holder.id,holder.total])):null;
+  const matches=people.filter(p=>(!holders||holders.has(p.id))&&normalize(p.name+' '+p.id+' '+(p.unit||'')).includes(words)).sort((x,y)=>x.name.localeCompare(y.name,'fa')||x.id.localeCompare(y.id));
+  return {accountId:u.userId,people:matches.slice(offset,offset+20).map(p=>({...publicPerson(p),...(holders?{currentTotal:holders.get(p.id)}:{})})),hasMore:matches.length>offset+20};
  }
  if(!['current','history'].includes(view))afail('نوع فهرست معتبر نیست.');
  const person=people.find(p=>p.id===q.get('person'));if(!person)afail('شخص در فهرست کارکنان شرکت پیدا نشد.',404);
- const db=storage(),currentWhere="type='asset_item' AND json_extract(data,'$.holderKind')='employee' AND json_extract(data,'$.holderId')=? AND coalesce(json_extract(data,'$.lifecycle'),'active')<>'disposed'";
+ const currentWhere=currentEmployeeAssets+' AND '+holderIdSql+'=?';
  const count:any=await db.prepare('SELECT COUNT(*) n FROM flow_entities WHERE '+currentWhere).bind(person.id).first();
  if(view==='history'){
   const rows=(await db.prepare(historySql).bind(person.id,person.id,offset).all()).results as any[];

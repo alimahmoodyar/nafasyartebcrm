@@ -30,15 +30,23 @@ const transfer=(id,revision,kind='employee',extra={})=>({mode:'transfer',recordI
  sql.prepare('UPDATE app_members SET name=?,unit=? WHERE id IN (?,?)').run('علی رضایی','فروش','alice','bob');
  assert.equal((await read(keeper,{view:'people',q:'علي رضايي'})).data.people.length,2,'Persian/Arabic names normalize and duplicate names remain separate identities');
  assert.equal((await read(keeper,{view:'people',q:'alice'})).data.people[0].unit,'فروش');
+ actor('alice-legacy-role',[],{assetRoles:['custodian']});
+ sql.prepare("UPDATE app_members SET name=? WHERE id='alice-legacy-role'").run('علی رضایی · اموال‌دار');
+ const currentPeople=()=>read(keeper,{view:'people',q:'علی رضایی',holdersOnly:'true'});
+ assert.deepEqual((await currentPeople()).data.people,[]);
  assert.equal((await read(alice,{view:'people',q:'علی'})).status,403);assert.equal((await read(hr,{person:'alice',view:'history'})).status,403);assert.equal((await read(external,{view:'work'})).status,403);
  assert.equal((await read(keeper,{person:'missing',view:'current'})).status,404);assert.equal((await read(keeper,{view:'people',q:'علی',offset:'-1'})).status,400);
  const id=crypto.randomUUID();assert.equal((await post(keeper,{...reg,id,category:'تجهیزات اداری'})).status,200);
  await perform(keeper,{mode:'transfer',recordId:id,revision:entity(id).revision,holderKind:'employee',holderId:'alice',location:'Office',condition:'good'});
  assert.equal((await read(keeper,{person:'alice',view:'current'})).data.currentTotal,0,'Pending arrival is not a received asset');
+ assert.deepEqual((await currentPeople()).data.people,[]);
  await perform(alice,{mode:'accept_transfer',recordId:id,revision:entity(id).revision,scan:load('lib/asset-label.ts').assetQrText(id),condition:'good'});
  let current=await read(keeper,{person:'alice',view:'current'});assert.equal(current.data.currentTotal,1);assert.equal(current.data.records[0].data.holderId,'alice');assert.match(current.data.records[0].data.handedAt,/T/);assert.ok(!('specifications' in current.data.records[0].data));
+ let holders=(await currentPeople()).data.people;
+ assert.deepEqual(holders.map(({id,currentTotal})=>[id,currentTotal]),[['alice',1]],'Keep the actual holder and exclude empty role accounts and same-name nonholders');
  await perform(alice,{mode:'transfer',recordId:id,revision:entity(id).revision,holderKind:'employee',holderId:'bob',location:'Other office',condition:'good'});
  assert.equal((await read(keeper,{person:'alice',view:'current'})).data.currentTotal,1);assert.equal((await read(keeper,{person:'bob',view:'current'})).data.currentTotal,0);
+ assert.deepEqual((await currentPeople()).data.people.map(p=>p.id),['alice']);
  await perform(alice,{mode:'cancel_transfer',recordId:id,revision:entity(id).revision});
  assert.equal((await read(keeper,{person:'alice',view:'history'})).data.history.length,1,'Cancelled requests do not invent history receipts');
  await perform(alice,{mode:'transfer',recordId:id,revision:entity(id).revision,holderKind:'employee',holderId:'bob',location:'Other office',condition:'good'});
@@ -48,6 +56,8 @@ const transfer=(id,revision,kind='employee',extra={})=>({mode:'transfer',recordI
  const legacy=crypto.randomUUID(),legacyData={name:'Legacy chair',code:'LEGACY',holderKind:'employee',holderId:'alice',holderName:'علی رضایی',condition:'good',location:'Old office',handedDay:'2020-01-02',history:[{mode:'register',holderKind:'stock',holderId:'',holderName:'Company',at:'2020-01-01T08:00:00Z'},{mode:'transfer',holderKind:'employee',holderId:'alice',holderName:'علی رضایی',location:'Old office',at:'2020-01-02T08:00:00Z'}]};
  sql.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'asset_item',?,1,?,?)").run(legacy,JSON.stringify(legacyData),now,now);
  const old=(await read(keeper,{person:'alice',view:'current'})).data.records.find(r=>r.id===legacy);assert.equal(old.data.handedAt,'');assert.equal(old.data.handedDay,'2020-01-02');assert.ok((await read(keeper,{person:'alice',view:'history'})).data.history.some(h=>h.source==='legacy'));
+ holders=(await currentPeople()).data.people;
+ assert.deepEqual(holders.map(p=>p.id),['alice','bob'],'Distinct people with the same name and current assets remain separate');
  sql.prepare("UPDATE app_members SET status='inactive' WHERE id='alice'").run();assert.equal((await read(keeper,{view:'people',q:'alice'})).data.people[0].active,false);assert.equal((await read(keeper,{person:'alice',view:'current'})).data.currentTotal,1);
  for(let i=0;i<35;i++){const mid='page-'+i;sql.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'asset_item',?,1,?,?)").run(mid,JSON.stringify({...legacyData,history:[],code:mid}),now,now);}
  const first=await read(keeper,{person:'alice',view:'current'}),second=await read(keeper,{person:'alice',view:'current',offset:'30'});assert.equal(first.data.records.length,30);assert.equal(first.data.hasMore,true);assert.equal(second.data.records.length,6);assert.equal(second.data.hasMore,false);
