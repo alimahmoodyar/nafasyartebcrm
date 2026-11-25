@@ -427,6 +427,17 @@ html,button,input,textarea,select,option,svg text{font-family:"Vazirmatn",sans-s
 .material-catalog-import .stocktable th:nth-child(2) { width: 51%; }
 .material-catalog-import .stocktable input, .material-catalog-import .stocktable select { width: 100%; min-width: 0; font: inherit; padding: 8px 10px; border: 1px solid var(--input); border-radius: 8px; background: white; color: inherit; }
 .material-catalog-import .stocktable thead { position: sticky; top: 0; background: var(--background); z-index: 1; }
+.material-catalog-import__table { overflow-x: auto; }
+.material-catalog-import .material-catalog-import__accounting { min-width: 720px; }
+.material-catalog-import .material-catalog-import__accounting th { white-space: normal; line-height: 1.45; }
+.material-catalog-import .material-catalog-import__accounting th:nth-child(1) { width: 18%; }
+.material-catalog-import .material-catalog-import__accounting th:nth-child(2) { width: 34%; }
+.material-catalog-import .material-catalog-import__accounting th:nth-child(3) { width: 19%; }
+.material-catalog-import .material-catalog-import__accounting th:nth-child(4) { width: 19%; }
+.material-catalog-import .material-catalog-import__accounting th:nth-child(5) { width: 10%; }
+.material-catalog-import .material-catalog-import__accounting input[type=checkbox] { width: auto; }
+.material-catalog-import .material-catalog-import__result td { white-space: normal; overflow-wrap: anywhere; font-size: .92em; background: var(--muted); }
+.material-catalog-import .material-catalog-import__result[data-review] td { color: #912d2d; background: #fff1f1; }
 .material-catalog-import .notice { display: block; }
 .material-catalog-import .notice p { margin-block: 8px; }
 .material-catalog-import summary { cursor: pointer; }
