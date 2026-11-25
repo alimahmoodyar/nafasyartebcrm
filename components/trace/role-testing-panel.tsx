@@ -10,6 +10,7 @@ import {ArrowLeftRight,Boxes,ClipboardList,Search,UserRound} from 'lucide-react'
 import {batchScanCode} from '@/lib/batch-qr';
 import type {CartableRow} from '@/lib/cartable-view';
 import {DomesticSupplyHome} from './domestic-supply-home';
+import {ForeignCommerceHome} from './foreign-commerce-home';
 import {LineManagerHome,OperationalRoleHome} from './line-manager-home';
 import './technical-role.css';
 import type {RoleProfile,ProfileWork} from '@/lib/role-profiles';
@@ -90,6 +91,7 @@ export function RoleTestingPanel({assigned,targetId='',onNavigate,onProfile,onAc
  if(id==='custodian'&&!snapshot&&!error&&!choosing)return <section className="panel inside" role="status">در حال دریافت پنل اموال‌دار…</section>;
  if(snapshot?.profile.id==='driver'&&!choosing)return <DriverDashboard accountKey={snapshot.profile.id} onNavigate={onNavigate}/>;
  if(id==='driver'&&!snapshot&&!error&&!choosing)return <section className="panel inside" role="status">در حال دریافت پنل راننده…</section>;
+ if(snapshot?.profile.id==='foreign'&&!choosing)return <ForeignCommerceHome profile={snapshot.profile} count={assigned?.count??snapshot.work.length} limited={assigned?.limited||snapshot.workHasMore} onNavigate={onNavigate}/>;
  if(id==='domestic'&&snapshot?.profile.id===id&&!choosing)return <DomesticSupplyHome
   canOpenCatalog={snapshot.profile.links.some(link=>link.target==='domestic-suppliers:')}
   onNavigate={onNavigate} onExit={assigned?.exit}

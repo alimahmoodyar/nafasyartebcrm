@@ -5,6 +5,7 @@ import type {Session} from '@/lib/permissions';
 import {cartableRows,type CartableRow} from '@/lib/cartable-view';
 import {roleProfiles} from '@/lib/role-profiles';
 import {RoleTestingPanel} from './role-testing-panel';
+import {ForeignCommerceHome} from './foreign-commerce-home';
 import {ServiceOfficeWorkspace} from './service-office-workspace';
 import {CentralWarehouseMenu} from './central-warehouse-menu';
 import {PersonalHome} from './personal-home';
@@ -47,6 +48,7 @@ export function EmployeeHome({user,apps,onNavigate,workspace,onWorkspaceChange,w
  const roleTools=<>{workspaces.length>0&&!active&&<section className="employee-workspaces" aria-label="نقش‌های من"><h3>نقش‌های من</h3><div className="employee-workspace-grid">{workspaces.map(w=><button type="button" className="employee-workspace-tile" key={w.id} onClick={()=>selectWorkspace(w.id)}><span className="employee-service-icon"><BriefcaseBusiness size={20}/></span><span><strong>{w.title}</strong><small>{w.group}</small></span></button>)}</div></section>}
   </>;
  const profile=active&&roleProfiles.find(p=>p.id===active.id);
+ if(active?.id==='foreign'&&profile)return <ForeignCommerceHome profile={{...profile,links:active.links}} name={user.name} count={current?.tasks.length||0} limited={current?.limited} personnel={apps.some(app=>app.key==='personnel')} onNavigate={onNavigate}/>;
  if(active&&profile)return <section dir="rtl">
   {!['line-manager','central-store','domestic'].includes(active.id)&&<button type="button" className="btn" onClick={()=>selectWorkspace('')}>بازگشت به خانهٔ من</button>}
   <RoleTestingPanel assigned={{profile:{...profile,links:active.links},count:current?.tasks.length||0,taskTitles:current?.tasks.map(row=>row.title),tasks:current?.tasks,loading:!current&&!error,error,limited:current?.limited,exit:()=>selectWorkspace('')}} targetId={active.id} onNavigate={onNavigate} onProfile={()=>{}} representativeDashboard={<SalesPanel demo={false} targetId="rep-dashboard" onNavigate={onNavigate}/>} serviceRepresentativeDashboard={<ServiceRepresentativeDashboard user={user} onNavigate={onNavigate}/>} centralWarehouseTools={warehouseTools} officeServiceDashboard={<ServiceOfficeWorkspace customerWorkspace={active.id==='home-service-customer-support'} taskTitles={current?.tasks.slice(0,2).map(row=>row.title)} user={user} onNavigate={onNavigate}/>}/>
