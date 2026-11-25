@@ -1,10 +1,11 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript'),React=require('react');
-let slots=[],cursor=0,effects=[],calls=[],saved=0,responseStatus=200,responseErrors=[],responseChanges=[],fixture;
+let slots=[],cursor=0,effects=[],calls=[],saved=0,responseStatus=200,responseErrors=[],responseChanges=[],responseCounts={},fixture;
 const react={...React,useState(value){const i=cursor++;if(!(i in slots))slots[i]=value;return[slots[i],v=>slots[i]=typeof v==='function'?v(slots[i]):v]},useRef(value){const i=cursor++;return slots[i]||(slots[i]={current:value})},useEffect(fn,deps){const i=cursor++,old=slots[i];if(!old||deps?.some((v,j)=>v!==old[j]))effects.push(fn);slots[i]=deps}};
 function compile(file,loader,extra={}){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText,{exports,require:loader,crypto:globalThis.crypto,File,console,...extra});return exports;}
 const units=compile('lib/material-units.ts',()=>{}),bom=compile('lib/bom-import.ts',n=>n.includes('material-units')?units:{validateBom:v=>v}),parser=compile('lib/material-import.ts',n=>n.includes('material-units')?units:bom);
 const header=['کد','نام','واحد','مقدار مصرف'],main=[header,...Array.from({length:81},(_,i)=>[String(10100000+i),'Part '+i,'عدد',100])],book=[{name:'12',grid:[header,['99999999','Other','ست',2]]},{name:'1',grid:main}];
-const ui=compile('components/trace/material-catalog-import.tsx',n=>n==='react'?react:n==='react/jsx-runtime'?require(n):n.includes('bom-import-file')?{readBomSheets:async()=>book,defaultBomSheet:()=>1}:n.includes('material-import')?parser:n.includes('material-units')?units:{Dialog:'dialog',DialogContent:'article',DialogTitle:'h2',DialogDescription:'p'},{fetch:async(url,options)=>{calls.push({url,body:JSON.parse(options.body)});if(responseStatus===0)throw Error('network');return{ok:responseStatus===200,status:responseStatus,json:async()=>({newMaterialCount:81,existingCount:0,errors:responseErrors,changes:responseChanges,warnings:[],catalogSnapshot:'snapshot'})}}});
+let uploadedBook=book;
+const ui=compile('components/trace/material-catalog-import.tsx',n=>n==='react'?react:n==='react/jsx-runtime'?require(n):n.includes('bom-import-file')?{readBomSheets:async()=>uploadedBook,defaultBomSheet:()=>1}:n.includes('material-import')?parser:n.includes('material-units')?units:{Dialog:'dialog',DialogContent:'article',DialogTitle:'h2',DialogDescription:'p'},{fetch:async(url,options)=>{calls.push({url,body:JSON.parse(options.body)});if(responseStatus===0)throw Error('network');return{ok:responseStatus===200,status:responseStatus,json:async()=>({newMaterialCount:81,existingCount:0,errors:responseErrors,changes:responseChanges,warnings:[],catalogSnapshot:'snapshot',...responseCounts})}}});
 const nodes=tree=>Array.isArray(tree)?tree.flatMap(nodes):React.isValidElement(tree)?[tree,...nodes(tree.props.children)]:[],text=tree=>Array.isArray(tree)?tree.map(text).join(''):React.isValidElement(tree)?text(tree.props.children):tree==null?'':String(tree);
 const find=(tree,p)=>{const result=nodes(tree).find(p);assert.ok(result,'Expected UI control');return result},button=(tree,label)=>find(tree,n=>n.type==='button'&&text(n)===label),tick=async()=>{for(let i=0;i<3;i++)await new Promise(resolve=>setImmediate(resolve));};
 function render(accounting=false){cursor=0;return ui.MaterialCatalogImport({accounting,onSaved:()=>saved++});}
@@ -33,6 +34,21 @@ async function upload(accounting=false){find(render(accounting),n=>n.type==='inp
  const resultRow=find(tree,n=>n.props.className==='material-catalog-import__result');
  assert.equal(resultRow.props.children.props.colSpan,5);
  assert.ok(text(resultRow).includes('واحد معتبر'));
+
+ slots=[];tree=render(true);button(tree,'ورود اکسل حسابداری').props.onClick();
+ uploadedBook=[{name:'Sheet1',grid:[['اقلام پر مصرف سال ۱۴۰۵'],['کد کالا','عنوان کالا','واحد اصلی','واحد فرعی'],['10100000','قطعه آزمون','عدد',''],['10100001','اجرت ساخت','بسته','']]},{name:'Sheet2',grid:[['کد','نوع','عنوان','واحد اصلی','واحد فرعی'],['10100000','کالا','قطعه آزمون','عدد',''],['10100001','کالا','اجرت ساخت','بسته','']]}];
+ tree=await upload(true);
+ assert.ok(text(tree).includes('فهرست اقلام پرمصرف مالی'));
+ responseErrors=[];responseCounts={newMaterialCount:1,linkedCount:0,existingCount:0,excludedCount:1};
+ responseChanges=[{row:2,status:'excluded',accountingCode:'10100001',message:'واحد پشتیبانی نمی‌شود.'}];
+ button(tree,'بررسی فایل').props.onClick();await tick();tree=render(true);
+ assert.equal(calls.at(-1).body.profile,'finance-frequent');
+ assert.equal(calls.at(-1).body.rows[1].financeIssue,'classification');
+ assert.equal(button(tree,'تأیید و ورود کالاها به سیستم').props.disabled,false);
+ button(tree,'تأیید و ورود کالاها به سیستم').props.onClick();await tick();tree=render(true);
+ assert.equal(calls.at(-1).body.mode,'commit');
+ assert.equal(calls.at(-1).body.profile,'finance-frequent');
+ assert.ok(text(tree).includes('1 کنار گذاشته شد'));
  // The real material passport page exposes the upload next to manual definition,
  // with exactly the same server-supplied definition permission.
  const flow=compile('components/trace/material-flow.tsx',n=>n==='react'?react:n==='react/jsx-runtime'?require(n):n.includes('material-units')?units:n.includes('/material-flow')?{roleNames:{},qty:x=>String(x)}:n.includes('/receipt-list')?{receiptList:()=>({items:[],total:0})}:n.includes('/serials')?{tehranDay:()=> '2026-11-04'}:new Proxy({},{get:(_,key)=>key}),{fetch:async()=>({ok:true,json:async()=>fixture})});

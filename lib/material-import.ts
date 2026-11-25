@@ -1,7 +1,32 @@
 import {clean,guessImportMapping} from './bom-import';
 import {normalizeMaterialUnit} from './material-units';
-export type MaterialImportRow={code:string;name:string;unit:string;existingCode?:string;createNew?:boolean};
+import type {BomSheet} from './bom-import-file';
+export type MaterialImportRow={code:string;name:string;unit:string;existingCode?:string;createNew?:boolean;financeIssue?:'classification'|'catalog'};
+export const financeMaterialImportLimit=1200;
 export type MaterialImportMapping={code:number;name:number;unit:number;existingCode?:number};
+export function financeMaterialWorkbook(sheets:BomSheet[]){
+ const key=(value:unknown)=>clean(value).replace(/[\s\u200c]/g,'').toLowerCase();
+ const header=(grid:unknown[][],headings:string[])=>grid.findIndex(row=>headings.every((value,i)=>key(row[i])===key(value)));
+ const frequent=sheets.find(sheet=>sheet.grid.slice(0,5).some(row=>key(row[0]).startsWith('اقلامپرمصرف')));
+ if(!frequent)return null;
+ const index=header(frequent.grid,['کد کالا','عنوان کالا','واحد اصلی','واحد فرعی']);
+ const catalog=sheets.find(sheet=>sheet!==frequent&&header(sheet.grid.slice(0,5),['کد','نوع','عنوان','واحد اصلی','واحد فرعی'])>=0);
+ if(index<0||!catalog)return null;
+ const catalogStart=header(catalog.grid,['کد','نوع','عنوان','واحد اصلی','واحد فرعی']);
+ const byCode=new Map<string,unknown[]|null>();
+ for(const row of catalog.grid.slice(catalogStart+1)){
+  const code=key(row[0]);
+  if(code)byCode.set(code,byCode.has(code)?null:row);
+ }
+ const rows:MaterialImportRow[]=frequent.grid.slice(index+1).filter(row=>row.some(value=>!!clean(value))).map(row=>{
+  const [code,name,unit]=[clean(row[0]),clean(row[1]),clean(row[2])],source=byCode.get(key(code));
+  const financeIssue=!source||key(source[2])!==key(name)||key(source[3])!==key(unit)?'catalog':
+   key(source[1])!=='کالا'||/^(اجرت|خدمات|هزینه)/.test(key(name))?'classification':undefined;
+  return {code,name,unit,...(financeIssue?{financeIssue}:{})};
+ });
+ if(!rows.length||rows.length>financeMaterialImportLimit)throw Error('برگهٔ اقلام پرمصرف باید بین ۱ تا ۱۲۰۰ قلم داشته باشد.');
+ return {name:frequent.name,rows};
+}
 export function guessMaterialImportMapping(row:unknown[],accounting=false):MaterialImportMapping{
  const m=guessImportMapping(row);
  if(!accounting)return {code:m.partCode,name:m.name,unit:m.unit};

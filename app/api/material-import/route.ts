@@ -23,7 +23,7 @@ export async function GET(){
 export async function POST(request:Request){try{
  checkOrigin(request);const u=await requireAccess();
  if(!u.isAdmin&&!u.permissions.flowRoles?.includes('inventory'))fail('ورود گروهی کالا به مجوز تعریف کالا در انبار نیاز دارد.',403);
- const b=JSON.parse(new TextDecoder().decode(await boundedBody(request,180000)));
+ const b=JSON.parse(new TextDecoder().decode(await boundedBody(request,u.isAdmin&&!u.profileReview?800000:180000)));
  if(!b||typeof b!=='object'||Array.isArray(b))fail('ساختار درخواست معتبر نیست.');
  if(b.catalog==='accounting')return json(await accountingMaterialImport(u,b));
  if(b.mode==='parse'){try{return json({rows:parseMaterialImportGrid(b.grid,b.header,b.mapping)});}catch(e){fail(e instanceof Error?e.message:'ساختار فایل معتبر نیست.');}}

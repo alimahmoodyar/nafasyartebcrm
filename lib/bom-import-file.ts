@@ -2,7 +2,7 @@ import {guessImportMapping,parseBomGrid,parseMappedBomGrid} from './bom-import';
 export type BomSheet={name:string;grid:unknown[][]};
 export function defaultBomSheet(sheets:BomSheet[]){return Math.max(0,sheets.findIndex(s=>s.name.trim().replace(/[١۱]/g,'1')==='1'));}
 function boundedGrid(grid:unknown[][]){if(grid.length>5000||grid.some(r=>r.length>200))throw Error('ابعاد فایل بیش از حد مجاز است.');return grid.map(row=>Array.from(row,v=>v??''));}
-export async function readBomSheets(file:File,formattedText=false):Promise<BomSheet[]>{
+export async function readBomSheets(file:File,formattedText=false,allowBinaryXls=false):Promise<BomSheet[]>{
  if(file.size>5*1024*1024)throw Error('حداکثر حجم فایل ۵ مگابایت است.');
  const prefix=await file.slice(0,200).text();let result:BomSheet[];
  if(prefix.trimStart().startsWith('<')){
@@ -29,7 +29,10 @@ export async function readBomSheets(file:File,formattedText=false):Promise<BomSh
    return {name:sheet.getAttributeNS(ns,'Name')||String(number+1),grid:boundedGrid(grid)};
   });
  }else{
-  if(!/\.xlsx$/i.test(file.name))throw Error('این XLS باینری است؛ در اکسل با فرمت XLSX ذخیره کنید. خروجی XML حسابداری با پسوند XLS پشتیبانی می‌شود.');
+  const signature=[208,207,17,224,161,177,26,225];
+  const bytes=allowBinaryXls&&formattedText&&/\.xls$/i.test(file.name)?new Uint8Array(await file.slice(0,8).arrayBuffer()):null;
+  const binary=bytes?.length===signature.length&&signature.every((byte,index)=>byte===bytes[index]);
+  if(!/\.xlsx$/i.test(file.name)&&!binary)throw Error('این XLS باینری است؛ در اکسل با فرمت XLSX ذخیره کنید. خروجی XML حسابداری با پسوند XLS پشتیبانی می‌شود.');
   if(formattedText){
    const XLSX=await import('xlsx'),workbook=XLSX.read(await file.arrayBuffer(),{type:'array',sheetRows:5001});
    if(!workbook.SheetNames.length||workbook.SheetNames.length>50)throw Error('فایل باید بین ۱ تا ۵۰ برگه داشته باشد.');
