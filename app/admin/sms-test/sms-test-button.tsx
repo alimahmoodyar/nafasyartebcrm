@@ -12,7 +12,7 @@ export function SmsTestButton(){
   setMessage('');
   try{
    const response=await fetch('/api/public-warranty',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'test-sms'})});
-   const result=await response.json();
+   const result=await response.json() as {accepted?:boolean;error?:string;mobileLast4?:string};
    if(!response.ok || !result.accepted)throw new Error(result.error || 'ارسال پیامک تأیید نشد.');
    setMessage('پنل ارسال پیامک به شمارهٔ منتهی به '+result.mobileLast4+' را پذیرفت.');
   }catch(error){
