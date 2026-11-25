@@ -2,9 +2,10 @@ import {requireAccess,checkOrigin,accessResponse,AccessError} from '@/lib/author
 import {storage} from '@/lib/storage';
 import {boundedBody} from '@/lib/firmware-storage';
 import {taskRequired as req,taskText as txt,dayAt,validDay} from '@/lib/duties';
+import {materialAccountingCode,materialAccountingKey} from '@/lib/material-accounting-code';
 import {asciiDigits} from '@/lib/batch-number';
 import {scaled} from '@/lib/production';
-import {supplierRead,supplierManage,supplierQuality,supplierCommercial,supplierRoute,supplierRows,supplierEntity,supplierIdentityView,supplierIdentityWrite,supplierLinkWrite,supplierHistoryWrite,supplierMetrics,qualification,supplierEvidenceBlock,technicalAuthorities,technicalBlock} from '@/lib/suppliers';
+import {supplierRead,supplierManage,supplierQuality,supplierCommercial,supplierRoute,supplierRows,supplierEntity,supplierIdentityView,supplierIdentityWrite,supplierLinkWrite,supplierHistoryWrite,supplierMetrics,supplierMetricsFrom,qualification,supplierEvidenceBlock,technicalAuthorities,technicalBlock} from '@/lib/suppliers';
 import {supplierFields,supplierRegistrationFields,supplierStates,supplierRisks,supplierHelp} from '@/lib/supplier-contract';
 const json=(v:any,status=200)=>Response.json(v,{status,headers:{'Cache-Control':'private, no-store'}});
 const fail=(s:string,status=400):never=>{throw new AccessError(s,status)};
@@ -14,9 +15,10 @@ export async function GET(request:Request){try{
  if(route&&!['domestic','foreign'].includes(route))fail('مسیر تأمین معتبر نیست.');
  if(route&&!supplierRoute(u,route))fail('دسترسی مسیر تأمین ندارید.',403);
  const suppliers=(await supplierRows('supplier')).filter(s=>(!route||s.data.route===route)&&supplierRoute(u,s.data.route)),materials=await supplierRows('material'),reviews=await supplierRows('supplier_review'),documents=await supplierRows('supplier_document'),links=(await supplierRows('supplier_material')).filter(l=>(!materialId||l.data.materialId===materialId)&&suppliers.some(s=>s.id===l.data.supplierId));
- const items=await Promise.all(links.map(async l=>{const s=suppliers.find(s=>s.id===l.data.supplierId)!,m=materials.find(m=>m.id===l.data.materialId),commercial=supplierCommercial(u,s.data.route),rs=reviews.filter(r=>r.data.linkId===l.id);return {...l,data:l.data&&s.data.route==='foreign'&&!commercial?{...l.data,notes:undefined,commercialDetails:undefined}:l.data,documents:documents.filter(d=>d.data.supplierId===s.id&&(!d.data.linkId||d.data.linkId===l.id)&&d.data.state==='approved'&&(!d.data.expiresOn||d.data.expiresOn>=dayAt())&&(d.data.visibility!=='commercial'||commercial)).map(d=>({id:d.id,title:d.data.title,version:d.data.version})),metrics:await supplierMetrics(l),block:m?(qualification(l,s,m)||await supplierEvidenceBlock(l)):'کالا موجود نیست',reviews:rs.map(r=>commercial?r:{...r,data:{...r.data,scores:undefined,score:undefined,supplierSnapshot:s.data.route==='foreign'?undefined:r.data.supplierSnapshot}}),commercial};}));
- const orders=(await supplierRows('purchase_order')).filter(o=>links.some(l=>l.id===o.data.supplierLinkId)).map(o=>supplierCommercial(u,o.data.route)?o:{id:o.id,created:o.created,data:{supplierLinkId:o.data.supplierLinkId,state:o.data.state,quantity:o.data.quantity,unit:o.data.unit,eta:o.data.promisedEta||o.data.eta}});
- return json({suppliers:suppliers.map(s=>({...supplierIdentityView(u,s),canEditIdentity:supplierIdentityWrite(u,s.data.route),canLink:supplierLinkWrite(u,s.data.route)})),links:items,orders,canWriteHistory:supplierHistoryWrite(u),materials:materials.map(m=>({id:m.id,...m.data,revision:m.revision})),canManage:route?supplierIdentityWrite(u,route):supplierManage(u),canQuality:supplierQuality(u),technicalAuthorities:technicalAuthorities(u),help:supplierHelp});
+ const [allOrders,allReceipts]=await Promise.all([supplierRows('purchase_order'),links.length?supplierRows('receipt'):Promise.resolve([])]);
+ const items=await Promise.all(links.map(async l=>{const s=suppliers.find(s=>s.id===l.data.supplierId)!,m=materials.find(m=>m.id===l.data.materialId),commercial=supplierCommercial(u,s.data.route),rs=reviews.filter(r=>r.data.linkId===l.id);return {...l,data:l.data&&s.data.route==='foreign'&&!commercial?{...l.data,notes:undefined,commercialDetails:undefined}:l.data,documents:documents.filter(d=>d.data.supplierId===s.id&&(!d.data.linkId||d.data.linkId===l.id)&&d.data.state==='approved'&&(!d.data.expiresOn||d.data.expiresOn>=dayAt())&&(d.data.visibility!=='commercial'||commercial)).map(d=>({id:d.id,title:d.data.title,version:d.data.version})),metrics:supplierMetricsFrom(l,allOrders,allReceipts),block:m?(qualification(l,s,m)||await supplierEvidenceBlock(l)):'کالا موجود نیست',reviews:rs.map(r=>commercial?r:{...r,data:{...r.data,scores:undefined,score:undefined,supplierSnapshot:s.data.route==='foreign'?undefined:r.data.supplierSnapshot}}),commercial};}));
+ const orders=allOrders.filter(o=>links.some(l=>l.id===o.data.supplierLinkId)).map(o=>supplierCommercial(u,o.data.route)?o:{id:o.id,created:o.created,data:{supplierLinkId:o.data.supplierLinkId,state:o.data.state,quantity:o.data.quantity,unit:o.data.unit,eta:o.data.promisedEta||o.data.eta}});
+ return json({suppliers:suppliers.map(s=>({...supplierIdentityView(u,s),canEditIdentity:supplierIdentityWrite(u,s.data.route),canLink:supplierLinkWrite(u,s.data.route)})),links:items,orders,canWriteHistory:supplierHistoryWrite(u),canImportVendors:u.isAdmin&&!u.profileReview&&route!=='foreign',materials:materials.map(m=>({id:m.id,...m.data,revision:m.revision})),canManage:route?supplierIdentityWrite(u,route):supplierManage(u),canQuality:supplierQuality(u),technicalAuthorities:technicalAuthorities(u),help:supplierHelp});
  }catch(e){return accessResponse(e)||json({error:'دریافت تأمین‌کنندگان انجام نشد.'},503)}}
 export async function POST(request:Request){try{
  checkOrigin(request);const u=await requireAccess();if(!supplierRead(u))fail('دسترسی ندارید.',403);const b=JSON.parse(new TextDecoder().decode(await boundedBody(request,40000))),db=storage(),id=req(b.id,80),mode=req(b.mode,30),now=new Date().toISOString();
@@ -59,7 +61,19 @@ export async function POST(request:Request){try{
    if(value&&!/^[0-9]+$/.test(value))fail(label+' باید فقط شامل رقم باشد.');
    d[key]=value;
   }
-  d.phone=phones[0]||'';d.phones=phones;for(const k of ['name','country','contact','phone'])if(!d[k])fail('نام، کشور، مسئول تماس و تلفن اصلی لازم است.');if(d.email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email))fail('ایمیل معتبر نیست.');target=old?.id||id;put(target,'supplier',d,old);
+  d.phone=phones[0]||'';d.phones=phones;
+  if(!d.name||!d.country||(!d.importedForSetup||d.active)&&(!d.contact||!d.phone))fail('نام، کشور، مسئول تماس و تلفن اصلی لازم است.');
+  if(d.importedForSetup&&d.active)d.importedForSetup=false;
+  if(Object.hasOwn(b,'accountingVendorCode')&&b.accountingVendorCode!==old?.data.accountingVendorCode){
+   if(!u.isAdmin||u.profileReview||route!=='domestic')fail('ثبت کد تفصیلی حسابداری فقط برای مدیر سامانه مجاز است.',403);
+   const value=materialAccountingKey(materialAccountingCode(b.accountingVendorCode));
+   if(old?.data.accountingVendorCode&&value!==old.data.accountingVendorCode)fail('کد تفصیلی ثبت‌شده برای حفظ ارتباط‌ها ثابت است.',409);
+   const where="type='supplier' AND json_extract(data,'$.route')='domestic' AND upper(json_extract(data,'$.accountingVendorCode'))=? AND id<>?";
+   if(value&&await db.prepare('SELECT id FROM flow_entities WHERE '+where+' LIMIT 1').bind(value,old?.id||id).first())fail('این کد تفصیلی قبلاً به تأمین‌کنندهٔ دیگری وصل شده است.',409);
+   if(value)guard('NOT EXISTS(SELECT 1 FROM flow_entities WHERE '+where+')',value,old?.id||id);
+   d.accountingVendorCode=value;
+  }
+  if(d.email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email))fail('ایمیل معتبر نیست.');target=old?.id||id;put(target,'supplier',d,old);
   if(linkMaterial)put('supplier-material:'+id,'supplier_material',{supplierId:target,materialId:linkMaterial.id,partCode:linkMaterial.data.code,supplierCode:txt(b.supplierCode||'',100),status:'pending',specs:linkMaterial.data.specs||'',unit:linkMaterial.data.unit,qualityRisk:'high',supplyRisk:'high',reviewDue:'',supplierRevision:1,notes:txt(b.linkNotes||'',3000)});
  }else if(mode==='commercial_details'){
   const link=await get(req(b.linkId),'supplier_material'),supplier=await get(link.data.supplierId,'supplier');

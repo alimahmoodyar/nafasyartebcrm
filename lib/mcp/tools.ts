@@ -166,6 +166,7 @@ import * as supplierQualityApi from '@/app/api/suppliers/quality/route';
 import * as supplierFiles from '@/app/api/suppliers/files/route';
 import {supplierDocumentKinds,supplierQualityHelp,supplierSeverities} from '@/lib/supplier-quality-contract';
 import * as suppliers from '@/app/api/suppliers/route';
+import * as supplierImportApi from '@/app/api/suppliers/import/route';
 import {supplierFields,supplierStates,supplierRisks,supplierHelp} from '@/lib/supplier-contract';
 import * as bomImport from '@/app/api/bom-import/route';
 import * as materialImport from '@/app/api/material-import/route';
@@ -593,6 +594,15 @@ api('get_sales_file_link','Get authorized sales receipt/contract metadata and pr
 add({name:'upload_sales_file',description:'Upload exact user-provided receipt or contract to private representative file storage (10 MiB). Explicit approval required. Never fabricate content. Prefer browser file selector for large files.',write:true,inputSchema:payload({id,agentId:id,serviceDomain:enumeration(['home']),title:text('',200),filename:text('',180),contentBase64:text('Exact file bytes, base64',14000000)}),run:async(a,o)=>{const {contentBase64,filename,...metadata}=a;let bytes:Uint8Array;try{bytes=Uint8Array.from(atob(contentBase64),c=>c.charCodeAt(0));}catch{throw new AccessError('Invalid base64 file.',400);}const form=new FormData();form.set('metadata',JSON.stringify(metadata));form.set('file',new File([bytes as BlobPart],filename));return result(await salesFilesApi.POST(new Request(new URL('/api/sales/files',o),{method:'POST',headers:{origin:o},body:form})));}});
 
 api('get_suppliers','Read material supplier links, contacts, qualification, review evidence and measured history. Commercial fields are role-filtered. Blank material means all accessible materials.',obj({material:text('',200),route:enumeration(['domestic','foreign'])},['material']),'/api/suppliers','GET',suppliers.GET,{},['material','route']);
+const vendorImportSchema={
+ source:text('File name of the prepared vendor workbook',300),
+ vendors:list(obj({vendorCode:text('',80),name:text('',500),legalType:enumeration(['شخص حقوقی','شخص حقیقی']),nationalId:text('',32),phone:text('',100),address:text('',500)}),500),
+ links:list(obj({vendorCode:text('',80),itemCode:text('',80),itemName:text('',500),hold:{type:'boolean'},reason:text('',500)}),2000),
+};
+api('preview_supplier_workbook','Admin: preview initial domestic supplier records and staged accounting item links. Missing contacts remain inactive for completion; exact accounting codes reuse existing records.',obj(vendorImportSchema),'/api/suppliers/import','POST',supplierImportApi.POST,{admin:true,write:false},[],a=>({...a,mode:'preview'}));
+api('commit_supplier_workbook','Admin: confirm exact vendor preview. Saves domestic vendor drafts and pending links, without purchasing or creating materials.',payload({id,...vendorImportSchema,snapshot:text('Exact preview snapshot',64)}),'/api/suppliers/import','POST',supplierImportApi.POST,{admin:true},[],a=>({...a,mode:'commit'}));
+api('preview_supplier_material_links','Admin: preview stored finance vendor/item pairs against exact catalog accounting codes. Read-only.',obj({}),'/api/suppliers/import','POST',supplierImportApi.POST,{admin:true,write:false},[],a=>({...a,mode:'preview_links'}));
+api('commit_supplier_material_links','Admin: after confirming exact preview, link existing material passports with pending quality qualification. No stock movement.',payload({id,snapshot:text('Exact preview snapshot',64)}),'/api/suppliers/import','POST',supplierImportApi.POST,{admin:true},[],a=>({...a,mode:'commit_links'}));
 add({name:'get_supplier_guide',description:'Supplier qualification and structured RFQ workflow; scoring weights are company policy, not ISO mandates.',inputSchema:obj({}),write:false,run:async()=>supplierHelp});
 const supplierPost=(name:string,description:string,mode:string,properties:Record<string,Schema>)=>api(name,description,payload({id,...properties}),'/api/suppliers','POST',suppliers.POST,{},[],a=>({...a,mode}));
 supplierPost('control_purchase_technical','R&D or QA/QC: hold/release a material or supplier-material pair with actual reason/evidence and current revision. Each authority releases only its own hold; any remaining hold blocks procurement. change revises material specifications and automatically holds procurement until explicit release. Never fabricate evidence.', 'technical',{targetId:id,scope:enumeration(['material','supplier_material']),revision:integer(1,1e9),authority:enumeration(['engineering','quality']),decision:enumeration(['hold','release','change']),reason:text('',3000),evidence:text('',3000),specs:text('New material specs for change; otherwise blank.',10000)});
@@ -602,6 +612,7 @@ Object.assign(tools.find(t=>t.name==='save_supplier')!.inputSchema.properties,{
  linkMaterialId:text('Optional existing material ID to link on creation, pending qualification.',200),
  economicCode:text('Optional economic code, digits only.',32),
  nationalId:text('Optional organization national ID, digits only.',32),
+ accountingVendorCode:text('Admin only, optional domestic accounting vendor code.',80),
  phones:list(text('',100),10),
 });
 supplierPost('archive_supplier','Archive supplier with reason, current revision and confirmation. Retains all historical documents/orders; prevents new sourcing. Does not close existing cases.','archive',{supplierId:id,revision:integer(1,1e9),reason:text('Actual deletion reason',3000)});

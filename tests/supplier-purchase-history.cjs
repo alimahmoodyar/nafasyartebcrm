@@ -90,6 +90,56 @@ async function supplier(mode,data,status,user){
  const download=user=>context.run(user,()=>historyApi.GET(request(path+'?file='+history.entries[0].files[0].id)));
  assert.equal((await download(technical)).status,403);
  assert.equal(await (await download(finance)).text(),'historical invoice');
+
+ const intake=load('app/api/suppliers/import/route.ts');
+ const admin={...actor('admin'),isAdmin:true};
+ const vendor=(vendorCode,name)=>({vendorCode,name,legalType:'شخص حقیقی',nationalId:'',phone:'',address:''});
+ const item=(vendorCode,itemCode,hold=false)=>({vendorCode,itemCode,itemName:'Item',hold,reason:hold?'Check receipt':''});
+ const workbook=process.env.VENDOR_IMPORT_WORKBOOK;
+ const draft=workbook?(()=>{
+  const xlsx=require('xlsx'),file=xlsx.readFile(workbook);
+  const sheets=file.SheetNames.map(name=>({name,grid:xlsx.utils.sheet_to_json(file.Sheets[name],{header:1,raw:false,defval:''})}));
+  const parsed=load('lib/supplier-import-contract.ts').parseVendorWorkbook(sheets);
+  assert.equal(parsed.vendors.length,204);
+  assert.equal(parsed.links.length,832);
+  return parsed;
+ })():{vendors:[vendor('000900','Test Workbook Vendor')],links:[item('000900','00123'),item('000900','00456',true)]};
+ async function importWorkbook(body,status,user=admin){
+  const response=await context.run(user,()=>intake.POST(request('/api/suppliers/import','POST',body)));
+  const result=await response.json();
+  assert.equal(response.status,status,JSON.stringify(result));
+  return result;
+ }
+ const file={source:'test.xlsx',...draft};
+ const before=entities('supplier').length,linksBefore=entities('supplier_material').length;
+ await importWorkbook({...file,mode:'preview'},403,domestic);
+ const preview=await importWorkbook({...file,mode:'preview'},200);
+ const staged=draft.links.filter(link=>!link.hold);
+ assert.equal(preview.created,draft.vendors.length);
+ assert.equal(preview.staged,staged.length);
+ assert.equal(preview.held,draft.links.length-staged.length);
+ assert.equal(entities('supplier').length,before);
+ const commit={...file,mode:'commit',id:crypto.randomUUID(),confirmed:true,snapshot:preview.snapshot};
+ await importWorkbook({...commit,snapshot:'invalid'},409);
+ assert.equal((await importWorkbook(commit,200)).saved,true);
+ assert.equal((await importWorkbook(commit,200)).repeated,true);
+ assert.equal((await importWorkbook({...file,mode:'preview'},200)).staged,0);
+ assert.equal(entities('supplier').length,before+draft.vendors.length);
+ assert.ok(entities('supplier').filter(row=>row.data.importedForSetup).every(row=>row.data.active===false));
+ assert.equal(entities('supplier_pending_material').length,draft.links.length);
+ assert.equal(entities('supplier_material').length,linksBefore);
+ assert.equal((await importWorkbook({mode:'preview_links'},200)).waiting,staged.length);
+ const code=staged[0].itemCode;
+ sql.prepare("UPDATE flow_entities SET data=json_set(data,'$.accountingCode',?),revision=revision+1 WHERE id=?").run(code,material.id);
+ const matching=staged.filter(link=>link.itemCode===code).length;
+ const next=await importWorkbook({mode:'preview_links'},200);
+ assert.equal(next.ready,matching);
+ await importWorkbook({mode:'commit_links',id:crypto.randomUUID(),confirmed:true,snapshot:next.snapshot},200);
+ assert.equal(entities('supplier_material').length,linksBefore+matching);
+ assert.equal(entities('supplier_pending_material').filter(row=>row.data.state==='linked').length,matching);
+ assert.equal((await importWorkbook({mode:'preview_links'},200)).ready,0);
+ assert.equal(operationalState(),beforeHistory);
+ console.log('PASS supplier workbook import: authorization, preview, retries, held rows and later accounting-code matches.');
  assert.equal(sql.prepare('PRAGMA foreign_key_check').all().length,0);
  console.log('PASS domestic suppliers: save before linking, registration identifiers, several phones, legacy edit, two distinct materials, duplicate and foreign-scope restrictions. PASS foreign purchase history: privacy, attachments, retry and no operational writes.');
 })().catch(error=>{console.error(error);process.exitCode=1;});
