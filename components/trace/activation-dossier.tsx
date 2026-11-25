@@ -59,7 +59,7 @@ export function ActivationDossier({record,showCustomer=true,legacyDateConfirmed=
     </header>
     <Fields fields={[
      ...phoneCustomerFields.map(([key,label]):Field=>[label,customer[key]]),
-     ['شمارهٔ تلفن',customer.telephone],['ایمیل',customer.email],
+     ['آدرس',customer.address],['شمارهٔ تلفن',customer.telephone],['ایمیل',customer.email],
     ]}/>
    </section>}
    <section className="activation-dossier-section">

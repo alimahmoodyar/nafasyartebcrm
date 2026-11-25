@@ -2,9 +2,10 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
 const {DatabaseSync}=require('node:sqlite');const root=path.resolve(__dirname,'..');const sql=new DatabaseSync(':memory:');sql.exec('PRAGMA foreign_keys=ON');for(const f of fs.readdirSync(path.join(root,'drizzle')).filter(f=>f.endsWith('.sql')).sort())sql.exec(fs.readFileSync(path.join(root,'drizzle',f),'utf8'));
 const db={prepare(q){let args=[];return{bind(...a){args=a;return this},async first(){return sql.prepare(q).get(...args)||null},async all(){return {results:sql.prepare(q).all(...args)}},async run(){return {meta:{changes:sql.prepare(q).run(...args).changes}}}}},async batch(stmts){sql.exec('BEGIN');try{const r=[];for(const s of stmts)r.push(await s.run());sql.exec('COMMIT');return r;}catch(e){sql.exec('ROLLBACK');throw e;}}};
 const objects=new Map();const bucket={async put(k,b){objects.set(k,b.slice(0));return {key:k}},async get(k){const b=objects.get(k);return b?{arrayBuffer:async()=>b.slice(0)}:null},async delete(k){objects.delete(k)}};
+const sentSms=[];let smsAccepted=true;
 let identity=null;const env={TRACE_OWNER_EMAIL:'owner@example.com',LLM_CONFIG_ENCRYPTION_KEY:require('node:crypto').randomBytes(32).toString('base64'),DB:db,BUCKET:bucket};
 const cache={};function load(file){file=path.resolve(root,file);if(cache[file])return cache[file];const exports={};cache[file]=exports;const source=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
-vm.runInNewContext(source,{exports,require:n=>{if(n==='cloudflare:workers')return {env};if(n==='@/app/chatgpt-auth')return {getChatGPTUser:async()=>identity};if(n.startsWith('@/')||n.startsWith('.')){const p=n.startsWith('@/')?path.join(root,n.slice(2)):path.resolve(path.dirname(file),n);return load(p+(path.extname(p)?'':'.ts'));}return require(n)},Response,Request,URL,URLSearchParams,Error,crypto:globalThis.crypto,Date,Intl,Set,Map,FormData,Blob,File,TextEncoder,TextDecoder,Uint8Array,ArrayBuffer,AbortController,ReadableStream,btoa,atob,setTimeout:(f,n)=>setTimeout(f,Math.min(n,10)),clearTimeout,console},{filename:file});return exports;}
+vm.runInNewContext(source,{exports,require:n=>{if(n==='cloudflare:workers')return {env};if(n==='@/app/chatgpt-auth')return {getChatGPTUser:async()=>identity};if(n.startsWith('@/')||n.startsWith('.')){const p=n.startsWith('@/')?path.join(root,n.slice(2)):path.resolve(path.dirname(file),n);return load(p+(path.extname(p)?'':'.ts'));}return require(n)} ,fetch:async(url,options)=>{assert.equal(url,'https://api.sms.ir/v1/send/bulk');sentSms.push(JSON.parse(options.body));return Response.json({status:smsAccepted?1:0,data:{messageIds:[12]}});},Response,Request,URL,URLSearchParams,Error,crypto:globalThis.crypto,Date,Intl,Set,Map,FormData,Blob,File,TextEncoder,TextDecoder,Uint8Array,ArrayBuffer,AbortController,AbortSignal,ReadableStream,btoa,atob,setTimeout:(f,n)=>setTimeout(f,Math.min(n,10)),clearTimeout,console},{filename:file});return exports;}
 const auth=load('lib/authorization.ts'),http=load('app/mcp/route.ts'),sse=load('lib/mcp/sse.ts'),tokens=load('app/api/mcp-tokens/route.ts'),configs=load('app/api/llm-config/route.ts'),secrets=load('lib/llm-secrets.ts'),catalog=load('lib/mcp/tools.ts');
 const base='https://test.local';const owner={userId:'owner',email:'owner@example.com',displayName:'Owner',fullName:null};
 const request=(path,method='GET',body,headers={})=>new Request(base+path,{method,headers:{origin:base,...(body?{'Content-Type':'application/json'}:{}),...headers},...(body?{body:JSON.stringify(body)}:{})});
@@ -197,6 +198,38 @@ async function get(u){const r=await context.run(u,()=>api.GET(request('/api/acti
  assert.equal(sql.prepare('SELECT 1 FROM service_activations WHERE serial=?').get('00540099'),undefined);
  assert.equal(sql.prepare('SELECT 1 FROM inventory_operations WHERE id=?').get(newBody.id),undefined);
  console.log('PASS phone activation: two assigned roles, separate chassis serial, product warranty policy, legacy reuse, privacy, retry and role revocation rollback, board history and unchanged warranty.');
+
+
+ const publicApi=load('app/api/public-warranty/route.ts');
+ const publicRequest=(body,headers)=>publicApi.POST(request('/api/public-warranty','POST',body,headers));
+ const details={serial:'PUBLIC-DEVICE-1',deviceCode:'1230123456',name:customer.name,mobile:'09121234567',nationalId:customer.nationalId,referrer:'پزشک نمونه',address:'نشانی نمونه'};
+ const startPublic={mode:'request',details};
+ assert.equal((await publicRequest(startPublic)).status,503);
+ env.PUBLIC_WARRANTY_ACTIVATION='1';env.PUBLIC_WARRANTY_TEST_MOBILE=details.mobile;env.SMSIR_API_KEY='fake-key';env.SMSIR_LINE_NUMBER='3000000000';
+ assert.equal((await (await publicApi.GET()).json()).ready,true);
+ assert.equal((await publicRequest(startPublic,{origin:'https://invalid.test'})).status,403);
+ assert.equal((await publicRequest(startPublic)).status,409,'unknown serial');
+ assert.equal(sentSms.length,0);
+ const seedPublic=sql.prepare("INSERT INTO records(id,kind,payload,created) VALUES(?,'device',?,?)");
+ seedPublic.run('device:PUBLIC-DEVICE-1',JSON.stringify({code:details.serial,product:'phone-oxygen'}),now);
+ assert.equal((await publicRequest({mode:'request',details:{...details,mobile:'09120000000'}})).status,403);
+ const sent=await publicRequest(startPublic);assert.equal(sent.status,200,await sent.clone().text());const challenge=await sent.json();
+ assert.equal(sentSms.length,1);assert.equal(sentSms[0].MessageText.length,70);
+ assert.equal(challenge.activationCode,undefined);
+ assert.ok(!sql.prepare('SELECT day FROM service_activations WHERE serial=?').get(details.serial));
+ const answer={mode:'confirm',details,token:challenge.token,code:algorithm.generateActivationCode(details.deviceCode)};
+ assert.equal((await publicRequest({...answer,code:answer.code==='00000'?'11111':'00000'})).status,403);
+ assert.equal((await publicRequest({...answer,details:{...details,address:'changed'}})).status,410);
+ const registered=await publicRequest(answer);assert.equal(registered.status,200,await registered.clone().text());
+ const final=await registered.json();assert.equal(final.welcomeStatus,'sent');
+ assert.equal(sentSms.length,2);assert.equal(sentSms[1].MessageText.length,62);
+ assert.equal(sql.prepare('SELECT day FROM service_activations WHERE serial=?').get(details.serial).day,final.activatedDay);
+ const publicDossier=sql.prepare("SELECT data FROM flow_entities WHERE type='phone_activation_device' AND json_extract(data,'$.serial')=?").get(details.serial);
+ assert.equal(JSON.parse(publicDossier.data).customer.address,'نشانی نمونه');
+ assert.equal((await (await publicRequest(answer)).json()).welcomeStatus,'sent');
+ assert.equal(sentSms.length,2,'retry sends no extra welcome');
+ assert.equal((await publicRequest(startPublic)).status,409);
+ console.log('PASS public warranty: gate, origin, known device, pilot number, one-code registration, dossier, two SMS and replay.');
 
  console.log('PASS activation: 10,000 VB-compatible vectors; normalization, leading zeros, roles, account/origin, fresh permissions, rollback, reset freeze/backup contract, retry audit, isolated history and MCP scopes.');
 })().catch(e=>{console.error(e);process.exit(1)});

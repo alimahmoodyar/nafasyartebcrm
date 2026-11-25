@@ -24,6 +24,7 @@ export type PhoneActivationCustomer = {
  nationalId:string;
  postalCode:string;
  referrer:string;
+ address?:string;
  telephone?:string;
  email?:string;
 };
