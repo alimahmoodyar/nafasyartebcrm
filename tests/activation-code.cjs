@@ -214,7 +214,7 @@ async function get(u){const r=await context.run(u,()=>api.GET(request('/api/acti
  seedPublic.run('device:PUBLIC-DEVICE-1',JSON.stringify({code:details.serial,product:'phone-oxygen'}),now);
  assert.equal((await publicRequest({mode:'request',details:{...details,mobile:'09120000000'}})).status,403);
  const sent=await publicRequest(startPublic);assert.equal(sent.status,200,await sent.clone().text());const challenge=await sent.json();
- assert.equal(sentSms.length,1);assert.equal(sentSms[0].MessageText.length,70);
+ assert.equal(sentSms.length,1);assert.equal(sentSms[0].MessageText.length,64);assert.ok(sentSms[0].MessageText.endsWith('\nلغو11'));
  assert.equal(challenge.activationCode,undefined);
  assert.ok(!sql.prepare('SELECT day FROM service_activations WHERE serial=?').get(details.serial));
  const answer={mode:'confirm',details,token:challenge.token,code:algorithm.generateActivationCode(details.deviceCode)};
@@ -222,7 +222,7 @@ async function get(u){const r=await context.run(u,()=>api.GET(request('/api/acti
  assert.equal((await publicRequest({...answer,details:{...details,address:'changed'}})).status,410);
  const registered=await publicRequest(answer);assert.equal(registered.status,200,await registered.clone().text());
  const final=await registered.json();assert.equal(final.welcomeStatus,'sent');
- assert.equal(sentSms.length,2);assert.equal(sentSms[1].MessageText.length,62);
+ assert.equal(sentSms.length,2);assert.equal(sentSms[1].MessageText.length,68);assert.ok(sentSms[1].MessageText.endsWith('\nلغو11'));
  assert.equal(sql.prepare('SELECT day FROM service_activations WHERE serial=?').get(details.serial).day,final.activatedDay);
  const publicDossier=sql.prepare("SELECT data FROM flow_entities WHERE type='phone_activation_device' AND json_extract(data,'$.serial')=?").get(details.serial);
  assert.equal(JSON.parse(publicDossier.data).customer.address,'نشانی نمونه');

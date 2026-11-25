@@ -82,10 +82,11 @@ export async function requestPublicWarranty(raw:unknown,client:string){
  const id=ticketType+':'+await hash(token),now=new Date().toISOString();
  const ticket:Ticket={state:'sending',expires:new Date(Date.now()+10*60000).toISOString(),fingerprint:await hash(token+JSON.stringify(details)),snapshot:target.snapshot};
  const db=storage();
- await db.prepare("DELETE FROM flow_entities WHERE type=? AND json_extract(data,'$.expires')<?").bind(ticketType,now).run();
+ // Expired challenges remain unusable even if this bounded cleanup is unavailable.
+ await db.prepare("DELETE FROM flow_entities WHERE id IN (SELECT id FROM flow_entities WHERE type=? AND json_extract(data,'$.expires')<? LIMIT 20)").bind(ticketType,now).run().catch(()=>{});
  await db.prepare('INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?)').bind(id,ticketType,JSON.stringify(ticket),now,now).run();
  const code=generateActivationCode(details.deviceCode);
- await sendNafasyarSms(details.customer.mobile,`نفس‌یار طب\nکد فعال‌سازی گارانتی: ${code}\nاین کد را روی دستگاه وارد کنید.`);
+ await sendNafasyarSms(details.customer.mobile,`نفس‌یار طب\nکد فعال‌سازی: ${code}\nکد را روی دستگاه وارد کنید.`);
  await db.prepare("UPDATE flow_entities SET data=json_set(data,'$.state','sent'),revision=revision+1,updated=? WHERE id=? AND revision=1").bind(now,id).run();
  return {token,mobileLast4:details.customer.mobile.slice(-4)};
 }
