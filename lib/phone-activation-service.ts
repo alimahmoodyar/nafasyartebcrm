@@ -179,12 +179,13 @@ export async function POST(request:Request){
   const serial=deviceSerial(body!.serial);
   let code:string;
   try{code=generateActivationCode(deviceCode);}catch(error){failure((error as Error).message);}
-  const corrected=purpose==='legacy-correction';
-  const chosenDay=corrected?parseCalendarDay(warrantyStartDay):'';
-  if(corrected&&(!chosenDay||chosenDay<='1900-01-01'||chosenDay>dayAt()))failure('تاریخ معتبر شروع گارانتی را انتخاب کنید. تاریخ نباید در آینده باشد.');
-  if(!corrected&&warrantyStartDay!==undefined)failure('تاریخ انتخابی فقط برای اصلاح سامانه قدیم ثبت می‌شود.');
+  const legacyCorrection=purpose==='legacy-correction';
+  const suppliedDay=warrantyStartDay!==undefined;
+  if(!legacyCorrection&&suppliedDay)failure('تاریخ انتخابی فقط برای اصلاح سامانه قدیم ثبت می‌شود.');
+  const chosenDay=suppliedDay?parseCalendarDay(warrantyStartDay):'';
+  if(suppliedDay&&(!chosenDay||chosenDay<='1900-01-01'||chosenDay>dayAt()))failure('تاریخ معتبر شروع گارانتی را انتخاب کنید. تاریخ نباید در آینده باشد.');
   const requestData=[serial,purpose,deviceCode,productId,customer,reference];
-  const requestKey=await digest(JSON.stringify(corrected?[...requestData,chosenDay]:requestData));
+  const requestKey=await digest(JSON.stringify(suppliedDay?[...requestData,chosenDay]:requestData));
   const previous=await db.prepare("SELECT actor,payload FROM inventory_operations WHERE id=? AND kind='phone_activation'").bind(id).first<{actor:string;payload:string}>();
   const reply=(payload:{requestKey:string;actorName:string;at:string;activatedDay:string;first:boolean;corrected?:boolean})=>{
    if(payload.requestKey!==requestKey)failure('شناسهٔ درخواست قبلاً استفاده شده است.',409);
@@ -197,7 +198,12 @@ export async function POST(request:Request){
   }
   const found=await lookup(serial),known=found.result;
   if(snapshot!==found.snapshot)failure('شناسنامه تغییر کرده است. سریال را دوباره بررسی کنید.',409);
-  if(corrected&&!known.canCorrectLegacy)failure(known.activatedDay?'تاریخ شروع گارانتی این دستگاه قبلاً ثبت شده است.':'سابقهٔ این سریال نیاز به بررسی دارد.',409);
+  const corrected=legacyCorrection&&known.canCorrectLegacy===true;
+  if(legacyCorrection&&!corrected){
+   if(known.state!=='activated'||!isIsoDay(known.activatedDay))failure('سابقهٔ این سریال نیاز به بررسی دارد. صدور کد برای این شناسنامه متوقف است.',409);
+   if(suppliedDay)failure('تاریخ شروع گارانتی این دستگاه قبلاً ثبت شده و قابل تغییر نیست.',409);
+  }
+  if(corrected&&!suppliedDay)failure('تاریخ شروع گارانتی را انتخاب کنید.');
   if(!corrected&&known.state==='review')failure('سابقهٔ این سریال نیاز به بررسی دارد. صدور کد برای این شناسنامه متوقف است.',409);
   const first=purpose==='activate'&&known.state==='new';
   const saveActivation=first||corrected;
@@ -220,8 +226,18 @@ export async function POST(request:Request){
   if(found.device)guard("EXISTS(SELECT 1 FROM records WHERE id=? AND kind='device' AND payload=?)",found.device.id,found.device.payload);
   else guard("NOT EXISTS(SELECT 1 FROM records WHERE kind='device' AND json_extract(payload,'$.code')=?)",serial);
   if(found.activation)guard('EXISTS(SELECT 1 FROM service_activations WHERE serial=? AND day=? AND months=? AND source=?)',serial,found.activation.day,found.activation.months,found.activation.source);
-  else if(!corrected&&found.legacyEvents.length)guard('EXISTS(SELECT 1 FROM flow_entities WHERE '+legacyMatch+')',serial,serial,serial);
+  else if(!legacyCorrection&&found.legacyEvents.length)guard('EXISTS(SELECT 1 FROM flow_entities WHERE '+legacyMatch+')',serial,serial,serial);
   else if(!saveActivation&&!found.device&&found.caseRow)guard('EXISTS(SELECT 1 FROM flow_entities WHERE '+homeCaseMatch+')',serial);
+  if(legacyCorrection){
+   guard("(SELECT count(*) FROM records WHERE kind='device' AND json_extract(payload,'$.code')=?)=?",serial,found.device?1:0);
+   if(!found.activation&&!found.issued){
+    guard('(SELECT count(*) FROM flow_entities WHERE '+legacyMatch+')=?',serial,serial,serial,found.legacyRows.length);
+    for(const row of found.legacyRows)guard('EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND data=? AND type=?)',row.id,row.data,legacyActivationType);
+   }
+   if(!found.activation)guard('NOT EXISTS(SELECT 1 FROM service_activations WHERE serial=?)',serial);
+   if(found.issued&&found.device&&!found.activation)guard(
+    '(SELECT MIN(at) FROM access_audit WHERE target=? AND action=?)=?','warranty:'+found.device.id,WARRANTY_CODE_ISSUED,found.issued);
+  }
   if(saveActivation){
    const person=customerInput(customer,corrected?found.correctionCustomer:known.customer);
    let selection:PhoneActivationProduct|null=null,months=known.months;
@@ -237,12 +253,8 @@ export async function POST(request:Request){
     guard('NOT EXISTS(SELECT 1 FROM access_audit WHERE target=? AND action=?)','warranty:'+found.device.id,WARRANTY_CODE_ISSUED);
     guard("COALESCE((SELECT payload FROM records WHERE id=? AND kind='distribution'),'')=?",'distribution:'+found.device.id,found.dist?.payload||'');
    }
-   if(corrected){
-    guard("(SELECT count(*) FROM records WHERE kind='device' AND json_extract(payload,'$.code')=?)=?",serial,found.device?1:0);
-    guard('(SELECT count(*) FROM flow_entities WHERE '+legacyMatch+')=?',serial,serial,serial,found.legacyRows.length);
-    for(const row of found.legacyRows)guard('EXISTS(SELECT 1 FROM flow_entities WHERE id=? AND data=? AND type=?)',row.id,row.data,legacyActivationType);
-    months=legacyCorrectionMonths;
-   }else guard('NOT EXISTS(SELECT 1 FROM flow_entities WHERE '+legacyMatch+')',serial,serial,serial);
+   if(corrected)months=legacyCorrectionMonths;
+   else guard('NOT EXISTS(SELECT 1 FROM flow_entities WHERE '+legacyMatch+')',serial,serial,serial);
    ops.push(db.prepare("INSERT INTO service_activations(serial,day,months,source,created,actor) VALUES(?,?,?,?,?,?)").bind(serial,activatedDay,months,corrected?'legacy-correction':'phone-activation',at,user.userId));
    ops.push(db.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'phone_activation_device',?,1,?,?)").bind(found.profileId,JSON.stringify({serial,customer:person,product:selection?{...selection,months}:{id:found.productId,name:known.productName,model:known.model,months},...(corrected?{warrantyStartDay:activatedDay}:{}),actorId:user.userId,actorName:user.name,at}),at,at));
    if(first&&found.device)ops.push(db.prepare('INSERT INTO access_audit(id,actor,target,action,after,at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),user.userId,'warranty:'+found.device.id,WARRANTY_CODE_ISSUED,JSON.stringify({operationId:id}),at));

@@ -222,6 +222,18 @@ async function get(u){const r=await context.run(u,()=>api.GET(request('/api/acti
  assert.deepEqual(sql.prepare('SELECT * FROM service_activations WHERE serial=?').get(correctionSerial),savedCorrection);
  const alreadyActivated=(await readPhone(actors[1],'00777001','legacy-correction')).data;
  assert.equal((await writePhone(actors[1],draft(alreadyActivated,'legacy-correction',{warrantyStartDay:chosenDay}))).status,409);
+ const importedReissue=await writePhone(actors[1],draft(alreadyActivated,'legacy-correction'));
+ assert.equal(importedReissue.status,200,JSON.stringify(importedReissue));
+ assert.equal(importedReissue.data.activationCode,'08314');
+ assert.equal(importedReissue.data.activatedDay,'2021-03-23');
+ assert.equal(importedReissue.data.corrected,undefined);
+ assert.equal(sql.prepare('SELECT day FROM service_activations WHERE serial=?').get('00777001'),undefined);
+ const canonical=(await readPhone(actors[1],serial,'legacy-correction')).data;
+ const canonicalReissue=await writePhone(actors[1],draft(canonical,'legacy-correction'));
+ assert.equal(canonicalReissue.status,200,JSON.stringify(canonicalReissue));
+ assert.equal(canonicalReissue.data.activatedDay,firstLookup.today);
+ assert.equal(canonical.device.customer.name,customer.name);
+ assert.deepEqual(sql.prepare('SELECT * FROM service_activations WHERE serial=?').get(serial),prior);
  const correctionRows=(await history(actors[1],{view:'history',q:correctionSerial,kind:'legacy-correction'})).data.rows;
  assert.equal(correctionRows.length,1);
  assert.equal(correctionRows[0].warrantyStartDay,chosenDay);
@@ -236,6 +248,17 @@ async function get(u){const r=await context.run(u,()=>api.GET(request('/api/acti
  assert.equal(benefit.endsAt,end);
  assert.equal(benefit.remainingDays,344);
  assert.match(repairedDossier,/<strong>۳۴۴<\/strong>/u);
+ const reissueDraft=draft(reopened,'legacy-correction');
+ const reissued=await writePhone(actors[1],reissueDraft);
+ assert.equal(reissued.status,200,JSON.stringify(reissued));
+ assert.equal(reissued.data.activationCode,'08314');
+ assert.equal(reissued.data.activatedDay,chosenDay);
+ assert.equal(reissued.data.corrected,undefined);
+ assert.equal((await writePhone(actors[1],reissueDraft)).status,200);
+ assert.deepEqual(sql.prepare('SELECT * FROM service_activations WHERE serial=?').get(correctionSerial),savedCorrection);
+ const reissuedHistory=(await history(actors[1],{view:'history',q:correctionSerial,kind:'legacy-correction'})).data.rows;
+ assert.equal(reissuedHistory.length,2);
+ assert.ok(reissuedHistory.every(row=>row.warrantyStartDay===chosenDay));
  const tracedSerial='00777005',tracedId='correction-traced-device';
  sql.prepare("INSERT INTO records(id,kind,payload,created) VALUES(?,'device',?,?)").run(tracedId,
   JSON.stringify({code:tracedSerial,product:'phone-oxygen',model:'M-01',warrantyMonths:12}),now);

@@ -2,7 +2,7 @@
 
 import type {ReactNode} from 'react';
 import {Archive,ChevronDown,ClipboardList,ShieldCheck,Store,UserRound} from 'lucide-react';
-import {calendarLocale} from '@/lib/persian-date';
+import {calendarLocale,formatDate} from '@/lib/persian-date';
 import {activationWarranty,formatActivationTime,importedActivationWarranty,phoneCustomerFields,type PhoneActivationHistoryRow} from '@/lib/phone-activation-contract';
 
 type Dossier=Pick<PhoneActivationHistoryRow,'serial'|'at'|'activatedAt'|'warrantyStartDay'|'legacy'|'customer'|'dealer'|'model'|'months'|'actor'>;
@@ -16,8 +16,8 @@ function Fields({fields,className=''}:{fields:Field[];className?:string}){
  </div>)}</dl>;
 }
 
-export function ActivationDossier({record,showCustomer=true,legacyDateConfirmed=true,today}:{
- record:Dossier;showCustomer?:boolean;legacyDateConfirmed?:boolean;today?:string;
+export function ActivationDossier({record,showCustomer=true,legacyDateConfirmed=true,today,showStoredStart}:{
+ record:Dossier;showCustomer?:boolean;legacyDateConfirmed?:boolean;today?:string;showStoredStart?:string;
 }){
  const {legacy,customer}=record,details=legacy?.details;
  const activationAt=record.activatedAt||legacy?.activeDate||record.at;
@@ -45,6 +45,9 @@ export function ActivationDossier({record,showCustomer=true,legacyDateConfirmed=
     <span className="activation-dossier-icon"><ShieldCheck size={21} aria-hidden="true"/></span>
     <div><h4>گارانتی دستگاه</h4><p>{duration}</p></div>
    </header>
+   {showStoredStart&&!record.warrantyStartDay&&<p>
+    شروع گارانتی <time dateTime={showStoredStart}>{formatDate(showStoredStart)}</time>
+   </p>}
    {warranty?<dl className="activation-dossier-warranty-facts" data-has-start={!!record.warrantyStartDay}>
     {record.warrantyStartDay&&<div><dt>تاریخ شروع گارانتی</dt><dd><time dateTime={record.warrantyStartDay}>{peopleDate.format(new Date(record.warrantyStartDay))}</time></dd></div>}
     <div><dt>تاریخ پایان گارانتی</dt><dd><time dateTime={warranty.endsOn}>{peopleDate.format(new Date(warranty.endsOn))}</time></dd></div>

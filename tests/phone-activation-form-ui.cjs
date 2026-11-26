@@ -32,7 +32,7 @@ async function fetchFixture(url,options){
  if(options.method==='POST'){
   const body=JSON.parse(options.body);
   posts.push(body);
-  return Response.json({accountId,activationCode:'04726',actorName:'کارشناس نمونه',at:'2026-11-24T08:00:00Z',first:body.serial!=='55060108',activatedDay:body.warrantyStartDay||'2026-11-24',corrected:body.purpose==='legacy-correction'});
+  return Response.json({accountId,activationCode:'04726',actorName:'کارشناس نمونه',at:'2026-11-24T08:00:00Z',first:body.serial!=='55060108',activatedDay:body.warrantyStartDay||'2026-11-24',corrected:body.purpose==='legacy-correction'&&!!body.warrantyStartDay});
  }
  const query=new URL(url,'https://test.local').searchParams;
  const serial=query.get('serial'),purpose=query.get('purpose');
@@ -138,7 +138,12 @@ const send=()=>nodes().find(node=>node.type==='form').props.onSubmit({preventDef
  await settleLookup();
  assert.equal(dateField(),undefined);
  await send();
- assert.equal(posts.length,4,'blocks correction when an activation day already exists');
+ assert.equal(posts.length,5,'issues a code for an existing activation');
+ assert.equal(posts[4].purpose,'legacy-correction');
+ assert.equal('warrantyStartDay' in posts[4],false,'never submit an editable date for a stored activation');
+ assert.equal('customer' in posts[4],false);
+ assert.equal(nodes().find(node=>node.type==='details').props.open,true);
+ assert.equal(nodes().find(node=>node.props.showStoredStart).props.showStoredStart,'2026-11-03');
  console.log('PASS correction form: Persian date component, missing/future date, exact submitted day and immediate dossier.');
  console.log('PASS phone form: code-first order, stale lookup ignored, retained code, no reference field, board and first activation with optional postcode.');
 })().catch(error=>{console.error(error);process.exitCode=1;});
