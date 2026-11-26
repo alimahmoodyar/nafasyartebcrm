@@ -6,6 +6,7 @@ import {Dialog,DialogContent,DialogDescription,DialogTitle} from '@/components/u
 import {initialProfilePhotoCrop,type ProfilePhotoCrop} from '@/lib/profile-photo';
 import {AccountCredentials} from './account-credentials';
 import {BaleSettings} from './bale-settings';
+import {RecoverySettings} from './password-recovery';
 import {PasskeySettings} from './passkeys';
 import {normalizeProfilePhoto,ProfilePhotoEditor,type ProfilePhotoDraft} from './profile-photo-editor';
 
@@ -82,7 +83,7 @@ export function UserProfile({accountId,name,onPersonnel,onAssets}:{accountId:str
     {photo&&<><button type="button" className="btn" disabled={busy} onClick={editCurrent}><Pencil size={18}/> ویرایش عکس</button>
      <button type="button" className="btn" disabled={busy} onClick={()=>{if(profile){setError('');setMessage('');setRemoveRevision(profile.revision);}}}>حذف عکس</button></>}
    </div>
-   {profile?.authType==='password'&&<><AccountCredentials accountId={accountId} username={profile.username||''}/><PasskeySettings/></>}
+   {profile?.authType==='password'&&<><AccountCredentials accountId={accountId} username={profile.username||''}/><RecoverySettings key={accountId} accountId={accountId}/><PasskeySettings/></>}
    <BaleSettings/>
    {error&&removeRevision===null&&<p role="alert">{error}</p>}
    {message&&<p role="status">{message}</p>}

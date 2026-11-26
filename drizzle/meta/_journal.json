@@ -211,6 +211,13 @@
       "when": 1795651200000,
       "tag": "0030_sourcing_read_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "6",
+      "when": 1795660200000,
+      "tag": "0031_password_recovery",
+      "breakpoints": true
     }
   ]
 }

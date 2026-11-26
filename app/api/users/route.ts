@@ -275,7 +275,7 @@ export async function DELETE(request:Request) {
       // Keep the member row for historical references, but release all login identity keys.
       // The audit snapshot retains the original email/subject for traceability.
       db.prepare("UPDATE app_members SET status='deleted',email='deleted+'||id||'@deleted.invalid',subject=NULL,updated=?,revision=revision+1 WHERE id=? AND "+gate).bind(now,old.id,auditId),
-      db.prepare("UPDATE password_accounts SET username='@deleted:'||member_id,password_hash='deleted',password_ciphertext=NULL,version=version+1 WHERE member_id=? AND "+gate).bind(old.id,auditId),
+      db.prepare("UPDATE password_accounts SET username='@deleted:'||member_id,password_hash='deleted',password_ciphertext=NULL,version=version+1,recovery_mobile=NULL,recovery_backup_hash=NULL,recovery_revision=recovery_revision+1 WHERE member_id=? AND "+gate).bind(old.id,auditId),
       db.prepare('DELETE FROM password_sessions WHERE member_id=? AND '+gate).bind(old.id,auditId),
       db.prepare('UPDATE mcp_tokens SET revoked=1 WHERE (subject=? OR subject=?) AND '+gate).bind('local:'+old.id,old.subject||'local:'+old.id,auditId),
       db.prepare('DELETE FROM mcp_streams WHERE token_id IN (SELECT id FROM mcp_tokens WHERE subject=? OR subject=?) AND '+gate).bind('local:'+old.id,old.subject||'local:'+old.id,auditId),

@@ -100,7 +100,14 @@ export const productionReceipts=sqliteTable('production_receipts',{
 
 export const passwordAccounts=sqliteTable('password_accounts',{
  memberId:text('member_id').primaryKey().references(()=>appMembers.id),username:text('username').notNull().unique(),passwordHash:text('password_hash').notNull(),passwordCiphertext:text('password_ciphertext'),mustChange:integer('must_change').notNull().default(0),passwordChangedAt:text('password_changed_at'),version:integer('version').notNull().default(1),
-});
+ recoveryMobile:text('recovery_mobile'),recoveryBackupHash:text('recovery_backup_hash'),recoveryRevision:integer('recovery_revision').notNull().default(0),
+},t=>[uniqueIndex('idx_password_recovery_mobile').on(t.recoveryMobile)]);
+export const passwordRecoveryChallenges=sqliteTable('password_recovery_challenges',{
+ tokenHash:text('token_hash').primaryKey().notNull(),memberId:text('member_id').notNull().references(()=>passwordAccounts.memberId,{onDelete:'cascade'}),
+ purpose:text('purpose').notNull(),mobile:text('mobile').notNull(),version:integer('version').notNull(),
+ recoveryRevision:integer('recovery_revision').notNull(),proof:text('proof').notNull(),expires:text('expires').notNull(),
+ attempts:integer('attempts').notNull().default(0),delivered:integer('delivered').notNull().default(0),
+},t=>[uniqueIndex('idx_password_recovery_member_purpose').on(t.memberId,t.purpose),index('idx_password_recovery_expires').on(t.expires),check('password_recovery_purpose',sql`${t.purpose} IN ('enroll','reset')`)]);
 export const passwordSessions=sqliteTable('password_sessions',{
  hash:text('hash').primaryKey(),memberId:text('member_id').notNull().references(()=>appMembers.id),version:integer('version').notNull(),expires:text('expires').notNull(),created:text('created').notNull(),
 },t=>[index('idx_password_sessions_member').on(t.memberId)]);
