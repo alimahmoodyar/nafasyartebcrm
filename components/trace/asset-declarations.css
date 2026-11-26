@@ -27,3 +27,42 @@
 }
 
 .asset-declaration-delete{color:#a32633}.asset-declaration-photo-card{display:grid;gap:6px}.asset-declaration-photo-card .tools{gap:6px;flex-wrap:wrap}
+
+.asset-mobile-brand { display: none; }
+.asset-declarations-layout[data-mobile-form] { grid-template-columns: minmax(0, 1fr); }
+.asset-declarations-layout[data-mobile-form] > .asset-declarations-list { display: none; }
+.asset-mobile-form { display: grid; gap: 12px; margin-block: 12px; }
+.asset-mobile-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  text-align: center;
+}
+.asset-mobile-steps li { padding: 6px 2px; border-block-end: 3px solid #dce4ef; color: #52647a; font-size: .875rem; }
+.asset-mobile-steps [data-complete], .asset-mobile-steps [aria-current] { border-color: #167449; }
+.asset-mobile-steps [aria-current] { color: #146942; font-weight: 700; }
+.asset-mobile-sheet { display: grid; gap: 12px; padding: 13px; min-width: 0; overflow-wrap: anywhere; }
+.asset-mobile-sheet h3 { margin: 0; scroll-margin-block-start: 108px; }
+.asset-mobile-sheet .field { min-width: 0; }
+.asset-mobile-sheet .field :is(input:not([type=file]), select, textarea) { min-height: 44px; font-size: 16px; }
+.asset-mobile-extra summary { padding-block: 9px; min-height: 44px; color: #146942; font-weight: 600; cursor: pointer; }
+.asset-mobile-extra .field { margin-block: 8px; }
+.asset-mobile-sheet .receipt-attachment > .tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.asset-mobile-sheet .receipt-attachment > .tools > .btn { white-space: normal; justify-content: center; text-align: center; min-height: 52px; }
+.asset-mobile-sheet .receipt-attachment > .tools > label { grid-column: 2; grid-row: 1; }
+.asset-mobile-sheet .receipt-attachment > .tools > label:focus-within { outline: 2px solid #146942; outline-offset: 2px; }
+.asset-mobile-sheet .receipt-attachment input[type=file] { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); }
+.asset-mobile-sheet .receipt-attachment > .tools > button { grid-column: 1; grid-row: 1; }
+.asset-mobile-review { display: grid; gap: 8px; list-style: none; margin: 0; padding: 0; }
+.asset-mobile-review li { display: flex; align-items: center; gap: 8px; justify-content: space-between; border-block-start: 1px solid #dce4ef; padding-block-start: 8px; }
+.asset-mobile-review li .btn { flex-shrink: 0; }
+.asset-mobile-actions { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; padding-block: 6px; }
+.asset-mobile-actions .btn { flex: 1 1 auto; min-height: 44px; white-space: normal; justify-content: center; }
+.asset-mobile-actions .btn.primary { flex-grow: 2; }
+@media (max-width: 760px) {
+  .asset-mobile-brand { display: block; object-fit: contain; object-position: right; }
+  .asset-declarations:has([data-mobile-form]) > .panelhead { gap: 8px; }
+}

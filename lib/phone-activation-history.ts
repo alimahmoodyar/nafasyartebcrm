@@ -11,7 +11,7 @@ const dealerKey=(id:string)=>"CASE WHEN s.id IS NOT NULL THEN 'sales:'||s.id WHE
 const text=(expression:string)=>"lower(replace(replace(replace(replace("+expression+",'ي','ی'),'ك','ک'),' ',''),char(8204),''))";
 
 type HistorySource={
- id:string; kind:'legacy'|'first'|'board'|'code'; serial:string; at:string; payload:string;
+ id:string; kind:PhoneActivationHistoryRow['kind']; serial:string; at:string; payload:string;
  dealerKey:string; dealer:string; profile:string|null; legacy:string|null;
 };
 function toHistoryRow(row:HistorySource):PhoneActivationHistoryRow{
@@ -21,9 +21,9 @@ function toHistoryRow(row:HistorySource):PhoneActivationHistoryRow{
   name:legacyCustomerName(details),mobile:details?.mobile,nationalId:details?.nationalId,postalCode:details?.postalCode,
   telephone:details?.telephone,email:details?.email,referrer:details?.doctor,
  };
- const p=row.profile?JSON.parse(row.profile) as {customer?:PhoneActivationCustomer;product?:PhoneActivationProduct;at?:string}:null;
+ const p=row.profile?JSON.parse(row.profile) as {customer?:PhoneActivationCustomer;product?:PhoneActivationProduct;at?:string;warrantyStartDay?:string}:null;
  const source=JSON.parse(row.payload);
- return {id:row.id,kind:row.kind,serial:row.serial,at:row.at,activatedAt:p?.at,
+ return {id:row.id,kind:row.kind,serial:row.serial,at:row.at,activatedAt:p?.at,warrantyStartDay:p?.warrantyStartDay,
   dealer:row.dealer,actor:source.actorName,legacy,
   model:[p?.product?.name,p?.product?.model].filter(Boolean).join(' · '),months:p?.product?.months,
   customer:p?.customer||priorCustomer};
@@ -46,7 +46,7 @@ const activationRows=
  "LEFT JOIN flow_entities s ON s.type='sales_agent' AND s.id=json_extract(m.data,'$.salesId') "+
  "WHERE NOT EXISTS(SELECT 1 FROM hospitalSerials h WHERE h.serial IN (json_extract(l.data,'$.event.deviceSetSerial'),json_extract(l.data,'$.event.setSerial'),json_extract(l.data,'$.event.serial'))) "+
  "UNION ALL "+
- "SELECT e.id,CASE WHEN json_extract(e.data,'$.purpose')='board' THEN 'board' WHEN json_extract(e.data,'$.first')=1 OR json_extract(p.data,'$.at')=e.created THEN 'first' ELSE 'code' END,"+
+ "SELECT e.id,CASE WHEN json_extract(e.data,'$.purpose')='legacy-correction' THEN 'legacy-correction' WHEN json_extract(e.data,'$.purpose')='board' THEN 'board' WHEN json_extract(e.data,'$.first')=1 OR json_extract(p.data,'$.at')=e.created THEN 'first' ELSE 'code' END,"+
  "COALESCE(json_extract(e.data,'$.serial'),json_extract(p.data,'$.serial'),''),e.created,COALESCE(json_extract(e.data,'$.day'),date(e.created,'+03:30')),"+
  "e.data,"+dealerKey("json_extract(e.data,'$.legacyAgencyId')")+",COALESCE(json_extract(s.data,'$.name'),json_extract(e.data,'$.dealer'),''),p.data,k.data,"+
  "COALESCE(json_extract(e.data,'$.serial'),json_extract(p.data,'$.serial'),''),COALESCE(json_extract(p.data,'$.customer.name'),trim(COALESCE(json_extract(k.data,'$.event.details.firstName'),'')||' '||COALESCE(json_extract(k.data,'$.event.details.lastName'),'')),'') "+
@@ -68,7 +68,7 @@ export async function phoneActivationHistory(q:URLSearchParams){
  const from=parseCalendarDay(fromText),to=parseCalendarDay(toText);
  if(fromText&&!from||toText&&!to||from&&to&&from>to)access('بازهٔ تاریخ را به شکل ۱۴۰۵/۰۸/۱۲ و با ترتیب درست وارد کنید.');
  const kind=q.get('kind')||'',agency=q.get('agency')||'',page=Number(q.get('page')||1);
- if(!['','legacy','first','board','code'].includes(kind)||agency.length>240||!Number.isSafeInteger(page)||page<1||page>10000)
+ if(!['','legacy','first','board','code','legacy-correction'].includes(kind)||agency.length>240||!Number.isSafeInteger(page)||page<1||page>10000)
   access('فیلتر سوابق معتبر نیست.');
  const term=normalized((q.get('q')||'').slice(0,160));
  const pageSize=30;

@@ -2,9 +2,10 @@
 
 import {useEffect,useRef,useState,type FormEvent} from 'react';
 import {KeyRound} from 'lucide-react';
-import {formatDateTime,formatDate,latinDigits} from '@/lib/persian-date';
-import {phoneCustomerFields,type PhoneActivationCustomer,type PhoneActivationDevice,type PhoneActivationProduct,type PhoneActivationPurpose,type PhoneActivationResult} from '@/lib/phone-activation-contract';
+import {formatDateTime,formatDate,isIsoDay,latinDigits} from '@/lib/persian-date';
+import {legacyCorrectionMonths,phoneCustomerFields,type PhoneActivationCustomer,type PhoneActivationDevice,type PhoneActivationProduct,type PhoneActivationPurpose,type PhoneActivationResult} from '@/lib/phone-activation-contract';
 import {ActivationDossier} from './activation-dossier';
+import {SolarDate} from './solar-date';
 
 type Lookup={accountId:string;device:PhoneActivationDevice;snapshot:string;today:string;linkedProductId:string};
 const serialKey=(value:string)=>latinDigits(value).trim().toUpperCase();
@@ -30,6 +31,7 @@ export function PhoneActivationPanel({accountId}:{accountId:string}){
  const [purpose,setPurpose]=useState<PhoneActivationPurpose>('activate');
  const [serial,setSerial]=useState(''),[code,setCode]=useState('');
  const [found,setFound]=useState<(Lookup&{purpose:PhoneActivationPurpose})|null>(null);
+ const [warrantyStartDay,setWarrantyStartDay]=useState('');
  const [customer,setCustomer]=useState<Partial<PhoneActivationCustomer>>({});
  const [products,setProducts]=useState<PhoneActivationProduct[]|null>(null),[productId,setProductId]=useState(''),[query,setQuery]=useState('');
  const [lookupError,setLookupError]=useState(''),[catalogError,setCatalogError]=useState('');
@@ -43,11 +45,15 @@ export function PhoneActivationPanel({accountId}:{accountId:string}){
  const lookup=found?.accountId===accountId&&found.purpose===purpose&&found.device.serial===normalized?found:null;
  const device=lookup?.device;
  const first=purpose==='activate'&&device?.state==='new';
- const chooseProduct=first&&device.months===null&&!lookup?.linkedProductId;
+ const correction=purpose==='legacy-correction';
+ const canCorrect=correction&&device?.canCorrectLegacy;
+ const showActivationForm=first||canCorrect;
+ const validStart=!!lookup&&isIsoDay(warrantyStartDay)&&warrantyStartDay>'1900-01-01'&&warrantyStartDay<=lookup.today;
+ const chooseProduct=showActivationForm&&device?.months===null&&!lookup?.linkedProductId;
  const selectedProduct=products?.find(product=>product.id===productId);
- const months=device?.months??selectedProduct?.months;
+ const months=correction?legacyCorrectionMonths:device?.months??selectedProduct?.months;
  const knownModel=[device?.productName,device?.model].filter(Boolean).join(' · ');
- const canSubmit=!!device&&!stale&&device.state!=='review'&&(purpose==='activate'||device.devicesKnown);
+ const canSubmit=!!device&&!stale&&(correction?canCorrect&&validStart:device.state!=='review'&&(purpose==='activate'||device.devicesKnown));
  const showDossier=device&&(device.state==='activated'||device.legacy||purpose==='board'&&device.devicesKnown);
 
  useEffect(()=>{
@@ -90,7 +96,7 @@ export function PhoneActivationPanel({accountId}:{accountId:string}){
  function resetLookup(){
   activeLookup.current?.abort();
   setFound(null);setLookupError('');setStale(false);
-  setCustomer({});setQuery('');setProductId('');setProducts(null);setCatalogError('');
+  setCustomer({});setWarrantyStartDay('');setQuery('');setProductId('');setProducts(null);setCatalogError('');
   resetResult();
  }
 
@@ -105,7 +111,7 @@ export function PhoneActivationPanel({accountId}:{accountId:string}){
   if(!lookup||!canSubmit||!digitsOnly(code)||result||lock.current)return;
   lock.current=true;setBusy(true);resetResult();
   try{
-   const draft={serial:lookup.device.serial,purpose,deviceCode:code,snapshot:lookup.snapshot,...(first?{customer,productId}:{})};
+   const draft={serial:lookup.device.serial,purpose,deviceCode:code,snapshot:lookup.snapshot,...(showActivationForm?{customer,productId}:{}),...(correction?{warrantyStartDay}:{})};
    const key=JSON.stringify(draft);
    if(pending.current?.key!==key)pending.current={key,id:crypto.randomUUID()};
    const issued=await request<PhoneActivationResult>(accountId,'',{method:'POST',body:JSON.stringify({...draft,confirmed:true,id:pending.current.id})});
@@ -156,6 +162,7 @@ export function PhoneActivationPanel({accountId}:{accountId:string}){
      }}>
       <option value="activate">فعال‌سازی دستگاه</option>
       <option value="board">تعویض برد الکترونیکی</option>
+      <option value="legacy-correction">اصلاح سامانه قدیم</option>
      </select>
     </label>
 
@@ -163,13 +170,14 @@ export function PhoneActivationPanel({accountId}:{accountId:string}){
      {!normalized&&'برای بررسی سابقه، سریال روی بدنه را وارد کنید.'}
      {normalized&&!isSerialValid&&'سریال روی بدنه را بررسی کنید.'}
      {isSerialValid&&!device&&!lookupError&&'در حال بررسی سابقهٔ سریال…'}
-     {device?.state==='review'&&'سوابق این سریال نیاز به بررسی دارد.'}
-     {device?.state==='activated'&&'سابقهٔ فعال‌سازی این سریال پیدا شد.'}
+     {device?.state==='review'&&!canCorrect&&'سوابق این سریال نیاز به بررسی دارد.'}
+     {device?.state==='activated'&&!canCorrect&&(correction?'تاریخ شروع گارانتی این دستگاه قبلاً ثبت شده است.':'سابقهٔ فعال‌سازی این سریال پیدا شد.')}
+     {canCorrect&&'برای دستگاهی که قبلاً فعال شده، تاریخ واقعی شروع گارانتی را وارد کنید.'}
      {device?.state==='new'&&purpose==='board'&&!device.devicesKnown&&'برای تعویض برد، سریال دستگاه دارای سابقه را وارد کنید.'}
     </div>
 
-    {first&&!result&&<fieldset className="phone-activation-first">
-     <legend>اطلاعات فعال‌سازی اولیه</legend>
+    {showActivationForm&&!result&&<fieldset className="phone-activation-first">
+     <legend>{correction?'اطلاعات اصلاح سامانه قدیم':'اطلاعات فعال‌سازی اولیه'}</legend>
      <div className="phone-activation-fields">
       {chooseProduct?<label className="field">جست‌وجوی مدل
        <input value={query} maxLength={80} onChange={event=>{
@@ -196,7 +204,9 @@ export function PhoneActivationPanel({accountId}:{accountId:string}){
       })}
      </div>
      {months!==undefined&&<p>{months?'مدت گارانتی '+months.toLocaleString('fa-IR')+' ماه':'بدون گارانتی'}</p>}
-     {lookup&&<p>شروع گارانتی پس از صدور {formatDate(lookup.today)}</p>}
+     {correction?<SolarDate label="تاریخ شروع گارانتی" value={warrantyStartDay} onChange={setWarrantyStartDay}/>
+      :lookup&&<p>شروع گارانتی پس از صدور {formatDate(lookup.today)}</p>}
+     {correction&&warrantyStartDay&&!validStart&&<small role="alert">تاریخ شروع گارانتی باید معتبر و تا امروز باشد.</small>}
     </fieldset>}
 
     {(error||lookupError)&&<p role="alert" className="notice error">{error||lookupError}</p>}
@@ -213,7 +223,7 @@ export function PhoneActivationPanel({accountId}:{accountId:string}){
    <div>
     <h3>کد پنج‌رقمی</h3>
     <p>ثبت‌کننده {result.actorName} · {formatDateTime(result.at)}</p>
-    {result.first&&<p>شروع فعال‌سازی {formatDate(result.activatedDay)}</p>}
+    {(result.first||result.corrected)&&<p>شروع گارانتی {formatDate(result.activatedDay)}</p>}
    </div>
    <strong dir="ltr">{result.activationCode}</strong>
    <button type="button" className="btn" onClick={async()=>{
@@ -224,15 +234,20 @@ export function PhoneActivationPanel({accountId}:{accountId:string}){
 
   {device&&(showDossier||device.history.length>0)&&<details className="phone-activation-dossier" key={device.serial+':'+purpose}>
    <summary>شناسنامه و سوابق دستگاه</summary>
-   {showDossier&&<ActivationDossier showCustomer={purpose==='activate'} today={lookup?.today}
+   {(showDossier||result?.corrected)&&<ActivationDossier showCustomer={purpose!=='board'} today={lookup?.today}
     legacyDateConfirmed={device.state==='activated'&&device.activatedDay===device.legacy?.activeDate.slice(0,10)} record={{
     serial:device.serial,at:device.legacy?.activeDate||device.activatedDay,legacy:device.legacy,
-    customer:device.customer,dealer:device.dealer,model:knownModel,months:device.months??undefined,
+    customer:result?.corrected?customer:device.customer,dealer:device.dealer,
+    model:result?.corrected&&selectedProduct?[selectedProduct.name,selectedProduct.model].filter(Boolean).join(' · '):knownModel,
+    months:result?.corrected?legacyCorrectionMonths:device.months??undefined,
+    warrantyStartDay:result?.corrected?result.activatedDay:device.warrantyCorrection?device.activatedDay:undefined,
+    activatedAt:result?.corrected?result.at:device.warrantyCorrection?.at,
+    actor:result?.corrected?result.actorName:device.warrantyCorrection?.actorName,
    }}/>}
    {!!device.history.length&&<section aria-label="سابقهٔ صدور کد">
     <h3>سابقهٔ صدور کد</h3>
     {device.history.map((entry,index)=><div className="recordline" key={entry.at+':'+index}>
-     <p>{entry.purpose==='board'?'صدور کد تعویض برد':'صدور کد فعال‌سازی'} · {entry.actorName} · {formatDateTime(entry.at)}</p>
+     <p>{entry.purpose==='board'?'صدور کد تعویض برد':entry.purpose==='legacy-correction'?'اصلاح سامانه قدیم':'صدور کد فعال‌سازی'} · {entry.actorName} · {formatDateTime(entry.at)}</p>
      {entry.reference&&<small>{entry.reference}</small>}
     </div>)}
    </section>}

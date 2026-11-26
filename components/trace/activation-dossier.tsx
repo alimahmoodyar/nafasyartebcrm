@@ -3,9 +3,9 @@
 import type {ReactNode} from 'react';
 import {Archive,ChevronDown,ClipboardList,ShieldCheck,Store,UserRound} from 'lucide-react';
 import {calendarLocale} from '@/lib/persian-date';
-import {formatActivationTime,importedActivationWarranty,phoneCustomerFields,type PhoneActivationHistoryRow} from '@/lib/phone-activation-contract';
+import {activationWarranty,formatActivationTime,importedActivationWarranty,phoneCustomerFields,type PhoneActivationHistoryRow} from '@/lib/phone-activation-contract';
 
-type Dossier=Pick<PhoneActivationHistoryRow,'serial'|'at'|'activatedAt'|'legacy'|'customer'|'dealer'|'model'|'months'|'actor'>;
+type Dossier=Pick<PhoneActivationHistoryRow,'serial'|'at'|'activatedAt'|'warrantyStartDay'|'legacy'|'customer'|'dealer'|'model'|'months'|'actor'>;
 type Field=[label:string,value:ReactNode];
 const peopleDate=new Intl.DateTimeFormat(calendarLocale,{dateStyle:'long',timeZone:'UTC'});
 const count=new Intl.NumberFormat('fa-IR');
@@ -22,18 +22,19 @@ export function ActivationDossier({record,showCustomer=true,legacyDateConfirmed=
  const {legacy,customer}=record,details=legacy?.details;
  const activationAt=record.activatedAt||legacy?.activeDate||record.at;
  const serial=legacy?.deviceSetSerial||record.serial;
- const warranty=legacy&&legacyDateConfirmed?importedActivationWarranty(legacy,today):null;
- const duration=legacy?'۲ سال از تاریخ فعال‌سازی':record.months!==undefined?count.format(record.months)+' ماه':'مدت گارانتی ثبت نشده';
+ const warranty=record.warrantyStartDay?activationWarranty(record.warrantyStartDay,record.months??0,today)
+  :legacy&&legacyDateConfirmed?importedActivationWarranty(legacy,today):null;
+ const duration=legacy||record.warrantyStartDay?'۲ سال از تاریخ فعال‌سازی':record.months!==undefined?count.format(record.months)+' ماه':'مدت گارانتی ثبت نشده';
  const agencyActive=details?.agencyActive;
  return <article className="activation-dossier" dir="rtl">
   <header className="activation-dossier-hero">
    <div className="activation-dossier-heading">
     <span className="activation-dossier-icon"><ClipboardList size={23} aria-hidden="true"/></span>
-    <div><h3>شناسنامهٔ دستگاه</h3>{legacy&&<p>سابقهٔ فعال‌سازی از سیستم قبلی</p>}</div>
+    <div><h3>شناسنامهٔ دستگاه</h3>{record.warrantyStartDay?<p>اصلاح سامانه قدیم</p>:legacy&&<p>سابقهٔ فعال‌سازی از سیستم قبلی</p>}</div>
    </div>
    <Fields className="activation-dossier-overview" fields={[
     ['سریال ثبت‌شدهٔ دستگاه',serial],
-    ['زمان ثبت فعال‌سازی',activationAt?formatActivationTime(activationAt,!!legacy&&!record.activatedAt):undefined],
+    [record.warrantyStartDay?'زمان ثبت اصلاح':'زمان ثبت فعال‌سازی',activationAt?formatActivationTime(activationAt,!!legacy&&!record.activatedAt&&!record.warrantyStartDay):undefined],
     ['محصول و مدل',record.model],
     ...(record.actor?[['ثبت‌کننده',record.actor] as Field]:[]),
    ]}/>
@@ -44,7 +45,8 @@ export function ActivationDossier({record,showCustomer=true,legacyDateConfirmed=
     <span className="activation-dossier-icon"><ShieldCheck size={21} aria-hidden="true"/></span>
     <div><h4>گارانتی دستگاه</h4><p>{duration}</p></div>
    </header>
-   {warranty?<dl className="activation-dossier-warranty-facts">
+   {warranty?<dl className="activation-dossier-warranty-facts" data-has-start={!!record.warrantyStartDay}>
+    {record.warrantyStartDay&&<div><dt>تاریخ شروع گارانتی</dt><dd><time dateTime={record.warrantyStartDay}>{peopleDate.format(new Date(record.warrantyStartDay))}</time></dd></div>}
     <div><dt>تاریخ پایان گارانتی</dt><dd><time dateTime={warranty.endsOn}>{peopleDate.format(new Date(warranty.endsOn))}</time></dd></div>
     <div><dt>روز باقی‌مانده</dt><dd className="activation-dossier-balance"><strong>{count.format(warranty.remainingDays)}</strong> روز
      {warranty.remainingDays===0&&<small>منقضی شده</small>}

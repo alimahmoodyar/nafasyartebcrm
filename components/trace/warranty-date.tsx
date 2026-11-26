@@ -1,10 +1,10 @@
 'use client';
-import {formatDateTime} from '@/lib/persian-date';
+import {formatDate,formatDateTime,isIsoDay} from '@/lib/persian-date';
 import {useEffect,useState} from 'react';
 
 export function WarrantyDateValue({at,loading=false,error=false}:{at:string|null;loading?:boolean;error?:boolean}) {
  const valid=at&&Number.isFinite(new Date(at).getTime());
- return <div className="kv"><p>تاریخ فعال‌سازی گارانتی</p><strong role="status">{loading?'در حال دریافت…':error?'دریافت تاریخ انجام نشد؛ دوباره باز کنید.':at?(valid?formatDateTime(at):'تاریخ نیازمند بررسی است'):'هنوز فعال نشده'}</strong></div>;
+ return <div className="kv"><p>تاریخ فعال‌سازی گارانتی</p><strong role="status">{loading?'در حال دریافت…':error?'دریافت تاریخ انجام نشد؛ دوباره باز کنید.':at?(valid?(isIsoDay(at)?formatDate(at):formatDateTime(at)):'تاریخ نیازمند بررسی است'):'هنوز فعال نشده'}</strong></div>;
 }
 
 export function WarrantyDateField({deviceId,demo}:{deviceId?:string;demo:boolean}) {
@@ -18,5 +18,5 @@ export function WarrantyDateField({deviceId,demo}:{deviceId?:string;demo:boolean
   return()=>controller.abort();
  },[deviceId,demo]);
  const current=result?.deviceId===deviceId?result:null;
- return <div className="field wide">{deviceId?<WarrantyDateValue at={demo?null:current?.at||null} loading={!demo&&!current} error={!demo&&current?.error}/>:<div className="kv"><p>تاریخ فعال‌سازی گارانتی</p><strong>ابتدا سریال ثبت‌شده را وارد کنید.</strong></div>}<p className="subtle">از زمان اولین صدور موفق کد فعال‌سازی، به وقت ایران؛ این تاریخ خودکار ثبت می‌شود.</p></div>;
+ return <div className="field wide">{deviceId?<WarrantyDateValue at={demo?null:current?.at||null} loading={!demo&&!current} error={!demo&&current?.error}/>:<div className="kv"><p>تاریخ فعال‌سازی گارانتی</p><strong>ابتدا سریال ثبت‌شده را وارد کنید.</strong></div>}<p className="subtle">بر اساس سابقهٔ فعال‌سازی دستگاه، به وقت ایران.</p></div>;
 }

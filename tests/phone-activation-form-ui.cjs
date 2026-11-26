@@ -26,13 +26,13 @@ function lookup(serial,purpose){
  const known=serial==='55060108';
  return {accountId,snapshot:serial+purpose,today:'2026-11-24',linkedProductId:'',
   device:{serial,state:known?'activated':'new',months:24,devicesKnown:known,activatedDay:known?'2026-11-03':'',
-   customer:purpose==='board'?{}:{name:known?'مشتری نمونه':''},history:[],model:'مدل نمونه',dealer:''}};
+   canCorrectLegacy:!known,customer:purpose==='board'?{}:{name:known?'مشتری نمونه':''},history:[],model:'مدل نمونه',dealer:''}};
 }
 async function fetchFixture(url,options){
  if(options.method==='POST'){
   const body=JSON.parse(options.body);
   posts.push(body);
-  return Response.json({accountId,activationCode:'04726',actorName:'کارشناس نمونه',at:'2026-11-24T08:00:00Z',first:body.serial!=='55060108',activatedDay:'2026-11-24'});
+  return Response.json({accountId,activationCode:'04726',actorName:'کارشناس نمونه',at:'2026-11-24T08:00:00Z',first:body.serial!=='55060108',activatedDay:body.warrantyStartDay||'2026-11-24',corrected:body.purpose==='legacy-correction'});
  }
  const query=new URL(url,'https://test.local').searchParams;
  const serial=query.get('serial'),purpose=query.get('purpose');
@@ -52,6 +52,7 @@ function load(file){
   setTimeout:fn=>{timers.add(fn);return fn;},clearTimeout:fn=>timers.delete(fn),
   require(name){
    if(name==='react')return hooks;
+   if(name==='./solar-date')return {SolarDate:function SolarDate(){return null;}};
    if(name==='./activation-dossier')return {ActivationDossier:()=>null};
    if(name.startsWith('@/'))return load(name.slice(2)+'.ts');
    if(name.startsWith('.'))return load(path.join(path.dirname(file),name)+'.ts');
@@ -118,6 +119,27 @@ const send=()=>nodes().find(node=>node.type==='form').props.onSubmit({preventDef
  await send();
  assert.equal(posts[2].customer.postalCode,'');
  assert.equal(posts[2].serial,'55061234');
+ update(input('نوع درخواست'),'legacy-correction');
+ await settleLookup();
+ const chosen='2026-10-22';
+ const dateField=()=>nodes().find(node=>node.props.label==='تاریخ شروع گارانتی');
+ assert.equal(dateField().props.value,'');
+ await send();
+ assert.equal(posts.length,3,'requires an explicitly chosen day');
+ dateField().props.onChange('2026-11-25');
+ await send();
+ assert.equal(posts.length,3,'blocks a future day');
+ dateField().props.onChange(chosen);
+ await send();
+ assert.equal(posts[3].purpose,'legacy-correction');
+ assert.equal(posts[3].warrantyStartDay,chosen);
+ assert.equal(nodes().find(node=>node.props.record?.warrantyStartDay).props.record.warrantyStartDay,chosen);
+ update(input('سریال روی بدنه'),'55060108');
+ await settleLookup();
+ assert.equal(dateField(),undefined);
+ await send();
+ assert.equal(posts.length,4,'blocks correction when an activation day already exists');
+ console.log('PASS correction form: Persian date component, missing/future date, exact submitted day and immediate dossier.');
  console.log('PASS phone form: code-first order, stale lookup ignored, retained code, no reference field, board and first activation with optional postcode.');
 })().catch(error=>{console.error(error);process.exitCode=1;});
 

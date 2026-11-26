@@ -8,7 +8,7 @@ import {ActivationDossier} from './activation-dossier';
 type Filters={q:string;from:string;to:string;agency:string;kind:string};
 type Agency={id:string;name:string};
 const defaults:Filters={q:'',from:'',to:'',agency:'',kind:''};
-const types={legacy:'ثبت در سیستم قبلی',first:'فعال‌سازی اولیه',board:'تعویض برد',code:'صدور کد مجدد'};
+const types={legacy:'ثبت در سیستم قبلی',first:'فعال‌سازی اولیه',board:'تعویض برد',code:'صدور کد مجدد','legacy-correction':'اصلاح سامانه قدیم'};
 
 export function ActivationHistoryPanel({accountId}:{accountId:string}){
  const [draft,setDraft]=useState(defaults),[advanced,setAdvanced]=useState(true);

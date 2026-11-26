@@ -4,18 +4,36 @@ import {ReceiptAttachment} from './receipt-attachment';
 import {ReceiptPhotoEditor} from './receipt-photo-editor';
 import {CameraCodeScanner} from './camera-code-scanner';
 import {AssetCategoryChoices} from './asset-category-choices';
+import {assetCategories} from '@/lib/asset-categories';
 import {assetConditions} from '@/lib/assets-contract';
 import {formatDateTime} from '@/lib/persian-date';
-import {CheckCheck,ClipboardList,Plus,Printer,Search,Building2} from 'lucide-react';
+import {ArrowRight,CheckCheck,ClipboardList,Plus,Printer,Search,Building2} from 'lucide-react';
 import './asset-declarations.css';
 
 const states:Record<string,string>={draft:'پیش‌نویس',submitted:'در انتظار تأیید اموال‌دار',returned:'نیازمند اصلاح',approved:'تأییدشده'};
+const declarationSteps=['مشخصات','عکس مال','بازبینی'] as const;
 const fresh=()=>({number:1,name:'',category:'',location:'',brand:'',model:'',serial:'',condition:'',existingCode:'',notes:'',photoFileIds:[] as string[]});
 export function AssetDeclarationsPanel({review=false,initialId='',onBack,onCompany}:{review?:boolean;initialId?:string;onBack?:()=>void;onCompany?:()=>void}){
  const [data,setData]=useState<any>(null),[selected,setSelected]=useState<any>(null),[items,setItems]=useState<any[]>([fresh()]),[noAssets,setNoAssets]=useState(false),[editing,setEditing]=useState(false),[holderConfirmed,setHolderConfirmed]=useState(false),[matched,setMatched]=useState(false),[reason,setReason]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState(''),[photoEditing,setPhotoEditing]=useState<number|null>(null),[large,setLarge]=useState(''),[assetSearch,setAssetSearch]=useState(''),[matches,setMatches]=useState<any[]>([]),[scanRow,setScanRow]=useState<number|null>(null);
  const flight=useRef(false),current=useRef<any>(null),account=useRef(''),operation=useRef({signature:'',id:''});
  const loadVersion=useRef(0),detailId=useId(),detailRef=useRef<HTMLDivElement>(null);
  const [focusRequest,setFocusRequest]=useState(0);
+ const [mobile,setMobile]=useState(false),[step,setStep]=useState(0),[unit,setUnit]=useState(0);
+ const stepHeading=useRef<HTMLHeadingElement>(null);
+ const isMobileForm=mobile&&!review&&editing&&!noAssets;
+ useEffect(()=>{
+  const media=window.matchMedia('(max-width: 760px)');
+  const updateMobile=()=>setMobile(media.matches);
+  updateMobile();
+  media.addEventListener('change',updateMobile);
+  return()=>media.removeEventListener('change',updateMobile);
+ },[]);
+ useEffect(()=>{
+  if(!isMobileForm)return;
+  const heading=stepHeading.current;
+  heading?.focus({preventScroll:true});
+  heading?.scrollIntoView({block:'start',behavior:'instant'});
+ },[isMobileForm,step,unit]);
  const [photoToEdit,setPhotoToEdit]=useState<{id:string;file:File}|null>(null);
  const headers=()=>({'Content-Type':'application/json',...(account.current?{'x-asset-account':account.current}:{})});
  async function read(recordId=''){
@@ -37,13 +55,14 @@ export function AssetDeclarationsPanel({review=false,initialId='',onBack,onCompa
   detail.focus({preventScroll:true});
   detail.scrollIntoView({block:'start',inline:'nearest',behavior:'instant'});
  },[focusRequest,review]);
- function choose(r:any){if(flight.current)return;if(editing&&!window.confirm('تغییرات ذخیره‌نشده را کنار بگذاریم؟'))return;current.current=r;setSelected(r);setItems(r.data.items.map((v:any,i:number)=>{const found=review?r.codeMatches?.[i]?.asset:null;return {...v,existingAssetId:found?.id||'',assetRevision:found?.revision||0};}));setNoAssets(!!r.data.noAssets);setEditing(!review&&['draft','returned'].includes(r.data.state));setHolderConfirmed(false);setMatched(false);setReason(review?'':[...(r.data.history||[])].reverse().find((entry:any)=>entry.mode==='save'||entry.mode==='submit')?.notes||'');setMatches([]);setError('');setMessage('');setPhotoEditing(null);if(review)setFocusRequest(n=>n+1);}
+ function choose(r:any){if(flight.current)return;if(editing&&!window.confirm('تغییرات ذخیره‌نشده را کنار بگذاریم؟'))return;current.current=r;setSelected(r);setItems(r.data.items.map((v:any,i:number)=>{const found=review?r.codeMatches?.[i]?.asset:null;return {...v,existingAssetId:found?.id||'',assetRevision:found?.revision||0};}));setNoAssets(!!r.data.noAssets);setEditing(!review&&['draft','returned'].includes(r.data.state));setHolderConfirmed(false);setMatched(false);setReason(review?'':[...(r.data.history||[])].reverse().find((entry:any)=>entry.mode==='save'||entry.mode==='submit')?.notes||'');setMatches([]);setError('');setMessage('');setPhotoEditing(null);resetSteps();if(review)setFocusRequest(n=>n+1);}
  useEffect(()=>{let live=true;void load().then(async j=>{
   if(!live||!initialId)return;
   const record=j.records.find((r:any)=>r.id===initialId)||(await read(initialId)).records[0];
   if(live&&record)choose(record);
  }).catch(e=>{if(live)setError(e.message)});return()=>{live=false}},[review,initialId]);
- function start(none=false){if(flight.current||editing&&!window.confirm('ویرایش ذخیره‌نشده را کنار بگذاریم؟'))return;current.current=null;setSelected(null);setItems(none?[]:[fresh()]);setNoAssets(none);setEditing(true);setHolderConfirmed(false);setReason('');setError('');setMessage('');setPhotoEditing(null);operation.current={signature:'',id:''};}
+ function resetSteps(){setStep(0);setUnit(0);setScanRow(null);}
+ function start(none=false){if(flight.current||editing&&!window.confirm('ویرایش ذخیره‌نشده را کنار بگذاریم؟'))return;resetSteps();current.current=null;setSelected(null);setItems(none?[]:[fresh()]);setNoAssets(none);setEditing(true);setHolderConfirmed(false);setReason('');setError('');setMessage('');setPhotoEditing(null);operation.current={signature:'',id:''};}
  function update(i:number,patch:any){setItems(p=>p.map((v,n)=>n===i?{...v,...patch}:v));}
  function quantity(raw:string){const n=Number(raw);if(!Number.isInteger(n)||n<1||n>20)return;if(items.slice(n).some(v=>v.photoFileIds?.length)){setError('ردیف دارای عکس را حذف نکنید؛ شماره عکس‌ها باید حفظ شود.');return;}setItems(p=>Array.from({length:n},(_,i)=>p[i]||{...fresh(),name:p[0]?.name||'',category:p[0]?.category||'',location:p[0]?.location||'',brand:p[0]?.brand||'',model:p[0]?.model||'',number:i+1}));}
  async function write(body:any){const signature=JSON.stringify(body);if(operation.current.signature!==signature)operation.current={signature,id:crypto.randomUUID()};const r=await fetch('/api/assets/declarations',{method:'POST',headers:headers(),body:JSON.stringify({...body,id:operation.current.id,confirmed:true})}),j=await r.json() as any;if(!r.ok)throw Error(j.error||'ثبت انجام نشد.');current.current=j.record;setSelected(j.record);
@@ -98,18 +117,113 @@ export function AssetDeclarationsPanel({review=false,initialId='',onBack,onCompa
  const ownReview=review&&!!selected&&(selected.data.memberId===data?.me||selected.data.createdBy===data?.accountId);
  const field=(i:number,k:string,label:string,required=false)=><label className="field"><span>{label}{required?' *':''}</span><input required={required} maxLength={k==='name'?200:300} value={items[i][k]||''} disabled={busy} onChange={e=>update(i,{[k]:e.target.value})}/></label>;
  const photos=(number:number)=>(selected?.files||[]).filter((f:any)=>f.number===number&&items[number-1]?.photoFileIds.includes(f.id));
- return <section className="panel inside asset-declarations" dir="rtl"><div className="panelhead"><div><h2><ClipboardList size={22}/> {review?'اعلام اموال کارکنان':'اعلام اموال شرکت نزد من'}</h2><p className="subtle">{review?'عکس، وضعیت و دارنده را تطبیق دهید؛ ثبت تکراری یا تحویل تاریخی ایجاد نمی‌شود.':'فقط اموال نزد خودت را اعلام کن؛ اموالدار بررسی و تأیید می‌کند.'}</p></div><div className="tools">{onBack&&<button className="btn" disabled={busy} onClick={()=>{if(!editing||window.confirm('از ویرایش ذخیره‌نشده خارج شویم؟'))onBack()}}>بازگشت</button>}{review&&onCompany&&<button className="btn" onClick={onCompany}><Building2 size={17}/>ثبت مستقیم اموال شرکت</button>}</div></div>
- {error&&(!review||!selected)&&<p className="notice error" role="alert">{error}</p>}{!review&&message&&<p className="notice" role="status">{message}</p>}
- {!data?<p>در حال دریافت…</p>:<>{!review&&<div className="tools"><button className="btn primary" disabled={busy||photoEditing!==null} onClick={()=>start()}><Plus size={17}/>اعلام اموال جدید</button><button className="btn" disabled={busy||photoEditing!==null} onClick={()=>start(true)}>مالی از شرکت نزد من نیست</button></div>}
- <div className="asset-declarations-layout" data-review-open={review&&!!selected||undefined}><aside className="asset-declarations-list" aria-label={review?'صف اعلام‌های در انتظار بررسی':undefined}>{data.records.map((r:any)=><button type="button" className={'asset-declaration-choice '+(selected?.id===r.id?'selected':'')} disabled={busy||photoEditing!==null} key={r.id} aria-controls={review?detailId:undefined} aria-pressed={review?selected?.id===r.id:undefined} onClick={()=>choose(r)}><strong>{review?r.data.memberName:r.data.noAssets?'اعلام نداشتن مال':r.data.items[0]?.name||'پیش‌نویس'}</strong><span>{r.data.noAssets?'مالی نزد من نیست':r.data.items.length.toLocaleString('fa-IR')+' مال'} · {states[r.data.state]}</span><small>{formatDateTime(r.updated)}</small></button>)}{!data.records.length&&<p className="subtle">{review?'اعلامی برای بررسی نیست.':'هنوز اعلامی ثبت نکرده‌ای.'}</p>}</aside>
+ const photoFields=(i:number)=>{
+  const item=items[i];
+  return <>{photos(i+1).map((f:any)=><div className="asset-declaration-photo-card" key={f.id}><button className="asset-declaration-photo" type="button" onClick={()=>setLarge(f.url)}><img src={f.url} alt={'عکس مال شماره '+(i+1).toLocaleString('fa-IR')}/><span>بزرگ‌نمایی</span></button>{editing&&<div className="tools"><button type="button" className="btn" disabled={busy||photoEditing!==null} onClick={()=>void openPhotoEditor(i,f)}>ویرایش عکس</button><button type="button" className="btn asset-declaration-delete" disabled={busy||photoEditing!==null} onClick={()=>update(i,{photoFileIds:item.photoFileIds.filter((id:string)=>id!==f.id)})}>حذف عکس</button></div>}</div>)}{photoEditing===i&&photoToEdit&&<ReceiptPhotoEditor source={photoToEdit.file} subject={'مال شماره '+(i+1).toLocaleString('fa-IR')} disabled={busy} onConfirm={file=>void upload(i,[file],photoToEdit.id)} onCancel={closePhotoEditor}/>} {editing&&<ReceiptAttachment file={null} required multiple subject={'مال شماره '+(i+1).toLocaleString('fa-IR')} disabled={busy||!!photoToEdit||photoEditing!==null&&photoEditing!==i} cameraLabel={isMobileForm?'گرفتن عکس':undefined} pickerLabel={isMobileForm?'گالری گوشی':undefined} onEditingChange={active=>setPhotoEditing(active?i:null)} onChange={file=>{if(file)void upload(i,[file])}} onFiles={files=>void upload(i,files)}/>}</>;
+ };
+ const stepLocked=busy||photoEditing!==null;
+ const activeUnit=Math.min(unit,Math.max(0,items.length-1));
+ const activeItem=items[activeUnit];
+ const requiredDetails=(item:any)=>['name','category','location','condition'].every(key=>typeof item[key]==='string'&&item[key].trim());
+ function changeStep(next:number,index=activeUnit){
+  setError('');setMessage('');setScanRow(null);setUnit(index);setStep(next);
+ }
+ function continueMobile(){
+  if(stepLocked||!activeItem)return;
+  if(step===0){
+   if(!requiredDetails(activeItem)){setError('نام مال، دسته‌بندی، محل فعلی و وضعیت ظاهری را وارد کنید.');return;}
+   changeStep(1);
+  }else if(step===1){
+   if(!activeItem.photoFileIds.length){setError('برای این مال حداقل یک عکس اضافه کنید.');return;}
+   changeStep(2);
+  }else{
+   const incomplete=items.findIndex(item=>!requiredDetails(item)||!item.photoFileIds.length);
+   if(incomplete!==-1){
+    const next=requiredDetails(items[incomplete])?1:0;
+    changeStep(next,incomplete);
+    setError('مشخصات و عکس این مال را تکمیل کنید.');
+    return;
+   }
+   void save('submit');
+  }
+ }
+ function addMobileUnit(){
+  if(items.length>=20)return;
+  setItems(previous=>[...previous,{...fresh(),number:previous.length+1}]);
+  changeStep(0,items.length);
+ }
+ const mobileHeading=step===0?'مشخصات مال '+(activeUnit+1).toLocaleString('fa-IR'):step===1?'عکس‌های '+(activeItem?.name||'مال'):'بازبینی قبل از ارسال';
+ return <section className="panel inside asset-declarations" dir="rtl"><div className="panelhead"><div>{!review&&<img className="asset-mobile-brand" src="/brand/nafasyar-logo.png" width={84} height={44} alt="نفس‌یار طب"/>}<h2><ClipboardList size={22}/> {review?'اعلام اموال کارکنان':isMobileForm?'ثبت مال من':'اعلام اموال شرکت نزد من'}</h2><p className="subtle">{review?'عکس، وضعیت و دارنده را تطبیق دهید؛ ثبت تکراری یا تحویل تاریخی ایجاد نمی‌شود.':'فقط اموال نزد خودت را اعلام کن؛ اموالدار بررسی و تأیید می‌کند.'}</p></div><div className="tools">{onBack&&<button className="btn" disabled={stepLocked} onClick={()=>{if(isMobileForm&&step>0){changeStep(step-1);return;}if(!editing||window.confirm('از ویرایش ذخیره‌نشده خارج شویم؟'))onBack()}}>بازگشت</button>}{review&&onCompany&&<button className="btn" onClick={onCompany}><Building2 size={17}/>ثبت مستقیم اموال شرکت</button>}</div></div>
+ {!isMobileForm&&error&&(!review||!selected)&&<p className="notice error" role="alert">{error}</p>}{!isMobileForm&&!review&&message&&<p className="notice" role="status">{message}</p>}
+ {!data?<p>در حال دریافت…</p>:<>{!review&&!isMobileForm&&<div className="tools"><button className="btn primary" disabled={busy||photoEditing!==null} onClick={()=>start()}><Plus size={17}/>اعلام اموال جدید</button><button className="btn" disabled={busy||photoEditing!==null} onClick={()=>start(true)}>مالی از شرکت نزد من نیست</button></div>}
+ <div className="asset-declarations-layout" data-review-open={review&&!!selected||undefined} data-mobile-form={isMobileForm||undefined}><aside className="asset-declarations-list" aria-label={review?'صف اعلام‌های در انتظار بررسی':undefined}>{data.records.map((r:any)=><button type="button" className={'asset-declaration-choice '+(selected?.id===r.id?'selected':'')} disabled={busy||photoEditing!==null} key={r.id} aria-controls={review?detailId:undefined} aria-pressed={review?selected?.id===r.id:undefined} onClick={()=>choose(r)}><strong>{review?r.data.memberName:r.data.noAssets?'اعلام نداشتن مال':r.data.items[0]?.name||'پیش‌نویس'}</strong><span>{r.data.noAssets?'مالی نزد من نیست':r.data.items.length.toLocaleString('fa-IR')+' مال'} · {states[r.data.state]}</span><small>{formatDateTime(r.updated)}</small></button>)}{!data.records.length&&<p className="subtle">{review?'اعلامی برای بررسی نیست.':'هنوز اعلامی ثبت نکرده‌ای.'}</p>}</aside>
  <div className="asset-declaration-detail" id={detailId} ref={detailRef} tabIndex={review?-1:undefined} aria-label={review?'پروندهٔ اعلام اموال':undefined}>{review&&selected&&error&&<p className="notice error" role="alert">{error}</p>}{review&&message&&<p className="notice" role="status">{message}</p>}{ownReview&&selected.data.state==='submitted'&&<p className="notice" role="status">{selected.data.reviewedAt?'اصلاحات شما ارسال شد.':'اعلام شما ارسال شد.'} چون دارندهٔ مال خودتان هستید، تأیید نهایی با اموال‌دار دیگری یا مدیر سامانه است.</p>}{showForm&&<><div className="notice"><strong>{selected?.data.memberName||data.personName}</strong><p>{selected?states[selected.data.state]:'پیش‌نویس جدید'}{selected?.data.reviewNotes?(selected.data.state==='submitted'?' · دلیل برگشت قبلی: ':' · نظر اموالدار: ')+selected.data.reviewNotes:''}</p>{!review&&<div role="status">{selected?.data.state==='submitted'&&<p>{selected.data.reviewedAt?'اصلاحات شما برای بررسی دوباره ارسال شد.':'این اعلام برای بررسی و تأیید به اموال‌دار ارسال شده است.'}{data.custodian&&' وضعیت را در کارتابل نقش اموال‌دار، بخش «پیگیری اعلام‌های خودم» ببینید.'}</p>}</div>}</div>
- {!review&&selected&&['draft','submitted','returned'].includes(selected.data.state)&&selected.data.memberId===data.me&&<div className="tools">{!editing&&selected.data.state==='submitted'&&<button type="button" className="btn" disabled={busy} onClick={()=>{if(window.confirm('این اعلام برای ویرایش به پیش‌نویس برگردد؟ بعد از اصلاح، دوباره آن را برای اموال‌دار ارسال کنید.'))void save()}}>ویرایش اعلام من</button>}<button type="button" className="btn asset-declaration-delete" disabled={busy||photoEditing!==null} onClick={()=>void withdraw()}>حذف پرونده</button></div>}
+ {!review&&selected&&['draft','submitted','returned'].includes(selected.data.state)&&selected.data.memberId===data.me&&<div className="tools">{!editing&&selected.data.state==='submitted'&&<button type="button" className="btn" disabled={busy} onClick={()=>{if(window.confirm('این اعلام برای ویرایش به پیش‌نویس برگردد؟ بعد از اصلاح، دوباره آن را برای اموال‌دار ارسال کنید.')){resetSteps();void save()}}}>ویرایش اعلام من</button>}<button type="button" className="btn asset-declaration-delete" disabled={busy||photoEditing!==null} onClick={()=>void withdraw()}>حذف پرونده</button></div>}
+ {isMobileForm&&activeItem?<div className="asset-mobile-form">
+  <ol className="asset-mobile-steps" aria-label="مراحل ثبت مال">
+   {declarationSteps.map((label,index)=><li key={label} aria-current={step===index?'step':undefined} data-complete={index<step||undefined}>{label}</li>)}
+  </ol>
+  <div className="flow-card asset-mobile-sheet">
+   <h3 ref={stepHeading} tabIndex={-1}>{mobileHeading}</h3>
+   {step===0&&<>
+    {field(activeUnit,'name','نام مال',true)}
+    <label className="field">دسته‌بندی مال *
+     <select required value={activeItem.category} disabled={busy} onChange={event=>update(activeUnit,{category:event.target.value})}>
+      <option value="">انتخاب دسته‌بندی</option>
+      {assetCategories.map(category=><option key={category.name}>{category.name}</option>)}
+      {activeItem.category&&!assetCategories.some(category=>category.name===activeItem.category)&&<option>{activeItem.category}</option>}
+     </select>
+    </label>
+    {field(activeUnit,'location','محل فعلی',true)}
+    <label className="field">وضعیت ظاهری *
+     <select required value={activeItem.condition} disabled={busy} onChange={event=>update(activeUnit,{condition:event.target.value})}>
+      <option value="">انتخاب وضعیت</option>{Object.entries(assetConditions).map(([value,label])=><option key={value} value={value}>{label}</option>)}
+     </select>
+    </label>
+    <details key={activeUnit} className="asset-mobile-extra">
+     <summary>برند، مدل، سریال و برچسب <small>(اختیاری)</small></summary>
+     {field(activeUnit,'brand','برند')}{field(activeUnit,'model','مدل')}{field(activeUnit,'serial','سریال سازنده')}
+     {field(activeUnit,'existingCode','کد اموال یا شمارهٔ برچسب')}
+     <button type="button" className="btn" disabled={busy} onClick={()=>setScanRow(scanRow===activeUnit?null:activeUnit)}>اسکن برچسب</button>
+     {scanRow===activeUnit&&<CameraCodeScanner onScan={code=>{update(activeUnit,{existingCode:code});setScanRow(null)}}/>}
+    </details>
+   </>}
+   {step===1&&<>
+    <p className="subtle">حداقل یک عکس از همین مال اضافه کنید. حداکثر ۵ عکس، هرکدام تا ۱۰ مگابایت.</p>
+    <div className="asset-declaration-photos">{photoFields(activeUnit)}</div>
+   </>}
+   {step===2&&<>
+    <ul className="asset-mobile-review">
+     {items.map((item,index)=><li key={item.number}>
+      <div><strong>{item.name||'مال '+item.number.toLocaleString('fa-IR')}</strong>
+       <p className="subtle">{[item.category,item.location,assetConditions[item.condition],item.photoFileIds.length.toLocaleString('fa-IR')+' عکس'].filter(Boolean).join(' · ')}</p></div>
+      <button type="button" className="btn" disabled={stepLocked} onClick={()=>changeStep(0,index)}>ویرایش</button>
+     </li>)}
+    </ul>
+    <button type="button" className="btn" disabled={stepLocked||items.length>=20} onClick={addMobileUnit}><Plus size={17}/>افزودن مال دیگر</button>
+    <label className="field">توضیحات (اختیاری)<textarea value={reason} onChange={event=>setReason(event.target.value)} maxLength={4000} rows={2}/></label>
+    <label className="asset-declaration-confirmation"><input type="checkbox" checked={holderConfirmed} onChange={event=>setHolderConfirmed(event.target.checked)}/><span>تأیید می‌کنم این اموال شرکت نزد من هستند.</span></label>
+   </>}
+  </div>
+  {error&&<p role="alert" className="notice error">{error}</p>}
+  {message&&<p role="status" className="notice">{message}</p>}
+  <div className="asset-mobile-actions">
+   {step>0&&<button type="button" className="btn" disabled={stepLocked} onClick={()=>changeStep(step-1)}><ArrowRight size={16}/>مرحلهٔ قبل</button>}
+   {step===0&&items.length>1&&<button type="button" className="btn" disabled={stepLocked} onClick={()=>{if(activeUnit===items.length-1&&!activeItem.photoFileIds.length&&!Object.values(activeItem).some(value=>typeof value==='string'&&value.trim())){
+    const remaining=items.filter((_,index)=>index!==activeUnit).map((item,index)=>({...item,number:index+1}));
+    setItems(remaining);changeStep(2,0);
+   }else changeStep(2);}}>بازگشت به بازبینی</button>}
+   <button type="button" className="btn" disabled={stepLocked} onClick={()=>void save()}>ذخیرهٔ پیش‌نویس</button>
+   <button type="button" className="btn primary" disabled={stepLocked||step===2&&!holderConfirmed} onClick={continueMobile}>{['ادامه به عکس','ادامه به بازبینی','ارسال برای بررسی اموال‌دار'][step]}</button>
+  </div>
+ </div>:<>
  {noAssets?<div className="notice"><h3>مالی از شرکت نزد من نیست</h3><p>این اعلام، اموال قبلی را حذف یا تسویه نمی‌کند. اگر دفتر اموال مغایرت داشته باشد، باید بررسی شود.</p></div>:<>{editing&&<div className="tools"><button type="button" className="btn" disabled={busy||photoEditing!==null||items.length>=20} onClick={()=>setItems(p=>[...p,{...fresh(),number:p.length+1}])}><Plus size={17}/>افزودن مال</button><label className="field">تعداد مال مشابه<select value={items.length} disabled={busy||photoEditing!==null} onChange={e=>quantity(e.target.value)}>{Array.from({length:20},(_,i)=><option key={i} value={i+1}>{(i+1).toLocaleString('fa-IR')}</option>)}</select></label><small>تا ۲۰ مال در هر اعلام؛ برای تعداد بیشتر اعلام بعدی بسازید.</small></div>}
  {review&&!ownReview&&selected?.data.state==='submitted'&&<div className="tools"><label className="field">جست‌وجوی شناسنامه موجود<input value={assetSearch} onChange={e=>setAssetSearch(e.target.value)} placeholder="نام، کد یا سریال"/></label><button className="btn" onClick={()=>void searchAssets()}><Search size={17}/>جست‌وجو</button></div>}
- {items.map((item,i)=><article className="flow-card asset-declaration-unit" key={i}><h3>مال شماره {(i+1).toLocaleString('fa-IR')}</h3><div className="asset-declaration-unit-layout"><div className="asset-declaration-photos">{photos(i+1).map((f:any)=><div className="asset-declaration-photo-card" key={f.id}><button className="asset-declaration-photo" type="button" onClick={()=>setLarge(f.url)}><img src={f.url} alt={'عکس مال شماره '+(i+1).toLocaleString('fa-IR')}/><span>بزرگ‌نمایی</span></button>{editing&&<div className="tools"><button type="button" className="btn" disabled={busy||photoEditing!==null} onClick={()=>void openPhotoEditor(i,f)}>ویرایش عکس</button><button type="button" className="btn asset-declaration-delete" disabled={busy||photoEditing!==null} onClick={()=>update(i,{photoFileIds:item.photoFileIds.filter((id:string)=>id!==f.id)})}>حذف عکس</button></div>}</div>)}{photoEditing===i&&photoToEdit&&<ReceiptPhotoEditor source={photoToEdit.file} subject={'مال شماره '+(i+1).toLocaleString('fa-IR')} disabled={busy} onConfirm={file=>void upload(i,[file],photoToEdit.id)} onCancel={closePhotoEditor}/>} {editing&&<ReceiptAttachment file={null} required multiple subject={'مال شماره '+(i+1).toLocaleString('fa-IR')} disabled={busy||!!photoToEdit||photoEditing!==null&&photoEditing!==i} onEditingChange={active=>setPhotoEditing(active?i:null)} onChange={file=>{if(file)void upload(i,[file])}} onFiles={files=>void upload(i,files)}/>}</div>
+ {items.map((item,i)=><article className="flow-card asset-declaration-unit" key={i}><h3>مال شماره {(i+1).toLocaleString('fa-IR')}</h3><div className="asset-declaration-unit-layout"><div className="asset-declaration-photos">{photoFields(i)}</div>
  <div>{editing||review&&!ownReview&&selected?.data.state==='submitted'?<div className="formgrid">{field(i,'name','نام مال',true)}<div className="asset-declaration-category"><h4>دسته‌بندی مال *</h4><AssetCategoryChoices value={item.category||''} onChange={category=>update(i,{category})} disabled={busy} iconSize={22}/>{field(i,'category','نام گروه مال',true)}</div>{field(i,'location','محل فعلی',true)}<label className="field">وضعیت ظاهری *<select value={item.condition||''} disabled={busy} onChange={e=>update(i,{condition:e.target.value})}><option value="">انتخاب کنید</option>{Object.entries(assetConditions).map(([v,t])=><option key={v} value={v}>{t}</option>)}</select></label>{field(i,'brand','برند (اختیاری)')}{field(i,'model','مدل (اختیاری)')}{field(i,'serial','سریال سازنده (اختیاری)')}{editing&&<label className="field">کد اموال یا شمارهٔ برچسب (اختیاری)<input value={item.existingCode||''} onChange={e=>update(i,{existingCode:e.target.value})}/><button className="btn" disabled={busy} onClick={()=>setScanRow(scanRow===i?null:i)}>اسکن برچسب</button>{scanRow===i&&<CameraCodeScanner onScan={v=>{update(i,{existingCode:v});setScanRow(null)}}/>}</label>}{review&&<><label className="field">تطبیق با شناسنامه<select value={item.existingAssetId||''} disabled={busy||['existing','inactive','conflict'].includes(selected?.codeMatches?.[i]?.state)} onChange={e=>{const match=matches.find(m=>m.id===e.target.value);update(i,{existingAssetId:match?.id||'',assetRevision:match?.revision||0})}}><option value="">{['inactive','conflict'].includes(selected?.codeMatches?.[i]?.state)?'کد هم‌نفس نیازمند بررسی است':'مال جدید؛ کد یکتا ساخته شود'}</option>{(selected?.codeMatches?.[i]?.asset?[selected.codeMatches[i].asset]:matches).map((m:any)=><option key={m.id} value={m.id}>{m.code} · {m.name} · دارنده: {m.holderName||'شرکت'}</option>)}</select><small>شمارهٔ اعلام‌شده: {item.existingCode||'ندارد'}</small>{selected?.codeMatches?.[i]?.state==='legacy'&&<small>این شماره در دفتر اموال هم‌نفس نیست و به‌عنوان شمارهٔ برچسب قبلی در اعلام می‌ماند.</small>}{selected?.codeMatches?.[i]?.state==='inactive'&&<small>این کد متعلق به مال بایگانی‌شده یا خارج‌شده است.</small>}{selected?.codeMatches?.[i]?.state==='conflict'&&<small>این کد در چند شناسنامه ثبت شده و نیاز به بررسی دارد.</small>}</label></>}</div>:<><h4>{item.name}</h4><p>{item.category} · {item.location} · {assetConditions[item.condition]||'وضعیت انتخاب نشده'}</p><p>{item.serial?'سریال: '+item.serial:''}</p></>}
  </div></div></article>)}</>}
  {editing&&<><label className="field">توضیحات (اختیاری)<textarea value={reason} onChange={e=>setReason(e.target.value)} maxLength={4000}/></label><label className="field"><span><input type="checkbox" checked={holderConfirmed} onChange={e=>setHolderConfirmed(e.target.checked)}/>تأیید می‌کنم این اعلام مربوط به اموال شرکت نزد خودم است.</span></label><div className="tools"><button className="btn" disabled={busy||photoEditing!==null} onClick={()=>void save()}>ذخیره پیش‌نویس</button><button className="btn primary" disabled={busy||photoEditing!==null||!holderConfirmed} onClick={()=>void save('submit')}>ارسال برای بررسی اموالدار</button></div><p className="subtle">برای هر مال، نام، گروه، محل، وضعیت و عکس مستقل لازم است. کد قطعی بعد از تأیید ایجاد می‌شود.</p></>}
+ </>}
  {review&&!ownReview&&selected?.data.state==='submitted'&&<><label className="field">یادداشت بررسی؛ برای اصلاح یا برگشت اجباری<textarea value={reason} onChange={e=>setReason(e.target.value)} maxLength={4000}/></label><label className="asset-declaration-confirmation"><input type="checkbox" checked={matched} onChange={e=>setMatched(e.target.checked)}/><span>مال، عکس، وضعیت و دارنده را تطبیق دادم.</span></label><div className="tools"><button className="btn" disabled={busy||!reason.trim()} onClick={()=>void reviewAction('return')}>برگشت برای اصلاح</button><button className="btn primary" disabled={busy||!matched||selected?.codeMatches?.some((entry:any)=>['inactive','conflict'].includes(entry.state))} onClick={()=>void reviewAction('approve')}><CheckCheck size={17}/>تأیید موجودی نزد این فرد</button></div></>}
  </>}
  {selected?.data.state==='approved'&&<div className="notice"><strong>تأیید اموالدار: {selected.data.reviewedName}</strong><p>مبنای ثبت: موجودی ابتدای استقرار</p>{selected.data.groupId&&review&&<a className="btn primary" href={'/api/assets/registration/print?id='+encodeURIComponent(selected.data.groupId)} target="_blank" rel="noopener noreferrer"><Printer size={17}/>چاپ لیبل‌ها و راهنمای شماره عکس</a>}{(selected.data.approvedItems||[]).map((v:any)=><p key={v.assetId}>مال شماره {v.number.toLocaleString('fa-IR')} · <bdi>{v.code}</bdi> · {v.copies.toLocaleString('fa-IR')} لیبل</p>)}</div>}

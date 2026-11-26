@@ -10,7 +10,10 @@ function fail(error:unknown){const denied=accessResponse(error);if(denied)return
 export async function GET(request:Request){try{
  await requireAccess('distribution');await requireAccess('device');
  const params=new URL(request.url).searchParams,device=params.get('device');if(!device)throw new Error('دستگاه را انتخاب کنید.');
- const warrantyActivatedAt=await firstWarrantyCodeIssuedAt(device);
+ const corrected=await storage().prepare(`SELECT a.day FROM records d JOIN service_activations a
+  ON a.serial=json_extract(d.payload,'$.code') WHERE d.id=? AND d.kind='device' AND a.source='legacy-correction'`)
+  .bind(device).first<{day:string}>();
+ const warrantyActivatedAt=corrected?.day||await firstWarrantyCodeIssuedAt(device);
  if(params.get('view')==='warranty')return Response.json({warrantyActivatedAt},{headers:{'Cache-Control':'no-store'}});
  const target='distribution:'+device;const audit=await storage().prepare("SELECT action, before, after, at FROM access_audit WHERE target = ? ORDER BY at DESC LIMIT 30").bind(target).all();
  return Response.json({warrantyActivatedAt,history:audit.results.map((r:any)=>({...r,before:r.before?JSON.parse(r.before):null,after:JSON.parse(r.after)}))},{headers:{'Cache-Control':'no-store'}});

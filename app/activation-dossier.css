@@ -111,6 +111,10 @@
   gap: 12px;
 }
 
+.activation-dossier-warranty-facts[data-has-start='true'] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .activation-dossier-warranty-facts > div {
   border-inline-start: 1px solid var(--dossier-warranty-edge);
   padding-inline-start: 14px;
@@ -163,5 +167,7 @@
     border-block-start: 1px solid var(--dossier-warranty-edge);
     padding-block-start: 10px;
   }
+  .activation-dossier-warranty-facts[data-has-start='true'] { grid-template-columns: 1fr; }
+  .activation-dossier-warranty-facts[data-has-start='true'] > div { padding-inline-start: 0; border-inline-start: 0; }
   .activation-dossier-warranty-facts > div:first-child { padding-inline-start: 0; border-inline-start: 0; }
 }

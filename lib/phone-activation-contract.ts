@@ -11,13 +11,21 @@ export function formatActivationTime(at:string,legacy:boolean){
 export function importedActivationWarranty(legacy:Pick<LegacyActivation,'activeDate'|'status'>,today=localDay()){
  // Excel stores the Tehran wall clock in an ISO string. Read its calendar day directly.
  const day=legacy.activeDate.slice(0,10);
- if(legacy.status!=='0'||day.startsWith('1900-')||!isIsoDay(day)||!isIsoDay(today)||day>today)return null;
- const endsOn=addSolarMonths(day,24);
+ return legacy.status==='0'&&!day.startsWith('1900-')?activationWarranty(day,24,today):null;
+}
+export const legacyCorrectionMonths=24;
+export function activationWarranty(day:string,months:number,today=localDay()){
+ if(!isIsoDay(day)||!isIsoDay(today)||day>today||months<=0)return null;
+ const endsOn=addSolarMonths(day,months);
  if(!endsOn)return null;
  const remainingDays=Math.max(0,(Date.parse(endsOn)-Date.parse(today))/86_400_000);
  return {endsOn,remainingDays};
 }
-export type PhoneActivationPurpose = 'activate'|'board';
+export const phoneActivationPurposes=['activate','board','legacy-correction'] as const;
+export type PhoneActivationPurpose = typeof phoneActivationPurposes[number];
+export function isPhoneActivationPurpose(value:unknown):value is PhoneActivationPurpose{
+ return phoneActivationPurposes.some(purpose=>purpose===value);
+}
 export type PhoneActivationCustomer = {
  name:string;
  mobile:string;
@@ -38,6 +46,8 @@ export type PhoneActivationDevice = {
  productName:string;
  months:number|null;
  devicesKnown:boolean;
+ canCorrectLegacy?:boolean;
+ warrantyCorrection?:{at:string;actorName:string};
  activatedDay:string;
  dealer:string;
  customer:Partial<PhoneActivationCustomer>;
@@ -46,10 +56,11 @@ export type PhoneActivationDevice = {
 };
 export type PhoneActivationHistoryRow={
  id:string;
- kind:'legacy'|'first'|'board'|'code';
+ kind:'legacy'|'first'|'board'|'code'|'legacy-correction';
  serial:string;
  at:string;
  activatedAt?:string;
+ warrantyStartDay?:string;
  dealer:string;
  model:string;
  months?:number;
@@ -61,6 +72,7 @@ export type PhoneActivationResult = {
  activationCode:string;
  activatedDay:string;
  first:boolean;
+ corrected?:boolean;
  actorName:string;
  at:string;
 };
