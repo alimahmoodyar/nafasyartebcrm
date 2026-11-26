@@ -47,6 +47,23 @@ async function supplier(mode,data,status,user){
  assert.equal((await readCatalog(domestic)).suppliers.some(row=>row.id===foreignSupplier.id),false);
  assert.equal((await context.run(domestic,()=>suppliers.GET(request('/api/suppliers?route=foreign')))).status,403);
  await supplier('link',{supplierId:foreignSupplier.id,materialId:material.id},403,domestic);
+ const readSupplierView=async(user,query,status=200)=>{
+  const response=await context.run(user,()=>suppliers.GET(request('/api/suppliers?'+query)));
+  const result=await response.json();
+  assert.equal(response.status,status,JSON.stringify(result));
+  return result;
+ };
+ const page=await readSupplierView(buyer,'route=foreign&view=list&search=Foreign');
+ assert.deepEqual(page.suppliers.map(s=>s.id),[foreignSupplier.id]);
+ assert.deepEqual([page.links,page.orders,page.materials],[[],[],[]]);
+ const scoped=await readSupplierView(buyer,'route=foreign&view=detail&supplier='+foreignSupplier.id);
+ assert.deepEqual(scoped.links.map(link=>link.id),[foreignLink.id]);
+ assert.deepEqual(scoped.materials.map(item=>item.id),[material.id]);
+ await readSupplierView(domestic,'route=domestic&view=detail&supplier='+foreignSupplier.id,404);
+ await readSupplierView(domestic,'route=foreign&view=list',403);
+ await readSupplierView(buyer,'route=foreign&view=list&page=-1',400);
+ assert.equal((await readSupplierView(technical,'route=foreign&view=list&search=Private')).suppliers.length,0);
+ assert.equal((await readSupplierView(domestic,'route=domestic&view=list&search='+encodeURIComponent('۰۲۱۵۵۵۵۰۱۱۱'))).suppliers[0].id,domesticSupplier.id);
  await supplier('supplier',{...domesticIdentity,route:'foreign'},403,domestic);
  const {economicCode,nationalId,phones,...legacy} = domesticIdentity;
  await supplier('supplier',{...legacy,city:'تهران',phone:phones[0],supplierId:domesticSupplier.id,revision:local.suppliers[0].revision},200,domestic);

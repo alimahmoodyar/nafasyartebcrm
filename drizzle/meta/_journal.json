@@ -204,6 +204,13 @@
       "when": 1795188637341,
       "tag": "0029_bale_integration",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "6",
+      "when": 1795651200000,
+      "tag": "0030_sourcing_read_indexes",
+      "breakpoints": true
     }
   ]
 }

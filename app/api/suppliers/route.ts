@@ -6,7 +6,8 @@ import {materialAccountingCode,materialAccountingKey} from '@/lib/material-accou
 import {asciiDigits} from '@/lib/batch-number';
 import {scaled} from '@/lib/production';
 import {supplierRead,supplierManage,supplierQuality,supplierCommercial,supplierRoute,supplierRows,supplierEntity,supplierIdentityView,supplierIdentityWrite,supplierLinkWrite,supplierHistoryWrite,supplierMetrics,supplierMetricsFrom,qualification,supplierEvidenceBlock,technicalAuthorities,technicalBlock} from '@/lib/suppliers';
-import {supplierFields,supplierRegistrationFields,supplierStates,supplierRisks,supplierHelp} from '@/lib/supplier-contract';
+import {supplierFields,supplierRegistrationFields,supplierStates,supplierRisks,supplierHelp,supplierSearchText,supplierSearchPhone} from '@/lib/supplier-contract';
+import {sourcingPage,sourcingPageSize} from '@/lib/sourcing-list-page';
 const json=(v:any,status=200)=>Response.json(v,{status,headers:{'Cache-Control':'private, no-store'}});
 const fail=(s:string,status=400):never=>{throw new AccessError(s,status)};
 export async function GET(request:Request){try{
@@ -14,11 +15,73 @@ export async function GET(request:Request){try{
  const query=new URL(request.url).searchParams,route=query.get('route')||'',materialId=query.get('material')||'';
  if(route&&!['domestic','foreign'].includes(route))fail('مسیر تأمین معتبر نیست.');
  if(route&&!supplierRoute(u,route))fail('دسترسی مسیر تأمین ندارید.',403);
- const suppliers=(await supplierRows('supplier')).filter(s=>(!route||s.data.route===route)&&supplierRoute(u,s.data.route)),materials=await supplierRows('material'),reviews=await supplierRows('supplier_review'),documents=await supplierRows('supplier_document'),links=(await supplierRows('supplier_material')).filter(l=>(!materialId||l.data.materialId===materialId)&&suppliers.some(s=>s.id===l.data.supplierId));
- const [allOrders,allReceipts]=await Promise.all([supplierRows('purchase_order'),links.length?supplierRows('receipt'):Promise.resolve([])]);
+ const view=query.get('view')||'',supplierId=query.get('supplier')||'';
+ if(view&&!route)fail('مسیر تأمین برای این نما لازم است.');
+ if(view&&!['list','detail','materials','similar'].includes(view))fail('نمای تأمین‌کنندگان معتبر نیست.');
+ const permissions={canWriteHistory:supplierHistoryWrite(u),canImportVendors:u.isAdmin&&!u.profileReview&&route!=='foreign',canManage:route?supplierIdentityWrite(u,route):supplierManage(u),canQuality:supplierQuality(u),technicalAuthorities:technicalAuthorities(u),help:supplierHelp};
+ const supplierView=(s:any)=>({...supplierIdentityView(u,s),canEditIdentity:supplierIdentityWrite(u,s.data.route),canLink:supplierLinkWrite(u,s.data.route)});
+ if(view==='materials'){
+  const materials=await supplierRows('material');
+  return json({materials:materials.map(m=>({id:m.id,...m.data,revision:m.revision}))});
+ }
+ if(view==='list'||view==='similar'){
+  const page=sourcingPage(query),search=supplierSearchText((query.get('search')||'').slice(0,160));
+  const phone=/^[+\d\s()-]+$/.test(search)?supplierSearchPhone(search):'';
+  const commercial=route!=='foreign'||supplierCommercial(u,route);
+  const contact=commercial?" || ' ' || coalesce(json_extract(s.data,'$.city'),'') || ' ' || coalesce(json_extract(s.data,'$.contact'),'') || ' ' || coalesce(json_extract(s.data,'$.accountingVendorCode'),'')":"";
+  const asciiDigitsSql=(sql:string)=>Array.from('۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩').reduce((expr,digit,i)=>"replace("+expr+",'"+digit+"','"+i%10+"')",sql);
+  const normalize=(sql:string)=>"replace(replace(replace(replace(lower("+sql+"),'ي','ی'),'ك','ک'),char(8204),' '),char(8205),' ')";
+  const searchText=asciiDigitsSql(normalize("coalesce(json_extract(s.data,'$.name'),'') || ' ' || coalesce(json_extract(s.data,'$.country'),'')"+contact));
+  const phoneText=asciiDigitsSql("replace(replace(replace(replace(replace(coalesce(value,''),' ',''),'-',''),'(',''),')',''),'+','')");
+  if(view==='similar'){
+   if(!permissions.canManage||route!=='domestic')fail('مجوز جست‌وجوی پرونده‌های مشابه ندارید.',403);
+   const phones=query.getAll('phone').slice(0,10).map(supplierSearchPhone).filter(p=>p.length>6);
+   const names=asciiDigitsSql(normalize("coalesce(json_extract(s.data,'$.name'),'')"));
+   const rows=(await storage().prepare(`SELECT s.id,json_extract(s.data,'$.name') AS name FROM flow_entities s
+    WHERE s.type='supplier' AND json_extract(s.data,'$.route')='domestic' AND NOT coalesce(json_extract(s.data,'$.deletedAt'),'')
+    AND s.id<>? AND ((length(?)>=4 AND length(${names})>=4 AND (instr(${names},?)>0 OR instr(?,${names})>0))
+    OR EXISTS(SELECT 1 FROM json_each(coalesce(json_extract(s.data,'$.phones'),json_array(json_extract(s.data,'$.phone'))))
+     WHERE ${phoneText} IN (SELECT value FROM json_each(?))))
+    ORDER BY s.created,s.id LIMIT 10`).bind(supplierId,search,search,search,JSON.stringify(phones.flatMap(p=>[p,p.replace(/^0/,'98'),p.replace(/^0/,'0098')]))).all<{id:string;name:string}>()).results;
+   return json({suppliers:rows.map(s=>({id:s.id,data:{name:s.name}}))});
+  }
+  const rows=(await storage().prepare(`SELECT s.id,s.revision,json_object(
+   'route',json_extract(s.data,'$.route'),'name',json_extract(s.data,'$.name'),'country',json_extract(s.data,'$.country'),
+   'city',json_extract(s.data,'$.city'),'kind',json_extract(s.data,'$.kind'),'active',json_extract(s.data,'$.active'),
+   'deletedAt',json_extract(s.data,'$.deletedAt'),'importedForSetup',json_extract(s.data,'$.importedForSetup')) AS data
+   FROM flow_entities s
+   WHERE s.type='supplier' AND json_extract(s.data,'$.route')=?
+   AND (? OR NOT coalesce(json_extract(s.data,'$.deletedAt'),''))
+   AND (?='' OR EXISTS(SELECT 1 FROM flow_entities l WHERE l.type='supplier_material'
+    AND json_extract(l.data,'$.supplierId')=s.id AND json_extract(l.data,'$.materialId')=?))
+   AND (?='' OR instr(${searchText},?)>0
+    OR (?<>'' AND EXISTS(SELECT 1 FROM json_each(coalesce(json_extract(s.data,'$.phones'),json_array(json_extract(s.data,'$.phone'))))
+     WHERE instr(${phoneText},?)>0 OR instr(${phoneText},?)>0)))
+   ORDER BY s.created,s.id LIMIT ? OFFSET ?`).bind(route,Number(query.get('deleted')==='1'),materialId,materialId,search,search,commercial?phone:'',phone,phone.replace(/^0/,'98'),sourcingPageSize+1,(page-1)*sourcingPageSize).all<{data:string}>()).results;
+  const summaries=rows.slice(0,sourcingPageSize).map(row=>supplierView({...row,data:JSON.parse(row.data)}));
+  return json({...permissions,suppliers:summaries,materials:[],links:[],orders:[],hasMore:rows.length>sourcingPageSize});
+ }
+ const scoped=view==='detail';
+ const suppliers=scoped
+  ?(await supplierRows('supplier',"entity.id=? AND json_extract(entity.data,'$.route')=?",supplierId,route))
+  :(await supplierRows('supplier')).filter(s=>(!route||s.data.route===route)&&supplierRoute(u,s.data.route));
+ if(scoped&&!suppliers.length)fail('پروندهٔ تأمین‌کننده در این مسیر پیدا نشد.',404);
+ const matchingLinks="SELECT l.id FROM flow_entities l WHERE l.type='supplier_material' AND json_extract(l.data,'$.supplierId')=?";
+ const linkFilter="json_extract(entity.data,'$.linkId') IN ("+matchingLinks+")";
+ const orderFilter="json_extract(entity.data,'$.supplierLinkId') IN ("+matchingLinks+")";
+ const [materials,reviews,documents,linkRows,allOrders,scopedReceipts]=await Promise.all([
+  scoped?supplierRows('material',"entity.id IN (SELECT json_extract(l.data,'$.materialId') FROM flow_entities l WHERE l.type='supplier_material' AND json_extract(l.data,'$.supplierId')=?)",supplierId):supplierRows('material'),
+  scoped?supplierRows('supplier_review',linkFilter,supplierId):supplierRows('supplier_review'),
+  scoped?supplierRows('supplier_document',"json_extract(entity.data,'$.supplierId')=?",supplierId):supplierRows('supplier_document'),
+  scoped?supplierRows('supplier_material',"json_extract(entity.data,'$.supplierId')=?",supplierId):supplierRows('supplier_material'),
+  scoped?supplierRows('purchase_order',orderFilter,supplierId):supplierRows('purchase_order'),
+  scoped?supplierRows('receipt',"json_extract(entity.data,'$.purchaseOrderId') IN (SELECT entity.id FROM flow_entities AS entity WHERE entity.type='purchase_order' AND "+orderFilter+")",supplierId):Promise.resolve(null),
+ ]);
+ const links=linkRows.filter(l=>(!materialId||l.data.materialId===materialId)&&suppliers.some(s=>s.id===l.data.supplierId));
+ const allReceipts=scopedReceipts??(links.length?await supplierRows('receipt'):[]);
  const items=await Promise.all(links.map(async l=>{const s=suppliers.find(s=>s.id===l.data.supplierId)!,m=materials.find(m=>m.id===l.data.materialId),commercial=supplierCommercial(u,s.data.route),rs=reviews.filter(r=>r.data.linkId===l.id);return {...l,data:l.data&&s.data.route==='foreign'&&!commercial?{...l.data,notes:undefined,commercialDetails:undefined}:l.data,documents:documents.filter(d=>d.data.supplierId===s.id&&(!d.data.linkId||d.data.linkId===l.id)&&d.data.state==='approved'&&(!d.data.expiresOn||d.data.expiresOn>=dayAt())&&(d.data.visibility!=='commercial'||commercial)).map(d=>({id:d.id,title:d.data.title,version:d.data.version})),metrics:supplierMetricsFrom(l,allOrders,allReceipts),block:m?(qualification(l,s,m)||await supplierEvidenceBlock(l)):'کالا موجود نیست',reviews:rs.map(r=>commercial?r:{...r,data:{...r.data,scores:undefined,score:undefined,supplierSnapshot:s.data.route==='foreign'?undefined:r.data.supplierSnapshot}}),commercial};}));
  const orders=allOrders.filter(o=>links.some(l=>l.id===o.data.supplierLinkId)).map(o=>supplierCommercial(u,o.data.route)?o:{id:o.id,created:o.created,data:{supplierLinkId:o.data.supplierLinkId,state:o.data.state,quantity:o.data.quantity,unit:o.data.unit,eta:o.data.promisedEta||o.data.eta}});
- return json({suppliers:suppliers.map(s=>({...supplierIdentityView(u,s),canEditIdentity:supplierIdentityWrite(u,s.data.route),canLink:supplierLinkWrite(u,s.data.route)})),links:items,orders,canWriteHistory:supplierHistoryWrite(u),canImportVendors:u.isAdmin&&!u.profileReview&&route!=='foreign',materials:materials.map(m=>({id:m.id,...m.data,revision:m.revision})),canManage:route?supplierIdentityWrite(u,route):supplierManage(u),canQuality:supplierQuality(u),technicalAuthorities:technicalAuthorities(u),help:supplierHelp});
+ return json({...permissions,suppliers:suppliers.map(supplierView),links:items,orders,materials:materials.map(m=>({id:m.id,...m.data,revision:m.revision}))});
  }catch(e){return accessResponse(e)||json({error:'دریافت تأمین‌کنندگان انجام نشد.'},503)}}
 export async function POST(request:Request){try{
  checkOrigin(request);const u=await requireAccess();if(!supplierRead(u))fail('دسترسی ندارید.',403);const b=JSON.parse(new TextDecoder().decode(await boundedBody(request,40000))),db=storage(),id=req(b.id,80),mode=req(b.mode,30),now=new Date().toISOString();

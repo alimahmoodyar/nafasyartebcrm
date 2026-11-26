@@ -18,7 +18,7 @@ export function supplierIdentityView(u:Session,supplier:any){
  const {name,country,kind,route,active,deletedAt}=supplier.data;
  return {id:supplier.id,revision:supplier.revision,data:{name,country,kind,route,active,deletedAt}};
 }
-export async function supplierRows(type:string){return (await storage().prepare('SELECT * FROM flow_entities WHERE type=? ORDER BY created,id').bind(type).all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}));}
+export async function supplierRows(type:string,filter='',...params:unknown[]){return (await storage().prepare('SELECT * FROM flow_entities AS entity WHERE type=?'+(filter?' AND ('+filter+')':'')+' ORDER BY created,id').bind(type,...params).all()).results.map((r:any)=>({...r,data:JSON.parse(r.data)}));}
 export async function supplierEntity(id:string,type:string){const r:any=await storage().prepare('SELECT * FROM flow_entities WHERE id=? AND type=?').bind(id,type).first();if(!r)throw new AccessError('رکورد مرتبط یافت نشد.',404);return {...r,data:JSON.parse(r.data)};}
 export function technicalAuthorities(u:Session){const p=u.permissions,internal=!p.salesAgentId&&!p.serviceAgentId&&!p.hospitalCenterId&&!p.salesRoles?.includes('agent')&&!p.serviceRoles?.includes('agent');return internal?['engineering','quality'].filter(r=>u.isAdmin||(r==='engineering'?p.supplyRoles?.includes('engineering'):p.flowRoles?.includes('qc')||p.qmsRoles?.some(x=>['qa','qc'].includes(x)))):[];}
 export function technicalBlock(e:any){const held=Object.entries(e?.data?.technicalControls||{}).find(([,v]:any)=>v.held);return held?'توقف فنی '+(e.type==='material'?'کالا':'تأمین‌کننده این کالا')+': '+(held[1] as any).reason:'';}
@@ -38,16 +38,28 @@ export function matchingTechnicalApproval(link:any,supplier:any,material:any,quo
  if(approval.materialId!==material.id||approval.materialSpecs!==materialSpecs||approval.designVersion!==(material.data.designVersion||0)||approval.unit!==material.data.unit||approval.supplierSpecs!==(link.data.supplierSpecs||'')||approval.supplierRevision!==supplier.revision||quoteSpecs!==materialSpecs||approval.quoteSpecs!==quoteSpecs)return null;
  return approval;
 }
-export async function supplierEvidenceBlock(link:any){for(const id of link.data.requiredDocumentIds||[]){let e:any;try{e=await supplierEntity(id,'supplier_document');}catch{return 'مدرک الزامی موجود نیست';}if(e.data.linkId!==link.id||e.data.state!=='approved'||e.data.expiresOn&&e.data.expiresOn<dayAt())return 'مدرک الزامی معتبر نیست: '+e.data.title;}if((await supplierRows('supplier_capa')).some(e=>e.data.linkId===link.id&&e.data.state!=='closed'&&e.data.holdPurchase))return 'خرید به دلیل اقدام اصلاحی باز متوقف است';return '';}
+export async function supplierEvidenceBlock(link:any){for(const id of link.data.requiredDocumentIds||[]){let e:any;try{e=await supplierEntity(id,'supplier_document');}catch{return 'مدرک الزامی موجود نیست';}if(e.data.linkId!==link.id||e.data.state!=='approved'||e.data.expiresOn&&e.data.expiresOn<dayAt())return 'مدرک الزامی معتبر نیست: '+e.data.title;}if(await storage().prepare("SELECT 1 FROM flow_entities WHERE type='supplier_capa' AND json_extract(data,'$.linkId')=? AND json_extract(data,'$.state') IS NOT 'closed' AND json_extract(data,'$.holdPurchase') LIMIT 1").bind(link.id).first())return 'خرید به دلیل اقدام اصلاحی باز متوقف است';return '';}
 export async function checkSupplierPurchase(linkId:string,materialId:string,route:string,amount:number){const link=await supplierEntity(linkId,'supplier_material'),supplier=await supplierEntity(link.data.supplierId,'supplier'),material=await supplierEntity(materialId,'material');if(link.data.materialId!==materialId||supplier.data.route!==route)throw new AccessError('تأمین‌کننده با کالا یا مسیر خرید منطبق نیست.',400);const reason=qualification(link,supplier,material,amount)||await supplierEvidenceBlock(link);if(reason)throw new AccessError(reason,409);return {link,supplier,material};}
 export async function supplierMetrics(link:any){
- const [orders,receipts]=await Promise.all([supplierRows('purchase_order'),supplierRows('receipt')]);
+ const [orders,receipts]=await Promise.all([
+  supplierRows('purchase_order',"json_extract(entity.data,'$.supplierLinkId')=?",link.id),
+  supplierRows('receipt',"json_extract(entity.data,'$.purchaseOrderId') IN (SELECT id FROM flow_entities WHERE type='purchase_order' AND json_extract(data,'$.supplierLinkId')=?)",link.id),
+ ]);
  return supplierMetricsFrom(link,orders,receipts);
 }
 export function supplierMetricsFrom(link:any,allOrders:any[],allReceipts:any[]){
- const orders=allOrders.filter(o=>o.data.supplierLinkId===link.id&&o.data.state!=='cancelled'),receipts=allReceipts.filter(r=>orders.some(o=>o.id===r.data.purchaseOrderId)),checked=receipts.filter(r=>r.data.state!=='pending_qc');
+ const orders=allOrders.filter(o=>o.data.supplierLinkId===link.id&&o.data.state!=='cancelled');
+ const orderIds=new Set(orders.map(order=>order.id));
+ const receipts=allReceipts.filter(r=>orderIds.has(r.data.purchaseOrderId));
+ const byOrder=new Map<string,any[]>();
+ for(const receipt of receipts){
+  const id=receipt.data.purchaseOrderId;
+  if(!byOrder.has(id))byOrder.set(id,[]);
+  byOrder.get(id)!.push(receipt);
+ }
+ const checked=receipts.filter(r=>r.data.state!=='pending_qc');
  const inspected=checked.reduce((n,r)=>n+(r.data.accepted||0)+(r.data.rejected||0),0),rejected=checked.reduce((n,r)=>n+(r.data.rejected||0),0);
- const completed=orders.filter(o=>receipts.filter(r=>r.data.purchaseOrderId===o.id).reduce((n,r)=>n+r.data.quantity,0)>=o.data.quantity),measured=completed.filter(o=>!!(o.data.promisedEta||o.data.eta)),onTime=measured.filter(o=>{const rs=receipts.filter(r=>r.data.purchaseOrderId===o.id).sort((a,b)=>(a.data.day||a.created).localeCompare(b.data.day||b.created));let n=0;for(const r of rs){n+=r.data.quantity;if(n>=o.data.quantity)return (r.data.day||r.created.slice(0,10))<=(o.data.promisedEta||o.data.eta);}return false;}).length;
+ const completed=orders.filter(o=>(byOrder.get(o.id)||[]).reduce((n,r)=>n+r.data.quantity,0)>=o.data.quantity),measured=completed.filter(o=>!!(o.data.promisedEta||o.data.eta)),onTime=measured.filter(o=>{const rs=(byOrder.get(o.id)||[]).sort((a,b)=>(a.data.day||a.created).localeCompare(b.data.day||b.created));let n=0;for(const r of rs){n+=r.data.quantity;if(n>=o.data.quantity)return (r.data.day||r.created.slice(0,10))<=(o.data.promisedEta||o.data.eta);}return false;}).length;
  return {orders:orders.length,receipts:receipts.length,inspectedQuantity:inspected,rejectedQuantity:rejected,quality:inspected?Math.round(10000*(inspected-rejected)/inspected)/100:null,completedOrders:completed.length,deliveryMeasuredOrders:measured.length,onTimeOrders:onTime,delivery:measured.length?Math.round(10000*onTime/measured.length)/100:null,latestPurchase:orders.at(-1)?.created||null};
 }
 export async function buildSupplierTargets(lines:any[],existing:any[]=[]){
