@@ -53,6 +53,8 @@ async function mobileFlow(){
  check(submissions.filter(s=>s.kind==='photo').map(s=>s.number).join(',')==='1,1,2','camera and gallery retain exact unit');
  check(wizard().querySelectorAll('.asset-mobile-review li').length===2,'review both assets');
  check(document.documentElement.scrollWidth<=innerWidth+2,'mobile layout horizontal overflow');
+ const notes=wizard().querySelector('textarea')!.getBoundingClientRect(), card=wizard().querySelector('.asset-mobile-sheet')!.getBoundingClientRect();
+ check(notes.left>=card.left&&notes.right<=card.right,'notes fit the review card');
  await capture('mobile-asset-review');
  wizard().querySelector<HTMLInputElement>('input[type=checkbox]')!.click();await sleep();
  await reachNext('ارسال برای بررسی اموال‌دار');await wait(()=>submissions.some(s=>s.mode==='submit')&&!document.querySelector('.asset-mobile-form'));

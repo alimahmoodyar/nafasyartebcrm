@@ -47,7 +47,7 @@
 .asset-mobile-sheet { display: grid; gap: 12px; padding: 13px; min-width: 0; overflow-wrap: anywhere; }
 .asset-mobile-sheet h3 { margin: 0; scroll-margin-block-start: 108px; }
 .asset-mobile-sheet .field { min-width: 0; }
-.asset-mobile-sheet .field :is(input:not([type=file]), select, textarea) { min-height: 44px; font-size: 16px; }
+.asset-mobile-sheet .field :is(input:not([type=file]), select, textarea) { box-sizing: border-box; inline-size: 100%; min-height: 44px; font-size: 16px; }
 .asset-mobile-extra summary { padding-block: 9px; min-height: 44px; color: #146942; font-weight: 600; cursor: pointer; }
 .asset-mobile-extra .field { margin-block: 8px; }
 .asset-mobile-sheet .receipt-attachment > .tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
