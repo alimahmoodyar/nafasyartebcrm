@@ -23,6 +23,9 @@ function failure(error:unknown){
   return Response.json({error:'این شماره برای بازیابی حساب دیگری ثبت شده است.'},{status:409,headers});
  if(/inventory_operation_guard/i.test(String(error)))
   return Response.json({error:'درخواست بازیابی تغییر کرده است. دوباره شروع کنید.'},{status:409,headers});
+ const missingSchema=/no such column:.*(?:recovery_mobile|recovery_revision|recovery_backup_hash)|no such table:.*password_recovery_challenges/i.test(String(error));
+ if(missingSchema)return Response.json({error:'به‌روزرسانی پایگاه داده برای بازیابی رمز روی این سرور کامل نشده است.'},{status:503,headers});
+ console.error('Password recovery failed unexpectedly.',{type:error instanceof Error?error.name:typeof error});
  return Response.json({error:'بازیابی در حال حاضر در دسترس نیست. دوباره تلاش کنید.'},{status:503,headers});
 }
 

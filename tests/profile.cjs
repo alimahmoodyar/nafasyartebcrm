@@ -40,6 +40,14 @@ async function detail(id,user){const go=()=>sourcing.GET(request('/api/sourcing?
  assert.equal((await context.run(actor('inventory'),()=>api.GET(request('/api/profile?image=1')))).headers.get('Content-Type'),'image/jpeg');
  await save({},actor('inventory'),409);
  const readOwn=async(query='')=>context.run(actor('inventory'),()=>api.GET(request('/api/profile'+query)));
+ const {initialProfilePhotoCrop,profilePhotoCrop,profilePhotoFrame}=load('lib/profile-photo.ts');
+ const smaller={...initialProfilePhotoCrop,zoom:0.5,x:0.5,y:-0.5};
+ assert.equal(profilePhotoCrop(smaller).zoom,0.5);
+ assert.equal(profilePhotoCrop({...smaller,zoom:0.49}),null);
+ for(const framing of [smaller,initialProfilePhotoCrop]){
+  const {panX,panY}=profilePhotoFrame(320,320,framing,320);
+  assert.ok(panX>0&&panY>0,'Square photos can be repositioned across both axes.');
+ }
  const crop={zoom:1.65,turns:1,x:0.22,y:-0.44};
  const original=btoa(String.fromCharCode(255,216,255,224,10,20,30,40,255,217));
  assert.equal((await readOwn('?source=1')).status,404);

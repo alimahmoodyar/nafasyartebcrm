@@ -94,6 +94,10 @@ const request=(path,method='GET',body,headers={})=>new Request(base+path,{
  // Upgrade an installation that already has a local administrator, employee and active session.
  const adminUsername='admin';
  const adminBeforeUpgrade=await useSession(adminUsername,adminPassword);
+ cookie=adminBeforeUpgrade;
+ const preMigrationStatus=await recovery.GET(request(authPath,'GET',undefined,{'x-profile-account':'local:'+adminId}));
+ assert.equal(preMigrationStatus.status,503);
+ assert.match((await preMigrationStatus.json()).error,/به‌روزرسانی پایگاه داده/);
  sql.exec(fs.readFileSync(path.join(root,'drizzle','0031_password_recovery.sql'),'utf8'));
  cookie=adminBeforeUpgrade;
  assert.equal((await auth.session()).isAdmin,true);

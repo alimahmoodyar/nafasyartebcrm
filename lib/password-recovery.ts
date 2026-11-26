@@ -56,7 +56,7 @@ async function sendChallenge(account:Account,mobile:string,purpose:Purpose,token
   recovery_revision=excluded.recovery_revision,proof=excluded.proof,expires=excluded.expires,attempts=0,delivered=0`)
   .bind(id,purpose,mobile,proof,expires,account.member_id,account.version,account.recovery_revision).run();
  if(!row.meta.changes)throw invalid();
- await sendNafasyarSms(mobile,purpose==='reset'?'هم‌نفس\nکد بازیابی رمز: '+code+'\nاعتبار: ۵ دقیقه':'هم‌نفس\nکد تأیید شماره بازیابی: '+code+'\nاعتبار: ۵ دقیقه');
+ await sendNafasyarSms(mobile,purpose==='reset'?'هم‌نفس\nکد بازیابی رمز: '+code+'\nاعتبار: ۵ دقیقه':'هم‌نفس\nکد تأیید شماره بازیابی: '+code+'\nاعتبار: ۵ دقیقه',undefined,code);
  await db.prepare('UPDATE password_recovery_challenges SET delivered=1 WHERE token_hash=?').bind(id).run();
 }
 export async function recoveryStatus(memberId:string){

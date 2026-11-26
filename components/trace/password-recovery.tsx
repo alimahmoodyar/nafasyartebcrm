@@ -73,6 +73,7 @@ export function PasswordRecoveryForm({initialUsername,onBack}:{initialUsername:s
 
 export function RecoverySettings({accountId}:{accountId:string}){
  const [status,setStatus]=useState<Result|null>(null),[opened,setOpened]=useState(false);
+ const [statusAttempt,setStatusAttempt]=useState(0);
  const [mobile,setMobile]=useState(''),[current,setCurrent]=useState(''),[backup,setBackup]=useState('');
  const [token,setToken]=useState(''),[code,setCode]=useState(''),[nextBackup,setNextBackup]=useState('');
  const [error,setError]=useState(''),[busy,setBusy]=useState(false);
@@ -80,7 +81,7 @@ export function RecoverySettings({accountId}:{accountId:string}){
   let active=true;
   request(undefined,accountId).then(result=>{if(active)setStatus(result);}).catch(error=>{if(active)setError(errorText(error));});
   return ()=>{active=false;};
- },[accountId]);
+ },[accountId,statusAttempt]);
  function clearForm(){setMobile('');setCurrent('');setBackup('');setToken('');setCode('');}
  async function submit(event:FormEvent){
   event.preventDefault();
@@ -100,7 +101,9 @@ export function RecoverySettings({accountId}:{accountId:string}){
   }catch(error){setError(errorText(error));}finally{setBusy(false);}
  }
  return <section style={{...panel,marginTop:16}}>
-  <strong>بازیابی رمز عبور</strong>
+  <p>برای دریافت کد هنگام فراموشی رمز، شمارهٔ همراه بازیابی را ثبت و تأیید کنید.</p>
+  {!status&&!error&&<span role="status">در حال بررسی وضعیت بازیابی…</span>}
+  {!status&&error&&<div><button type="button" className="btn" onClick={()=>{setError('');setStatusAttempt(attempt=>attempt+1);}}>تلاش دوباره</button></div>}
   {status&&<span role="status">{status.mobileLast4?<>شمارهٔ بازیابی تأییدشده با پایان <bdi>{status.mobileLast4}</bdi></>:'شمارهٔ بازیابی هنوز تأیید نشده است.'}</span>}
   {status?.requiresBackup&&<small>برای بازیابی حساب مدیر اصلی، کد پیامکی و کد پشتیبان لازم است.</small>}
   {nextBackup&&<BackupCode code={nextBackup}/>}

@@ -3,7 +3,7 @@
 import {useEffect,useRef,useState,type PointerEvent} from 'react';
 import {RotateCw} from 'lucide-react';
 import {Dialog,DialogContent,DialogDescription,DialogTitle} from '@/components/ui/dialog';
-import {initialProfilePhotoCrop,profilePhotoFrame,profilePhotoImageLimit,profilePhotoSourceLimit,profilePhotoMaxZoom,type ProfilePhotoCrop} from '@/lib/profile-photo';
+import {initialProfilePhotoCrop,profilePhotoFrame,profilePhotoImageLimit,profilePhotoSourceLimit,profilePhotoMinZoom,profilePhotoMaxZoom,type ProfilePhotoCrop} from '@/lib/profile-photo';
 import './profile-photo-editor.css';
 
 export type ProfilePhotoDraft={url:string;revision:number;crop:ProfilePhotoCrop;source?:string};
@@ -65,6 +65,8 @@ const clampOffset=(offset:number)=>Math.max(-1,Math.min(1,offset));
 export function ProfilePhotoEditor({draft,name,busy,onClose,onSave}:{draft:ProfilePhotoDraft;name:string;busy:boolean;onClose:()=>void;onSave:(image:string,crop:ProfilePhotoCrop)=>Promise<void>}){
  const [image,setImage]=useState<HTMLImageElement|null>(null);
  const [crop,setCrop]=useState(draft.crop);
+ const zoomRange=crop.zoom<1?1-profilePhotoMinZoom:profilePhotoMaxZoom-1;
+ const zoomPosition=Math.round((crop.zoom-1)/zoomRange*50);
  const [error,setError]=useState('');
  const frame=useRef<HTMLCanvasElement>(null),preview=useRef<HTMLCanvasElement>(null);
  const drag=useRef<{id:number;x:number;y:number;crop:ProfilePhotoCrop}|null>(null);
@@ -130,7 +132,12 @@ export function ProfilePhotoEditor({draft,name,busy,onClose,onSave}:{draft:Profi
      </section>
      <fieldset disabled={busy||!image}>
       <label className="field">بزرگ‌نمایی
-       <input type="range" min="1" max={profilePhotoMaxZoom} step="0.05" value={crop.zoom} onChange={event=>setCrop({...crop,zoom:Number(event.target.value)})}/>
+       <input type="range" dir="ltr" min={-50} max={50} step={1} value={zoomPosition} aria-valuetext={Math.round(crop.zoom*100)+'٪'}
+        onChange={event=>{
+         const position=Number(event.target.value)/50;
+         const range=position<0?1-profilePhotoMinZoom:profilePhotoMaxZoom-1;
+         setCrop(current=>({...current,zoom:Number((1+position*range).toFixed(2))}));
+        }}/>
       </label>
       <button type="button" className="btn" onClick={()=>setCrop({zoom:crop.zoom,turns:(crop.turns+1)%4,x:-crop.y,y:crop.x})}><RotateCw size={18}/> چرخش ۹۰ درجه</button>
       <button type="button" className="btn" onClick={()=>setCrop(initialProfilePhotoCrop)}>بازنشانی برش</button>

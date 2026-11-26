@@ -1,16 +1,35 @@
 'use client';
 
-import {useEffect,useRef,useState} from 'react';
-import {Camera,Pencil,X} from 'lucide-react';
+import {Fragment,useEffect,useRef,useState} from 'react';
+import {Camera,X} from 'lucide-react';
 import {Dialog,DialogContent,DialogDescription,DialogTitle} from '@/components/ui/dialog';
 import {initialProfilePhotoCrop,type ProfilePhotoCrop} from '@/lib/profile-photo';
 import {AccountCredentials} from './account-credentials';
-import {BaleSettings} from './bale-settings';
 import {RecoverySettings} from './password-recovery';
 import {PasskeySettings} from './passkeys';
 import {normalizeProfilePhoto,ProfilePhotoEditor,type ProfilePhotoDraft} from './profile-photo-editor';
 
 type Profile={accountId:string;revision:number;hasPhoto:boolean;hasSource?:boolean;crop?:ProfilePhotoCrop|null;authType?:string;username?:string};
+
+function ProfileCredentials({accountId,username}:{accountId:string;username:string}){
+ const [expanded,setExpanded]=useState(false);
+ return <section>
+  <button type="button" className="btn" aria-expanded={expanded} onClick={()=>setExpanded(!expanded)}>
+   {expanded?'بستن فرم تغییر رمز':'تغییر رمز و نام کاربری'}
+  </button>
+  {expanded&&<AccountCredentials accountId={accountId} username={username}/>}
+ </section>;
+}
+
+function ProfileRecovery({accountId}:{accountId:string}){
+ const [expanded,setExpanded]=useState(false);
+ return <section>
+  <button type="button" className="btn" aria-expanded={expanded} onClick={()=>setExpanded(!expanded)}>
+   {expanded?'بستن تنظیمات بازیابی':'بازیابی رمز عبور'}
+  </button>
+  {expanded&&<RecoverySettings accountId={accountId}/>}
+ </section>;
+}
 
 export function UserProfile({accountId,name,onPersonnel,onAssets}:{accountId:string;name:string;onPersonnel?:()=>void;onAssets?:()=>void}){
  const [open,setOpen]=useState(false);
@@ -78,13 +97,21 @@ export function UserProfile({accountId,name,onPersonnel,onAssets}:{accountId:str
    {onPersonnel&&<button className="btn primary" onClick={()=>{setOpen(false);onPersonnel();}}>پرتال پرسنلی من</button>}
    {onAssets&&<button className="btn primary" onClick={()=>{setOpen(false);onAssets();}}>اموال امانی من</button>}
    <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" aria-label="انتخاب فایل عکس پروفایل" hidden onChange={event=>{const file=event.currentTarget.files?.[0];event.currentTarget.value='';if(file)void choose(file);}}/>
-   <div className="tools">
-    <button type="button" className="btn" disabled={busy||!profile} onClick={()=>input.current?.click()}><Camera size={18}/> {busy&&!editing&&removeRevision===null?'در حال آماده‌سازی…':photo?'تغییر عکس':'انتخاب عکس'}</button>
-    {photo&&<><button type="button" className="btn" disabled={busy} onClick={editCurrent}><Pencil size={18}/> ویرایش عکس</button>
-     <button type="button" className="btn" disabled={busy} onClick={()=>{if(profile){setError('');setMessage('');setRemoveRevision(profile.revision);}}}>حذف عکس</button></>}
-   </div>
-   {profile?.authType==='password'&&<><AccountCredentials accountId={accountId} username={profile.username||''}/><RecoverySettings key={accountId} accountId={accountId}/><PasskeySettings/></>}
-   <BaleSettings/>
+   <details>
+    <summary className="btn"><Camera size={18} aria-hidden="true"/> مدیریت عکس</summary>
+    <div className="tools">
+     <button type="button" className="btn" disabled={busy||!profile} onClick={()=>input.current?.click()}>{busy&&!editing&&removeRevision===null?'در حال آماده‌سازی…':photo?'جایگزینی عکس':'انتخاب عکس'}</button>
+     {photo&&<>
+      <button type="button" className="btn" disabled={busy} onClick={editCurrent}>ویرایش عکس</button>
+      <button type="button" className="btn" disabled={busy} onClick={()=>{if(profile){setError('');setMessage('');setRemoveRevision(profile.revision);}}}>حذف عکس</button>
+     </>}
+    </div>
+   </details>
+   {profile?.accountId===accountId&&profile.authType==='password'&&<Fragment key={accountId}>
+    <ProfileCredentials accountId={accountId} username={profile.username||''}/>
+    <ProfileRecovery accountId={accountId}/>
+    <PasskeySettings/>
+   </Fragment>}
    {error&&removeRevision===null&&<p role="alert">{error}</p>}
    {message&&<p role="status">{message}</p>}
   </section>}
