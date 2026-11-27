@@ -31,6 +31,7 @@ function ProfileRecovery({accountId}:{accountId:string}){
  </section>;
 }
 
+import {EventProfileLink} from "./event-directory";
 export function UserProfile({accountId,name,onPersonnel,onAssets}:{accountId:string;name:string;onPersonnel?:()=>void;onAssets?:()=>void}){
  const [open,setOpen]=useState(false);
  const [profile,setProfile]=useState<Profile|null>(null);
@@ -93,7 +94,7 @@ export function UserProfile({accountId,name,onPersonnel,onAssets}:{accountId:str
   </button>
   {open&&<section className="user-profile-card" aria-label="پروفایل من">
    <button className="link" aria-label="بستن پروفایل" onClick={()=>setOpen(false)}><X size={18}/></button>
-   <h3>{name}</h3>
+   <h3>{name}</h3><EventProfileLink/>
    {onPersonnel&&<button className="btn primary" onClick={()=>{setOpen(false);onPersonnel();}}>پرتال پرسنلی من</button>}
    {onAssets&&<button className="btn primary" onClick={()=>{setOpen(false);onAssets();}}>اموال امانی من</button>}
    <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" aria-label="انتخاب فایل عکس پروفایل" hidden onChange={event=>{const file=event.currentTarget.files?.[0];event.currentTarget.value='';if(file)void choose(file);}}/>

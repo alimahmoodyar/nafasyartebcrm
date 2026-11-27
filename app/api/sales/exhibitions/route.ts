@@ -15,5 +15,5 @@ export async function GET(req:Request){
  try{const {actor,members}=await context();return Response.json({...await readVisits(storage(),actor,new URL(req.url).searchParams.get('event')?.trim()||''),members,me:actor.id},{headers:{'Cache-Control':'private, no-store'}})}catch(e){return fail(e)}
 }
 export async function POST(req:Request){
- try{checkOrigin(req);const {actor,members}=await context();const b=JSON.parse(new TextDecoder().decode(await boundedBody(req,20000)));return Response.json(await saveVisit(storage(),actor,b,members.map(m=>m.id)))}catch(e){return fail(e)}
+ try{checkOrigin(req);const {actor,members}=await context();const b=JSON.parse(new TextDecoder().decode(await boundedBody(req,20000)));if(!b.revision&&!(await readVisits(storage(),actor,b.event)).visits?.length)throw new AccessError('رویداد تازه را از «رویدادهای من» تعریف کنید.',403);return Response.json(await saveVisit(storage(),actor,b,members.map(m=>m.id)))}catch(e){return fail(e)}
 }
