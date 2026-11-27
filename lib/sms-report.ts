@@ -11,7 +11,8 @@ const purposes=['recovery_enroll','recovery_reset','admin_test','warranty_activa
 export type SmsPurpose=typeof purposes[number];
 const outcomes=[
  'invalid_mobile','rate_limited','invalid_password','backup_required','mobile_in_use','config_unavailable',
- 'account_mismatch','schema_unavailable','challenge_unavailable','network_timeout','network_dns','network_tls','network_error',
+ 'account_mismatch','recovery_mobile_unverified','recovery_mobile_mismatch','recovery_backup_unavailable',
+ 'schema_unavailable','challenge_unavailable','network_timeout','network_dns','network_tls','network_error',
  'provider_rejected','provider_response_unknown','provider_accepted','challenge_changed','internal_error',
 ] as const;
 export type SmsOutcome=typeof outcomes[number];

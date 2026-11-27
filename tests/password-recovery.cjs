@@ -136,7 +136,11 @@ const request=(path,method='GET',body,headers={})=>new Request(base+path,{
  const workerStatus=await recovery.GET(request(authPath,'GET',undefined,{'x-profile-account':'local:'+workerId}));
  assert.deepEqual(await workerStatus.json(),{mobileLast4:'0123',requiresBackup:false});
  cookie='';
- const beforeMismatch=sent.length;await publicStart('recovery-worker',adminMobile);assert.equal(sent.length,beforeMismatch);
+ const beforeMismatch=sent.length;
+ const mismatchReply=await publicStart('recovery-worker',adminMobile);
+ assert.equal(mismatchReply.status,200);
+ assert.deepEqual(Object.keys(await mismatchReply.json()),['token']);
+ assert.equal(sent.length,beforeMismatch);
  const expiring=await (await publicStart('recovery-worker',workerMobile)).json();
  sql.prepare("UPDATE password_recovery_challenges SET expires='2000-01-01' WHERE member_id=?").run(workerId);
  assert.equal((await publicFinish(expiring.token,sent.at(-1).code,'Recovery-worker-next-123')).status,400);
@@ -170,6 +174,10 @@ const request=(path,method='GET',body,headers={})=>new Request(base+path,{
  assert.equal((await publicFinish(secondAdmin.token,sent.at(-1).code,'Recovery-admin-another-123',adminSetup.backupCode)).status,400);
  await useSession(adminUsername,'Recovery-admin-next-123');
  cookie=await useSession(adminUsername,'Recovery-admin-next-123');
+ const unverified=(await (await listReport('?purpose=recovery_reset&last4=0123')).json()).entries;
+ assert(unverified.some(x=>x.outcome==='recovery_mobile_unverified'&&x.last4==='0123'&&x.messageId===undefined));
+ const wrongNumber=(await (await listReport('?purpose=recovery_reset&last4='+encodeURIComponent('۰۱۲۴'))).json()).entries;
+ assert(wrongNumber.some(x=>x.outcome==='recovery_mobile_mismatch'&&x.last4==='0124'&&x.messageId===undefined));
  const filtered=await listReport('?purpose=recovery_enroll&last4='+encodeURIComponent('۰۱۲۳'));
  assert.equal(filtered.status,200);assert.match(filtered.headers.get('cache-control'),/no-store/);
  const {entries}=await filtered.json();

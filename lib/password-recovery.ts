@@ -111,9 +111,16 @@ export async function startRecovery(input:{username?:unknown;mobile?:unknown},cl
  if(!account)return {token};
  try{
   await withSmsReport('recovery_reset',async report=>{
-   if(account.recovery_mobile!==mobile||account.admin&&!account.recovery_backup_hash){
-    // Only retain a truncated destination for actual send attempts.
-    report('account_mismatch');
+   if(!account.recovery_mobile){
+    report('recovery_mobile_unverified',{mobile});
+    return;
+   }
+   if(account.recovery_mobile!==mobile){
+    report('recovery_mobile_mismatch',{mobile});
+    return;
+   }
+   if(account.admin&&!account.recovery_backup_hash){
+    report('recovery_backup_unavailable',{mobile});
     return;
    }
    report('internal_error',{mobile});

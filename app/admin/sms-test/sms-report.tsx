@@ -20,6 +20,9 @@ const outcomes={
  mobile_in_use:'شماره برای حساب دیگری ثبت شده است',
  config_unavailable:'تنظیمات یا دسترسی به پنل پیامک آماده نبود',
  account_mismatch:'حساب یا شمارهٔ بازیابی تطبیق نداشت',
+ recovery_mobile_unverified:'شمارهٔ بازیابی برای این حساب هنوز تأیید نشده است',
+ recovery_mobile_mismatch:'شمارهٔ واردشده با شمارهٔ بازیابی تأییدشدهٔ حساب فرق دارد',
+ recovery_backup_unavailable:'کد پشتیبان بازیابی مدیر اصلی هنوز آماده نیست',
  schema_unavailable:'به‌روزرسانی پایگاه دادهٔ بازیابی کامل نشده است',
  challenge_unavailable:'درخواست تأیید آماده نشد',
  network_timeout:'مهلت پاسخ پنل تمام شد',
@@ -197,7 +200,7 @@ export function SmsReport(){
     </div>
     <div className="sms-report-entry-status">
      <span>{outcomes[entry.outcome as keyof typeof outcomes]||'وضعیت ثبت‌شده نامشخص است'}</span>
-     {entry.last4&&<span>شمارهٔ منتهی به <bdi>{entry.last4}</bdi></span>}
+     {entry.last4&&<span>{entry.purpose==='recovery_reset'?'شمارهٔ واردشده با پایان':'شمارهٔ منتهی به'} <bdi>{entry.last4}</bdi></span>}
     </div>
     {(entry.httpStatus!=null||entry.panelCode!=null||entry.messageId!=null)&&<div className="sms-report-numbers">
      {entry.httpStatus!=null&&<span>وضعیت HTTP <bdi>{entry.httpStatus}</bdi></span>}
