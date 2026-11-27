@@ -6,6 +6,7 @@ import {legacyActivationChunkSize,legacyActivationWarnings,legacyCustomerName,pa
 type Parsed=ReturnType<typeof parseLegacyWorkbook>;
 type PreviewWork={input:Parsed;packs:LegacyActivation[][];next:number;matches:Map<string,LegacyPreview>;directoryReady:boolean};
 type SavedRow={event:LegacyActivation;file:string;importedAt:string;salesName:string};
+type RecoveryReview={counts:Record<string,number>;more:boolean;rows:{id:string;code:string;existing:string;candidate:string|null;witness:string|null;witnessMax:string|null;baseLow:string|null;baseHigh:string|null;status:string}[]};
 type ResultRow={row:LegacyActivation;comparison:LegacyPreview|undefined;alternatives?:LegacyActivation[]};
 const displayCount=(n:number)=>n.toLocaleString('fa-IR');
 const split=(rows:LegacyActivation[])=>Array.from({length:Math.ceil(rows.length/legacyActivationChunkSize)},(_,i)=>rows.slice(i*legacyActivationChunkSize,(i+1)*legacyActivationChunkSize));
@@ -31,6 +32,7 @@ export function LegacyActivationPanel({accountId}:{accountId:string}){
  const [filter,setFilter]=useState<'conflicts'|'warnings'|'new'|'same'|'enrich'>('conflicts'),[page,setPage]=useState(1);
  const [history,setHistory]=useState<{rows:SavedRow[];more:boolean}|null>(null),[historyQuery,setHistoryQuery]=useState(''),[historyPage,setHistoryPage]=useState(1);
  const [checked,setChecked]=useState(false),[committed,setCommitted]=useState(0);
+ const [serialAudit,setSerialAudit]=useState<RecoveryReview|null>(null);
  const pendingPreview=useRef<PreviewWork|null>(null);
  const salesById=useMemo(()=>new Map(sales.map(item=>[item.id,item])),[sales]);
  const linksById=useMemo(()=>new Map(links.map(item=>[item.id,item])),[links]);
@@ -195,6 +197,15 @@ export function LegacyActivationPanel({accountId}:{accountId:string}){
    {selected&&<button type="button" className="btn" disabled={busy||!sale||sale===activeLink?.salesId} onClick={linkAgency}>{activeLink?'تغییر اتصال نمایندگی':'ثبت اتصال نمایندگی'}</button>}
   </>}
   <h4>سوابق واردشده</h4>
+  <details><summary>بررسی سریال‌های فعال‌سازی قدیمی</summary>
+   <p>سریال خالی با سابقهٔ همان کد ده‌رقمی یا فرمول هفت رقم اول تکمیل می‌شود. موارد زیر به بررسی نیاز دارند.</p>
+   <button className="btn" disabled={busy} onClick={()=>void run(async()=>setSerialAudit(await request<RecoveryReview>('بررسی سریال‌ها','?view=serial-recovery')))}>نمایش گزارش</button>
+   {serialAudit&&<><p>از سابقهٔ هم‌کد {displayCount(serialAudit.counts.exact||0)} · از فرمول {displayCount(serialAudit.counts.formula||0)} · مغایرت {displayCount((serialAudit.counts.conflict||0)+(serialAudit.counts.mismatch||0))} · بدون سریال قابل تعیین {displayCount(serialAudit.counts.unsupported||0)}</p>
+    {serialAudit.rows.length>0?<div className="as-table"><table><thead><tr><th>شناسهٔ قدیمی</th><th>کد دستگاه</th><th>سریال موجود</th><th>فرمول</th><th>سریال‌های مرجع</th><th>علت بررسی</th></tr></thead><tbody>{serialAudit.rows.map(r=><tr key={r.id}>
+     <td>{r.id.split(':')[1]}</td><td><bdi>{r.code||'—'}</bdi></td><td>{r.existing||'—'}</td><td>{r.candidate||'—'}</td>
+     <td>{[...new Set([r.witness,r.witnessMax,r.baseLow,r.baseHigh].filter(Boolean))].join('، ')||'—'}</td><td>{r.status==='unsupported'?'کد ناقص یا خارج از قاعده':'مغایرت سریال‌ها'}</td></tr>)}</tbody></table></div>:<p>موردی برای بررسی وجود ندارد.</p>}
+    {serialAudit.more&&<button className="btn" disabled={busy} onClick={()=>void run(async()=>setSerialAudit(await request<RecoveryReview>('ادامهٔ گزارش','?view=serial-recovery&after='+encodeURIComponent(serialAudit.rows[serialAudit.rows.length-1].id))))}>صفحهٔ بعد</button>}</>}
+  </details>
   <form className="tools" onSubmit={e=>{e.preventDefault();readHistory()}}><label className="field">شناسهٔ فعال‌سازی یا سریال<input type="search" maxLength={160} value={historyQuery} onChange={e=>setHistoryQuery(e.target.value)}/></label><button className="btn" disabled={busy}>نمایش سوابق</button></form>
   {history&&<>{history.rows.length?<div className="as-table"><table><thead><tr><th>شناسه</th><th>سابقه</th><th>نمایندگی</th><th>فایل و زمان ثبت</th></tr></thead><tbody>{history.rows.map(({event,file,importedAt,salesName})=><tr key={event.activeId}><td><bdi>{event.activeId}</bdi></td><td><bdi>{summary(event)}</bdi></td><td>{salesName||'تعیین‌تکلیف‌نشده'}{event.agencyName&&<small> · نام قبلی {event.agencyName}</small>}</td><td>{file} · {formatDateTime(importedAt)}</td></tr>)}</tbody></table></div>:<p>سابقه‌ای پیدا نشد.</p>}
    {(historyPage>1||history.more)&&<div className="tools"><button className="btn" type="button" disabled={busy||historyPage<=1} onClick={()=>readHistory(historyPage-1)}>قبلی</button><button className="btn" type="button" disabled={busy||!history.more} onClick={()=>readHistory(historyPage+1)}>بعدی</button></div>}

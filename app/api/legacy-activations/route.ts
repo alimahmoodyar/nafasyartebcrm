@@ -3,6 +3,7 @@ import {boundedBody} from '@/lib/firmware-storage';
 import {latinDigits} from '@/lib/persian-date';
 import {storage} from '@/lib/storage';
 import {trainingContext} from '@/lib/training-context';
+import {recoveryCounts,recoveryReview,recoveryUpdate} from '@/lib/legacy-serial-recovery';
 import {cleanLegacyActivation,legacyActivationChunkSize,legacyDetailsComparison,legacyActivationType,legacyAgencyType,type LegacyActivation,type LegacyPreview} from '@/lib/legacy-activation-import';
 
 const json=(body:unknown)=>Response.json(body,{headers:{'Cache-Control':'private, no-store','Vary':'Cookie, Authorization'}});
@@ -17,13 +18,16 @@ function scope(request:Request,userId:string){
 async function previousRows(rows:LegacyActivation[]){
  const found=await storage().prepare("SELECT id,data FROM flow_entities WHERE type=? AND id IN (SELECT value FROM json_each(?))")
   .bind(legacyActivationType,JSON.stringify(rows.map(row=>eventId(row.activeId)))).all<{id:string;data:string}>();
- return new Map(found.results.map(row=>[row.id,{raw:row.data,stored:JSON.parse(row.data) as {event:LegacyActivation}}]));
+ return new Map(found.results.map(row=>[row.id,{raw:row.data,stored:JSON.parse(row.data) as {event:LegacyActivation;serialRecovery?:{method:string}}}]));
+}
+function compareImport(existing:{event:LegacyActivation;serialRecovery?:{method:string}},row:LegacyActivation){
+ return legacyDetailsComparison(existing.serialRecovery?{...existing.event,deviceSetSerial:''}:existing.event,row);
 }
 function compare(rows:LegacyActivation[],previous:Awaited<ReturnType<typeof previousRows>>):LegacyPreview[]{
  return rows.flatMap<LegacyPreview>(row=>{
   const existing=previous.get(eventId(row.activeId));
   if(!existing)return [];
-  const status=legacyDetailsComparison(existing.stored.event,row);
+  const status=compareImport(existing.stored,row);
   return [{activeId:row.activeId,status,...(status==='conflict'?{existing:existing.stored.event}:{})}];
  });
 }
@@ -32,6 +36,12 @@ export async function GET(request:Request){
   const user=await requireAdmin();
   scope(request,user.userId);
   const db=storage(),q=new URL(request.url).searchParams;
+  if(q.get('view')==='serial-recovery'){
+   const after=q.get('after')||'';
+   if(after&&!/^legacy-activation:[0-9]{1,20}$/.test(after))fail('صفحه نامعتبر است.');
+   const [counts,review]=await Promise.all([db.prepare(recoveryCounts).all<{status:string;n:number}>(),db.prepare(recoveryReview).bind(after).all<{id:string}>()]);
+   return json({counts:Object.fromEntries(counts.results.map(row=>[row.status,row.n])),rows:review.results.slice(0,40),more:review.results.length>40});
+  }
   if(q.get('view')==='history'){
    const page=Number(q.get('page')||1),query=latinDigits((q.get('q')||'').trim().slice(0,160)).toUpperCase();
    if(!Number.isSafeInteger(page)||page<1||page>100000)fail('شمارهٔ صفحه معتبر نیست.');
@@ -60,6 +70,14 @@ export async function POST(request:Request){
   let body:{mode?:unknown;rows?:unknown;file?:unknown;confirmed?:unknown;legacyId?:unknown;salesId?:unknown;revision?:unknown}|null;
   try{body=JSON.parse(new TextDecoder().decode(await boundedBody(request,480000)));}catch{fail('درخواست ورود سوابق معتبر نیست یا حجم آن زیاد است.');}
   const db=storage(),now=new Date().toISOString();
+  if(body?.mode==='initialize-serials'){
+   const marker='legacy-serial-backfill:v72';
+   if(!await db.prepare('SELECT 1 AS done FROM flow_entities WHERE id=?').bind(marker).first()){
+    await db.batch([db.prepare(recoveryUpdate(false)).bind(user.userId,now,now),
+     db.prepare("INSERT OR IGNORE INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,'legacy_serial_backfill','{}',1,?,?)").bind(marker,now,now)]);
+   }
+   return json({done:true});
+  }
   if(body?.mode==='link'){
    const {legacyId,salesId,revision}=body;
    if(body.confirmed!==true||typeof legacyId!=='string'||! /^[1-9][0-9]{0,19}$/.test(legacyId)||
@@ -88,18 +106,22 @@ export async function POST(request:Request){
   const values=pending.map(row=>[eventId(row.activeId),null,JSON.stringify({event:row,file,importedAt:now,actor:user.userId})]);
   for(const row of rows){
    const id=eventId(row.activeId),existing=previous.get(id);
-   if(!existing||legacyDetailsComparison(existing.stored.event,row)!=='enrich')continue;
-   const event={...existing.stored.event,details:{...existing.stored.event.details,...row.details}};
-   values.push([id,existing.raw,JSON.stringify({...existing.stored,event})]);
+   if(!existing||compareImport(existing.stored,row)!=='enrich')continue;
+   const event={...existing.stored.event,deviceSetSerial:row.deviceSetSerial||existing.stored.event.deviceSetSerial,details:{...existing.stored.event.details,...row.details}};
+   const next={...existing.stored,event};
+   if(row.deviceSetSerial)delete next.serialRecovery;
+   values.push([id,existing.raw,JSON.stringify(next)]);
   }
-  const saved=values.length?await db.prepare(`WITH incoming AS (
+  const insert=db.prepare(`WITH incoming AS (
    SELECT json_extract(value,'$[0]') AS id,json_extract(value,'$[1]') AS prior,json_extract(value,'$[2]') AS after FROM json_each(?)
   ) INSERT INTO flow_entities(id,type,data,revision,created,updated)
    SELECT id,?,after,1,?,? FROM incoming
    WHERE prior IS NULL OR EXISTS(SELECT 1 FROM flow_entities WHERE flow_entities.id=incoming.id AND flow_entities.data=incoming.prior)
    ON CONFLICT(id) DO UPDATE SET data=excluded.data,revision=flow_entities.revision+1,updated=excluded.updated
    WHERE flow_entities.type=excluded.type AND flow_entities.data=(SELECT prior FROM incoming WHERE incoming.id=excluded.id)
-   RETURNING id`).bind(JSON.stringify(values),legacyActivationType,now,now).all<{id:string}>():{results:[]};
+   RETURNING id`).bind(JSON.stringify(values),legacyActivationType,now,now);
+  const prefixes=[...new Set(rows.map(r=>r.serial.slice(0,7)))];
+  const saved=values.length?(await db.batch<{id:string}>([insert,db.prepare(recoveryUpdate(true)).bind(JSON.stringify(prefixes),user.userId,now,now)]))[0]:{results:[]};
   const newIds=new Set(saved.results.filter(row=>!previous.has(row.id)).map(row=>row.id));
   const remaining=rows.filter(row=>!newIds.has(eventId(row.activeId)));
   return json({saved:newIds.size,enriched:saved.results.length-newIds.size,known:remaining.length?compare(remaining,await previousRows(remaining)):[]});

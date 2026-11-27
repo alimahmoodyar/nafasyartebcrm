@@ -10,12 +10,15 @@ const sql=new DatabaseSync(':memory:');
 for(const file of fs.readdirSync(path.join(root,'drizzle')).filter(name=>name.endsWith('.sql')).sort()){
  sql.exec(fs.readFileSync(path.join(root,'drizzle',file),'utf8'));
 }
-const db={prepare(query){
+const db={async batch(statements){
+ sql.exec('BEGIN');try{const results=statements.map(s=>s.execute());sql.exec('COMMIT');return results;}catch(e){sql.exec('ROLLBACK');throw e;}
+},prepare(query){
  let args=[];
  return {
   bind(...values){args=values;return this;},
   async first(){return sql.prepare(query).get(...args)||null;},
   async all(){return {results:sql.prepare(query).all(...args)};},
+  execute(){return {results:sql.prepare(query).all(...args)};},
  };
 }};
 class AccessError extends Error{constructor(message,status){super(message);this.status=status;}}
@@ -118,6 +121,46 @@ const addAgent=(id,kind,active)=>sql.prepare("INSERT INTO flow_entities(id,type,
  assert.equal(mapped.event.agencyName,'Old Agency');
  assert.equal(mapped.salesName,'Edited name');
  assert.equal(sql.prepare('SELECT COUNT(*) n FROM service_activations').get().n,0);
+ const recovery={mode:'initialize-serials'};
+ const pairs=[['9030711001','599030711'],['1370516216','50070516'],['1456789000','10056789'],['8123456000','50123456'],
+  ['1123470000','51123470'],['1123471000','11123471'],['2123471000','12123471'],['3123470000','53123470'],['4123471000','14123471']];
+ let nextId=200;
+ const seeds=[];
+ for(const [code,out] of pairs){
+  seeds.push({...row,activeId:String(nextId++),serial:code,deviceSetSerial:out});
+  seeds.push({...row,activeId:String(nextId++),serial:code.slice(0,7)+'999',deviceSetSerial:''});
+ }
+ const missing=seeds[1];
+ seeds.push({...row,activeId:'800',serial:'2550205443',deviceSetSerial:'62550205'},
+  {...row,activeId:'801',serial:'2550205999',deviceSetSerial:''},
+  {...row,activeId:'802',serial:'9039999000',deviceSetSerial:''},
+  {...row,activeId:'803',serial:'9030711',deviceSetSerial:''});
+ // Records written by release 71 before initialization.
+ for(const seed of seeds)sql.prepare("INSERT INTO flow_entities(id,type,data,created,updated) VALUES(?,'legacy_activation_event',?,'old','old')").run('legacy-activation:'+seed.activeId,JSON.stringify({event:contract.cleanLegacyActivation(seed),file:'old.xlsx'}));
+ const audit=await get('?view=serial-recovery');
+ assert.equal(audit.counts.formula,pairs.length+1);assert.equal(audit.counts.mismatch,1);assert.equal(audit.counts.conflict,1);assert.equal(audit.counts.unsupported,1);
+ const snapshot=()=>sql.prepare("SELECT data FROM flow_entities WHERE id=?").get('legacy-activation:'+missing.activeId).data;
+ const before=JSON.parse(snapshot());assert.equal(before.event.deviceSetSerial,'');
+ await post(recovery);const initialized=snapshot();await post(recovery);assert.equal(snapshot(),initialized);
+ const after=JSON.parse(snapshot());assert.equal(after.event.deviceSetSerial,pairs[0][1]);delete after.serialRecovery;after.event.deviceSetSerial='';assert.deepEqual(after,before);
+ for(let i=0;i<pairs.length;i++)assert.equal((await get('?view=history&q='+seeds[i*2+1].activeId)).rows[0].event.deviceSetSerial,pairs[i][1]);
+ assert.equal((await preview([missing])).known[0].status,'same');
+ assert.equal((await get('?view=history&q=801')).rows[0].event.deviceSetSerial,'');
+ const byId=async id=>(await get('?view=history&q='+id)).rows[0];
+ const event=(activeId,serial,deviceSetSerial='')=>({...row,activeId,serial,deviceSetSerial});
+ await post(importer([event('810','5123456789'),event('811','5123456789','ABC-01')]));
+ assert.equal((await byId('810')).event.deviceSetSerial,'ABC-01');assert.equal((await byId('810')).serialRecovery.method,'exact');
+ await post(importer([event('812','5123456789','ABC-02')]));
+ assert.equal((await byId('810')).event.deviceSetSerial,'');assert.equal((await byId('811')).event.deviceSetSerial,'ABC-01');
+ await post(importer([event('820','9031234000')]));assert.equal((await byId('820')).serialRecovery.method,'formula');
+ await post(importer([event('821','9031234000','599031234')]));assert.equal((await byId('820')).serialRecovery.method,'exact');
+ await post(importer([event('822','9031234000','OTHER')]));assert.equal((await byId('820')).event.deviceSetSerial,'');
+ await post(importer([event('830','7123456000')]));await post(importer([event('830','7123456000','REAL')]));
+ assert.equal((await byId('830')).event.deviceSetSerial,'REAL');assert.equal((await byId('830')).serialRecovery,undefined);
+ await post(importer([event('840','3123456000')]));await post(importer([event('840','3123456000','53345678')]));
+ assert.equal((await byId('840')).event.deviceSetSerial,'53345678');assert.equal((await byId('840')).serialRecovery,undefined);
+ await post(importer([event('841','3123456000')]));assert.equal((await byId('841')).event.deviceSetSerial,'');
+ const review=await get('?view=serial-recovery');assert.ok(review.rows.some(r=>r.id==='legacy-activation:841'&&r.status==='conflict'));
  sql.prepare("UPDATE reset_control SET phase='maintenance' WHERE id=1").run();
  await post(importer([{...row,activeId:'125'}]),423);
  isAdmin=false;

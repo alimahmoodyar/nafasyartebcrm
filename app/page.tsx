@@ -129,6 +129,19 @@ function Workspace(){
  const [loginScreen,setLoginScreen]=useState(false);
  const [deleteError,setDeleteError]=useState<{id:string;message:string}|null>(null);
  const [identity,setIdentity]=useState<Session|null>(null),[authLoading,setAuthLoading]=useState(true);
+ const recoveryOwner=identity?.isAdmin&&!identity.profileReview&&!identity.mustChangePassword?identity.userId:'';
+ useEffect(()=>{
+  if(!recoveryOwner)return;
+  let active=true,timer:ReturnType<typeof setTimeout>;
+  async function initialize(){
+   try{
+    const response=await fetch('/api/legacy-activations',{method:'POST',headers:{'Content-Type':'application/json','x-assistant-account':recoveryOwner},body:JSON.stringify({mode:'initialize-serials'})});
+    if(!response.ok)throw Error();
+   }catch{if(active)timer=setTimeout(initialize,60000);}
+  }
+  void initialize();
+  return()=>{active=false;clearTimeout(timer);};
+ },[recoveryOwner]);
  const incomingQcOpened=useRef('');
  const productCreateRequest=useRef<{signature:string;id:string}|null>(null);
  useEffect(()=>{if(!identity)return;const q=new URLSearchParams(window.location.search),raw=q.get('incomingQc');if(!raw)return;const key=identity.userId+':'+(identity.profileReview?.id||'')+':'+raw;if(incomingQcOpened.current===key)return;incomingQcOpened.current=key;const code=incomingQcCode(raw,window.location.origin);if(code&&navigate('warehouse',warehouseTarget('flow','qc-scan:'+encodeURIComponent(code),'receipts'))){const url=new URL(window.location.href);url.searchParams.delete('incomingQc');window.history.replaceState(null,'',url.pathname+url.search+url.hash)}},[identity?.userId,identity?.profileReview?.id]);

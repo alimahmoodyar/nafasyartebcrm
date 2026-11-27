@@ -39,10 +39,11 @@ export function legacyCustomerName(details?:LegacyActivationDetails){
  return [details?.firstName,details?.lastName].filter(Boolean).join(' ');
 }
 export function legacyDetailsComparison(existing:LegacyActivation,incoming:LegacyActivation){
- if(legacyActivationKey(existing)!==legacyActivationKey(incoming))return 'conflict';
+ const shared=existing.deviceSetSerial||incoming.deviceSetSerial;
+ if(legacyActivationKey({...existing,deviceSetSerial:existing.deviceSetSerial||shared})!==legacyActivationKey({...incoming,deviceSetSerial:incoming.deviceSetSerial||shared}))return 'conflict';
  const before=existing.details||{},after=incoming.details||{};
  if(detailColumns.some(([key])=>before[key]&&after[key]&&before[key]!==after[key]))return 'conflict';
- return detailColumns.some(([key])=>!before[key]&&after[key])?'enrich':'same';
+ return (!existing.deviceSetSerial&&incoming.deviceSetSerial)||detailColumns.some(([key])=>!before[key]&&after[key])?'enrich':'same';
 }
 const activationDate=(value:unknown)=>{
  const raw=value instanceof Date&&Number.isFinite(+value)?value.toISOString():text(value,25);
@@ -89,7 +90,7 @@ export function parseLegacyWorkbook(rows:unknown[][]){
   if(indexOfCompatible>=0){
    const compatible=others[indexOfCompatible];
    if(legacyDetailsComparison(compatible,row)==='enrich'){
-    const enriched={...compatible,details:{...compatible.details,...row.details}};
+    const enriched={...compatible,deviceSetSerial:compatible.deviceSetSerial||row.deviceSetSerial,details:{...compatible.details,...row.details}};
     if(indexOfCompatible===0)unique.set(row.activeId,enriched);
     if(conflicts.has(row.activeId))others[indexOfCompatible]=enriched;
    }
