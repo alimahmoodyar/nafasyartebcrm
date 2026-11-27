@@ -1,0 +1,4 @@
+Vosk-browser 0.0.8 by Ciaran O'Reilly, from https://registry.npmjs.org/vosk-browser/-/vosk-browser-0.0.8.tgz (Apache-2.0).
+Vosk speech recognition, https://github.com/alphacep/vosk-api (Apache-2.0).
+Farsi acoustic and language model vosk-model-small-fa-0.42 by Alpha Cephei, https://alphacephei.com/vosk/models/vosk-model-small-fa-0.42.zip (Apache-2.0).
+This distribution repacks the original am, conf, graph and ivector directories into a gzip TAR split into three static files; the model parameters are unchanged.

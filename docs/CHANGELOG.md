@@ -2981,3 +2981,6 @@ Observed in the live browser: home retained a prior driver profile cookie and di
 ## Employee purchase intake — 2026-11-14
 - Personnel portal: goods/service intake, catalogue search, conditional urgency/output fields, current-manager review/reduction/return/resubmission, direct manager routing, known-material warehouse queue and new/service procurement queue.
 - Scoped pagination, domain-checked duties, stable retry identity, audit/CAS and matching MCP. No stock or financial posting; downstream automatic fulfilment and contractor manufacturing remain explicitly open in PROCUREMENT-IMPLEMENTATION-AUDIT.md.
+
+## نسخه ۷۳ — تردد ایستگاهی و تقویم کارکرد
+ایستگاه قابل نصب از پنل اداری، ثبت چهره محلی، تشخیص آفلاین «منو ببین»، صف مقاوم به قطع اتصال، فایل صوتی اختیاری و جداگانهٔ ورود و خروج، و تقویم ماهانهٔ شخصی با جزییات محل تردد.

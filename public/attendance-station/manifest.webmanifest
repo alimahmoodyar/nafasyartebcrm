@@ -1,0 +1,24 @@
+{
+  "id": "/attendance-station/index.html",
+  "name": "ایستگاه تردد نفس‌یار طب",
+  "short_name": "ایستگاه تردد",
+  "lang": "fa",
+  "dir": "rtl",
+  "display": "standalone",
+  "scope": "/attendance-station/",
+  "start_url": "/attendance-station/index.html",
+  "theme_color": "#12654f",
+  "background_color": "#f3f7f6",
+  "icons": [
+    {
+      "src": "/brand/hamnafas-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/brand/hamnafas-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

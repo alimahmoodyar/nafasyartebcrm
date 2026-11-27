@@ -30,6 +30,11 @@ const profile={mode:'employee',code:'A01',memberId:'alice',managerId:'manager',s
  const managerView=(await get(manager)).data;assert.ok(!JSON.stringify(managerView).includes('IR220000000000000000000001'));assert.ok(!JSON.stringify(managerView).includes('PRIVATE-PERSONAL'));assert.equal((await get(bob)).data.records.filter(r=>r.type==='hr_employee').length,1);
  const sid=await ok(hr,{mode:'shift',title:'Day shift',startTime:'08:00',endTime:'16:00',weekdays:[0,1,2,3,4,5,6],holidays:[],breakMinutes:0});
  for(const mid of ['alice','bob'])await ok(hr,{mode:'assignment',memberId:mid,start:day,end:duties.addDay(today,30),shiftId:sid});
+ const monthly=await load('lib/personnel-attendance-month.ts').attendanceMonth('alice',day,today);
+ assert(monthly.days.some(d=>d.day===day),'Assigned day in employee calendar');
+ assert(monthly.punches.every(p=>!p.data.memberId||p.data.memberId==='alice'));
+ const friday=Object.entries(monthly.calendar).find(([day])=>new Date(day+'T12:00Z').getUTCDay()===5);
+ assert(friday,'Weekly Friday holiday is visible in employee month');
  const personalAfterShift=(await get(alice)).data;assert.equal(personalAfterShift.profileStatus.services.leave.ready,true);assert.equal(personalAfterShift.personalWork.assignments.length,1);assert.equal(personalAfterShift.personalWork.assignments[0].data.memberId,'alice');assert.equal(personalAfterShift.personalWork.assignments[0].shift.startTime,'08:00');assert.ok(!JSON.stringify(personalAfterShift.personalWork).includes('IR220000000000000000000001'));
  const leave={mode:'request',kind:'leave',memberId:'alice',leaveType:'annual',start:next,end:next};const lid=await ok(alice,leave);
  assert.equal((await apply(alice,lid,'approve')).status,403);assert.equal((await post(bob,{...leave,start:today,end:today})).status,403);

@@ -561,3 +561,6 @@ Observed in the live browser: home retained a prior driver profile cookie and di
 ## Employee purchase intake release
 - Scope: intake and necessity review only; downstream automatic purchase/stock fulfilment and subcontract manufacturing remain open.
 - Tests: internal/external/peer scope, current manager, direct manager route, quantity reduction, conditional date/urgency/service fields, retry and stale revision, no stock/payment posting. Shared operational JSON/reset freeze reused.
+
+## Attendance stations and employee month (73)
+Verify station registration, credential revocation, employee binding, retries and out-of-order events, payroll locks, month access, official/company holidays and Friday display. Station recordings are optional and privately cached. Factory webcam, microphone, speakers and acoustic accuracy need local acceptance testing.

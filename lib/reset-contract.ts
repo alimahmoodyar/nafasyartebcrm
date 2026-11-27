@@ -324,3 +324,5 @@ resetHelp.push('راهنماهای عیب‌یابی محصول، تاریخچه
 // reset/backup order; no parallel tables, new FK or new blob store were added.
 
 // Mission workEvents/arrival/return leg and manager-approved payTimes are bounded staff_mission JSON; daily calculation/version is immutable hr_payroll JSON. Existing 0016 freeze/backup/delete covers both atomically; no new table, blob or FK. No history rewrite.
+// attendance_station, attendance_station_member, attendance_station_sound and its bounded inline chunks are operational. Both resets delete them alongside hr_punch.
+// Existing generic flow/inventory freeze and backup rules apply. Only hashed credentials are stored.

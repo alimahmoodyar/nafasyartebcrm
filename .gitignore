@@ -61,3 +61,12 @@ startup-*.tmp
 *.receipt
 
 DIAGNOSTICS.json
+
+/public/attendance-station/speech/fa-0.42.*.bin
+/public/attendance-station/speech/.model-checksums*
+/public/attendance-station/models/face_landmark_68_tiny_model-shard1
+/public/attendance-station/models/face_recognition_model-shard1
+/public/attendance-station/models/face_recognition_model-shard2
+/public/attendance-station/models/tiny_face_detector_model-shard1
+/public/attendance-station/face-api.min.js
+/public/attendance-station/speech/vosk.js

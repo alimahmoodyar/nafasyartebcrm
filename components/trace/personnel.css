@@ -16,3 +16,4 @@
 .hr-administration .hr-create-profile{width:100%;min-height:44px;margin-block:10px 12px;justify-content:center;white-space:normal}
 .hr-administration .hr-create-profile svg{flex:none}
 .hr-administration [aria-labelledby="hr-personnel-form-title"]{scroll-margin-top:140px}
+.attendance-month{display:grid;gap:1rem}.attendance-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;text-align:center}.attendance-grid button{background:var(--card,#fff);color:inherit;border:1px solid #dce3eb;border-radius:8px;min-height:4rem;padding:.25rem;cursor:pointer}.attendance-grid small{display:block;font-size:clamp(.61rem,2vw,.8rem)}.attendance-grid .holiday{color:#9b3943;background:#fff5f5}.attendance-grid button[aria-pressed=true]{outline:2px solid #087d62}.attendance-grid button:disabled{opacity:.45}

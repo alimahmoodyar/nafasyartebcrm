@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer"><meta name="theme-color" content="#12654f">
+<title>ایستگاه تردد | نفس‌یار طب</title><link rel="manifest" href="manifest.webmanifest"><link rel="stylesheet" href="style.css"><link rel="icon" href="/brand/hamnafas-192.png"></head>
+<body><header><img src="/brand/nafasyar-logo.png" alt="نفس‌یار طب"><nav><button id="station-tab">ایستگاه تردد</button><button id="enroll-tab">ثبت چهره پرسنل</button></nav></header>
+<main><h1 id="title">ایستگاه تردد</h1><p id="location" class="station-info"></p>
+<div class="grid"><section><div class="screen"><span id="off">وب‌کم خاموش است</span><video id="live" autoplay muted playsinline hidden></video><div id="guide" class="guide" hidden></div></div><button id="camera-stop" hidden>خاموش کردن دوربین</button></section>
+<div class="panel"><section class="panel" id="enroll" hidden><label class="field">پرسنل فعال<select id="name"><option value="">انتخاب فرد</option></select></label>
+<label><input id="consent" type="checkbox"> با نگهداری الگوی چهره‌ام روی این ایستگاه برای ثبت تردد موافقم.</label>
+<div class="previews" id="previews"></div><b id="pose"></b><div class="buttons"><button id="capture" class="primary">روشن کردن وب‌کم</button><button id="redo" hidden>تکرار آخرین نما</button></div></section>
+<section class="panel" id="station"><small>ساعت تهران</small><div class="clock" id="clock"></div><div class="buttons punch"><button id="in" class="primary" disabled>ثبت ورود</button><button id="out" disabled>ثبت خروج</button></div><button id="listen" disabled>فعال کردن «منو ببین»</button></section>
+<div id="message" class="msg" role="status" aria-live="polite">در حال آماده‌سازی ایستگاه…</div>
+</div></div><section class="info"><div class="tools"><span class="state" id="queue"></span><button id="sync">همگام‌سازی</button><button id="install" hidden>نصب روی این سیستم</button></div><p id="offline" class="state"></p></section></main>
+<script defer src="face-api.min.js"></script><script defer src="storage.js"></script><script defer src="camera.js"></script><script type="module" src="acknowledge.js"></script><script defer src="station.js"></script></body></html>
