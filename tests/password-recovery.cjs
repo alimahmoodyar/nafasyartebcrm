@@ -130,7 +130,14 @@ const request=(path,method='GET',body,headers={})=>new Request(base+path,{
  const workerChallenge=await setup(workerId,'۰۹۱۲۰۰۰۰۱۲۳',workerPassword);
  assert.equal(workerChallenge.status,200,await workerChallenge.clone().text());assert.equal(sent.at(-1).mobile,workerMobile);
  const workerProof=await workerChallenge.json(),workerCode=sent.at(-1).code;
- assert.equal((await confirmSetup(workerId,workerProof.token,workerCode==='000000'?'000001':'000000')).status,400);
+ const wrongEnrollment=await confirmSetup(workerId,workerProof.token,workerCode==='000000'?'000001':'000000');
+ assert.equal(wrongEnrollment.status,400);assert.match(await wrongEnrollment.text(),/تطبیق ندارد/);
+ const enrollmentExpiry=sql.prepare('SELECT expires FROM password_recovery_challenges WHERE member_id=? AND purpose=?').get(workerId,'enroll').expires;
+ const expirySql=sql.prepare('UPDATE password_recovery_challenges SET expires=? WHERE member_id=? AND purpose=?');
+ expirySql.run('2000-01-01',workerId,'enroll');
+ const expiredEnrollment=await confirmSetup(workerId,workerProof.token,workerCode);
+ assert.equal(expiredEnrollment.status,400);assert.match(await expiredEnrollment.text(),/مهلت پنج‌دقیقه‌ای/);
+ expirySql.run(enrollmentExpiry,workerId,'enroll');
  assert.deepEqual(await (await confirmSetup(workerId,workerProof.token,workerCode)).json(),{mobileLast4:'0123'});
  assert.equal((await confirmSetup(workerId,workerProof.token,workerCode)).status,400);
  const workerStatus=await recovery.GET(request(authPath,'GET',undefined,{'x-profile-account':'local:'+workerId}));

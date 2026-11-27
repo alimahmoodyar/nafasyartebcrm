@@ -1,4 +1,5 @@
 'use client';
+import {ExhibitionVisits} from './exhibition-visits';
 import {StaffMissionSourceButton} from './staff-missions-panel';
 import {RefreshButton} from './refresh-button';
 import {NumberInput} from '@/components/trace/number-input';
@@ -28,6 +29,7 @@ export function SalesLeadsPanel({targetId='',refreshKey,onConvert}:{targetId?:st
  const dash=data.dashboard,filtered=data.records.filter((r:any)=>{const x=r.data,open=!['lost','converted'].includes(x.stage);return (stage==='all'||x.stage===stage)&&(owner==='all'||x.ownerId===owner)&&(segment==='all'||x.segment===segment)&&(queue==='all'||queue==='today'&&open&&x.nextDue<=data.today||queue==='late'&&open&&x.nextDue<data.today||queue==='stalled'&&open&&Date.parse(data.today)-Date.parse(x.lastContact?.day||x.createdDay)>=7*86400000)&&(!query||[x.title,x.contactName,x.company,x.phone,x.city].join(' ').includes(query));});
  const summarize=(title:string,buckets:any,labels:(key:string)=>string)=><div className="flow-card"><h4>{title}</h4>{Object.entries(buckets).map(([key,v]:any)=><p key={key}>{labels(key)}: {v.total} پرونده · {v.open} باز · {v.converted} تبدیل به سفارش</p>)}</div>;
  return <section aria-label="سرنخ‌ها و فرصت‌های فروش" dir="rtl"><IconActions inline scope="sales-leads-panel-actions-105e351f57"><h3>سرنخ‌ها و فرصت‌های فروش</h3><button className="btn primary" disabled={busy} onClick={()=>{setSelected('');start('save',null)}}>سرنخ جدید</button><RefreshButton retry={!!error} className="btn" disabled={busy} onRefresh={()=>load().catch(e=>setError(e.message))} /></IconActions>
+ <ExhibitionVisits contacts={data.records.map((r:any)=>({phone:r.data.phone,person:r.data.contactName,company:r.data.company,city:r.data.city}))}/>
  <p className="footnote">{data.help}</p>{error&&<p className="notice error" role="alert">{error}</p>}{message&&<p role="status">{message}</p>}
  <div className="formgrid"><SolarDate label="ایجاد از تاریخ" required={false} value={from} onChange={setFrom}/><SolarDate label="ایجاد تا تاریخ" required={false} value={to} onChange={setTo}/><button className="btn" onClick={()=>void load().catch(e=>setError(e.message))}>اعمال بازه گزارش</button></div>
  <div className="flow-card"><strong>گزارش پرونده‌های ایجادشده در بازه انتخابی</strong><p>کل: {dash.total} · باز: {dash.open} · تبدیل به سفارش: {dash.converted} · نرخ تبدیل: {dash.conversionRate===null?'—':dash.conversionRate+'٪'}</p><p>پیگیری معوق: {dash.overdue} · بدون تماس در هفت روز اخیر: {dash.stalled} · مسئول غیرفعال: {dash.inactiveOwners}</p><p>مبلغ تخمینی فرصت‌های باز: {amount(dash.estimatedOpenRial)} · {dash.unknownEstimates} پرونده بدون برآورد</p></div>

@@ -60,7 +60,8 @@ async function sendChallenge(account:Account,mobile:string,purpose:Purpose,token
  if(!row.meta.changes)throw invalid();
  await sendNafasyarSms(mobile,purpose==='reset'?'هم‌نفس\nکد بازیابی رمز: '+code+'\nاعتبار: ۵ دقیقه':'هم‌نفس\nکد تأیید شماره بازیابی: '+code+'\nاعتبار: ۵ دقیقه',undefined,code,report);
  try{
-  const updated=await db.prepare('UPDATE password_recovery_challenges SET delivered=1 WHERE token_hash=?').bind(id).run();
+  const acceptedExpiry=purpose==='enroll'?new Date(Date.now()+5*60000).toISOString():expires;
+  const updated=await db.prepare('UPDATE password_recovery_challenges SET delivered=1,expires=? WHERE token_hash=?').bind(acceptedExpiry,id).run();
   if(!updated.meta.changes)report('challenge_changed');
  }catch(error){
   report('challenge_unavailable');
@@ -135,12 +136,24 @@ export async function startRecovery(input:{username?:unknown;mobile?:unknown},cl
 
 async function consumeAttempt(input:{token?:unknown;code?:unknown},purpose:Purpose,memberId=''){
  const {token}=input,code=typeof input.code==='string'?asciiDigits(input.code).trim():'';
+ const enrolling=purpose==='enroll'&&!!memberId;
+ if(enrolling&&!/^\d{6}$/.test(code))throw new AccessError('کد پیامک باید شش رقم باشد.',400);
  if(typeof token!=='string'||!/^[a-f0-9]{64}$/.test(token)||!/^\d{6}$/.test(code))throw invalid();
  const id=await digest(token),now=new Date().toISOString();
  const challenge=await storage().prepare(`UPDATE password_recovery_challenges SET attempts=attempts+1
   WHERE token_hash=? AND purpose=? AND delivered=1 AND expires>? AND attempts<5 AND (?='' OR member_id=?)
   RETURNING token_hash,member_id,mobile,version,recovery_revision,proof`).bind(id,purpose,now,memberId,memberId).first<Challenge>();
- if(!challenge||!same(await digest(token+':'+code),challenge.proof))throw invalid();
+ if(!challenge){
+  if(!enrolling)throw invalid();
+  const state=await storage().prepare('SELECT expires,attempts FROM password_recovery_challenges WHERE token_hash=? AND purpose=? AND member_id=?').bind(id,purpose,memberId).first<{expires:string;attempts:number}>();
+  if(state&&state.expires<=now)throw new AccessError('مهلت پنج‌دقیقه‌ای این کد تمام شده است. کد تازه بگیرید.',400);
+  if(state&&state.attempts>=5)throw new AccessError('پنج بار برای این کد تلاش شده است. کد تازه بگیرید.',400);
+  throw new AccessError('این درخواست دیگر فعال نیست. از آخرین فرم ارسال کد استفاده کنید.',400);
+ }
+ if(!same(await digest(token+':'+code),challenge.proof)){
+  if(enrolling)throw new AccessError('کد واردشده با کد آخرین درخواست تطبیق ندارد.',400);
+  throw invalid();
+ }
  const account=await lookup('member_id',challenge.member_id);
  if(!account||account.version!==challenge.version||account.recovery_revision!==challenge.recovery_revision)throw invalid();
  return {account,challenge};
