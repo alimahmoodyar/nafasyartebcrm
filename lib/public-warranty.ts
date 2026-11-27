@@ -87,7 +87,7 @@ export async function requestPublicWarranty(raw:unknown,client:string){
  await db.prepare("DELETE FROM flow_entities WHERE id IN (SELECT id FROM flow_entities WHERE type=? AND json_extract(data,'$.expires')<? LIMIT 20)").bind(ticketType,now).run().catch(()=>{});
  await db.prepare('INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES(?,?,?,1,?,?)').bind(id,ticketType,JSON.stringify(ticket),now,now).run();
  const code=generateActivationCode(details.deviceCode);
- await sendNafasyarSms(details.customer.mobile,`نفس‌یار طب\nکد فعال‌سازی: ${code}\nکد را روی دستگاه وارد کنید.`);
+ await sendNafasyarSms(details.customer.mobile,`نفس‌یار طب\nکد فعال‌سازی: ${code}\nکد را روی دستگاه وارد کنید.`,undefined,undefined,'warranty_activation');
  await db.prepare("UPDATE flow_entities SET data=json_set(data,'$.state','sent'),revision=revision+1,updated=? WHERE id=? AND revision=1").bind(now,id).run();
  return {token,mobileLast4:details.customer.mobile.slice(-4)};
 }
@@ -127,7 +127,7 @@ export async function confirmPublicWarranty(raw:unknown,token:unknown,entered:un
   db.prepare('UPDATE flow_entities SET data=?,revision=revision+1,updated=? WHERE id=? AND revision=?').bind(JSON.stringify({...ticket,state:'complete',result}),now,id,row.revision),
  ]);
  try{
-  await sendNafasyarSms(customer.mobile,'به خانوادهٔ نفس‌یار خوش آمدید!\nشروع گارانتی دستگاه: '+localizedDate.format(new Date(now)));
+  await sendNafasyarSms(customer.mobile,'به خانوادهٔ نفس‌یار خوش آمدید!\nشروع گارانتی دستگاه: '+localizedDate.format(new Date(now)),undefined,undefined,'warranty_welcome');
   result.welcomeStatus='sent';
  }catch{result.welcomeStatus='unconfirmed';}
  await db.prepare("UPDATE flow_entities SET data=json_set(data,'$.result.welcomeStatus',?),revision=revision+1,updated=? WHERE id=? AND type=?")

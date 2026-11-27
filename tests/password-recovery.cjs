@@ -54,7 +54,7 @@ function load(file){
    return require(name);
   },
   fetch:(...args)=>smsFetch(...args),Response,Request,URL,URLSearchParams,Error,SyntaxError,crypto:globalThis.crypto,Date,Intl,
-  TextEncoder,TextDecoder,Uint8Array,ArrayBuffer,AbortController,ReadableStream,btoa,atob,setTimeout,clearTimeout,console,
+  TextEncoder,TextDecoder,Uint8Array,ArrayBuffer,AbortController,AbortSignal,ReadableStream,btoa,atob,setTimeout,clearTimeout,console,
  },{filename:absolute});
  return exports;
 }const auth=load('lib/authorization.ts'),login=load('app/api/auth/login/route.ts');
@@ -68,6 +68,8 @@ const request=(path,method='GET',body,headers={})=>new Request(base+path,{
  // Recovery uses the real routes, migrated SQLite tables and the configured SMS adapter with a fake provider.
  cookie='';
  env.SMSIR_API_KEY='synthetic-recovery-key';env.SMSIR_LINE_NUMBER='100045715000';
+ const reportRoute=load('app/api/admin/sms-report/route.ts'),reportPath='/api/admin/sms-report';
+ const listReport=(suffix='')=>reportRoute.GET(request(reportPath+suffix));
  const recovery=load('app/api/auth/recovery/route.ts'),authPath='/api/auth/recovery';
  const sent=[];let smsFails=false;
  smsFetch=async(url,options)=>{
@@ -115,9 +117,14 @@ const request=(path,method='GET',body,headers={})=>new Request(base+path,{
   const result=await publicReply.json();assert.deepEqual(Object.keys(result),['token']);assert.match(result.token,/^[a-f0-9]{64}$/);
  }
  assert.equal(sent.length,0);
+ assert.equal((await listReport()).status,401);
  const workerCookie=await useSession('recovery-worker',workerPassword);cookie=workerCookie;
+ assert.equal((await listReport()).status,403);
  assert.equal((await setup(adminId,workerMobile,workerPassword)).status,409);
  assert.equal((await setup(workerId,workerMobile,'wrong')).status,403);
+ const line=env.SMSIR_LINE_NUMBER;delete env.SMSIR_LINE_NUMBER;
+ assert.equal((await setup(workerId,workerMobile,workerPassword)).status,503);
+ env.SMSIR_LINE_NUMBER=line;
  smsFails=true;assert.equal((await setup(workerId,workerMobile,workerPassword)).status,503);smsFails=false;
  assert.equal(sql.prepare('SELECT recovery_mobile FROM password_accounts WHERE member_id=?').get(workerId).recovery_mobile,null);
  const workerChallenge=await setup(workerId,'۰۹۱۲۰۰۰۰۱۲۳',workerPassword);
@@ -162,7 +169,40 @@ const request=(path,method='GET',body,headers={})=>new Request(base+path,{
  const secondAdmin=await (await publicStart(adminUsername,adminMobile)).json();
  assert.equal((await publicFinish(secondAdmin.token,sent.at(-1).code,'Recovery-admin-another-123',adminSetup.backupCode)).status,400);
  await useSession(adminUsername,'Recovery-admin-next-123');
+ cookie=await useSession(adminUsername,'Recovery-admin-next-123');
+ const filtered=await listReport('?purpose=recovery_enroll&last4='+encodeURIComponent('۰۱۲۳'));
+ assert.equal(filtered.status,200);assert.match(filtered.headers.get('cache-control'),/no-store/);
+ const {entries}=await filtered.json();
+ assert(entries.every(x=>x.last4==='0123'&&x.purpose==='recovery_enroll'));
+ assert(entries.some(x=>x.outcome==='invalid_password'));
+ assert(entries.some(x=>x.outcome==='config_unavailable'));
+ assert(entries.some(x=>x.outcome==='provider_rejected'&&x.httpStatus===400&&x.panelCode===101));
+ const accepted=entries.find(x=>x.outcome==='provider_accepted');
+ assert.equal(accepted.messageId,321);
+ assert.equal((await listReport('?entry='+entries.find(x=>x.outcome==='invalid_password').id)).status,404);
+ assert.equal((await listReport('?last4='+workerMobile)).status,400);
+ smsFetch=async(url,options)=>{
+  assert.equal(url,'https://api.sms.ir/v1/send/321');
+  assert.equal(options.headers['X-API-KEY'],env.SMSIR_API_KEY);
+  assert.equal(options.redirect,'error');
+  return Response.json({status:1,data:{messageId:321,deliveryState:2,mobile:workerMobile,messageText:workerCode}});
+ };
+ const delivered=await listReport('?entry='+accepted.id);
+ assert.deepEqual(await delivered.json(),{deliveryState:2});
+ const storedReports=sql.prepare("SELECT data FROM flow_entities WHERE type='sms_attempt_report'").all().map(row=>JSON.parse(row.data));
+ const rawReports=JSON.stringify(storedReports);
+ for(const secret of [adminSetup.backupCode,workerMobile,adminMobile,workerProof.token,workerPassword,env.SMSIR_API_KEY])assert.ok(!rawReports.includes(secret));
+ assert.ok(!rawReports.includes(JSON.stringify(workerCode)));
+ const reportKeys=['purpose','outcome','last4','httpStatus','panelCode','messageId'];
+ assert(storedReports.every(entry=>Object.keys(entry).every(k=>reportKeys.includes(k))));
+ const domain=load('lib/sms-report.ts');
+ for(let i=0;i<26;i++)await domain.withSmsReport('admin_test',async record=>record('provider_accepted',{mobile:workerMobile,messageId:i+500}));
+ const firstPage=await (await listReport('?purpose=admin_test')).json();
+ assert.equal(firstPage.entries.length,25);assert.ok(firstPage.nextCursor);
+ const secondPage=await (await listReport('?purpose=admin_test&before='+encodeURIComponent(firstPage.nextCursor))).json();
+ assert.equal(secondPage.entries.length,1);assert.equal(secondPage.nextCursor,null);
+ assert.ok(!firstPage.entries.some(x=>x.id===secondPage.entries[0].id));
  const auditLog=JSON.stringify(sql.prepare('SELECT * FROM access_audit').all());
  assert.ok(!auditLog.includes(adminSetup.backupCode)&&!auditLog.includes(adminMobile)&&!auditLog.includes(workerMobile));
- console.log('Password recovery passed: confirmed mobile, protected admin backup and rotation, SMS adapter, generic replies, expiry/replay, session revocation and no recovery secrets in audit.');
+ console.log('Password recovery passed: confirmed mobile, protected admin backup and rotation, SMS adapter, generic replies, expiry/replay, session revocation, SMS report permissions, preflight/rejection/acceptance diagnostics, safe delivery status, pagination and no recovery secrets in audit.');
 })().catch(e=>{console.error(e);process.exit(1)});

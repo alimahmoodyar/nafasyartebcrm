@@ -4,6 +4,7 @@ import {assetSmsReady,sendNafasyarSms} from './asset-sms';
 import {digest,hashPassword,newToken,password,username,verifyPassword} from './password-auth';
 import {rate} from './sms-rate';
 import {storage} from './storage';
+import {withSmsReport,type SmsReportUpdate} from './sms-report';
 
 type Purpose='enroll'|'reset';
 type Account={member_id:string;subject:string|null;username:string;password_hash:string;version:number;recovery_revision:number;recovery_mobile:string|null;recovery_backup_hash:string|null;admin:number};
@@ -45,7 +46,8 @@ function smsCode(){
  return String(sample[0]%1000000).padStart(6,'0');
 }
 
-async function sendChallenge(account:Account,mobile:string,purpose:Purpose,token:string){
+async function sendChallenge(account:Account,mobile:string,purpose:Purpose,token:string,report:SmsReportUpdate){
+ report('challenge_unavailable',{mobile});
  const db=storage(),code=smsCode(),id=await digest(token),proof=await digest(token+':'+code);
  const now=new Date().toISOString(),expires=new Date(Date.now()+5*60000).toISOString();
  await db.prepare('DELETE FROM password_recovery_challenges WHERE token_hash IN (SELECT token_hash FROM password_recovery_challenges WHERE expires<=? LIMIT 30)').bind(now).run();
@@ -56,40 +58,70 @@ async function sendChallenge(account:Account,mobile:string,purpose:Purpose,token
   recovery_revision=excluded.recovery_revision,proof=excluded.proof,expires=excluded.expires,attempts=0,delivered=0`)
   .bind(id,purpose,mobile,proof,expires,account.member_id,account.version,account.recovery_revision).run();
  if(!row.meta.changes)throw invalid();
- await sendNafasyarSms(mobile,purpose==='reset'?'هم‌نفس\nکد بازیابی رمز: '+code+'\nاعتبار: ۵ دقیقه':'هم‌نفس\nکد تأیید شماره بازیابی: '+code+'\nاعتبار: ۵ دقیقه',undefined,code);
- await db.prepare('UPDATE password_recovery_challenges SET delivered=1 WHERE token_hash=?').bind(id).run();
+ await sendNafasyarSms(mobile,purpose==='reset'?'هم‌نفس\nکد بازیابی رمز: '+code+'\nاعتبار: ۵ دقیقه':'هم‌نفس\nکد تأیید شماره بازیابی: '+code+'\nاعتبار: ۵ دقیقه',undefined,code,report);
+ try{
+  const updated=await db.prepare('UPDATE password_recovery_challenges SET delivered=1 WHERE token_hash=?').bind(id).run();
+  if(!updated.meta.changes)report('challenge_changed');
+ }catch(error){
+  report('challenge_unavailable');
+  throw error;
+ }
 }
 export async function recoveryStatus(memberId:string){
  const account=await lookup('member_id',memberId);
  if(!account)throw new AccessError('حساب فعال یافت نشد.',401);
  return {mobileLast4:account.recovery_mobile?.slice(-4)||null,requiresBackup:!!account.admin};
 }
-export async function startEnrollment(memberId:string,input:{mobile?:unknown;currentPassword?:unknown;backupCode?:unknown}){
- const mobile=recoveryMobile(input.mobile);
- await rate('recovery-enroll-password',memberId,10,15*60000);
- const account=await lookup('member_id',memberId);
- if(!account||typeof input.currentPassword!=='string'||input.currentPassword.length>128||!await verifyPassword(input.currentPassword,account.password_hash))
-  throw new AccessError('رمز فعلی صحیح نیست.',403);
- if(account.admin&&account.recovery_mobile&&mobile!==account.recovery_mobile&&!await matchesBackup(account,input.backupCode))
-  throw new AccessError('برای تغییر شمارهٔ بازیابی مدیر اصلی، کد پشتیبان فعلی را وارد کنید.',403);
- if(await storage().prepare('SELECT 1 FROM password_accounts WHERE recovery_mobile=? AND member_id<>?').bind(mobile,memberId).first())
-  throw new AccessError('این شماره برای بازیابی حساب دیگری ثبت شده است.',409);
+async function checkRecoverySms(report:SmsReportUpdate){
+ report('config_unavailable');
  if(!await assetSmsReady())throw new AccessError('تنظیمات ارسال پیامک هنوز آماده نیست.',503);
- await rate('recovery-enroll-send',memberId,4,30*60000);
- await rate('recovery-enroll-destination',mobile,5,60*60000);
- const token=newToken();
- await sendChallenge(account,mobile,'enroll',token);
- return {token};
+ report('internal_error');
+}
+export async function startEnrollment(memberId:string,input:{mobile?:unknown;currentPassword?:unknown;backupCode?:unknown}){
+ return withSmsReport('recovery_enroll',async report=>{
+  report('invalid_mobile');
+  const mobile=recoveryMobile(input.mobile);
+  report('internal_error',{mobile});
+  await rate('recovery-enroll-password',memberId,10,15*60000);
+  const account=await lookup('member_id',memberId);
+  if(!account||typeof input.currentPassword!=='string'||input.currentPassword.length>128||!await verifyPassword(input.currentPassword,account.password_hash)){
+   report('invalid_password');
+   throw new AccessError('رمز فعلی صحیح نیست.',403);
+  }
+  if(account.admin&&account.recovery_mobile&&mobile!==account.recovery_mobile&&!await matchesBackup(account,input.backupCode)){
+   report('backup_required');
+   throw new AccessError('برای تغییر شمارهٔ بازیابی مدیر اصلی، کد پشتیبان فعلی را وارد کنید.',403);
+  }
+  if(await storage().prepare('SELECT 1 FROM password_accounts WHERE recovery_mobile=? AND member_id<>?').bind(mobile,memberId).first()){
+   report('mobile_in_use');
+   throw new AccessError('این شماره برای بازیابی حساب دیگری ثبت شده است.',409);
+  }
+  await checkRecoverySms(report);
+  await rate('recovery-enroll-send',memberId,4,30*60000);
+  await rate('recovery-enroll-destination',mobile,5,60*60000);
+  const token=newToken();
+  await sendChallenge(account,mobile,'enroll',token,report);
+  return {token};
+ });
 }
 export async function startRecovery(input:{username?:unknown;mobile?:unknown},client:string){
  const name=validateInput(()=>username(input.username)),mobile=recoveryMobile(input.mobile),token=newToken();
  await rate('recovery-request-client',client,15,30*60000);
  const account=await lookup('username',name);
- if(account?.recovery_mobile!==mobile||account.admin&&!account.recovery_backup_hash)return {token};
+ if(!account)return {token};
  try{
-  await rate('recovery-send',account.member_id,3,30*60000);
-  await rate('recovery-global','all',100,60*60000);
-  if(await assetSmsReady())await sendChallenge(account,mobile,'reset',token);
+  await withSmsReport('recovery_reset',async report=>{
+   if(account.recovery_mobile!==mobile||account.admin&&!account.recovery_backup_hash){
+    // Only retain a truncated destination for actual send attempts.
+    report('account_mismatch');
+    return;
+   }
+   report('internal_error',{mobile});
+   await rate('recovery-send',account.member_id,3,30*60000);
+   await rate('recovery-global','all',100,60*60000);
+   await checkRecoverySms(report);
+   await sendChallenge(account,mobile,'reset',token,report);
+  });
  }catch{/* The public response is identical for unknown accounts and undelivered messages. */}
  return {token};
 }
