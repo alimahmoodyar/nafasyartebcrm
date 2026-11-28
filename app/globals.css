@@ -711,3 +711,8 @@ button.hospital-network-option { cursor: pointer; }
 .workspace-home-crumb:hover::before{background:#167b56}
 .workspace-home-crumb:focus-visible{outline:2px solid currentColor;outline-color:#167b56;outline-offset:-2px;border-radius:6px}
 @media(forced-colors:active){.workspace-home-crumb::before{forced-color-adjust:none;background:ButtonText}.workspace-home-crumb span{forced-color-adjust:none;color:ButtonFace}}
+
+.material-passport-edit{grid-column:1/-1;display:grid;gap:16px;align-items:start}
+.material-passport-edit>.formgrid{min-width:0}
+.material-passport-edit>.material-attachments{min-width:0;grid-column:auto!important;margin-top:0!important}
+@media(min-width:768px){.material-passport-edit{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
