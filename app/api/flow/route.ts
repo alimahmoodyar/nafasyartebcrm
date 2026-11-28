@@ -38,6 +38,7 @@ import {materialAccountingCode,materialAccountingKey,materialAccountingSql,nextM
 import {normalizePartCode,receiptDay,suggestBatchNumber} from '@/lib/batch-number';
 import {tehranDay,serialPrefix,nextSerials} from '@/lib/serials';
 import {boundedBody} from '@/lib/firmware-storage';
+function placementNote(value:unknown){if(value===undefined)return '';if(typeof value!=='string'||value.length>500)throw new AccessError('یادداشت محل حداکثر ۵۰۰ نویسه است.',400);return value.trim()}
 const fail=(s:string,status=400):never=>{throw new AccessError(s,status)};
 const text=(s:unknown,max=4000)=>{if(typeof s!=='string'||s.length>max)fail('متن معتبر نیست.');return (s as string).trim()};
 const needed=(s:unknown,max=200)=>{const v=text(s,max);if(!v)fail('فیلد الزامی خالی است.');return v};
@@ -127,7 +128,8 @@ async function previewPOST(request:Request){try{
  }
  put(eid,'material_warehouse',{...(old?.data||{}),name,parentId,serviceDomain,serviceOwner,warehouseType,directReceiptEnabled,quarantineWarehouseId,locations:b.locations,active:b.active,assignmentVersion:2},old);
  }else if(mode==='material_location'){
- const m=await get(needed(b.materialId),'material');if(b.revision!==m.revision)fail('شناسنامه تغییر کرده است.',409);const w=await get(needed(b.warehouseId),'material_warehouse'),directory=(await warehouseDirectory()).find(w=>w.id===b.warehouseId);if(!w.data.active||(!warehouseMember(u,directory,'inventory')&&!materialCatalogEngineer(u)))fail('تعریف محل این انبار در مسئولیت شما نیست.',403);const location=needed(b.location,100);if(!/^[^\s]+-[^\s]+-[^\s]+-[^\s]+$/.test(location)||w.data.locations?.length&&!w.data.locations.includes(location))fail('محل معتبر راهرو-قفسه-طبقه-خانه را انتخاب کنید.');put(m.id,'material',{...m.data,defaultLocations:{...m.data.defaultLocations,[w.id]:location},locationHistory:[...(m.data.locationHistory||[]),{warehouseId:w.id,location,actor:u.userId,name:u.name,at:now}]},m);
+ const m=await get(needed(b.materialId),'material');if(b.revision!==m.revision)fail('شناسنامه تغییر کرده است.',409);const w=await get(needed(b.warehouseId),'material_warehouse'),directory=(await warehouseDirectory()).find(w=>w.id===b.warehouseId);if(!w.data.active||(!warehouseMember(u,directory,'inventory')&&!materialCatalogEngineer(u)))fail('تعریف محل این انبار در مسئولیت شما نیست.',403);const location=needed(b.location,100);if(!/^[^\s]+-[^\s]+-[^\s]+-[^\s]+$/.test(location)||w.data.locations?.length&&!w.data.locations.includes(location))fail('محل معتبر راهرو-قفسه-طبقه-خانه را انتخاب کنید.');const guide=b.locationNote===undefined?(m.data.defaultLocations?.[w.id]===location?m.data.defaultLocationNotes?.[w.id]||'':''):placementNote(b.locationNote);
+ put(m.id,'material',{...m.data,defaultLocationNotes:{...m.data.defaultLocationNotes,[w.id]:guide},defaultLocations:{...m.data.defaultLocations,[w.id]:location},locationHistory:[...(m.data.locationHistory||[]),{warehouseId:w.id,location,note:guide,actor:u.userId,name:u.name,at:now}]},m);
  }else if(mode==='material'){
  const automatic=!b.code&&b.revision===0;
  if(automatic&&technicalMaterialEdit&&!u.isAdmin&&!u.permissions.flowRoles?.includes('inventory'))fail('تعریف کالای جدید با انبار است.',403);
@@ -262,10 +264,29 @@ async function previewPOST(request:Request){try{
  put(r.id,'receipt',{...r.data,qcOwner:owner,qcOwners:[owner],qcAssignment:'assigned',qcAssignmentHistory:[...(r.data.qcAssignmentHistory||[]),{from:r.data.qcOwner||'',to:owner,by:u.name,at:now}]},r);
  }else if(mode==='shelve'){
  const held=await get(needed(b.receiptId),'receipt');if(held.data.subcontractHold)fail('تراز مواد ساخت باید ابتدا توسط مسئول فنی تأیید شود.');
- const r=await get(needed(b.receiptId),'receipt');await warehouseAssignment(r,'warehouseOwner');await assertWarehouseNotCounting(db,r.data.warehouseId||'');if(r.data.purchaseHold)fail('مغایرت خرید هنوز توسط تأمین با سفارش مصوب و کنترل مالی تعیین تکلیف نشده است.',409);if(r.data.state!=='awaiting_warehouse')fail('این بچ آماده انتقال نیست.');const master=await get(r.data.materialId,'material'),displayLoc=String(b.location||'');if(!displayLoc)fail('محل نگهداری در شناسنامه این کالا برای این انبار تعیین نشده است؛ ابتدا شناسنامه را تکمیل کنید.',409);if(b.materialRevision!==master.revision)fail('نشانی شناسنامه تغییر کرده است؛ کار جانمایی را دوباره باز کنید.',409);if(b.placed!==true||b.confirmed!==true)fail('گذاشتن کالا در محل شناسنامه را تأیید کنید.');const loc=storageLocation(r.data.warehouseId||'',displayLoc);if(!/^[^\s|]+-[^\s|]+-[^\s|]+-[^\s|]+$/.test(displayLoc))fail('نشانی شناسنامه معتبر نیست.');
- if(r.data.warehouseId){const w=await get(r.data.warehouseId,'material_warehouse');if(displayLoc!==String(master.data.defaultLocations?.[r.data.warehouseId||'']||'')&&!w.data.locations.includes(displayLoc))fail('محل در این انبار تعریف نشده است.');}
- guard('NOT EXISTS(SELECT 1 FROM flow_slots WHERE location=? AND quantity>0 AND batch_id<>?)',loc,r.data.batchId);
- stmts.push(db.prepare('INSERT INTO flow_slots(location,batch_id,quantity) VALUES(?,?,?) ON CONFLICT(location) DO UPDATE SET batch_id=excluded.batch_id,quantity=flow_slots.quantity+excluded.quantity').bind(loc,r.data.batchId,r.data.accepted));entry(r.data.batchId,'quarantine',-r.data.accepted);entry(r.data.batchId,'raw',r.data.accepted);stmts.push(...await allocateAcceptedPurchase(r.data.purchaseOrderId||'',r.data.batchId,r.data.accepted));put(r.id,'receipt',{...r.data,state:'stored',location:loc,locationLabel:displayLoc,storedBy:u.name,storedAt:now,placementConfirmation:{actor:u.userId,by:u.name,at:now,materialId:master.id,materialRevision:master.revision,location:displayLoc}},r);
+ const r=await get(needed(b.receiptId),'receipt');await warehouseAssignment(r,'warehouseOwner');await assertWarehouseNotCounting(db,r.data.warehouseId||'');if(r.data.purchaseHold)fail('مغایرت خرید هنوز توسط تأمین با سفارش مصوب و کنترل مالی تعیین تکلیف نشده است.',409);if(r.data.state!=='awaiting_warehouse')fail('این بچ آماده انتقال نیست.');const master=await get(r.data.materialId,'material');
+ if(b.materialRevision!==master.revision)fail('نشانی شناسنامه تغییر کرده است؛ کار جانمایی را دوباره باز کنید.',409);
+ if(b.placed!==true||b.confirmed!==true)fail('گذاشتن کالا در محل‌های انتخاب‌شده را تأیید کنید.');
+ const warehouseId=r.data.warehouseId||'',warehouse=warehouseId?await get(warehouseId,'material_warehouse'):null;
+ const defaultLocation=master.data.defaultLocations?.[warehouseId]||'';
+ const input=b.placements===undefined?[{location:b.location,quantity:String(r.data.accepted/1000)}]:b.placements;
+ if(!Array.isArray(input)||!input.length)fail('دست‌کم یک محل جانمایی لازم است.');
+ const seen=new Set<string>();
+ const placements=input.map((item:any)=>{
+  const location=needed(item?.location,100);
+  if(!/^[^\s|]+-[^\s|]+-[^\s|]+-[^\s|]+$/.test(location))fail('نشانی محل نگهداری معتبر نیست.');
+  if(warehouse&&location!==defaultLocation&&!warehouse.data.locations?.includes(location))fail('محل در این انبار تعریف نشده است.');
+  if(seen.has(location))fail('هر خانه را فقط یک بار وارد کنید.');
+  seen.add(location);
+  let quantity:number;try{quantity=scaled(item.quantity)}catch{throw new AccessError('مقدار هر خانه باید مثبت و حداکثر سه رقم اعشار باشد.',400)}
+  return {location,label:location,slot:storageLocation(warehouseId,location),quantity,note:placementNote(item.note)};
+ });
+ if(placements.reduce((sum:number,p:{quantity:number})=>sum+p.quantity,0)!==r.data.accepted)fail('جمع مقادیر خانه‌ها باید دقیقاً برابر مقدار پذیرفته‌شدهٔ کنترل کیفیت باشد.');
+ const json=JSON.stringify(placements);
+ guard("NOT EXISTS(SELECT 1 FROM flow_slots s JOIN json_each(?) p ON s.location=json_extract(p.value,'$.slot') WHERE s.quantity>0 AND s.batch_id<>?)",json,r.data.batchId);
+ stmts.push(db.prepare("INSERT INTO flow_slots(location,batch_id,quantity) SELECT json_extract(value,'$.slot'),?,json_extract(value,'$.quantity') FROM json_each(?) WHERE 1 ON CONFLICT(location) DO UPDATE SET batch_id=excluded.batch_id,quantity=flow_slots.quantity+excluded.quantity").bind(r.data.batchId,json));
+ const loc=placements.length===1?placements[0].slot:'',displayLoc=placements.map((p:{location:string})=>p.location).join('، ');
+ entry(r.data.batchId,'quarantine',-r.data.accepted);entry(r.data.batchId,'raw',r.data.accepted);stmts.push(...await allocateAcceptedPurchase(r.data.purchaseOrderId||'',r.data.batchId,r.data.accepted));put(r.id,'receipt',{...r.data,state:'stored',location:loc,locationLabel:displayLoc,storedBy:u.name,storedAt:now,placementConfirmation:{actor:u.userId,by:u.name,at:now,materialId:master.id,materialRevision:master.revision,defaultLocationNote:master.data.defaultLocationNotes?.[warehouseId]||'',placements,location:displayLoc}},r);
  }else if(mode==='request_edit'||mode==='confirm_material_request'){
  const r=await get(needed(b.requestId),'request');if(!['pending','line_review'].includes(r.data.state))fail('درخواست پس از تحویل فیزیکی قابل ویرایش نیست.',409);if(b.revision!==r.revision)fail('درخواست تغییر کرده است.',409);if(r.data.requestedQuantity!=null)fail('پس از ارسال بخشی از درخواست، مقدار اولیه قابل ویرایش نیست.',409);put(r.id,'request',{...r.data,quantity:scaled(b.quantity),notes:text(b.notes||''),state:mode==='confirm_material_request'?'pending':r.data.state,reviewedBy:mode==='confirm_material_request'?u.userId:r.data.reviewedBy,reviewHistory:[...(r.data.reviewHistory||[]),{mode,quantity:scaled(b.quantity),actor:u.userId,name:u.name,at:now}]},r);
  }else if(mode==='return_line_discrepancy'){const r=await get(needed(b.requestId),'request');await warehouseAssignment(r,'warehouseOwner');if(r.data.state!=='line_discrepancy'||b.revision!==r.revision)fail('مغایرت تغییر کرده است.',409);put(r.id,'request',{...r.data,state:'awaiting_line_receipt',returnReason:needed(b.reason,4000),returnedBy:u.userId,returnedAt:now},r);

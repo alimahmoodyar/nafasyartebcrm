@@ -53,6 +53,40 @@ const p=await create('product',{code:'FLOW',name:'FlowDevice',group:'سایر ت
  const wRow=sql.prepare('SELECT data FROM flow_entities WHERE id=?').get(receivingFixture.id);const wd=JSON.parse(wRow.data);wd.locations=[...new Set([...(wd.locations||[]),'A-1-1-2'])];sql.prepare('UPDATE flow_entities SET data=? WHERE id=?').run(JSON.stringify(wd),receivingFixture.id);
  let alt=await flow.POST(request('/api/flow','POST',{id:crypto.randomUUID(),mode:'shelve',receiptId:r2.id,location:'Z-9-9-9',materialRevision:mBefore.revision,placed:true,confirmed:true}));assert.equal(alt.status,400);
  alt=await flow.POST(request('/api/flow','POST',{id:crypto.randomUUID(),mode:'shelve',receiptId:r2.id,location:'A-1-1-2',materialRevision:mBefore.revision,placed:true,confirmed:true}));assert.equal(alt.status,200,await alt.text());assert.equal(sql.prepare('SELECT data FROM flow_entities WHERE id=?').get('material:01').data,mBefore.data);
+ // Exercise placement against the real QC, receipt and stock endpoints.
+ await op('material',{code:'98101',name:'Split fixture',unit:'کیلوگرم',specs:'V1',fields,qcOwner:'',warehouseOwner:'',procurementOwner:'',revision:0});
+ const materialId='material:98101', bins=['B-1-1-1','B-1-1-2'];
+ wd.locations.push(...bins);
+ sql.prepare('UPDATE flow_entities SET data=? WHERE id=?').run(JSON.stringify(wd),receivingFixture.id);
+ const read=id=>JSON.parse(sql.prepare('SELECT data FROM flow_entities WHERE id=?').get(id).data);
+ const rev=id=>sql.prepare('SELECT revision FROM flow_entities WHERE id=?').get(id).revision;
+ await op('material_location',{materialId,revision:rev(materialId),location:bins[0],locationNote:'upper shelf'});
+ assert.equal(read(materialId).defaultLocationNotes[receivingFixture.id],'upper shelf');
+ await op('receipt',{materialId,day:'2026-10-01',quantity:'10',supplier:'Supplier',specs:'V1'});
+ const receiptId=entities('receipt').find(r=>r.data.materialId===materialId).id;
+ await op('incoming_qc',{receiptId,accepted:'8',rejected:'2',values:{purity:'94'},notes:'2 damaged'});
+ const rows=[{location:bins[0],quantity:'5.125',note:'front'},{location:bins[1],quantity:'2.875',note:'back'}];
+ const shelfBody={mode:'shelve',receiptId,materialRevision:rev(materialId),placed:true,confirmed:true};
+ async function place(placements,status,id=crypto.randomUUID()){
+  const res=await flow.POST(request('/api/flow','POST',{...shelfBody,id,placements}));
+  assert.equal(res.status,status,await res.text());
+ }
+ for(const quantity of ['2.874','2.876','0','-1'])await place([rows[0],{...rows[1],quantity}],400);
+ await place([rows[0],{...rows[1],location:bins[0]}],400);
+ await place([rows[0],{...rows[1],location:'A-1-1-2'}],409);
+ assert.equal(stock(receiptId,'quarantine'),10000);
+ assert.equal(stock(receiptId,'raw'),0);
+ assert.equal(sql.prepare('SELECT COUNT(*) AS n FROM flow_slots WHERE batch_id=?').get(receiptId).n,0);
+ const placementId=crypto.randomUUID();
+ await place(rows,200,placementId);
+ await place(rows,200,placementId);
+ const saved=read(receiptId).placementConfirmation;
+ assert.equal(saved.defaultLocationNote,'upper shelf');
+ assert.deepEqual(saved.placements.map(p=>[p.location,p.quantity,p.note]),[[bins[0],5125,'front'],[bins[1],2875,'back']]);
+ assert.deepEqual(sql.prepare('SELECT quantity FROM flow_slots WHERE batch_id=? ORDER BY location').all(receiptId).map(r=>r.quantity),[5125,2875]);
+ assert.equal(stock(receiptId,'quarantine'),2000);
+ assert.equal(stock(receiptId,'raw'),8000);
+ if(process.argv.includes('--placement-only')){console.log('PASS: QC split placement, exact totals, notes, occupancy, rollback and retry');return;}
  await operate({mode:'move',batchId:r1.id,from:'raw',to:'line',quantity:'1'},400);
  const req=crypto.randomUUID();await op('request',{id:req,materialId:'material:01',quantity:'10',notes:'daily'});
  const expectedIssue=[{batchId:r1.id,location:'A-1-1-1',quantity:'8'},{batchId:r2.id,location:'A-1-1-2',quantity:'2'}];
