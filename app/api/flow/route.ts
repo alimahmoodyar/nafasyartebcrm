@@ -68,7 +68,7 @@ async function previewPOST(request:Request){try{
  checkOrigin(request);const u=await requireAccess();const b=JSON.parse(new TextDecoder().decode(await boundedBody(request,180000)));const id=needed(b.id,80);if(!/^[a-f0-9-]{36}$/i.test(id))fail('شناسه عملیات معتبر نیست.');const mode=needed(b.mode,40),db=storage(),now=new Date().toISOString();
  if(mode==='receipt'&&b.receiptVersion===2&&b.confirmed!==true)fail('تأیید ثبت دریافت لازم است.');
  const technicalMaterialEdit=['material','material_location'].includes(mode)&&materialCatalogEngineer(u);
- const role:Record<string,string>={warehouse:'inventory',material_location:'inventory',material:'inventory',receipt:'inventory',start_incoming_qc:'qc',edit_receipt:'inventory',request_receipt_edit:'inventory',correct_receipt_material:'qc',confirm_receipt_relabel:'inventory',return_rejected_purchase:'inventory',incoming_qc:'qc',assign_qc:'inventory',shelve:'inventory',request:'production',request_edit:'production',confirm_material_request:'production',agree_line_quantity:'inventory',return_line_discrepancy:'inventory',issue:'inventory',confirm_line_receipt:'production',supply:'inventory',supply_close:'procurement',capacity:'production',plan:'production',assign:'production',prepare:'production',build:'production',reject:'production',repair:'production',print:'production'};
+ const role:Record<string,string>={warehouse:'inventory',remove_test_stock:'inventory',material_location:'inventory',material:'inventory',receipt:'inventory',start_incoming_qc:'qc',edit_receipt:'inventory',request_receipt_edit:'inventory',correct_receipt_material:'qc',confirm_receipt_relabel:'inventory',return_rejected_purchase:'inventory',incoming_qc:'qc',assign_qc:'inventory',shelve:'inventory',request:'production',request_edit:'production',confirm_material_request:'production',agree_line_quantity:'inventory',return_line_discrepancy:'inventory',issue:'inventory',confirm_line_receipt:'production',supply:'inventory',supply_close:'procurement',capacity:'production',plan:'production',assign:'production',prepare:'production',build:'production',reject:'production',repair:'production',print:'production'};
  if(!role[mode]||(!flowRole(u,role[mode])&&!technicalMaterialEdit&&!(['request','request_edit','confirm_material_request','confirm_line_receipt'].includes(mode)&&flowRole(u,'inventory')&&warehouseAccess(u,'line'))))fail('دسترسی این عملیات را ندارید.',403);
  if(mode==='material'&&!u.isAdmin&&!u.permissions.flowRoles?.includes('inventory')&&!technicalMaterialEdit)fail('تعریف کالا به نقش عمومی انبار نیاز دارد.',403);
  if(['receipt','return_rejected_purchase'].includes(mode)&&!warehouseAccess(u,'quarantine')||mode==='shelve'&&(!warehouseAccess(u,'quarantine')||!warehouseAccess(u,'raw'))||mode==='issue'&&!warehouseAccess(u,'raw'))fail('این انبار در مسئولیت شما نیست.',403);
@@ -92,7 +92,40 @@ async function previewPOST(request:Request){try{
  async function assignee(mid:string,role:string,warehouseId=''){if(!mid)return '';const m:any=await db.prepare("SELECT permissions FROM app_members WHERE id=? AND status='active'").bind(mid).first();const directory=m&&warehouseId?(await warehouseDirectory(undefined,[{...m,id:mid}])).find(w=>w.id===warehouseId):null;if(!m||!((storedAccessPermissions(m.permissions).flowRoles||[]).includes(role)||storedAccessPermissions(m.permissions).warehouseResponsibilities?.some(r=>r.role===role&&r.warehouseId===warehouseId)||directory?.[role+'Members']?.some((member:any)=>member.id===mid)))fail('مسئول انتخاب‌شده دسترسی این مرحله را ندارد.');guard("EXISTS(SELECT 1 FROM app_members WHERE id=? AND status='active' AND permissions=?)",mid,m.permissions);return mid;}
  function assigned(e:any,key:string){if(u.isAdmin)return;const owner=e.data[key];if(owner&&u.userId!=='local:'+owner&&u.userId!==owner)guard('EXISTS(SELECT 1 FROM app_members WHERE id=? AND subject=?)',owner,u.userId);}
  async function warehouseAssignment(r:any,key:string){if(!r.data.warehouseId){if(!u.isAdmin&&!u.permissions.flowRoles?.includes(key==='qcOwner'?'qc':'inventory'))fail('این محموله در محدوده مسئولیت انبار شما نیست.',403);if(key==='qcOwner'&&!r.data.qcOwner&&!u.isAdmin)fail('برای این محموله ابتدا مسئول کنترل کیفیت تعیین شود.',403);assigned(r,key);return r.data[key]||'';}const assignedWarehouse=key==='qcOwner'?r.data.quarantineWarehouseId||r.data.warehouseId:r.data.warehouseId;await get(assignedWarehouse,'material_warehouse');const w=(await warehouseDirectory()).find(w=>w.id===assignedWarehouse);if(!w)fail('انبار پیدا نشد.');const role=key==='qcOwner'?'qc':'inventory';if(role==='qc'){const owners=receiptQcOwners(r,w);if(!owners.length&&!u.isAdmin&&!u.profileReview)fail('برای این محموله ابتدا مسئول کنترل کیفیت تعیین شود.');if(!warehouseMember(u,{id:w.id,qcMembers:w.qcMembers.filter((m:any)=>owners.includes(m.id))},'qc'))fail('کنترل این محموله به فرد دیگری ارجاع شده است.',403);const owner=w.qcMembers.find((m:any)=>owners.includes(m.id)&&[m.id,'local:'+m.id,m.subject].includes(u.userId))?.id||'';if(owner)await assignee(owner,'qc',w.id);return owner;}if(!warehouseMember(u,w,'inventory'))fail('این مرحله در مسئولیت شما برای این انبار نیست.',403);const member=w.inventoryMembers.find((m:any)=>[m.id,'local:'+m.id,m.subject].includes(u.userId));if(member)await assignee(member.id,'inventory',w.id);return member?.id||'';}
- if(mode==='warehouse'){
+ if(mode==='remove_test_stock'){
+  if(!u.isAdmin||u.profileReview||u.rolePreview)fail('خارج کردن موجودی آزمایشی فقط برای مدیر سامانه مجاز است.',403);
+  const receipt=await get(needed(b.batchId),'receipt');
+  const batch=await record(receipt.data.batchId,'batch');
+  const blocked='این بچ به خرید، مصرف، انتقال یا سابقهٔ عملیاتی متصل است و از این مسیر قابل پاک‌سازی نیست.';
+  if(receipt.data.purchaseOrderId||receipt.data.purchaseHold||receipt.data.correction||receipt.data.relabel||receipt.data.supplierReturns?.length)fail(blocked,409);
+  if(!['pending_qc','awaiting_qc_template','awaiting_warehouse','stored','rejected'].includes(receipt.data.state))fail('این بچ برای پاک‌سازی موجودی آزمایشی آماده نیست.',409);
+  await assertWarehouseNotCounting(db,receipt.data.warehouseId||'');
+  const untouched=`NOT EXISTS(SELECT 1 FROM inventory_entries e JOIN inventory_operations o ON o.id=e.operation_id
+    WHERE e.item_id=? AND o.kind NOT IN ('opening','flow_receipt','flow_incoming_qc','flow_shelve'))
+   AND NOT EXISTS(SELECT 1 FROM production_materials WHERE batch_id=?)
+   AND NOT EXISTS(SELECT 1 FROM flow_entities f, json_tree(f.data) field
+     WHERE f.id<>? AND f.type IN ('accounting_valuation','build','repair','request') AND field.type='text' AND field.value=?)
+   AND NOT EXISTS(SELECT 1 FROM records r WHERE json_extract(r.payload,'$.batch')=? OR json_extract(r.payload,'$.replacement')=?)`;
+  const references=[batch.id,batch.id,receipt.id,batch.id,batch.id,batch.id];
+  if(!await db.prepare('SELECT 1 AS ok WHERE '+untouched).bind(...references).first())fail(blocked,409);
+  guard(untouched,...references);
+  const balanceQuery='SELECT warehouse,quantity FROM inventory_balances WHERE item_id=? AND quantity<>0 ORDER BY warehouse';
+  const balances=(await db.prepare(balanceQuery).bind(batch.id).all<{warehouse:string;quantity:number}>()).results;
+  if(!balances.length)fail('این بچ موجودی قابل پاک‌سازی ندارد.',409);
+  if(balances.some(row=>row.quantity<=0||!['raw','quarantine','rejected','scrap'].includes(row.warehouse)))fail(blocked,409);
+  const revision=receipt.revision;
+  const code=batch.data.code;
+  if(b.previewOnly===true)return json({batchId:batch.id,code,name:batch.data.part,unit:batch.data.unit,quantity:balances.reduce((sum,row)=>sum+row.quantity,0),revision,balances});
+  if(b.confirmed!==true||b.revision!==revision||b.code!==code||JSON.stringify(b.balances)!==JSON.stringify(balances))fail('برای پاک‌سازی، دوباره جزئیات و کد همین بچ را تأیید کنید.',409);
+  const reason=needed(b.reason,500);
+  guard('((SELECT count(*) FROM inventory_balances WHERE item_id=? AND quantity<>0)=?)',batch.id,balances.length);
+  for(const row of balances){
+   guard('EXISTS(SELECT 1 FROM inventory_balances WHERE item_id=? AND warehouse=? AND quantity=?)',batch.id,row.warehouse,row.quantity);
+   entry(batch.id,row.warehouse,-row.quantity);
+  }
+  stmts.push(db.prepare('DELETE FROM flow_slots WHERE batch_id=?').bind(batch.id));
+  put(receipt.id,'receipt',{...receipt.data,state:'test_stock_removed',testStockRemoval:{at:now,actor:u.userId,reason,balances}},receipt);
+ }else if(mode==='warehouse'){
  if(!u.isAdmin||b.confirmed!==true)fail('تعریف انبار به تأیید مدیر سامانه نیاز دارد.',403);
  const eid=b.warehouseId?needed(b.warehouseId):'warehouse:'+id,old=b.warehouseId?await get(eid,'material_warehouse'):undefined;if(old?.data.deletedAt)fail('این انبار حذف شده و قابل ویرایش یا فعال‌سازی مجدد نیست.',409);if(b.revision!==(old?.revision||0))fail('تعریف انبار تغییر کرده است.',409);
  const name=needed(b.name);guard("NOT EXISTS(SELECT 1 FROM flow_entities WHERE type='material_warehouse' AND json_extract(data,'$.name')=? AND COALESCE(json_extract(data,'$.deletedAt'),'')='' AND id<>?)",name,eid);if(typeof b.active!=='boolean')fail('وضعیت انبار مشخص شود.');

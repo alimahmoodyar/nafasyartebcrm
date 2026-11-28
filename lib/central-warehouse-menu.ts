@@ -43,7 +43,7 @@ export function centralWarehouseMenus(user:Session):WarehouseMenu[]{
    count('دوره‌های باز شمارش','inventory-counts:open'),count('مغایرت‌ها و سوابق','inventory-counts:history'),
   ]),
   group('locations','شناسنامه و محل کالا',[
-   entry('materials','شناسنامهٔ کالاها'),entry('materials','محل نگهداری کالا','warehouse-menu:locations'),
+   entry('materials','شناسنامهٔ کالاها'),
   ]),
  ].filter(menu=>menu.links.length);
 }

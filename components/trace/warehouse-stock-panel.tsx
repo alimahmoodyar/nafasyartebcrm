@@ -9,8 +9,34 @@ import type {Session} from '@/lib/permissions';
 import type {Row} from '@/lib/model';
 import {filterWarehouseStock,groupWarehouseStock} from '@/lib/warehouse-stock';
 import {warehouseName} from '@/lib/production';
+type TestStockPreview={batchId:string;code:string;name:string;unit:string;quantity:number;revision:number;balances:{warehouse:string;quantity:number}[]};
 export function WarehouseStockPanel({user,demo,onOpen,onHistory}:{onHistory?:(group:any)=>void;user:Session;demo:boolean;onOpen:(row:Row)=>void}){
  const [data,setData]=useState<any>(null),[error,setError]=useState(''),[query,setQuery]=useState(''),[warehouse,setWarehouse]=useState(''),[includeChildren,setIncludeChildren]=useState(true),[kind,setKind]=useState(''),[selected,setSelected]=useState<any>(null),[expanded,setExpanded]=useState<string[]>([]);
+ const canRemoveTestStock=user.isAdmin&&!user.profileReview&&!user.rolePreview;
+ const [cleanup,setCleanup]=useState<TestStockPreview|null>(null),[reason,setReason]=useState(''),[cleanupError,setCleanupError]=useState(''),[cleanupBusy,setCleanupBusy]=useState(false),[cleanupMessage,setCleanupMessage]=useState('');
+ async function stockCleanup<Result>(payload:Record<string,unknown>){
+  const response=await fetch('/api/flow',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:crypto.randomUUID(),mode:'remove_test_stock',...payload})});
+  const result=await response.json() as Result & {error?:string};
+  if(!response.ok)throw Error(result.error||'پاک‌سازی موجودی انجام نشد.');
+  return result;
+ }
+ async function previewCleanup(batchId:string){
+  setCleanupBusy(true);setCleanupMessage('');setCleanupError('');setReason('');
+  try{setCleanup(await stockCleanup<TestStockPreview>({batchId,previewOnly:true}));}
+  catch(error){setCleanupError((error as Error).message);}
+  finally{setCleanupBusy(false);}
+ }
+ async function removeTestStock(event:React.FormEvent){
+  event.preventDefault();
+  if(!cleanup||cleanupBusy||!reason.trim())return;
+  setCleanupBusy(true);setCleanupError('');
+  try{
+   await stockCleanup({batchId:cleanup.batchId,code:cleanup.code,revision:cleanup.revision,balances:cleanup.balances,reason:reason.trim(),confirmed:true});
+   setCleanup(null);setCleanupMessage('موجودی آزمایشی بچ '+cleanup.code+' از موجودی انبار خارج شد.');
+   await load();window.dispatchEvent(new Event('nafasyar-tasks-changed'));
+  }catch(error){setCleanupError((error as Error).message);}
+  finally{setCleanupBusy(false);}
+ }
  async function load(){setError('');try{const r=await fetch('/api/warehouse/stock',{cache:'no-store'}),v:any=await r.json();if(!r.ok){setData(null);throw Error(v.error||'دریافت موجودی انجام نشد.');}setData(v);setSelected(null);}catch(e:any){setError(e.message);}}
  useEffect(()=>{if(!demo)void load();},[demo]);
  if(demo)return <p className="notice">برای موجودی واقعی وارد اطلاعات شرکت شوید.</p>;
@@ -23,6 +49,20 @@ export function WarehouseStockPanel({user,demo,onOpen,onHistory}:{onHistory?:(gr
    <label className="field">انبار یا مرکز خدمات<select value={warehouse} onChange={e=>setWarehouse(e.target.value)}><option value="">همه انبارهای مجاز</option>{warehouses.map((w:any)=><option key={w.id} value={w.id}>{warehousePath(warehouses,w.id)}</option>)}</select></label>
   </div>
   <div className="warehouse-stock__toolbar"><label className="flow-check"><input type="checkbox" checked={includeChildren} onChange={e=>setIncludeChildren(e.target.checked)}/>شامل زیرانبارها</label><RefreshButton retry={!!error} type="button" className="btn" onRefresh={()=>load()} /></div>
+  {cleanupMessage&&<p role="status">{cleanupMessage}</p>}{!cleanup&&cleanupError&&<p className="notice error" role="alert">{cleanupError}</p>}
+  {canRemoveTestStock&&<Dialog open={!!cleanup} onOpenChange={open=>{if(!open&&!cleanupBusy){setCleanup(null);setCleanupError('')}}}>
+   <DialogContent className="modal sm:max-w-lg">
+    <DialogTitle>خارج کردن موجودی آزمایشی</DialogTitle>
+    <DialogDescription>فقط موجودی همین بچ خارج می‌شود. شناسنامهٔ کالا و سابقهٔ عملیات قابل پیگیری می‌مانند.</DialogDescription>
+    {cleanup&&<form onSubmit={removeTestStock}>
+     <p><strong>{cleanup.name}</strong> · بچ <bdi>{cleanup.code}</bdi></p>
+     <p>کل موجودی این بچ در انبارها <strong>{(cleanup.quantity/1000).toLocaleString('fa-IR')} {cleanup.unit}</strong></p>
+     <label className="field">دلیل پاک‌سازی<textarea required maxLength={500} disabled={cleanupBusy} value={reason} onChange={e=>setReason(e.target.value)}/></label>
+     {cleanupError&&<p className="notice error" role="alert">{cleanupError}</p>}
+     <div className="tools"><button className="btn primary" disabled={cleanupBusy||!reason.trim()}>{cleanupBusy?'در حال ثبت…':'تأیید خروج موجودی آزمایشی'}</button><button type="button" className="btn" disabled={cleanupBusy} onClick={()=>{setCleanup(null);setCleanupError('')}}>انصراف</button></div>
+    </form>}
+   </DialogContent>
+  </Dialog>}
   {error&&<p className="notice error" role="alert">{error}</p>}{!data&&!error&&<p role="status">در حال دریافت موجودی…</p>}
   {entries.some((e:any)=>e.serviceLotId&&!e.warehouseId)&&<p className="notice">بخشی از موجودی خدمات هنوز به انبار متصل نشده است؛ در «همه انبارهای مجاز» دیده می‌شود. مدیر می‌تواند در تعریف انبار، مرکز خدمات را انتخاب کند.</p>}
   {data&&<>
@@ -50,7 +90,7 @@ export function WarehouseStockPanel({user,demo,onOpen,onHistory}:{onHistory?:(gr
         <td className="warehouse-stock__location"><span>{warehousePath(warehouses,e.warehouseId)||e.warehouseName}</span><small>{e.serviceLotId?'خدمات':warehouseName(e.warehouse)}{e.locations&&' · '+e.locations}</small></td>
         {stockNumber(e.quality.usable,'usable')}{stockNumber(e.quality.pending,'pending')}{stockNumber(e.quality.rejected,'rejected')}
         {showService&&<>{stockNumber(e.reserved||0)}{stockNumber(Math.max(0,e.quality.usable-(e.reserved||0)))}</>}
-        <td>{e.kind==='material'&&!e.serviceLotId&&<BatchLabelLink batchId={e.row.id}/>}</td>
+        <td>{e.kind==='material'&&!e.serviceLotId&&<><BatchLabelLink batchId={e.row.id}/>{canRemoveTestStock&&<button type="button" className="btn" disabled={cleanupBusy} onClick={()=>void previewCleanup(e.row.id)}>پاک‌سازی موجودی آزمایشی</button>}</>}</td>
        </tr>)}</tbody></table></div>
       </div>
      </td></tr>}

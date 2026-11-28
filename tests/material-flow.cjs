@@ -86,7 +86,31 @@ const p=await create('product',{code:'FLOW',name:'FlowDevice',group:'سایر ت
  assert.deepEqual(sql.prepare('SELECT quantity FROM flow_slots WHERE batch_id=? ORDER BY location').all(receiptId).map(r=>r.quantity),[5125,2875]);
  assert.equal(stock(receiptId,'quarantine'),2000);
  assert.equal(stock(receiptId,'raw'),8000);
- if(process.argv.includes('--placement-only')){console.log('PASS: QC split placement, exact totals, notes, occupancy, rollback and retry');return;}
+ if(process.argv.includes('--placement-only')){
+  const viewer={userId:'inventoryUser',email:'inventory@example.test',name:'Inventory',isAdmin:false,permissions:{read:['batch'],write:['batch'],eventStages:[],flowRoles:['inventory']}};
+  await op('remove_test_stock',{batchId:receiptId,previewOnly:true},403,viewer);
+  sql.prepare("INSERT INTO flow_entities(id,type,data,revision,created,updated) VALUES('fixture-removal-link','request',?,1,'2026-01-01','2026-01-01')").run(JSON.stringify({allocations:[{batchId:receiptId}]}));
+  await op('remove_test_stock',{batchId:receiptId,previewOnly:true},409);
+  sql.prepare("DELETE FROM flow_entities WHERE id='fixture-removal-link'").run();
+  const preview=await op('remove_test_stock',{batchId:receiptId,previewOnly:true});
+  assert.equal(preview.quantity,10000);
+  assert.equal(stock(receiptId,'raw'),8000);
+  const removal={batchId:receiptId,code:preview.code,revision:preview.revision,balances:preview.balances,reason:'fixture cleanup'};
+  await op('remove_test_stock',{...removal,confirmed:false},409);
+  await op('remove_test_stock',{...removal,balances:[]},409);
+  const operationId=crypto.randomUUID();
+  await op('remove_test_stock',{...removal,id:operationId});
+  await op('remove_test_stock',{...removal,id:operationId});
+  assert.equal(stock(receiptId,'raw'),0);
+  assert.equal(stock(receiptId,'quarantine'),0);
+  assert.equal(stock(r2.id,'raw'),10000);
+  assert.equal(sql.prepare('SELECT count(*) AS n FROM flow_slots WHERE batch_id=?').get(receiptId).n,0);
+  assert.equal(read(receiptId).state,'test_stock_removed');
+  assert.equal(read(receiptId).testStockRemoval.reason,'fixture cleanup');
+  assert.equal(read(materialId).name,'Split fixture');
+  console.log('PASS: approved split placement and confirmed test stock removal with audit, isolated balances and retry');
+  return;
+ }
  await operate({mode:'move',batchId:r1.id,from:'raw',to:'line',quantity:'1'},400);
  const req=crypto.randomUUID();await op('request',{id:req,materialId:'material:01',quantity:'10',notes:'daily'});
  const expectedIssue=[{batchId:r1.id,location:'A-1-1-1',quantity:'8'},{batchId:r2.id,location:'A-1-1-2',quantity:'2'}];

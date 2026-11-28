@@ -7,6 +7,10 @@ const icons:Record<string,LucideIcon>={stock:Boxes,operations:PackageOpen,supply
 
 export function CentralWarehouseMenu({menus,activeId,onSelect,onNavigate}:{menus:WarehouseMenu[];activeId:string;onSelect:(id:string)=>void;onNavigate:(section:string,target?:string)=>void}){
  const active=menus.find(menu=>menu.id===activeId);
+ function openMenu(menu:WarehouseMenu){
+  if(menu.id==='locations'&&menu.links.length===1){const [link]=menu.links;onNavigate(link.section,link.target);return;}
+  onSelect(menu.id);
+ }
  if(!menus.length)return null;
  return <section className="employee-workspace-tools central-warehouse-menu" aria-label={active?.title||'ابزارهای انبار مرکزی'}>
   <header className="central-warehouse-menu-heading">
@@ -15,7 +19,7 @@ export function CentralWarehouseMenu({menus,activeId,onSelect,onNavigate}:{menus
   </header>
   <div className="employee-workspace-grid central-warehouse-grid">
    {active?active.links.map(link=><button type="button" className="employee-workspace-tile central-warehouse-tile" key={link.section+link.target} onClick={()=>onNavigate(link.section,link.target)}><strong>{link.title}</strong><ChevronLeft size={17} aria-hidden="true"/></button>):
-    menus.map(menu=>{const Icon=icons[menu.id];return <button type="button" className="employee-workspace-tile central-warehouse-tile" key={menu.id} onClick={()=>onSelect(menu.id)}><span className="employee-service-icon"><Icon size={20} aria-hidden="true"/></span><span className="central-warehouse-tile-copy"><strong>{menu.title}</strong><small>{menu.links.slice(0,2).map(link=>link.title).join('، ')}</small></span><ChevronLeft size={17} aria-hidden="true"/></button>})}
+    menus.map(menu=>{const Icon=icons[menu.id];return <button type="button" className="employee-workspace-tile central-warehouse-tile" key={menu.id} onClick={()=>openMenu(menu)}><span className="employee-service-icon"><Icon size={20} aria-hidden="true"/></span><span className="central-warehouse-tile-copy"><strong>{menu.title}</strong>{menu.id!=='locations'&&<small>{menu.links.slice(0,2).map(link=>link.title).join('، ')}</small>}</span><ChevronLeft size={17} aria-hidden="true"/></button>})}
   </div>
  </section>;
 }
