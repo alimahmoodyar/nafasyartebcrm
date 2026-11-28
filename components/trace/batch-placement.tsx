@@ -10,12 +10,14 @@ export function completePlacement(rows:Placement[],accepted:number){
  return rows.length>0&&rows.every(r=>!!r.location&&amount(r.quantity)>0)&&new Set(rows.map(r=>r.location)).size===rows.length&&placementTotal(rows)===accepted;
 }
 export function BinPicker({options,value,onChange}:{options:string[];value:string;onChange:(v:string)=>void}){
- const parts=value.split('-'),addresses=options.map(v=>v.split('-'));
- if(!options.length||addresses.some(a=>a.length!==4))return <label className="field">راهرو-قفسه-طبقه-خانه{options.length?<select value={value} onChange={e=>onChange(e.target.value)}><option value="">انتخاب کنید</option>{options.map(x=><option key={x}>{x}</option>)}</select>:<input value={value} onChange={e=>onChange(e.target.value)}/>}</label>;
- return <div className="formgrid">{levels.map((label,i)=>{
+ const parts=value.split('-');
+ const addresses=options.map(v=>v.split('-')).filter(a=>a.length===4&&a.every(Boolean));
+ const legacy=options.filter(v=>v.split('-').length!==4||v.split('-').some(part=>!part));
+ if(!options.length)return <div className="formgrid wide">{levels.map((label,i)=><label className="field" key={label}>{label}<input required dir="auto" pattern="[^\s\x7C\x2D]+" value={parts[i]||''} onChange={e=>onChange(levels.map((_,j)=>i===j?e.target.value.replace(/-/g,''):parts[j]||'').join('-'))}/></label>)}</div>;
+ return <>{addresses.length>0&&<div className="formgrid wide">{levels.map((label,i)=>{
  const matches=addresses.filter(a=>a.slice(0,i).every((part,j)=>part===parts[j]));
  return <label className="field" key={label}>{label}<select value={parts[i]||''} onChange={e=>{const choices=matches.filter(a=>a[i]===e.target.value);const next=choices.find(a=>a.slice(i+1).every((v,j)=>v===parts[i+1+j]))||choices[0];if(next)onChange(next.join('-'))}}><option value="" disabled>انتخاب کنید</option>{[...new Set(matches.map(a=>a[i]))].sort().map(v=><option key={v}>{v}</option>)}</select></label>
- })}</div>;
+ })}</div>}{legacy.length>0&&<label className="field">نشانی ثبت‌شده با قالب قدیمی<select value={legacy.includes(value)?value:''} onChange={e=>onChange(e.target.value)}><option value="">انتخاب کنید</option>{legacy.map(v=><option key={v}>{v}</option>)}</select></label>}</>;
 }
 export function BatchPlacement({rows,options,accepted,unit,onChange}:{rows:Placement[];options:string[];accepted:number;unit:string;onChange:(r:Placement[])=>void}){
  const remaining=accepted-placementTotal(rows),available=options.filter(v=>!rows.some(r=>r.location===v));

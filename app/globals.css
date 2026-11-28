@@ -703,3 +703,11 @@ button.hospital-network-option { cursor: pointer; }
 @media print{.workspace-assistant-slot,.workspace-assistant-panel{display:none!important}.workspace-body.assistant-is-open{display:block}.assistant-is-open>main.shell{display:block}}
 
 .iran-iban-control{display:flex;align-items:stretch;border:1px solid var(--input);border-radius:9px;background:#fff;overflow:hidden;min-width:0}.iran-iban-prefix{display:flex;align-items:center;padding:0 12px;border-right:1px solid #dce3ee;background:#f3f6fa;color:#445779;font-weight:700;flex-shrink:0}.iran-iban-control input{border:0;border-radius:0;min-width:0;flex:1;font-variant-numeric:tabular-nums;letter-spacing:.5px}.iran-iban-control:focus-within{border-color:#16828d;box-shadow:0 0 0 3px #16828d18}.iran-iban-control input:focus{box-shadow:none}.iran-iban-error{color:#a53838}.iran-iban-valid{color:#237351}
+
+/* Keep the whole house clickable, including the area around the roof. */
+.workspace-breadcrumb .workspace-home-crumb{position:relative;isolation:isolate;display:grid;place-items:center;flex:0 0 52px;width:52px;height:47px;border:0;background:transparent;padding:0;cursor:pointer;font:inherit;color:white}
+.workspace-home-crumb::before{content:"";position:absolute;z-index:-1;inset:2px 3px;background:#285449;clip-path:polygon(50% 0,100% 39%,92% 48%,87% 44%,87% 96%,13% 96%,13% 44%,8% 48%,0 39%)}
+.workspace-home-crumb span{padding-top:9px;font-size:13px;font-weight:700;line-height:1}
+.workspace-home-crumb:hover::before{background:#167b56}
+.workspace-home-crumb:focus-visible{outline:2px solid currentColor;outline-color:#167b56;outline-offset:-2px;border-radius:6px}
+@media(forced-colors:active){.workspace-home-crumb::before{forced-color-adjust:none;background:ButtonText}.workspace-home-crumb span{forced-color-adjust:none;color:ButtonFace}}
