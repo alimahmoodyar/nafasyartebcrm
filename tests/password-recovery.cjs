@@ -140,8 +140,14 @@ const request=(path,method='GET',body,headers={})=>new Request(base+path,{
  expirySql.run(enrollmentExpiry,workerId,'enroll');
  assert.deepEqual(await (await confirmSetup(workerId,workerProof.token,workerCode)).json(),{mobileLast4:'0123'});
  assert.equal((await confirmSetup(workerId,workerProof.token,workerCode)).status,400);
+ const statusForWorker=()=>recovery.GET(request(authPath,'GET',undefined,{'x-profile-account':'local:'+workerId})).then(r=>r.json());
+ const hr={memberId:workerId,nationalId:'1234567890',mobile:'1234567890'};
+ sql.prepare("INSERT INTO flow_entities (id,type,data,revision,created,updated) VALUES ('hr-recovery','hr_employee',?,1,'2026-01-01','2026-01-01')").run(JSON.stringify(hr));
+ assert.equal((await statusForWorker()).suggestedMobile,'');
+ hr.mobile='+98 912 555 6677';
+ sql.prepare("UPDATE flow_entities SET data=? WHERE id='hr-recovery'").run(JSON.stringify(hr));
  const workerStatus=await recovery.GET(request(authPath,'GET',undefined,{'x-profile-account':'local:'+workerId}));
- assert.deepEqual(await workerStatus.json(),{mobileLast4:'0123',requiresBackup:false});
+ assert.deepEqual(await workerStatus.json(),{mobileLast4:'0123',requiresBackup:false,suggestedMobile:'09125556677',username:'recovery-worker'});
  cookie='';
  const beforeMismatch=sent.length;
  const mismatchReply=await publicStart('recovery-worker',adminMobile);
@@ -170,7 +176,7 @@ const request=(path,method='GET',body,headers={})=>new Request(base+path,{
  assert.match(adminSetup.backupCode,/^(?:[a-f0-9]{8}-){3}[a-f0-9]{8}$/);
  assert.equal((await setup(adminId,'09120000125',adminPassword)).status,403);
  const adminStatus=await recovery.GET(request(authPath,'GET',undefined,{'x-profile-account':'local:'+adminId}));
- assert.deepEqual(await adminStatus.json(),{mobileLast4:'0124',requiresBackup:true});
+ assert.deepEqual(await adminStatus.json(),{mobileLast4:'0124',requiresBackup:true,suggestedMobile:'',username:'admin'});
  cookie='';
  const adminReset=await (await publicStart(adminUsername,adminMobile)).json(),adminCode=sent.at(-1).code;
  assert.equal((await publicFinish(adminReset.token,adminCode,'Recovery-admin-next-123')).status,400);

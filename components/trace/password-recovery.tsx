@@ -1,10 +1,12 @@
 'use client';
 import {useEffect,useState,type FormEvent} from 'react';
 
+import {Eye,EyeOff} from 'lucide-react';
+
 const endpoint='/api/auth/recovery';
 const panel={display:'grid',gap:12};
 const actions={display:'flex',gap:8,flexWrap:'wrap'} as const;
-type Result={saved?:boolean;token?:string;backupCode?:string;mobileLast4?:string|null;requiresBackup?:boolean;error?:string};
+type Result={suggestedMobile?:string;username?:string;saved?:boolean;token?:string;backupCode?:string;mobileLast4?:string|null;requiresBackup?:boolean;error?:string};
 async function request(input?:Record<string,string>,accountId?:string):Promise<Result>{
  const response=await fetch(endpoint,{
   cache:'no-store',method:input?'POST':'GET',
@@ -73,6 +75,7 @@ export function PasswordRecoveryForm({initialUsername,onBack}:{initialUsername:s
 
 export function RecoverySettings({accountId}:{accountId:string}){
  const [status,setStatus]=useState<Result|null>(null),[opened,setOpened]=useState(false);
+ const [showPassword,setShowPassword]=useState(false);
  const [statusAttempt,setStatusAttempt]=useState(0);
  const [mobile,setMobile]=useState(''),[current,setCurrent]=useState(''),[backup,setBackup]=useState('');
  const [token,setToken]=useState(''),[code,setCode]=useState(''),[nextBackup,setNextBackup]=useState('');
@@ -82,7 +85,7 @@ export function RecoverySettings({accountId}:{accountId:string}){
   request(undefined,accountId).then(result=>{if(active)setStatus(result);}).catch(error=>{if(active)setError(errorText(error));});
   return ()=>{active=false;};
  },[accountId,statusAttempt]);
- function clearForm(){setMobile('');setCurrent('');setBackup('');setToken('');setCode('');}
+ function clearForm(){setShowPassword(false);setMobile('');setCurrent('');setBackup('');setToken('');setCode('');}
  async function submit(event:FormEvent){
   event.preventDefault();
   if(busy)return;
@@ -91,7 +94,7 @@ export function RecoverySettings({accountId}:{accountId:string}){
    if(!token){
     const result=await request({action:'enroll_start',mobile,currentPassword:current,backupCode:backup},accountId);
     if(!result.token)throw new Error('درخواست تأیید آماده نشد. دوباره تلاش کنید.');
-    setToken(result.token);setCurrent('');setBackup('');
+    setToken(result.token);setShowPassword(false);setCurrent('');setBackup('');
    }else{
     const result=await request({action:'enroll_confirm',token,code},accountId);
     if(!result.mobileLast4)throw new Error('تأیید شمارهٔ بازیابی انجام نشد.');
@@ -108,11 +111,15 @@ export function RecoverySettings({accountId}:{accountId:string}){
   {status?.requiresBackup&&<small>برای بازیابی حساب مدیر اصلی، کد پیامکی و کد پشتیبان لازم است.</small>}
   {nextBackup&&<BackupCode code={nextBackup}/>}
   {error&&<p className="notice error" role="alert">{error}</p>}
-  {!opened&&status&&<div><button className="btn" type="button" onClick={()=>{setNextBackup('');setError('');setOpened(true);}}>{status.mobileLast4?'مدیریت شمارهٔ بازیابی':'ثبت شمارهٔ بازیابی'}</button></div>}
+  {!opened&&status&&<div><button className="btn" type="button" onClick={()=>{setNextBackup('');setError('');setMobile(status.suggestedMobile||'');setOpened(true);}}>{status.mobileLast4?'مدیریت شمارهٔ بازیابی':'ثبت شمارهٔ بازیابی'}</button></div>}
   {opened&&<form style={panel} onSubmit={submit}>
    {token?<label className="field">کد ۶رقمی پیامک<input dir="ltr" autoComplete="one-time-code" inputMode="numeric" maxLength={6} required value={code} onChange={e=>setCode(e.target.value)}/></label>:<>
-    <label className="field">شمارهٔ همراه بازیابی<input type="tel" dir="ltr" maxLength={20} required value={mobile} onChange={e=>setMobile(e.target.value)}/></label>
-    <label className="field">رمز فعلی<input type="password" autoComplete="current-password" required maxLength={128} value={current} onChange={e=>setCurrent(e.target.value)}/></label>
+    <label className="field">شمارهٔ همراه بازیابی<input name="recoveryMobile" autoComplete="section-recovery tel-national" type="tel" dir="ltr" maxLength={20} required value={mobile} onChange={e=>setMobile(e.target.value)}/></label>
+    <input type="text" name="username" autoComplete="username" hidden readOnly value={status?.username||''}/>
+    <div className="field"><label htmlFor="recovery-current-password">رمز فعلی</label><div style={{display:'flex',gap:6}}>
+     <input id="recovery-current-password" name="currentPassword" style={{flex:1,minWidth:0}} type={showPassword?'text':'password'} autoComplete="current-password" required maxLength={128} value={current} onChange={e=>setCurrent(e.target.value)}/>
+     <button type="button" className="btn" aria-label={showPassword?'پنهان کردن رمز':'نمایش رمز'} aria-controls="recovery-current-password" onClick={()=>setShowPassword(v=>!v)}>{showPassword?<EyeOff size={18}/>:<Eye size={18}/>}</button>
+    </div></div>
     {status?.requiresBackup&&status.mobileLast4&&<label className="field">کد پشتیبان فعلی (برای تغییر به شماره‌ای دیگر)<input dir="ltr" type="password" autoComplete="off" maxLength={48} value={backup} onChange={e=>setBackup(e.target.value)}/></label>}
    </>}
    <div style={actions}>

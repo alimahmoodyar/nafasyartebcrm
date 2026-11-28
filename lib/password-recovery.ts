@@ -71,7 +71,12 @@ async function sendChallenge(account:Account,mobile:string,purpose:Purpose,token
 export async function recoveryStatus(memberId:string){
  const account=await lookup('member_id',memberId);
  if(!account)throw new AccessError('حساب فعال یافت نشد.',401);
- return {mobileLast4:account.recovery_mobile?.slice(-4)||null,requiresBackup:!!account.admin};
+ const person=await storage().prepare("SELECT json_extract(data,'$.mobile') AS mobile FROM flow_entities WHERE type='hr_employee' AND json_extract(data,'$.memberId')=? ORDER BY updated DESC,id LIMIT 1").bind(memberId).first<{mobile:unknown}>();
+ let suggestedMobile='';
+ if(person?.mobile){
+  try{suggestedMobile=recoveryMobile(person.mobile);}catch(error){if(!(error instanceof AccessError))throw error;}
+ }
+ return {mobileLast4:account.recovery_mobile?.slice(-4)||null,requiresBackup:!!account.admin,suggestedMobile,username:account.username};
 }
 async function checkRecoverySms(report:SmsReportUpdate){
  report('config_unavailable');
